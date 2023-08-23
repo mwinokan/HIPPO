@@ -9,9 +9,9 @@ A pipeline for optimally selecting building blocks to maximise interaction diver
 
 ## Inputs
 
-* [ ] Crystallographic data from a fragment screen (i.e. from Fragalysis)
-* [ ] A set of follow-up compounds with associated catalogue building blocks
-* [ ] A budget for building block procurement
+* Crystallographic data from a fragment screen (i.e. from Fragalysis)
+* A set of follow-up compounds with associated catalogue building blocks
+* A budget for building block procurement
 
 ## Outputs
 
