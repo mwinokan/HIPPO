@@ -23,9 +23,11 @@ class Compound:
         self._ligand_group = None
         self._set_name = None
         self._ligand_features = None
+        self._is_pains = None
         
         # from_rdkit_mol
         self._mol = None
+        self._protein_system = None
 
         # from_bound_pdb
         self._bound_pdb = None
@@ -65,13 +67,23 @@ class Compound:
         return self
     
     @classmethod
-    def from_rdkit_mol(cls, name, mol):
+    def from_rdkit_mol(cls, name, mol, protonate=False, verbosity=1):
 
         self = cls.__new__(cls)
 
         self.__init__(name)
 
         self._mol = mol
+
+        if protonate:
+            try:
+                prot_mol = mp.rdkit.protonate(self.mol,verbosity=verbosity-1)
+            except ValueError as e:
+                mout.error(f'Cound not protonate: {e}')
+                self._protonation_failed = True
+            else:
+                self._mol = prot_mol
+                self._protonation_failed = False
 
         return self
 
@@ -119,12 +131,19 @@ class Compound:
         return self._smiles
 
     @property
+    def protein_system(self):
+        return self._protein_system
+
+    @property
     def fingerprint(self):
         return self._fingerprint
 
     @property
     def ligand_group(self):
         if self._ligand_group is None:
+
+            # if self._bound_pdb:
+
             lig_residues = self.bound_system['rLIG']
             lig_residues = [l for l in lig_residues if l.chain == self._chain_char]
 
@@ -133,6 +152,16 @@ class Compound:
                 split_lig_residues += lig.split_by_site()
 
             self._ligand_group = split_lig_residues[self._site_index]
+
+            # else:
+
+            #     try:
+            #         self._mol = mp.rdkit.protonate(self.mol)
+            #     except ValueError as e:
+            #         mout.error(e)
+            #         return None
+
+            #     self._ligand_group = mp.rdkit.mol_to_AtomGroup(self.mol)
 
         return self._ligand_group
 
@@ -195,8 +224,7 @@ class Compound:
     ### METHODS
 
     def calculate_fingerprint(self):
-        
-        fingerprint = Fingerprint(self)
+        self._fingerprint = Fingerprint(self)
 
 class FailedToAssignBondOrders(Exception):
     pass

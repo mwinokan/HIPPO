@@ -15,9 +15,9 @@ A pipeline for optimally selecting building blocks to maximise interaction diver
 
 ## Outputs
 
-* [ ] Interaction fingerprints for each hit and compound
-* [ ] Scores for interaction coverage of a given compound set
-* [ ] Sankey diagram of fragment screen interaction conservation
+* [x] Interaction fingerprints for each hit and compound
+* [x] Scores for interaction coverage of a given compound set
+* [x] Sankey diagram of fragment screen interaction conservation
 * [ ] UMAP reduction of the interaction fingerprints into 1D and 2D interaction space
 * [ ] Suggested building block sets that optimise interaction coverage and stay within the budget
 
@@ -44,28 +44,34 @@ Install from python source:
 import hippo as hp
 
 # create the hippo
-pipeline = hp.HIPPO()
+pipeline = hp.HIPPO('project_name')
 
-crystal_path = '...'
-compound_paths = [
-  ...
-]
+# protein APO structure
+pipeline.add_protein_reference(path=protein_reference)
 
-# assign paths
-pipeline.get_crystallographic_directory(crystals=crystal_path)
+# get the fragment screen data
+pipeline.add_hit_metadata(path=metadata_csv)
+pipeline.add_hit_directory(path=aligned_path)
 
-# load in the compound sets
-for path in compound_paths():
-  pipeline.add_compound_set(path=path)
+# add elaborations/merges
+pipeline.add_product_compounds('compounds', metadata_csv, compound_directory, compound_mol_pattern)
+
+# make the interaction fingerprints
+pipeline.generate_fingerprints()
 
 # interaction coverage
-pipeline.generate_fingerprints()
 pipeline.score_interaction_coverage()
 
-# UMAP visualisation
+# UMAP visualisation (not implemented yet)
 pipeline.plot_umap()
 
 # optimise building block selection
 pipeline.suggest_building_blocks(budget=10_000)
+
+# store the whole pipeline as a binary
+pipeline.write_pickle(pickle_path)
+
+# load an existing pickled pipeline:
+pipeline = hp.HIPPO.from_pickle(pickle_path)
 
 ```

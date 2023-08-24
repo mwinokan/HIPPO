@@ -1,17 +1,23 @@
 
 import os
+import mout
 import molparse as mp
 from .compound import Compound
 from .tools import df_row_to_dict
+import pandas as pd
 
 class CompoundSet:
 
     ### DUNDERS
 
-    def __init__(self, name, compounds):
+    def __init__(self, name, compounds = None):
         
         self._name = name
+        if compounds is None:
+            compounds = []
         self._compounds = compounds
+        self._fingerprint_df = None
+        self._metadata_cols = []
 
     def __repr__(self):
         return f'CompoundSet("{self.name}", #compounds={self.num_compounds})'
@@ -19,7 +25,7 @@ class CompoundSet:
     ### FACTORIES
 
     @classmethod
-    def from_df(cls, name, df):
+    def from_df(cls, name, df, protein, verbosity=1):
 
         self = cls.__new__(cls)
 
@@ -29,10 +35,16 @@ class CompoundSet:
         compounds = []
         for index, row in df.iterrows():
             mol_name = row[id_col]
+            if verbosity:
+                mout.progress(index,len(df),prepend='mol --> Compound',append=mol_name, fill='🦛')
             mol = row[mol_col]
             compound = Compound.from_rdkit_mol(mol_name,mol)
             compound._set_name = name
+            compound._protein_system = protein
             compounds.append(compound)
+
+        if verbosity:
+            mout.finish()
         
         self.__init__(name,compounds)
 
@@ -69,4 +81,33 @@ class CompoundSet:
     @property
     def num_compounds(self):
         return len(self.compounds)
+
+    @property
+    def fingerprinted_compounds(self):
+        return [c for c in self.compounds if c.fingerprint is not None]
+
+    @property
+    def fingerprints(self):
+        return [c.fingerprint for c in self.compounds if c.fingerprint is not None]
+
+    @property
+    def fingerprint_df(self):
+        if self._fingerprint_df is None:
+            self._fingerprint_df = pd.DataFrame([f for f in self.fingerprints])
+        return self._fingerprint_df
     
+    ### METHODS
+
+    def add_compound(self, compound):
+        self.compounds.append(compound)
+        compound._set_name = self.name
+
+    def get_present_features(self):
+
+        features = set()
+        for col in [c for c in self.fingerprint_df.columns if c not in self._metadata_cols]:
+            covered = any(self.fingerprint_df[col].values)
+            if covered:
+                features.add(col)
+
+        return features
