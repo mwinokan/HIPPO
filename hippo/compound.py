@@ -24,6 +24,7 @@ class Compound:
         self._set_name = None
         self._ligand_features = None
         self._is_pains = None
+        self._building_blocks = None
         
         # from_rdkit_mol
         self._mol = None
@@ -41,7 +42,10 @@ class Compound:
         self._chain_char = None
 
     def __repr__(self):
-        return f'Compound("{self.name}", "{self.smiles}")'
+        if self._building_blocks:
+            return f'Compound("{self.name}", "{self.smiles}", cost={self.cost_range_str}, lead_time={self.lead_time})'
+        else:
+            return f'Compound("{self.name}", "{self.smiles}")'
 
     ### FACTORIES
 
@@ -123,6 +127,10 @@ class Compound:
             self._mol = m_pdb_prot
 
         return self._mol
+
+    @property
+    def is_pains(self):
+        return self._is_pains
 
     @property
     def smiles(self):
@@ -221,6 +229,27 @@ class Compound:
             self._bound_system = mp.parsePDB(self.bound_pdb, verbosity=0, alternative_site_warnings=False)
         return self._bound_system
 
+    @property
+    def building_blocks(self):
+        return self._building_blocks
+
+    @property
+    def cost_range_str(self):
+        cost_min = 0
+        cost_max = 0
+        
+        for bb in self.building_blocks:
+            # assert bb._cost_unit == '/g'
+            cost_min += bb._cost_min
+            cost_max += bb._cost_max
+
+        return f'${cost_min}-{cost_max}'
+    
+    @property
+    def lead_time(self):
+        lead_time = max([bb.lead_time for bb in self.building_blocks])
+        return lead_time
+    
     ### METHODS
 
     def calculate_fingerprint(self):

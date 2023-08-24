@@ -7,7 +7,7 @@ import pandas as pd
 
 from .set import CompoundSet
 from .compound import Compound
-from .block import BuildingBlock
+from .block import BuildingBlock, BuildingBlockSet
 
 import pickle
 
@@ -18,6 +18,8 @@ from rdkit.Chem import PandasTools
 import plotly.graph_objects as go
 
 from .compound import FailedToAssignBondOrders
+
+import random
 
 class HIPPO:
 
@@ -49,7 +51,10 @@ class HIPPO:
         self._metadata_df = None
         self._compound_sets = []
         self._missed_features = None
-        self._building_blocks = {}
+        self._building_blocks = BuildingBlockSet()
+
+    def __repr__(self):
+        return f'HIPPO({self.project_key})'
 
     ### FACTORIES
 
@@ -90,7 +95,7 @@ class HIPPO:
 
     @property
     def all_compounds(self):
-        return sum([s.compounds for s in self.compound_sets],[])
+        return set().union(*self.compound_sets)
 
     @property
     def fingerprinted_compounds(self):
@@ -152,6 +157,9 @@ class HIPPO:
 
         assert path is not None
 
+        if name in [s.name for s in self.compound_sets]:
+            mout.warning(f'Skipping existing {name}')
+
         if self.verbosity > 1:
             mout.debug('HIPPO.add_hit_data()')
             mout.var('path',str(path),valCol=mcol.file)
@@ -179,10 +187,13 @@ class HIPPO:
 
         return 
 
-    def add_compound_from_sdf(self, name, path, idName='name',molColName='mol'):
+    def add_compounds_from_sdf(self, name, path, idName='name',molColName='mol'):
+
+        if name in [s.name for s in self.compound_sets]:
+            mout.warning(f'Skipping existing {name}')
 
         if self.verbosity > 1:
-            mout.debug('HIPPO.add_compound_sdf()')
+            mout.debug('HIPPO.add_compounds_from_sdf()')
             mout.var('name',name,valCol=mcol.arg)
             mout.var('path',str(path),valCol=mcol.file)
             mout.var('idName',idName,valCol=mcol.arg)
@@ -205,7 +216,10 @@ class HIPPO:
         if self.verbosity:
             mout.success(f'Loaded {comp_set.num_compounds} compounds "{comp_set.name}"')
 
-    def add_product_compounds(self, name, metadata, data_path, mol_pattern):
+    def add_product_compounds(self, name, metadata, data_path, mol_pattern, skip_unconstrained_minimisation_fail=False):
+
+        if name in [s.name for s in self.compound_sets]:
+            mout.warning(f'Skipping existing {name}')
 
         if self.verbosity > 1:
             mout.debug('HIPPO.add_compound_set()')
@@ -224,13 +238,17 @@ class HIPPO:
 
         for index, (smiles, mol_weight, metadata) in meta_df[['reactant1_smi','reactant1_mw','reactant1_metadata']].iterrows():
             
-            if smiles not in self._building_blocks:
-                self._building_blocks[smiles] = BuildingBlock(smiles, mol_weight, metadata)
+            bb = BuildingBlock(smiles, mol_weight, metadata)
+
+            if bb not in self._building_blocks:
+                self.building_blocks.add(bb)
 
         for index, (smiles, mol_weight, metadata) in meta_df[['reactant2_smi','reactant2_mw','reactant2_metadata']].iterrows():
             
-            if smiles not in self._building_blocks:
-                self._building_blocks[smiles] = BuildingBlock(smiles, mol_weight, metadata)
+            bb = BuildingBlock(smiles, mol_weight, metadata)
+
+            if bb not in self._building_blocks:
+                self.building_blocks.add(bb)
 
         if self.verbosity:
             mout.success(f'Found {self.num_building_blocks} building blocks for "{name}"')
@@ -264,15 +282,22 @@ class HIPPO:
             
             minimisation_failed = meta_row[f'{place_type}_fail_minimization_without_constraint'].values[0]
 
-            if minimisation_failed:
+            if skip_unconstrained_minimisation_fail and minimisation_failed:
                 mout.error(f'Skipping b/c minimisation failed: {compound}')
                 continue
 
             compound._smiles = meta_row['product_smi'].values[0]
             compound._is_pains = meta_row['is_pains'].values[0]
             compound._protein_system = self.protein_system
+            
+            reactant1_smiles = meta_row['reactant1_smi'].values[0]
+            reactant2_smiles = meta_row['reactant2_smi'].values[0]
+            
+            bb1 = self.building_blocks[reactant1_smiles]
+            bb2 = self.building_blocks[reactant2_smiles]
+            compound._building_blocks = BuildingBlockSet([bb1,bb2])
 
-            comp_set.add_compound(compound)
+            comp_set.add(compound)
         
         mout.finish()
 
@@ -394,3 +419,36 @@ class HIPPO:
             pprint(in_2_but_not_1)
 
         return in_1_but_not_2, in_2_but_not_1
+
+
+    def random_building_block_set(self,size):
+
+        # get a random sample of building blocks
+        bb_set = BuildingBlockSet(random.sample(self.building_blocks,size))
+
+        bb_set.name = 'random'
+
+        return bb_set
+
+    # def score_building_block_set(self, bb_set, summary=False):
+        
+    #     if summary:
+    #         bb_set.summary()
+
+    #     product_set = bb_set.get_available_products(self.compound_sets[-1])
+        
+    #     if summary:
+    #         product_set.summary()
+
+
+
+    def summary(self):
+        mout.header(f'{self}')        
+
+        mout.var('#building_blocks',len(self.building_blocks))
+        mout.var('#compound_sets',len(self.compound_sets))
+        mout.var('#compounds',self.num_compounds)
+
+        mout.underline('compound sets:')
+        for comp_set in self.compound_sets:
+            mout.out(comp_set)

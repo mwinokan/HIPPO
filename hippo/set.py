@@ -6,21 +6,41 @@ from .compound import Compound
 from .tools import df_row_to_dict
 import pandas as pd
 
-class CompoundSet:
+from collections.abc import Set
+
+class CompoundSet(Set):
 
     ### DUNDERS
 
-    def __init__(self, name, compounds = None):
-        
+    def __init__(self, name, compounds=()):
+        # super(CompoundSet,self).__init__(compounds)
+
         self._name = name
-        if compounds is None:
-            compounds = []
-        self._compounds = compounds
+        self._elements = []
+
+        for comp in compounds:
+            self.add(comp)
+
         self._fingerprint_df = None
         self._metadata_cols = []
 
     def __repr__(self):
         return f'CompoundSet("{self.name}", #compounds={self.num_compounds})'
+
+    def __iter__(self):
+        return iter(self._elements)
+
+    def __contains__(self, compound):
+        return compound in self._elements
+
+    def __len__(self):
+        return len(self._elements)
+
+    # def __add__(self, other):
+    #     return CompoundSet(f'add({self}, {other})')
+
+    # def union(self, other):
+    #     return CompoundSet(f'union({self}, {other})', self.union(other))
 
     ### FACTORIES
 
@@ -76,7 +96,7 @@ class CompoundSet:
     
     @property
     def compounds(self):
-        return self._compounds
+        return self._elements
    
     @property
     def num_compounds(self):
@@ -98,9 +118,10 @@ class CompoundSet:
     
     ### METHODS
 
-    def add_compound(self, compound):
-        self.compounds.append(compound)
-        compound._set_name = self.name
+    def add(self, compound):
+        if compound not in self._elements:
+            self._elements.append(compound)
+            compound._set_name = self.name
 
     def get_present_features(self):
 
@@ -111,3 +132,20 @@ class CompoundSet:
                 features.add(col)
 
         return features
+
+    def summary(self):
+
+        mout.header(self)
+
+        print_data = []
+        for comp in self:
+            print_data.append(dict(
+                smiles=comp.smiles,
+                set_name=comp.set_name,
+                is_pains=comp.is_pains,
+                building_blocks=comp.building_blocks,
+                cost_range_str=comp.cost_range_str,
+                lead_time=comp.lead_time,
+            ))
+
+        print(pd.DataFrame(print_data))
