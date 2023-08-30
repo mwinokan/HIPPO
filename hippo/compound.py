@@ -41,6 +41,11 @@ class Compound:
         self._site_index = None
         self._chain_char = None
 
+        # fragmenstein
+        self._fragmenstein_ddG = None
+        self._fragmenstein_ligand_efficiency = None
+        self._fragmenstein_outcome = None
+
     def __repr__(self):
         if self._building_blocks:
             return f'Compound("{self.name}", "{self.smiles}", cost={self.cost_range_str}, lead_time={self.lead_time})'
@@ -147,6 +152,23 @@ class Compound:
         return self._fingerprint
 
     @property
+    def as_dict(self):
+
+        data = {}
+
+        data['name'] = self.name
+        data['smiles'] = self.smiles
+        data['set_name'] = self.set_name
+        data['is_pains'] = self.is_pains
+        data['cost_range_str'] = self.cost_range_str
+        data['lead_time'] = self.lead_time
+        
+        for key, value in self.fingerprint.items():
+            data[key] = value
+
+        return data
+
+    @property
     def ligand_group(self):
         if self._ligand_group is None:
 
@@ -235,20 +257,36 @@ class Compound:
 
     @property
     def cost_range_str(self):
-        cost_min = 0
-        cost_max = 0
+        if self.building_blocks:
         
-        for bb in self.building_blocks:
-            # assert bb._cost_unit == '/g'
-            cost_min += bb._cost_min
-            cost_max += bb._cost_max
+            cost_min = 0
+            cost_max = 0
+            for bb in self.building_blocks:
 
-        return f'${cost_min}-{cost_max}'
+                if bb._cost_min is None:
+                    return None
+                if bb._cost_max is None:
+                    return None
+
+                # assert bb._cost_unit == '/g'
+                cost_min += bb._cost_min
+                cost_max += bb._cost_max
+
+            return f'${cost_min}-{cost_max}'
+
+        return None
     
     @property
     def lead_time(self):
-        lead_time = max([bb.lead_time for bb in self.building_blocks])
-        return lead_time
+        if self.building_blocks:
+            lead_times = []
+            for bb in self.building_blocks:
+                if bb.lead_time is None:
+                    return None
+                lead_times.append(bb.lead_time)
+            lead_time = max(lead_times)
+            return lead_time
+        return None
     
     ### METHODS
 

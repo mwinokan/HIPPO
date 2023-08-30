@@ -5,6 +5,7 @@ import mout
 import json
 import numpy as np
 from collections.abc import Set
+from pprint import pprint
 
 class BuildingBlock:
 
@@ -69,6 +70,19 @@ class BuildingBlock:
         self._cost_unit = self._best_catalog_entry['purchaseInfo']['price_range_unit']
         self._lead_time = self._best_catalog_entry['purchaseInfo']['lead_time_str']
 
+    def get_cost(self, field='max'):
+        
+        if self._cost_min == 0:
+            return self._cost_max
+
+        if self.cost_max == np.inf:
+            return self._cost_min
+
+        if field == 'min':
+            return self._cost_min
+
+        if field == 'max':
+            return self._cost_max
 
     def get_lowest_cost(self, use_max=False):
         
@@ -96,7 +110,12 @@ class BuildingBlock:
         if catalog_metadata is None:
             return
 
-        self._catalog_metadata = eval(catalog_metadata)
+        try:
+            self._catalog_metadata = eval(catalog_metadata)
+        except TypeError as e:
+            mout.error(f'{self}: {e}')
+            pprint(catalog_metadata)
+            exit()
         # self._catalog_metadata = json.loads(catalog_metadata.strip('"').replace("'",'"'))
 
         for entry in self.get_purchaseable_entries():
@@ -159,8 +178,13 @@ class BuildingBlockSet(Set):
     def __iter__(self):
         return iter(self._elements)
 
-    def __contains__(self, compound):
-        return compound in self._elements
+    def __contains__(self, query):
+        if isinstance(query,str):
+            return query in self.smiles
+        elif isinstance(query,BuildingBlock):
+            return query in self._elements
+        else:
+            return NotImplementedError(f"Unsupported query type: {type(query)}")
 
     def __len__(self):
         return len(self._elements)
@@ -201,6 +225,10 @@ class BuildingBlockSet(Set):
     @property
     def cost(self):
         return self._cost
+
+    @property
+    def smiles(self):
+        return[ bb.smiles for bb in self._elements]
     
     ### METHODS
 
@@ -209,12 +237,11 @@ class BuildingBlockSet(Set):
             self._elements.append(bb)
             bb._set_name = self.name
 
-    def get_cost(self):
-        pass
-
     def get_products(self, candidates):
 
         comp_set = CompoundSet(f'Products({self})')
+
+        candidates = [c for c in candidates if c.building_blocks is not None]
 
         for candidate in candidates:
 
