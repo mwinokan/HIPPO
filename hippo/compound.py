@@ -47,10 +47,7 @@ class Compound:
         self._fragmenstein_outcome = None
 
     def __repr__(self):
-        if self._building_blocks:
-            return f'Compound("{self.name}", "{self.smiles}", cost={self.cost_range_str}, lead_time={self.lead_time})'
-        else:
-            return f'Compound("{self.name}", "{self.smiles}")'
+        return f'Compound("{self.name}", "{self.smiles}")'
 
     ### FACTORIES
 

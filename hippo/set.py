@@ -5,18 +5,20 @@ import molparse as mp
 from .compound import Compound
 from .tools import df_row_to_dict
 import pandas as pd
+# import random
 
-from collections.abc import Set
+from collections.abc import MutableSet
 
-class CompoundSet(Set):
+class CompoundSet(MutableSet):
 
     ### DUNDERS
 
-    def __init__(self, name, compounds=()):
+    def __init__(self, name, compounds=(), immutable=False):
         # super(CompoundSet,self).__init__(compounds)
 
         self._name = name
         self._elements = []
+        self._immutable = immutable
 
         for comp in compounds:
             self.add(comp)
@@ -25,7 +27,10 @@ class CompoundSet(Set):
         self._metadata_cols = []
 
     def __repr__(self):
-        return f'CompoundSet("{self.name}", #compounds={self.num_compounds})'
+        bbs = self.get_building_blocks()
+        purchaseable_bbs = self.get_building_blocks(purchaseable_only=True)
+        purchaseable_bbs.get_products(self.compounds)
+        return f'CompoundSet("{self.name}", #compounds={self.num_compounds}, #bbs={len(bbs)}, #bbs (purchaseable)={len(purchaseable_bbs)}: ${purchaseable_bbs.get_price():.2f})'
 
     def __iter__(self):
         return iter(self._elements)
@@ -36,11 +41,28 @@ class CompoundSet(Set):
     def __len__(self):
         return len(self._elements)
 
-    # def __add__(self, other):
-    #     return CompoundSet(f'add({self}, {other})')
+    def __getitem__(self, key):
 
-    # def union(self, other):
-    #     return CompoundSet(f'union({self}, {other})', self.union(other))
+        if isinstance(key,list):
+            return CompoundSet('queried',[c for c in [self[k] for k in key] if c is not None])
+
+        if isinstance(key,Compound):
+            key = str(key)
+
+        elif isinstance(key,int):
+            return [c for c in self][key]
+
+        matches = [comp for comp in self if str(comp) == key]
+
+        if len(matches) < 1:
+            mout.error(f'{key} not in {self}')
+            return None
+        elif len(matches) > 1:
+            mout.error(f'Multiple {key} in {self}')
+            exit()
+            return None
+
+        return matches[0]
 
     ### FACTORIES
 
@@ -93,6 +115,10 @@ class CompoundSet(Set):
     @property
     def name(self):
         return self._name
+
+    @name.setter
+    def name(self,a):
+        self._name = a
     
     @property
     def compounds(self):
@@ -113,15 +139,48 @@ class CompoundSet(Set):
     @property
     def fingerprint_df(self):
         if self._fingerprint_df is None:
-            self._fingerprint_df = pd.DataFrame([f for f in self.fingerprints])
+            fingerprints = self.fingerprints
+            if len(fingerprints) < 1:
+                mout.error(f'no fingerprints for {self}')
+            self._fingerprint_df = pd.DataFrame(fingerprints)
         return self._fingerprint_df
     
+    @property
+    def immutable(self):
+        return self._immutable
+    
+    @immutable.setter
+    def immutable(self,b):
+        self._immutable = b
+
     ### METHODS
 
+    def discard(self, key):
+        assert not self.immutable
+        if key in self:
+            i = self._elements.index(key)
+            del self._elements[i]
+        else:
+            raise ValueError(f'{key} not in {self}')
+
+    def remove(self, key):
+        assert not self.immutable
+        if key in self:
+            i = self._elements.index(key)
+            del self._elements[i]
+        else:
+            raise ValueError(f'{key} not in {self}')
+
     def add(self, compound):
+        assert not self.immutable
         if compound not in self._elements:
             self._elements.append(compound)
             compound._set_name = self.name
+        else:
+            raise ValueError(f'{compound} already in {self}')
+
+    # def get_random(size=1):
+    #     return random.sample(self._elements,size)
 
     def get_present_features(self):
 
@@ -149,3 +208,67 @@ class CompoundSet(Set):
             ))
 
         print(pd.DataFrame(print_data))
+
+    def get_building_blocks(self,purchaseable_only=False):
+
+        from .block import BuildingBlockSet
+
+        bb_set = BuildingBlockSet()
+
+        for comp in self:
+            if comp.building_blocks is not None:
+                for bb in comp.building_blocks:
+                    if not purchaseable_only or bb.purchaseable:
+                        bb_set.add(bb)
+
+        return bb_set
+
+    ### PROTECTION
+
+    def __le__(self):
+        raise NotImplementedError('CompoundSet.__le__')
+
+    def __lt__(self):
+        raise NotImplementedError('CompoundSet.__lt__')
+
+    def __eq__(self):
+        raise NotImplementedError('CompoundSet.__eq__')
+
+    def __ne__(self):
+        raise NotImplementedError('CompoundSet.__ne__')
+
+    def __gt__(self):
+        raise NotImplementedError('CompoundSet.__gt__')
+
+    def __ge__(self):
+        raise NotImplementedError('CompoundSet.__ge__')
+
+    def __and__(self):
+        raise NotImplementedError('CompoundSet.__and__')
+
+    def __or__(self):
+        raise NotImplementedError('CompoundSet.__or__')
+
+    # def __sub__(self):
+    #     raise NotImplementedError('CompoundSet.__sub__')
+
+    def __xor__(self):
+        raise NotImplementedError('CompoundSet.__xor__')
+
+    def isdisjoint(self):
+        raise NotImplementedError('CompoundSet.isdisjoint')
+
+    def pop(self):
+        raise NotImplementedError('CompoundSet.pop')
+
+    def __ior__(self):
+        raise NotImplementedError('CompoundSet.__ior__')
+
+    def __ixor__(self):
+        raise NotImplementedError('CompoundSet.__ixor__')
+
+    def __iand__(self):
+        raise NotImplementedError('CompoundSet.__iand__')
+
+    def __isub__(self):
+        raise NotImplementedError('CompoundSet.__isub__')

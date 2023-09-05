@@ -3,38 +3,101 @@ from .set import CompoundSet
 import pandas as pd
 import mout
 import json
+import pickle
 import numpy as np
-from collections.abc import Set
+from collections.abc import MutableSet
 from pprint import pprint
+from rdkit.Chem import CanonSmiles
+import plotly.graph_objects as go
+from scipy.interpolate import interp1d
+from copy import deepcopy
+import molparse as mp
+from pprint import pprint
+import functools
+
+class PriceInterpolator:
+
+    def __init__(self,log_price_interpolator, min_amount, min_price):
+        self.log_price_interpolator = log_price_interpolator
+        self.min_amount = min_amount
+        self.min_price = min_price
+
+    def __call__(self,x):
+
+        if isinstance(x,np.ndarray):
+            return [ self.__call__(v) for v in x]
+
+        if x <= self.min_amount:
+                return self.min_price
+        else:
+            return np.power(10,self.log_price_interpolator(np.log10(x)))
+
+class FlatPriceInterpolator:
+
+    def __init__(self, unit_price, unit_in_mg):
+        self.price_per_mg = unit_price / unit_in_mg
+        self.min_amount = unit_in_mg
+        self.min_price = unit_price
+
+    def __call__(self,x):
+        if isinstance(x,np.ndarray):
+            return [ self.__call__(v) for v in x]
+
+        if x <= self.min_amount:
+            return self.min_price
+        else:
+            return self.price_per_mg * x
+
+class SingleValueInterpolator:
+
+    def __init__(self, value):
+        self.value = value
+
+    def __call__(self,x):
+        if isinstance(x,np.ndarray):
+            return [ self.__call__(v) for v in x]
+
+        return self.value
 
 class BuildingBlock:
 
     ### DUNDERS
 
-    def __init__(self, smiles, molecular_weight=None, catalog_metadata=None, minimise='cost_max'):
+    def __init__(self, smiles, molecular_weight=None):
         
         self._smiles = smiles
         self._molecular_weight = molecular_weight
-        self._cost_str = None
-        self._cost_min = None
-        self._cost_max = None
-        self._cost_unit = None
-        self._lead_time = None
-        self._catalog_metadata = None
-
-        self.sanitise_catalog_metadata(catalog_metadata)
+        self._purchase_info = []
+        self._has_purchase_interpolators = False
+        self._min_lead_time = None
+        self._required_amount = None
+        self._price_interpolator = None
+        self._has_purchase_interpolators = False
+        self._lead_time_interpolator = None
 
     def __repr__(self):
-        if self._cost_str is not None:
-            return f'BuildingBlock({self.smiles}, cost={self._cost_str}, lead_time={self.lead_time} weeks)'
-        else:
-            return f'BuildingBlock({self.smiles})'
+        # if self._cost_str is not None:
+        #     return f'BuildingBlock({self.smiles}, cost={self._cost_str}, lead_time={self.lead_time} weeks)'
+        # else:
+        return f'BuildingBlock({self.smiles})'
 
     def __eq__(self, other):
         return self.smiles == other.smiles
 
     def __hash__(self):
         return hash(self.smiles)
+
+    def __deepcopy__(self):
+        copy = BuildingBlock(self.smiles, self._molecular_weight)
+        copy._purchase_info = deepcopy(self._purchase_info)
+        copy._has_purchase_interpolators = self._has_purchase_interpolators
+        copy._min_lead_time = self._min_lead_time
+        copy._required_amount = self._required_amount
+        copy._price_interpolator = self._price_interpolator
+        copy._has_purchase_interpolators = self._has_purchase_interpolators
+        copy._lead_time_interpolator = self._lead_time_interpolator
+        # copy._products = self._products
+        return copy
 
     ### PROPERTIES
 
@@ -43,124 +106,149 @@ class BuildingBlock:
         return self._smiles
 
     @property
-    def lead_time(self):
-        return self._lead_time
+    def purchaseable(self):
+        return bool(self._purchase_info)
 
+    @property
+    def has_purchase_interpolators(self):
+        return self._has_purchase_interpolators
+
+    @property
+    def min_lead_time(self):
+        return self._min_lead_time
+
+    @property
+    def required_amount(self):
+        return self._required_amount
+    
+    @required_amount.setter
+    def required_amount(self, a):
+        self._required_amount = float(a)
+    
     ### METHODS
 
-    def get_purchaseable_entries(self):
-        return [ data for data in self._catalog_metadata if 'purchaseInfo' in data]
+    def copy(self):
+        return self.__deepcopy__()
 
-    # def get_exact_catalogue_entries(self):
-    #     return [ data for data in self.get_purchaseable_entries() if data['inchikeyMatches']['exact']]
+    @functools.cache
+    def get_purchase_info(self,amount_in_mg):
 
-    def get_shortest_lead_time(self):
+        for info in self._purchase_info:
+            if info['amount'] == amount_in_mg:
+                return info
         
-        entries = self.get_purchaseable_entries()
-
-        if not entries:
-            mout.error(f'No purchaseable entries in catalog_metadata ({self})')
-            return
-
-        self._best_catalog_entry = sorted(entries, key=lambda x: x['purchaseInfo']['lead_time_str'])[0]
-
-        self._cost_str = self._best_catalog_entry['purchaseInfo']['price_range_str']
-        self._cost_min = self._best_catalog_entry['purchaseInfo']['price_range_min']
-        self._cost_max = self._best_catalog_entry['purchaseInfo']['price_range_max']
-        self._cost_unit = self._best_catalog_entry['purchaseInfo']['price_range_unit']
-        self._lead_time = self._best_catalog_entry['purchaseInfo']['lead_time_str']
-
-    def get_cost(self, field='max'):
-        
-        if self._cost_min == 0:
-            return self._cost_max
-
-        if self.cost_max == np.inf:
-            return self._cost_min
-
-        if field == 'min':
-            return self._cost_min
-
-        if field == 'max':
-            return self._cost_max
-
-    def get_lowest_cost(self, use_max=False):
-        
-        entries = self.get_purchaseable_entries()
-
-        if not entries:
-            mout.error(f'No purchaseable entries in catalog_metadata ({self})')
-            return
-
-        if use_max:
-            key = 'price_range_max'
+        if self.has_purchase_interpolators:
+            return dict(price=self._price_interpolator(amount_in_mg),lead_time=self._lead_time_interpolator(amount_in_mg))
         else:
-            key = 'price_range_min'
+            mout.error(f'No purchase info for {amount_in_mg}mg of {self}')
+            return {}
 
-        self._best_catalog_entry = sorted(entries, key=lambda x: x['purchaseInfo'][key])[0]
+    @functools.cache
+    def get_price(self,amount_in_mg=10):
+        if amount_in_mg == 0:
+            return 0
+        info = self.get_purchase_info(amount_in_mg)
+        if not info:
+            return None
+        return info['price']
 
-        self._cost_str = self._best_catalog_entry['purchaseInfo']['price_range_str']
-        self._cost_min = self._best_catalog_entry['purchaseInfo']['price_range_min']
-        self._cost_max = self._best_catalog_entry['purchaseInfo']['price_range_max']
-        self._cost_unit = self._best_catalog_entry['purchaseInfo']['price_range_unit']
-        self._lead_time = self._best_catalog_entry['purchaseInfo']['lead_time_str']
+    @functools.cache
+    def get_lead_time(self,amount_in_mg=10):
+        info = self.get_purchase_info(amount_in_mg)
+        return float(info['lead_time'])
 
-    def sanitise_catalog_metadata(self, catalog_metadata):
+    def add_purchase_info(self,**info):
 
-        if catalog_metadata is None:
-            return
+        assert 'lead_time' in info
+        assert 'price' in info
+        assert 'amount' in info
+        assert info['amount_unit'] == 'mg'
+        assert info['price_unit'] == 'USD'
+        assert info['lead_time_unit'] == 'days'
 
-        try:
-            self._catalog_metadata = eval(catalog_metadata)
-        except TypeError as e:
-            mout.error(f'{self}: {e}')
-            pprint(catalog_metadata)
-            exit()
-        # self._catalog_metadata = json.loads(catalog_metadata.strip('"').replace("'",'"'))
+        self._purchase_info.append(info)
 
-        for entry in self.get_purchaseable_entries():
+    def create_price_interpolator(self, log_price_interpolator, min_amount, min_price):
 
-            if entry['purchaseInfo']['isBuildingBlock']:
-                price_range_str = entry['purchaseInfo']['bbPriceRange']
-                lead_time_str = entry['purchaseInfo']['bbLeadTimeWeeks']
+        def price_interpolator(x):
+            if x < min_amount:
+                return min_price
             else:
-                price_range_str = entry['purchaseInfo']['scrPriceRange']
-                lead_time_str = entry['purchaseInfo']['scrLeadTimeWeeks']
+                return np.power(10,log_price_interpolator(np.log10(x)))
 
-            if price_range_str == 'unknown':
-                del entry['purchaseInfo']
-                continue
+        return price_interpolator
 
-            price_range_str = price_range_str.replace('k','000')
+    def generate_purchase_interpolators(self, debug=False, show=False):
+        
+        self._purchase_info = sorted(self._purchase_info, key=lambda x: x['amount'])
+
+        amounts = []
+        prices = []
+        lead_times = []
+
+        for info in self._purchase_info:
+
+            price = info['price']
+            amount = info['amount']
+            lead_time = info['lead_time']
             
-            split_price_range = price_range_str.split('/')
-            price_range_unit = f'/{split_price_range[1].strip()}'
+            amounts.append(amount)
+            lead_times.append(lead_time)
+            prices.append(price)
 
-            if '-' in price_range_str:
-                price_range_min = float(split_price_range[0].split('-')[0].lstrip('$').strip())
-                price_range_max = float(split_price_range[0].split('-')[1].strip())
-            elif '>' in price_range_str:
-                price_range_max = np.inf
-                price_range_min = float(split_price_range[0].lstrip('> $').strip())
-            elif '<' in price_range_str:
-                price_range_min = 0
-                price_range_max = float(split_price_range[0].lstrip('< $').strip())
-            else:
-                mout.error(price_range_str)
-                raise Exception('Could not parse price_range_str')
+        if debug:
+            mout.header(self)
+            mout.var('amounts',amounts)
+            mout.var('lead_times',lead_times)
+            mout.var('prices',prices)
 
-            # if price_range_unit == '/mg':
-            #     price_range_min *= 1000
-            #     price_range_max *= 1000
-            #     price_range_unit = '/g'
+        if len(amounts) < 2:
+            mout.warning(f'Single pricing data point ({amount}mg) for {self.smiles}')
+            self._lead_time_interpolator = SingleValueInterpolator(lead_time)
+            self._price_interpolator = FlatPriceInterpolator(price,amount)
 
-            entry['purchaseInfo']['price_range_str'] = price_range_str
-            entry['purchaseInfo']['price_range_min'] = price_range_min
-            entry['purchaseInfo']['price_range_max'] = price_range_max
-            entry['purchaseInfo']['price_range_unit'] = price_range_unit
-            entry['purchaseInfo']['lead_time_str'] = lead_time_str
+        else:
 
-class BuildingBlockSet(Set):
+            log_amounts = np.log10(amounts)
+            log_prices = np.log10(prices)
+
+            log_price_interpolator = interp1d(log_amounts,log_prices,kind='linear',fill_value='extrapolate')
+
+            self._price_interpolator = PriceInterpolator(log_price_interpolator, amounts[0], prices[0])
+
+            self._lead_time_interpolator = interp1d(amounts,lead_times,kind='linear',bounds_error=False,fill_value=(lead_times[0],lead_times[-1]))
+
+            self._min_lead_time = min(lead_times)
+
+        if show:
+
+            fig = go.Figure()
+            
+            trace = go.Scatter(name='price',x=amounts,y=prices,mode='markers')
+            fig.add_trace(trace)
+
+            trace = go.Scatter(name='lead_time',x=amounts,y=lead_times,mode='markers')
+            fig.add_trace(trace)
+
+            fig.update_xaxes(type="log")
+            fig.update_yaxes(type="log")
+                
+            # interpolators
+            xs = np.linspace(0.1,2000,500)
+            
+            ys = self._price_interpolator(xs)
+            trace = go.Scatter(name='price (interpolated)',x=xs,y=ys,mode='lines')
+            fig.add_trace(trace)
+
+            ys = self._lead_time_interpolator(xs)
+            trace = go.Scatter(name='lead_time (interpolated)',x=xs,y=ys,mode='lines')
+            fig.add_trace(trace)
+
+            fig.show()
+
+        self._has_purchase_interpolators = True
+
+class BuildingBlockSet(MutableSet):
 
     ### DUNDERS
 
@@ -174,6 +262,8 @@ class BuildingBlockSet(Set):
         for bb in bbs:
             if bb not in self._elements:
                 self._elements.append(bb)
+
+        self._products = None
 
     def __iter__(self):
         return iter(self._elements)
@@ -194,6 +284,11 @@ class BuildingBlockSet(Set):
         if isinstance(key,list):
             return BuildingBlockSet([bb for bb in [self[k] for k in key] if bb is not None])
 
+        if isinstance(key,BuildingBlock):
+            key = key.smiles
+
+        key = CanonSmiles(key)
+
         matches = [bb for bb in self if bb.smiles == key]
 
         if len(matches) < 1:
@@ -210,9 +305,16 @@ class BuildingBlockSet(Set):
         if self.name is not None:
             return f'BuildingBlockSet("{self.name}", #building_blocks={len(self)})'
         else:
-            return f'BuildingBlockSet(#building_blocks={len(self)})'
+            return f'BuildingBlockSet(#{self.id}, #building_blocks={len(self)})'
+
+    def __hash__(self):
+        return hash(" ".join(sorted(self.smiles)))
 
     ### PROPERTIES
+
+    @property
+    def id(self):
+        return hash(self)
 
     @property
     def name(self):
@@ -222,15 +324,48 @@ class BuildingBlockSet(Set):
     def name(self, n):
         self._name = n
 
-    @property
-    def cost(self):
-        return self._cost
+    # @property
+    # def cost(self):
+    #     return self._cost
 
     @property
     def smiles(self):
         return[ bb.smiles for bb in self._elements]
+
+    @property
+    def amounts(self):
+        return {bb.smiles:bb.required_amount for bb in bb_set}
+
+    @property
+    def products(self):
+        if self._products is None:
+            mout.error('Products have not been generated')
+        return self._products
+
+    @property
+    def num_products(self):
+        return len(self.products)
+
+    @property
+    def hit_feature_coverage(self):
+        return self._hit_feature_coverage
+
+    @property
+    def num_new_features(self):
+        return self._num_new_features
     
     ### METHODS
+
+    def copy(self):
+        new = BuildingBlockSet([bb.copy() for bb in self])
+        return new
+
+    def discard(self, key):
+        if key in self:
+            i = self._elements.index(key)
+            del self._elements[i]
+        else:
+            mout.warning(f'Tried to delete element not in set: {key}')
 
     def add(self, bb):
         if bb not in self._elements:
@@ -250,6 +385,18 @@ class BuildingBlockSet(Set):
 
             comp_set.add(candidate)
 
+        comp_set.immutable = True
+
+        # get required amounts
+        for bb in self:
+            bb.required_amount = 0
+        for prod in comp_set:
+            for bb in prod.building_blocks:
+                if bb in self:
+                    self[bb].required_amount += 1
+
+        self._products = comp_set
+
         return comp_set
 
     def summary(self):
@@ -260,8 +407,8 @@ class BuildingBlockSet(Set):
         for bb in self:
             print_data.append(dict(
                 smiles=bb.smiles,
-                cost=bb._cost_str,
-                lead_time=bb.lead_time,
+                cost=bb.get_price(),
+                lead_time=bb.get_lead_time(),
             ))
 
         print(pd.DataFrame(print_data))
@@ -280,3 +427,87 @@ class BuildingBlockSet(Set):
                     bb.get_shortest_lead_time()
                 else:
                     raise Exception(f"Unknown quantity to minimise '{minimise}'")
+
+    def get_price(self,blanket_amount=None):
+
+        price = 0.0
+
+        for bb in self._elements:
+            
+            if blanket_amount is not None:
+                amount = blanket_amount
+            else:
+                amount = bb.required_amount
+
+            assert not np.isnan(amount), (bb, amount)
+
+            bb_price = bb.get_price(amount)
+
+            if bb_price is not None:
+
+                assert not np.isnan(bb_price), (bb, amount, bb_price, bb.generate_purchase_interpolators(debug=True,show=True))
+
+                price += bb_price
+
+        return price
+
+    def get_lead_times(self,blanket_amount=None):
+
+        lead_times = []
+
+        for bb in self._elements:
+            
+            if blanket_amount:
+                amount = blanket_amount
+            else:
+                amount = bb.required_amount
+
+            lead_times.append(bb.get_lead_time(amount))
+
+        return lead_times
+
+    def remove_unused(self,candidates,verbosity=0):
+        self.get_products(candidates)
+
+        count = 0
+        while len([bb for bb in self if bb.required_amount < 1]) > 0:
+            for bb in self:
+                if bb.required_amount < 1:
+                    self.remove(bb)
+                    if verbosity:
+                        mout.warning(f'Removing unused {bb}')
+                    count += 1
+                self.get_products(candidates)
+        return count
+
+    def write(self,directory):
+
+        identifier = self.id
+
+        mp.write(directory / f'BBS_{identifier}.pickle',self)
+
+        json_data = dict(id=identifier,size=len(self),price=self.get_price(),building_blocks=[],products=[])
+
+        for bb in self:
+            json_data['building_blocks'].append(dict(smiles=bb.smiles, amount=bb.required_amount, price=bb.get_price(bb.required_amount), lead_time=bb.get_lead_time(bb.required_amount)))
+
+        try:
+            getattr(self, '_products')
+        except AttributeError:
+            self.get_products()
+
+        for prod in self._products:
+            json_data['products'].append(dict(name=prod.name, smiles=str(prod.smiles)))
+
+        json_data['num_products'] = len(json_data['products'])
+
+        mp.write(directory / f'BBS_{identifier}.json', json_data)
+
+    def prepare_for_scoring(self, hit_features):
+
+        self_features = self.products.get_present_features()
+
+        num_in_hits_but_not_self = len(hit_features - self_features)
+        self._hit_feature_coverage = (len(hit_features)-num_in_hits_but_not_self)/len(hit_features)
+
+        self._num_new_features = len(self_features - hit_features)
