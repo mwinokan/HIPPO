@@ -25,8 +25,18 @@ class Attribute:
     def __call__(self,value):
         """return the score of a given value"""
 
-        if isinstance(value,BuildingBlockSet):
+        if not self.weight:
+            return 0.0
+
+        if isinstance(value,BuildingBlockSet) or 'BuildingBlockSet' in str(type(value)):
             value = self.get_value(value)
+        elif isinstance(value,dict):
+            value = self.get_value(value)
+
+        value = float(value)
+
+        if value is None:
+            return 0.5
 
         return self.weight * self.unweighted(value)
 
@@ -36,7 +46,10 @@ class Attribute:
     ### METHODS
 
     def get_value(self,bb_set):
-        return getattr(bb_set,self.key)
+        if isinstance(bb_set,dict):
+            return bb_set[self.key]
+        else:
+            return getattr(bb_set,self.key)
 
     def get_percentile_interpolator(self,values,bins=100):
         count, bins_count = np.histogram(values, bins=bins)
@@ -45,10 +58,16 @@ class Attribute:
         self._percentile_interpolator = interp1d(bins_count[1:],cdf,kind='linear',fill_value="extrapolate")
 
     def unweighted(self,value):
-        if self.reverse:
-            return 1 - self._percentile_interpolator(value)
-        else:
-            return self._percentile_interpolator(value)
+        try:
+            if self.reverse:
+                return 1 - self._percentile_interpolator(value)
+            else:
+                return self._percentile_interpolator(value)
+        except ValueError as e:
+            mout.error(f'{self.key=}')
+            mout.error(f'{value=}')
+            mout.error(f'{type(value)=}')
+            raise e
 
 class CustomAttribute(Attribute):
 
@@ -157,6 +176,11 @@ class Scorer:
 
             print(pd.DataFrame(print_data))
             mout.var('score',score)
+
+        if isinstance(bb_set,dict):
+            bb_set['score'] = score
+        else:
+            bb_set.score = score
 
         return score
 

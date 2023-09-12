@@ -15,6 +15,8 @@ import molparse as mp
 from pprint import pprint
 import functools
 
+from .compound import FailedToAssignBondOrders
+
 class PriceInterpolator:
 
     def __init__(self,log_price_interpolator, min_amount, min_price):
@@ -66,14 +68,19 @@ class BuildingBlock:
     def __init__(self, smiles, molecular_weight=None):
         
         self._smiles = smiles
-        self._molecular_weight = molecular_weight
+        self._molecular_weight = float(molecular_weight)
         self._purchase_info = []
         self._has_purchase_interpolators = False
         self._min_lead_time = None
+        self._price_1mg = None
+        self._price_10mg = None
+        self._lead_time_1mg = None
+        self._lead_time_10mg = None
         self._required_amount = None
         self._price_interpolator = None
         self._has_purchase_interpolators = False
         self._lead_time_interpolator = None
+        self._id = None
 
     def __repr__(self):
         # if self._cost_str is not None:
@@ -89,13 +96,18 @@ class BuildingBlock:
 
     def __deepcopy__(self):
         copy = BuildingBlock(self.smiles, self._molecular_weight)
+        copy._id = self._id
         copy._purchase_info = deepcopy(self._purchase_info)
-        copy._has_purchase_interpolators = self._has_purchase_interpolators
         copy._min_lead_time = self._min_lead_time
         copy._required_amount = self._required_amount
         copy._price_interpolator = self._price_interpolator
         copy._has_purchase_interpolators = self._has_purchase_interpolators
         copy._lead_time_interpolator = self._lead_time_interpolator
+        copy._price_1mg = self._price_1mg
+        copy._price_10mg = self._price_10mg
+        copy._lead_time_1mg = self._lead_time_1mg
+        copy._lead_time_10mg = self._lead_time_10mg
+
         # copy._products = self._products
         return copy
 
@@ -104,6 +116,18 @@ class BuildingBlock:
     @property
     def smiles(self):
         return self._smiles
+
+    @property
+    def molecular_weight(self):
+        return self._molecular_weight
+
+    @property
+    def id(self):
+        return self._id
+
+    @id.setter
+    def id(self,i):
+        self._id = i
 
     @property
     def purchaseable(self):
@@ -118,20 +142,53 @@ class BuildingBlock:
         return self._min_lead_time
 
     @property
+    def price_1mg(self):
+        return self._price_1mg
+
+    @property
+    def price_10mg(self):
+        return self._price_10mg
+
+    @property
+    def lead_time_1mg(self):
+        return self._lead_time_1mg
+
+    @property
+    def lead_time_10mg(self):
+        return self._lead_time_10mg
+
+    @property
     def required_amount(self):
         return self._required_amount
     
-    @required_amount.setter
-    def required_amount(self, a):
-        self._required_amount = float(a)
+    @property
+    def dict(self):
+        return dict(
+            id = self.id,
+            smiles = self.smiles,
+            molecular_weight = self.molecular_weight,
+            purchaseable = self.purchaseable,
+            price_1mg = self.price_1mg,
+            price_10mg = self.price_10mg,
+            lead_time_1mg = self.lead_time_1mg,
+            lead_time_10mg = self.lead_time_10mg,
+            min_lead_time = self.min_lead_time,
+            required_amount = self.required_amount,
+        )
     
     ### METHODS
+
+    def clear_amount(self):
+        self._required_amount = 0
+
+    def increment_amount(self):
+        self._required_amount += 1
 
     def copy(self):
         return self.__deepcopy__()
 
-    @functools.cache
-    def get_purchase_info(self,amount_in_mg):
+    # @functools.cache
+    def get_purchase_info(self,amount_in_mg,verbosity=1):
 
         for info in self._purchase_info:
             if info['amount'] == amount_in_mg:
@@ -140,10 +197,25 @@ class BuildingBlock:
         if self.has_purchase_interpolators:
             return dict(price=self._price_interpolator(amount_in_mg),lead_time=self._lead_time_interpolator(amount_in_mg))
         else:
-            mout.error(f'No purchase info for {amount_in_mg}mg of {self}')
+            if verbosity:
+                mout.error(f'No purchase info for {amount_in_mg}mg of {self}')
             return {}
 
-    @functools.cache
+    def replace_purchase_info(self,amount_in_mg,new):
+
+        for i,info in enumerate(self._purchase_info):
+            
+            if info['amount'] == amount_in_mg:
+                break
+
+        else:
+            mout.error(f'could not replace purchase info {amount_in_mg}mg: {self}')
+            return
+
+        self._purchase_info[i] = new
+        # self._purchase_info.append(new)
+
+    # @functools.cache
     def get_price(self,amount_in_mg=10):
         if amount_in_mg == 0:
             return 0
@@ -152,7 +224,7 @@ class BuildingBlock:
             return None
         return info['price']
 
-    @functools.cache
+    # @functools.cache
     def get_lead_time(self,amount_in_mg=10):
         info = self.get_purchase_info(amount_in_mg)
         return float(info['lead_time'])
@@ -165,6 +237,35 @@ class BuildingBlock:
         assert info['amount_unit'] == 'mg'
         assert info['price_unit'] == 'USD'
         assert info['lead_time_unit'] == 'days'
+
+        amount = info['amount']
+
+        amounts = [ i['amount'] for i in self._purchase_info]
+
+        if amount in amounts:
+
+            existing = self.get_purchase_info(amount)
+
+            if all([info[key] == existing[key] for key in ['lead_time','price']]):
+                return
+
+            if all([info[key] >= existing[key] for key in ['lead_time','price']]):
+                return
+
+            if all([info[key] <= existing[key] for key in ['lead_time','price']]):
+                self.replace_purchase_info(amount,info)
+                return
+
+            if info['price'] < existing['price']:
+                self.replace_purchase_info(amount,info)
+                mout.warning(f'Preferring ${info["price"]} & {info["lead_time"]}days to ${existing["price"]} & {existing["lead_time"]}days ({self.smiles})')
+                return                
+            else:
+                mout.warning(f'Preferring ${existing["price"]} & {existing["lead_time"]}days to ${info["price"]} & {info["lead_time"]}days ({self.smiles})')
+                return
+
+            mout.error(f'Could not solve duplicate purchase info for {info["amount"]}mg: {self}')
+            return
 
         self._purchase_info.append(info)
 
@@ -248,6 +349,11 @@ class BuildingBlock:
 
         self._has_purchase_interpolators = True
 
+        self._price_1mg = self.get_price(1)
+        self._price_10mg = self.get_price(10)
+        self._lead_time_1mg = self.get_lead_time(1)
+        self._lead_time_10mg = self.get_lead_time(10)
+
 class BuildingBlockSet(MutableSet):
 
     ### DUNDERS
@@ -264,6 +370,13 @@ class BuildingBlockSet(MutableSet):
                 self._elements.append(bb)
 
         self._products = None
+        self._hit_feature_coverage = None
+        self._num_new_features = None
+        
+        self._avg_fragmenstein_ddG = None
+        self._std_fragmenstein_ddG = None
+        self._avg_fragmenstein_mRMSD = None
+        self._std_fragmenstein_mRMSD = None
 
     def __iter__(self):
         return iter(self._elements)
@@ -292,7 +405,7 @@ class BuildingBlockSet(MutableSet):
         matches = [bb for bb in self if bb.smiles == key]
 
         if len(matches) < 1:
-            mout.error(f'{key} not in {self}')
+            # mout.error(f'{key} not in {self}')
             return None
         elif len(matches) > 1:
             mout.error(f'Multiple {key} in {self}')
@@ -305,7 +418,7 @@ class BuildingBlockSet(MutableSet):
         if self.name is not None:
             return f'BuildingBlockSet("{self.name}", #building_blocks={len(self)})'
         else:
-            return f'BuildingBlockSet(#{self.id}, #building_blocks={len(self)})'
+            return f'BuildingBlockSet(#building_blocks={len(self)})'
 
     def __hash__(self):
         return hash(" ".join(sorted(self.smiles)))
@@ -313,7 +426,7 @@ class BuildingBlockSet(MutableSet):
     ### PROPERTIES
 
     @property
-    def id(self):
+    def hash(self):
         return hash(self)
 
     @property
@@ -334,7 +447,11 @@ class BuildingBlockSet(MutableSet):
 
     @property
     def amounts(self):
-        return {bb.smiles:bb.required_amount for bb in bb_set}
+        return {bb.smiles:bb.required_amount for bb in self}
+
+    @property
+    def total_bb_amount(self):
+        return sum(bb.required_amount for bb in self)
 
     @property
     def products(self):
@@ -354,6 +471,79 @@ class BuildingBlockSet(MutableSet):
     def num_new_features(self):
         return self._num_new_features
     
+    @property
+    def avg_fragmenstein_ddG(self):
+        return self._avg_fragmenstein_ddG
+
+    @property
+    def std_fragmenstein_ddG(self):
+        return self._std_fragmenstein_ddG
+
+    @property
+    def avg_fragmenstein_mRMSD(self):
+        return self._avg_fragmenstein_mRMSD
+
+    @property
+    def std_fragmenstein_mRMSD(self):
+        return self._std_fragmenstein_mRMSD
+
+    @property
+    def price(self):
+        return self.get_price()
+
+    @property
+    def lead_times(self):
+        return self.get_lead_times()
+
+    @property
+    def min_lead_time(self):
+        return min(self.lead_times)
+
+    @property
+    def max_lead_time(self):
+        return max(self.lead_times)
+
+    @property
+    def avg_lead_time(self):
+        return np.mean(self.lead_times)
+
+    @property
+    def std_lead_time(self):
+        return np.std(self.lead_times)
+
+    @property
+    def dict(self):
+
+        d = dict(
+
+            # properties
+            # id = self.id,
+            name = self.name,
+            
+            num_bbs=len(self),
+            total_bb_amount=self.total_bb_amount,
+            num_products=self.num_products,
+            
+            price=self.price,
+            max_lead_time=self.max_lead_time,
+            avg_lead_time=self.avg_lead_time,
+
+            hit_feature_coverage=self.hit_feature_coverage,
+            num_new_features=self.num_new_features,
+            
+            avg_fragmenstein_ddG=self.avg_fragmenstein_ddG,
+            std_fragmenstein_ddG=self.std_fragmenstein_ddG,
+            avg_fragmenstein_mRMSD=self.avg_fragmenstein_mRMSD,
+            std_fragmenstein_mRMSD=self.std_fragmenstein_mRMSD,
+
+            # lists
+            building_blocks = [bb.dict for bb in self],
+            products = [p.dict for p in self.products],
+            
+        )
+
+        return d
+    
     ### METHODS
 
     def copy(self):
@@ -372,7 +562,7 @@ class BuildingBlockSet(MutableSet):
             self._elements.append(bb)
             bb._set_name = self.name
 
-    def get_products(self, candidates):
+    def get_products(self, candidates, debug=False):
 
         comp_set = CompoundSet(f'Products({self})')
 
@@ -389,29 +579,47 @@ class BuildingBlockSet(MutableSet):
 
         # get required amounts
         for bb in self:
-            bb.required_amount = 0
+            bb.clear_amount()
+
+        if debug:
+            mout.var('#products',len(comp_set))
+
+        count = 0
         for prod in comp_set:
+
+            if debug:
+                mout.out(f'BBS has all BBs for {prod.name}')
+
             for bb in prod.building_blocks:
-                if bb in self:
-                    self[bb].required_amount += 1
+                assert bb in self
+                self[bb].increment_amount()
+                count += 1
 
         self._products = comp_set
 
         return comp_set
 
-    def summary(self):
+    def summary(self,return_df=False):
 
         mout.header(self)
 
         print_data = []
         for bb in self:
-            print_data.append(dict(
+            d = dict(
                 smiles=bb.smiles,
-                cost=bb.get_price(),
-                lead_time=bb.get_lead_time(),
-            ))
+                amount=bb.required_amount,
+                # cost_per_mg=round(bb.get_price(),2),
+            )
+            
+            d[f'price'] = round(bb.get_price(bb.required_amount),2)
+            d[f'lead_time'] = round(bb.get_lead_time(bb.required_amount),1)
 
-        print(pd.DataFrame(print_data))
+            print_data.append(d)
+
+        df = pd.DataFrame(print_data)
+
+        if return_df:
+            return df
 
     def assign_price_info(self,minimise='cost_min'):
 
@@ -480,28 +688,48 @@ class BuildingBlockSet(MutableSet):
                 self.get_products(candidates)
         return count
 
-    def write(self,directory):
+    def write(self,directory,bbs_id=None,extra_data=None,verbosity=1):
 
-        identifier = self.id
+        identifier = bbs_id if bbs_id is not None else self.id
 
-        mp.write(directory / f'BBS_{identifier}.pickle',self)
+        self.name = f'BBS_{identifier:06}'
 
-        json_data = dict(id=identifier,size=len(self),price=self.get_price(),building_blocks=[],products=[])
+        mp.write(directory / f'BBS_{identifier:06}.pickle',self,verbosity=verbosity-1)
 
-        for bb in self:
-            json_data['building_blocks'].append(dict(smiles=bb.smiles, amount=bb.required_amount, price=bb.get_price(bb.required_amount), lead_time=bb.get_lead_time(bb.required_amount)))
+        json_data = self.dict
 
-        try:
-            getattr(self, '_products')
-        except AttributeError:
-            self.get_products()
+        if extra_data:
+            json_data.update(extra_data)
 
-        for prod in self._products:
-            json_data['products'].append(dict(name=prod.name, smiles=str(prod.smiles)))
+        mp.write(directory / f'BBS_{identifier:06}.json', json_data,verbosity=verbosity-1)
 
-        json_data['num_products'] = len(json_data['products'])
+    def product_df(self, animal):
 
-        mp.write(directory / f'BBS_{identifier}.json', json_data)
+        def get_hit(name):
+            name = name.replace('-','_')
+            for hit in animal.hits:
+                if name in hit._pose_name:
+                    return hit
+
+        data = []
+
+        for p in self.products:
+
+            d = p.dict
+
+            d['mol'] = p.mol
+
+            for i,h in enumerate(p.inspirations):
+                hit = get_hit(h)
+                try:
+                    d[f'inspiration_mol_{i}'] = hit.mol
+                except FailedToAssignBondOrders as e:
+                    mout.warning(f'Using hit.ligand_group.rdkit_mol {p.name=} {hit._pose_name=}')
+                    d[f'inspiration_mol_{i}'] = hit.ligand_group.rdkit_mol
+
+            data.append(d)
+
+        return pd.DataFrame(data)
 
     def prepare_for_scoring(self, hit_features):
 
@@ -511,3 +739,14 @@ class BuildingBlockSet(MutableSet):
         self._hit_feature_coverage = (len(hit_features)-num_in_hits_but_not_self)/len(hit_features)
 
         self._num_new_features = len(self_features - hit_features)
+
+        self._avg_fragmenstein_ddG = np.mean([p._fragmenstein_ddG for p in self.products])
+        self._std_fragmenstein_ddG = np.std([p._fragmenstein_ddG for p in self.products])
+            
+        p_with_RMSD = [p._fragmenstein_mRMSD for p in self.products if p._fragmenstein_mRMSD is not None]
+        if p_with_RMSD:
+            self._avg_fragmenstein_mRMSD = np.mean(p_with_RMSD)
+            self._std_fragmenstein_mRMSD = np.std(p_with_RMSD)
+        else:
+            self._avg_fragmenstein_mRMSD = None
+            self._std_fragmenstein_mRMSD = None

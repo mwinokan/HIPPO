@@ -5,7 +5,7 @@ import molparse as mp
 from .compound import Compound
 from .tools import df_row_to_dict
 import pandas as pd
-# import random
+import random
 
 from collections.abc import MutableSet
 
@@ -28,9 +28,10 @@ class CompoundSet(MutableSet):
 
     def __repr__(self):
         bbs = self.get_building_blocks()
-        purchaseable_bbs = self.get_building_blocks(purchaseable_only=True)
-        purchaseable_bbs.get_products(self.compounds)
-        return f'CompoundSet("{self.name}", #compounds={self.num_compounds}, #bbs={len(bbs)}, #bbs (purchaseable)={len(purchaseable_bbs)}: ${purchaseable_bbs.get_price():.2f})'
+        # purchaseable_bbs = self.get_building_blocks(purchaseable_only=True)
+        # purchaseable_bbs.get_products(self.compounds)
+        # return f'CompoundSet("{self.name}", #compounds={self.num_compounds}, #bbs={len(bbs)}, #bbs (purchaseable)={len(purchaseable_bbs)}: ${purchaseable_bbs.get_price():.2f})'
+        return f'CompoundSet("{self.name}", #compounds={self.num_compounds}, #bbs={len(bbs)})'
 
     def __iter__(self):
         return iter(self._elements)
@@ -63,6 +64,10 @@ class CompoundSet(MutableSet):
             return None
 
         return matches[0]
+
+    def __setitem__(self, key, value):
+        assert isinstance(key,int)
+        [c for c in self][key] = value
 
     ### FACTORIES
 
@@ -155,6 +160,12 @@ class CompoundSet(MutableSet):
 
     ### METHODS
 
+    def pop(self):
+        return self._elements.pop()
+        # last = self._elements[-1]
+        # self._elements = self._elements[:-1]
+        # return last
+
     def discard(self, key):
         assert not self.immutable
         if key in self:
@@ -178,6 +189,9 @@ class CompoundSet(MutableSet):
             compound._set_name = self.name
         else:
             raise ValueError(f'{compound} already in {self}')
+
+    def shuffle(self):
+        random.shuffle(self._elements)
 
     # def get_random(size=1):
     #     return random.sample(self._elements,size)
@@ -257,9 +271,6 @@ class CompoundSet(MutableSet):
 
     def isdisjoint(self):
         raise NotImplementedError('CompoundSet.isdisjoint')
-
-    def pop(self):
-        raise NotImplementedError('CompoundSet.pop')
 
     def __ior__(self):
         raise NotImplementedError('CompoundSet.__ior__')

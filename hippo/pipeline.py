@@ -70,7 +70,11 @@ class HIPPO:
         self._compound_sets = []
         self._missed_features = None
         self._building_blocks = BuildingBlockSet()
-        # self._max_lead_time = None
+        self._hit_features = None
+        self._bb_id_to_smiles = None
+        self._bb_smiles_to_id = None
+        self._hit_compounds = None
+        self._base_compounds = None
 
         # stage flags
         self._has_protein_reference = False
@@ -84,6 +88,7 @@ class HIPPO:
         self._has_hit_fingerprints = False
         self._has_product_fingerprints = False
         self._has_non_purchaseable_been_culled = False
+        self._has_bb_map = None
 
         # umap
         self._umap_dims = None
@@ -175,7 +180,7 @@ class HIPPO:
 
             data_row = dict(comp.fingerprint)
 
-            data.append(comp.as_dict)
+            data.append(comp.dict_with_fingerprint)
 
         return pd.DataFrame(data)
 
@@ -234,6 +239,30 @@ class HIPPO:
     @has_purchase_info.setter
     def has_purchase_info(self,b):
         self._has_purchase_info = b
+
+    @property
+    def hit_features(self):
+        if self._hit_features is None:
+            self._hit_features = self.compound_sets[0].get_present_features()
+        return self._hit_features
+
+    @property
+    def has_bb_map(self):
+        return self._has_bb_map
+
+    @property
+    def hits(self):
+        return self._hit_compounds
+
+    @property
+    def bases(self):
+        return self._base_compounds
+
+    @property
+    def product_sets(self):
+        assert self.hits is not None
+        assert self.has_hit_directory
+        return self._compound_sets[1:]
 
     ### METHODS
 
@@ -323,6 +352,7 @@ class HIPPO:
         )
 
         self._compound_sets.append(comp_set)
+        self._hit_compounds = self._compound_sets[-1]
 
         if self.verbosity:
             mout.success(f'Loaded {comp_set.num_compounds} compounds "{comp_set.name}"')
@@ -365,7 +395,7 @@ class HIPPO:
         if self.verbosity:
             mout.success(f'Loaded {comp_set.num_compounds} compounds "{comp_set.name}"')
 
-    def add_reaction_products(self, name, metadata, data_path, mol_pattern, skip_unconstrained_minimisation_fail=False, expecting=None):
+    def add_reaction_products(self, name, metadata, data_path, mol_pattern, skip_unconstrained_minimisation_fail=False, expecting=None, skip_too_moved=True, skip_too_contorted=True):
 
         assert self.has_hit_directory
 
@@ -453,9 +483,13 @@ class HIPPO:
                     if f'{meta_name}.minimised.mol' not in basename_mols:
                         mout.warning(f'Missing {meta_name}.minimised.mol')
 
+        # get the base compound
+        base = list(data_path.glob('base/base.minimised.mol'))
+        assert base
+
         progress = len(mols) > 100
 
-        for i,mol_file in enumerate(mols):
+        for i,mol_file in enumerate(base + mols):
 
             prod_name = mol_file.name.split('.')[0]
 
@@ -466,7 +500,11 @@ class HIPPO:
 
             compound = Compound.from_rdkit_mol(prod_name, mol)
 
-            if 'base' in prod_name:
+            compound._metadata_csv = str(metadata)
+
+            if prod_name == 'base':
+                place_type = 'frag'
+            elif 'base' in prod_name:
                 place_type = 'base'
             elif 'frag':
                 place_type = 'frag'
@@ -475,30 +513,33 @@ class HIPPO:
 
             if f'{place_type}_placed_name' in meta_df:
                 meta_row = meta_df[meta_df[f'{place_type}_placed_name'] == prod_name]
-                assert len(meta_row)
+                assert len(meta_row), prod_name
             else:
                 meta_row = meta_df[meta_df['name'] == prod_name]
-                assert len(meta_row)
+                assert len(meta_row), prod_name
             
             if f'{place_type}_fail_minimization_without_constraint' in meta_row:
                 compound._minimization_failed_without_constraint = meta_row[f'{place_type}_fail_minimization_without_constraint'].values[0]
 
             if 'product_smi' in meta_row:
-                compound._smiles = meta_row['product_smi'].values[0]
+                compound._smiles = str(meta_row['product_smi'].values[0])
             elif 'smiles' in meta_row:
-                compound._smiles = meta_row['smiles'].values[0]
+                compound._smiles = str(meta_row['smiles'].values[0])
             else:
                 mout.error(f"Couldn't get SMILES from metadata {index=}")
                 raise Exception("No SMILES")
 
             if 'is_pains' in meta_row:
-                compound._smiles = meta_row['is_pains'].values[0]
+                compound._is_pains = bool(meta_row['is_pains'].values[0])
             else:
                 mout.error(f"Couldn't get PAINS from metadata {index=}")
                 raise Exception("No PAINS")
 
+            if 'num_atom_difference' in meta_row:
+                compound._num_atom_difference = int(meta_row['num_atom_difference'].values[0])
+
             if '∆∆G' in meta_row:
-                compound._fragmenstein_ddG = meta_row['∆∆G'].values[0]
+                compound._fragmenstein_ddG = float(meta_row['∆∆G'].values[0])
             else:
                 # get fragmenstein json
                 try:
@@ -506,10 +547,18 @@ class HIPPO:
                         mol_json_data = json.load(f)
                         # mout.json(mol_json_data)
 
-                    compound._fragmenstein_ddG = mol_json_data['Energy']['ligand_ref2015']['total_score'] - mol_json_data['Energy']['unbound_ref2015']['total_score']
-                    compound._fragmenstein_mRMSD = mol_json_data['mRMSD']
+                    compound._fragmenstein_ddG = float(mol_json_data['Energy']['ligand_ref2015']['total_score'] - mol_json_data['Energy']['unbound_ref2015']['total_score'])
+                    compound._fragmenstein_mRMSD = float(mol_json_data['mRMSD'])
                     compound._fragmenstein_too_moved = compound._fragmenstein_mRMSD > 1.0
                     compound._fragmenstein_too_contorted = compound._fragmenstein_ddG > 0.0
+
+                    if skip_too_moved and compound._fragmenstein_too_moved:
+                        # mout.warning(f'Skipping {compound} [too moved]')
+                        continue
+
+                    if skip_too_contorted and compound._fragmenstein_too_contorted:
+                        # mout.warning(f'Skipping {compound} [too contorted]')
+                        continue
 
                 except FileNotFoundError:
                     pass
@@ -518,18 +567,28 @@ class HIPPO:
                 compound._fragmenstein_ligand_efficiency = meta_row['LE'].values[0]
 
             if 'outcome' in meta_row:
-                compound._fragmenstein_outcome = meta_row['outcome'].values[0]
+                compound._fragmenstein_outcome = str(meta_row['outcome'].values[0])
 
             compound._protein_system = self.protein_system
             
-            reactant1_smiles = meta_row['reactant1_smi'].values[0]
-            reactant2_smiles = meta_row['reactant2_smi'].values[0]
+            reactant1_smiles = str(meta_row['reactant1_smi'].values[0])
+            reactant2_smiles = str(meta_row['reactant2_smi'].values[0])
             
             bb1 = self.building_blocks[reactant1_smiles]
             bb2 = self.building_blocks[reactant2_smiles]
             compound._building_blocks = BuildingBlockSet([bb1,bb2])
 
-            comp_set.add(compound)
+            if 'base' == prod_name:
+                if self.bases is None:
+                    assert len(self.compound_sets) == 1
+                    self._base_compounds = CompoundSet('bases')
+                    self._compound_sets.append(self.bases)
+
+                compound._name = f'{name}-base'
+                self.bases.add(compound)
+
+            else:
+                comp_set.add(compound)
         
         mout.finish()
 
@@ -663,7 +722,7 @@ class HIPPO:
 
         return in_1_but_not_2, in_2_but_not_1
 
-    def random_building_block_set(self, budget=None, size=None, max_lead_time=None, verbosity=1, max_iter=1000, start_with=None, top_down=False, debug=True):
+    def random_building_block_set(self, budget=None, size=None, max_lead_time=None, verbosity=1, max_iter=5000, start_with=None, top_down=False, debug=False, by_set=False, bbs_id=None, bb_price_cutoff=None, retry_over_budget=50):
 
         assert size or budget, "One of size and budget must be specified"
         assert not (size and budget), "One of size and budget must be None"
@@ -800,50 +859,76 @@ class HIPPO:
                 mout.var('avg(lead_times)',f'{np.mean(lead_times):.1f}')
                 mout.var('max(lead_times)',f'{this_max_lead_time:.0f}')
 
-            else:
+            elif by_set:
 
-                # get all produceable compounds
-                available = self.all_products
-                # mout.debug(available)
-                # self.building_blocks.get_products(self.all_compounds)
-                # available = self.all_products
-                # mout.debug(available._elements)
-                # all_bbs = self.building_blocks
+                assert isinstance(by_set,dict)
+                assert not max_lead_time
 
-                if debug:
-                    print(f'{self.all_products=}')
-                    print(f'{id(self.all_products)=}')
-                    print(f'{len(self.all_products)=}')
-                    print(f'{len(self.all_compounds)=}')
-                    print(f'{len(self.building_blocks)=}')
+                if verbosity:
+                    mout.header(f'Choosing BBs up to ${budget} from {len(by_set)} product sets...')
 
-                if max_lead_time:
-                    mout.out(f'Choosing from {len(available)} product compounds up to ${budget} with lead_time <= {max_lead_time} days')
+                # shuffle the product sets
+                for key in by_set:
+                    random.shuffle(by_set[key])
+
+                if start_with:
+                    bb_set = start_with.copy()
+                    products = bb_set.get_products(self.all_compounds)
+                    products.immutable = False
                 else:
-                    mout.out(f'Choosing from {len(available)} product compounds up to ${budget}')
+                    bb_set = BuildingBlockSet()
+                    products = CompoundSet(f'Products(BBS#{bbs_id})')
 
-                bb_set = BuildingBlockSet()
-                products = CompoundSet('from random BBS')
-
-                iteration = 0
+                iteration = -1
                 old_bb_set = None
 
                 while iteration < max_iter:
 
-                    # get a random product from available compounds
-                    random_product = random.choice(available)
-                    while random_product in products:
-                        random_product = random.choice(available)
-                    products.add(random_product)
+                    iteration += 1
+
+                    if old_bb_set is not None:
+                        start_price = old_bb_set.get_price()
+                    else:
+                        start_price = 0
+                    
+                    if verbosity:
+                        mout.var("iteration",iteration)
+                        mout.var("start_price",start_price)
+
+                    if old_bb_set and iteration > 50:
+                        if start_price > budget - 100:
+                            if verbosity:
+                                mout.error('Good enough')
+                            break
+
+                    # pick a random product set
+                    try:
+                        prod_set_key = random.choice(list(by_set.keys()))
+                    except IndexError:
+                        return None
+
+                    # deal with empty set
+                    if len(by_set[prod_set_key]) == 0:
+                        del by_set[prod_set_key]
+                        continue
+
+                    # pick a random product
+                    random_product = by_set[prod_set_key].pop()
 
                     # add the BBs
-                    for bb in random_product.building_blocks:
-                        if bb not in bb_set:
-                            bb_set.add(bb)
-                            bb_set[bb].required_amount = 0
-                            if verbosity > 1:
-                                mout.out(f'Adding: {bb.smiles}')
-                        bb_set[bb].required_amount += 1
+                    try:
+                        for bb in random_product.building_blocks:
+                            if not bb.purchaseable:
+                                raise Exception(f'{bb} not purchaseable')
+                            if bb not in bb_set:
+                                bb_set.add(bb)
+                                bb_set[bb].clear_amount()
+                                if verbosity > 1:
+                                    mout.out(f'Adding: {bb.smiles}')
+                            bb_set[bb].increment_amount()
+                    except Exception as e:
+                        mout.error(str(e))
+                        continue
 
                     # calculate total cost
                     total_price = bb_set.get_price()
@@ -853,9 +938,9 @@ class HIPPO:
                         mout.var('budget remaining',remaining)
 
                     # lead times
-                    lead_times = bb_set.get_lead_times()
-                    this_max_lead_time = max(lead_times)
                     if verbosity > 1:
+                        lead_times = bb_set.get_lead_times()
+                        this_max_lead_time = max(lead_times)
                         mout.var('avg(lead_times)',np.mean(lead_times))
                         if max_lead_time:
                             mout.var('max(lead_times)',this_max_lead_time,valCol=mcol.error if this_max_lead_time > max_lead_time else None)
@@ -866,44 +951,224 @@ class HIPPO:
                         if verbosity > 1:
                             mout.error('Over budget')
                         if old_bb_set is None:
-                            # try again
-                            return self.random_building_block_set(budget=budget, size=size, max_lead_time=max_lead_time, verbosity=verbosity, max_iter=max_iter, start_with=start_with, top_down=top_down)
+                            bb_set = BuildingBlockSet()
+                            continue
 
                         bb_set = old_bb_set.copy()
-                        break
+                        continue
 
-                    # if verbosity > 0:
-                    #     mout.progress(total_price,budget,prepend='random BBS',append=f'#bbs={len(bb_set)} #prods={len(products)} ${total_price:.2f}')
+                    try:
+                        products.add(random_product)
+                    except ValueError:
+                        continue
 
                     old_bb_set = bb_set.copy()
 
+                
+                # get products
+                expected_products = bb_set.get_products(self.all_compounds)
+                if debug:
+                    mout.var('bb_set.total_bb_amount',bb_set.total_bb_amount)
+                    mout.var('#products',len(products))
+                    mout.var('#expected_products',len(expected_products))
+                assert bb_set.total_bb_amount == 2*len(products)
+                assert all([p.smiles in products.smiles for p in expected_products])
+
+                bb_set._products = products
+                bb_set._products.immutable = True
+
+                if verbosity:
+
+                    mout.var('#products',len(bb_set.products))
+                    for prod in bb_set.products:
+                        mout.out(f'{prod.name} {prod.smiles}')
+                    
+                    mout.var('#bbs',len(bb_set))
+
+                    for bb in bb_set:
+                        if bb.required_amount:
+                            mout.out(f'{bb.required_amount}mg of {bb}')
+                        else:
+                            mout.out(f'{mcol.error}{bb.required_amount}mg of {bb}')
+                
+                    total_price = bb_set.get_price()
+                    remaining = budget - total_price
+                    mout.var('total_price',f'${total_price:.2f}')
+                    mout.var('budget remaining',f'${remaining:.2f}')
+
+                    lead_times = bb_set.get_lead_times()
+                    this_max_lead_time = max(lead_times)
+                    mout.var('avg(lead_times)',f'{np.mean(lead_times):.1f}')
+                    mout.var('max(lead_times)',f'{this_max_lead_time:.0f}')
+
+                bb_set.prepare_for_scoring(self.hit_features)
+
+            else:
+
+                available = CompoundSet('reminaining_products',self.all_products.compounds)
+                available.shuffle()
+
+                if debug:
+                    print(f'{self.all_products=}')
+                    print(f'{len(self.all_products)=}')
+
+                    print(f'{available=}')
+                    print(f'{len(available)=}')
+                    
+                    print(f'{len(self.all_compounds)=}')
+                    print(f'{len(self.building_blocks)=}')
+
+                if verbosity:
+                    if max_lead_time:
+                        mout.out(f'Choosing from {len(available)} product compounds up to ${budget} with lead_time <= {max_lead_time} days')
+                        raise NotImplementedError
+                    else:
+                        mout.out(f'Choosing from {len(available)} product compounds up to ${budget}')
+
+                bb_set = BuildingBlockSet()
+                products = CompoundSet('from random BBS')
+
+                iteration = -1
+                old_bb_set = None
+                over_budget_count = 0
+
+                while iteration < max_iter:
+
                     iteration += 1
 
-                # get products
-                products = bb_set.get_products(self.all_compounds)
-                # import time
-                # products.name = f'{products.name} {time.time()}'
-                mout.var('#products',len(products))
-                for prod in products:
-                    mout.out(f'{prod.name} {prod.smiles}')
-                
-                mout.var('#bbs',len(bb_set))
-
-                for bb in bb_set:
-                    if bb.required_amount:
-                        mout.out(f'{bb.required_amount}mg of {bb}')
+                    if old_bb_set is not None:
+                        start_price = old_bb_set.get_price()
                     else:
-                        mout.out(f'{mcol.error}{bb.required_amount}mg of {bb}')
-                
-                total_price = bb_set.get_price()
-                remaining = budget - total_price
-                mout.var('total_price',f'${total_price:.2f}')
-                mout.var('budget remaining',f'${remaining:.2f}')
+                        start_price = 0
+                    
+                    if verbosity:
+                        mout.var("iteration",iteration)
+                        mout.var("start_price",start_price)
 
-                lead_times = bb_set.get_lead_times()
-                this_max_lead_time = max(lead_times)
-                mout.var('avg(lead_times)',f'{np.mean(lead_times):.1f}')
-                mout.var('max(lead_times)',f'{this_max_lead_time:.0f}')
+                    if old_bb_set and over_budget_count > retry_over_budget:
+                        if start_price > budget - 100:
+                            mout.header('Good enough')
+                            break
+                    
+                    if len(available) < 1:
+                        if verbosity:
+                            mout.header('No more available')
+                        break
+
+                    # get a random product from available compounds
+                    # random_product = random.choice(available)
+                    # while random_product in products:
+                        # random_product = random.choice(available)
+                    random_product = available.pop()
+                    if verbosity > 1:
+                        mout.out(f'Trying: {random_product.name}')
+
+                    # add the BBs
+                    # try:
+
+                    # skip if BBs too expensive
+                    if bb_price_cutoff and any([bb.get_price(1) > bb_price_cutoff for bb in random_product.building_blocks]):
+                        continue
+
+                    for bb in random_product.building_blocks:
+                        if not bb.purchaseable:
+                            raise Exception(f'{bb} not purchaseable')
+                        
+                        if bb not in bb_set:
+                            bb_set.add(bb)
+                            bb_set[bb].clear_amount()
+                            if verbosity > 1:
+                                mout.out(f'Adding: {bb.smiles}')
+
+                        if verbosity > 1:
+                            mout.out(f'Incrementing: {bb.smiles}')
+                        bb_set[bb].increment_amount()
+                    
+                    if verbosity > 1:
+                        mout.var('bb_set.total_bb_amount',bb_set.total_bb_amount)
+                        mout.var('#products-1',len(products))
+
+                    # except Exception as e:
+                        # mout.error(str(e))
+                        # continue
+
+                    # calculate total cost
+                    total_price = bb_set.get_price()
+                    remaining = budget - total_price
+                    if verbosity > 1:
+                        mout.var('total_price',total_price)
+                        mout.var('budget remaining',remaining)
+
+                    # lead times
+                    if verbosity > 1:
+                        lead_times = bb_set.get_lead_times()
+                        this_max_lead_time = max(lead_times)
+                        mout.var('avg(lead_times)',np.mean(lead_times))
+                        if max_lead_time:
+                            mout.var('max(lead_times)',this_max_lead_time,valCol=mcol.error if this_max_lead_time > max_lead_time else None)
+                        else:
+                            mout.var('max(lead_times)',this_max_lead_time)
+
+                    if remaining < 0:
+                        over_budget_count += 1
+                        if verbosity > 1:
+                            mout.error('Over budget')
+                        if old_bb_set is None:
+                            bb_set = BuildingBlockSet()
+                        else:
+                            bb_set = old_bb_set.copy()
+                        continue
+
+                    old_bb_set = bb_set.copy()
+
+                    if verbosity > 1:
+                        mout.out(f'Adding: {random_product.name}')
+                    products.add(random_product)
+
+                else:
+                    mout.warning(f'Reached {max_iter=}')
+
+                # get products
+                # expected_products = bb_set.get_products(self.all_products)
+                if debug:
+                    mout.var('bb_set.total_bb_amount',bb_set.total_bb_amount)
+                    mout.var('#products',len(products))
+                    # mout.var('#expected_products',len(expected_products))
+                assert bb_set.total_bb_amount == 2*len(products)
+                # assert all([p.smiles in products.smiles for p in expected_products])
+                # assert len(products) == len(expected_products)
+
+                # # get products
+                # products = bb_set.get_products(self.all_compounds)
+
+                products.immutable = True
+                bb_set._products = products
+
+                if verbosity:
+
+                    mout.var('#products',len(products))
+                    for prod in products:
+                        mout.out(f'{prod.name} {prod.smiles}')
+                    
+                    mout.var('#bbs',len(bb_set))
+
+                    for bb in bb_set:
+                        if bb.required_amount:
+                            mout.out(f'{bb.required_amount}mg of {bb}')
+                        else:
+                            mout.out(f'{mcol.error}{bb.required_amount}mg of {bb}')
+                
+                    total_price = bb_set.get_price()
+                    remaining = budget - total_price
+                    mout.var('total_price',f'${total_price:.2f}')
+                    mout.var('budget remaining',f'${remaining:.2f}')
+
+                    lead_times = bb_set.get_lead_times()
+                    this_max_lead_time = max(lead_times)
+                    mout.var('avg(lead_times)',f'{np.mean(lead_times):.1f}')
+                    mout.var('max(lead_times)',f'{this_max_lead_time:.0f}')
+
+                bb_set.prepare_for_scoring(self.hit_features)
 
         return bb_set
 
@@ -1036,8 +1301,7 @@ class HIPPO:
         if cull_non_purchaseable:
             count = 0
             overlap = 0
-            for comp_set in self.compound_sets[1:]:
-                print(comp_set,len(comp_set))
+            for comp_set in self.product_sets:
                 for compound in comp_set:
                     if compound not in self.all_products:
                         comp_set.remove(compound)
@@ -1103,9 +1367,14 @@ class HIPPO:
             if smiles == 'nan':
                 continue
 
-            assert not np.isnan(lead_time), (csv, smiles, lead_time, amount, price)
-            assert not np.isnan(amount), (csv, smiles, lead_time, amount, price)
-            assert not np.isnan(price), (csv, smiles, lead_time, amount, price)
+            try:
+                assert not np.isnan(lead_time), (csv, smiles)
+                assert not np.isnan(amount), (csv, smiles)
+                assert not np.isnan(price), (csv, smiles)
+            except AssertionError as e:
+                if self.verbosity > 2:
+                    mout.warning(f'Skipping purchase row containing NaN: {e}')
+                continue
 
             bb = self.building_blocks[smiles]
 
@@ -1124,17 +1393,49 @@ class HIPPO:
             )
 
         if missing:
-            mout.error(f'Could not identify {len(missing)} BBs by SMILES')
+            mout.warning(f'{len(missing)} unmatched BBs in purchase info')
 
     def generate_purchase_interpolators(self):
         
-        for bb in list(self.building_blocks)[1:]:
+        for bb in list(self.building_blocks):
 
             if not bb.purchaseable:
                 continue
 
             if not bb.has_purchase_interpolators:
                 bb.generate_purchase_interpolators()
+
+    def create_bb_map(self):
+
+        assert self.has_all_compounds
+
+        self._bb_id_to_smiles = {}
+        self._bb_smiles_to_id = {}
+
+        for i,bb in enumerate(self.building_blocks):
+            bb.id = i
+            self._bb_id_to_smiles[i] = bb.smiles
+            self._bb_smiles_to_id[bb.smiles] = i
+
+    def bb_id_to_smiles(self,bb_id):
+        assert self.has_bb_map
+        return self._bb_id_to_smiles[bb_id]
+
+    def bb_smiles_to_id(self,smiles):
+        assert self.has_bb_map
+        return self._bb_smiles_to_id[smiles]
+
+    def get_bb_set_hex_id(self,bb_set):
+        fingerprint = []
+        for i,s in self._bb_id_to_smiles.items():
+            if s in bb_set:
+                fingerprint.append(True)
+            else:
+                fingerprint.append(False)
+
+        bin_str = '0b' + ''.join(['1' if x else '0' for x in fingerprint])
+        number = eval(bin_str)
+        return hex(number)
 
     def summary(self):
         mout.header(f'{self}')        
@@ -1146,7 +1447,6 @@ class HIPPO:
         mout.underline('compound sets:')
         for comp_set in self.compound_sets:
             mout.out(comp_set)
-
 
 def plot_hist(x,show=True,bin_size=1):
     fig = go.Figure()

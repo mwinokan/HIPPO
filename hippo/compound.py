@@ -23,7 +23,6 @@ class Compound:
         self._ligand_group = None
         self._set_name = None
         self._ligand_features = None
-        self._is_pains = None
         self._building_blocks = None
         
         # from_rdkit_mol
@@ -41,8 +40,20 @@ class Compound:
         self._site_index = None
         self._chain_char = None
 
+        # target information
+        self._target = None
+        self._target_type = None
+        self._reaction = None
+        self._inspirations = None
+
+        # Kate metadata
+        self._is_pains = None
+        self._num_atom_difference = None
+        self._metadata_csv = None
+
         # fragmenstein
         self._fragmenstein_ddG = None
+        self._fragmenstein_mRMSD = None
         self._fragmenstein_ligand_efficiency = None
         self._fragmenstein_outcome = None
 
@@ -117,7 +128,7 @@ class Compound:
             try:
                 m_pdb = AllChem.AssignBondOrdersFromTemplate(m_smiles, m_pdb)
             except ValueError as e:
-                raise FailedToAssignBondOrders()
+                raise FailedToAssignBondOrders(self.name)
 
             # protonate
             m_pdb_prot = Chem.AddHs(m_pdb)
@@ -135,6 +146,14 @@ class Compound:
         return self._is_pains
 
     @property
+    def num_atom_difference(self):
+        return self._num_atom_difference
+
+    @property
+    def metadata_csv(self):
+        return self._metadata_csv
+
+    @property
     def smiles(self):
         if self._smiles is None:
             self._smiles = mp.rdkit.mol_to_smiles(self.mol)
@@ -149,22 +168,58 @@ class Compound:
         return self._fingerprint
 
     @property
-    def as_dict(self):
+    def target(self):
+        return self._target
 
-        data = {}
+    @property
+    def target_type(self):
+        return self._target_type
 
-        data['name'] = self.name
-        data['smiles'] = self.smiles
-        data['set_name'] = self.set_name
-        data['is_pains'] = self.is_pains
-        data['cost_range_str'] = self.cost_range_str
-        data['lead_time'] = self.lead_time
+    @property
+    def reaction(self):
+        return self._reaction
+
+    @property
+    def inspirations(self):
+        return self._inspirations
+
+    @property
+    def dict(self):
+
+        d = dict(
+
+            # properties
+            name = self.name,
+            smiles = self.smiles,
+            set_name = self.set_name,
+            
+            target = self.target,
+            target_type = self.target_type,
+            reaction = self.reaction,
+            inspirations = self.inspirations,
+            
+            is_pains = self.is_pains,
+            num_atom_difference = self.num_atom_difference,
+
+            fragmenstein_ddG = self.fragmenstein_ddG,
+            fragmenstein_mRMSD = self.fragmenstein_mRMSD,
+            fragmenstein_ligand_efficiency = self.fragmenstein_ligand_efficiency,
+            fragmenstein_outcome = self.fragmenstein_outcome,
+
+            building_blocks = [bb.dict for bb in self.building_blocks]
+        )
         
+        return d
+
+    @property
+    def dict_with_fingerprint(self):
+        d = self.dict
+
         for key, value in self.fingerprint.items():
-            data[key] = value
+            d[key] = value
 
-        return data
-
+        return d
+    
     @property
     def ligand_group(self):
         if self._ligand_group is None:
@@ -284,6 +339,23 @@ class Compound:
             lead_time = max(lead_times)
             return lead_time
         return None
+
+    @property
+    def fragmenstein_ddG(self):
+        return self._fragmenstein_ddG
+
+    @property
+    def fragmenstein_mRMSD(self):
+        return self._fragmenstein_mRMSD
+
+    @property
+    def fragmenstein_ligand_efficiency(self):
+        return self._fragmenstein_ligand_efficiency
+
+    @property
+    def fragmenstein_outcome(self):
+        return self._fragmenstein_outcome
+
     
     ### METHODS
 
