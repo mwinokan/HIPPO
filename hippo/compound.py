@@ -76,14 +76,7 @@ class Compound:
 
         self._pose_name = metadata['crystal_name']
         self._crystal_name = metadata['RealCrystalName']
-        self._smiles = metadata['new_smiles'] or metadata['smiles']
-
-        if '.' in self._smiles:
-            mout.error('There is a dot in the SMILES:')
-            mout.var(f'{self}.smiles',self.smiles)
-            self._smiles = sorted(self.smiles.split('.'), key=lambda x: len(x))[-1]
-            mout.warning('Using the following:')
-            mout.var(f'{self}.smiles',self.smiles)
+        self.smiles = metadata['new_smiles'] or metadata['smiles']
 
         self._alternate_name = metadata['alternate_name']
         self._site_name = metadata['site_name']
@@ -164,8 +157,19 @@ class Compound:
     @property
     def smiles(self):
         if self._smiles is None:
-            self._smiles = mp.rdkit.mol_to_smiles(self.mol)
+            self.smiles = mp.rdkit.mol_to_smiles(self.mol)
         return self._smiles
+
+    @smiles.setter
+    def smiles(self,s):
+        if self._smiles is not None:
+            mout.warning(f'Overwriting SMILES: {self.name}')
+        assert isinstance(s,str)
+        if '.' in s:
+            mout.error(f'There is a dot in the SMILES [{self.name}]: {s}')
+            s = sorted(self.smiles.split('.'), key=lambda x: len(x))[-1]
+            mout.warning(f'Using: {s}')
+        self._smiles = s
 
     @property
     def protein_system(self):
