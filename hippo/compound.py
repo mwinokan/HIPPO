@@ -167,7 +167,7 @@ class Compound:
         assert isinstance(s,str)
         if '.' in s:
             mout.error(f'There is a dot in the SMILES [{self.name}]: {s}')
-            s = sorted(self.smiles.split('.'), key=lambda x: len(x))[-1]
+            s = sorted(s.split('.'), key=lambda x: len(x))[-1]
             mout.warning(f'Using: {s}')
         self._smiles = s
 
