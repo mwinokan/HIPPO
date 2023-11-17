@@ -77,6 +77,14 @@ class Compound:
         self._pose_name = metadata['crystal_name']
         self._crystal_name = metadata['RealCrystalName']
         self._smiles = metadata['new_smiles'] or metadata['smiles']
+
+        if '.' in self._smiles:
+            mout.error('There is a dot in the SMILES:')
+            mout.var(f'{self}.smiles',self.smiles)
+            self._smiles = sorted([self.smiles.split('.')], key=lambda x: len(x), reverse=True)[0]
+            mout.warning('Using the following:')
+            mout.var(f'{self}.smiles',self.smiles)
+
         self._alternate_name = metadata['alternate_name']
         self._site_name = metadata['site_name']
         self._pdb_entry = metadata['pdb_entry']
