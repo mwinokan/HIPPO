@@ -81,7 +81,7 @@ class Compound:
         if '.' in self._smiles:
             mout.error('There is a dot in the SMILES:')
             mout.var(f'{self}.smiles',self.smiles)
-            self._smiles = sorted([self.smiles.split('.')], key=lambda x: len(x), reverse=True)[0]
+            self._smiles = sorted(self.smiles.split('.'), key=lambda x: len(x))[-1]
             mout.warning('Using the following:')
             mout.var(f'{self}.smiles',self.smiles)
 
