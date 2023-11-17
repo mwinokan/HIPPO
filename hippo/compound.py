@@ -186,6 +186,11 @@ class Compound:
     @property
     def dict(self):
 
+        if self.building_blocks:
+            building_blocks = [bb.dict for bb in self.building_blocks]
+        else:
+            building_blocks = None
+
         d = dict(
 
             # properties
@@ -206,7 +211,8 @@ class Compound:
             fragmenstein_ligand_efficiency = self.fragmenstein_ligand_efficiency,
             fragmenstein_outcome = self.fragmenstein_outcome,
 
-            building_blocks = [bb.dict for bb in self.building_blocks]
+            building_blocks = building_blocks,
+
         )
         
         return d
