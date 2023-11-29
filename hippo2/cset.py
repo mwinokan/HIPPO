@@ -1,5 +1,4 @@
 
-import os
 import mout
 
 from collections.abc import MutableSet
@@ -98,7 +97,9 @@ class CompoundSet(MutableSet):
         return self
 
     @classmethod
-    def from_bound_pdbs(cls, name, pdbs, metadata_df, pdb_pattern, tags=None ):
+    def from_bound_pdbs(cls, name, pdbs, metadata_df, pdb_pattern, tags=None):
+
+        import os
 
         self = cls.__new__(cls)
 
@@ -108,8 +109,6 @@ class CompoundSet(MutableSet):
 
         for pdb in pdbs:
             pose_name = os.path.basename(pdb).removesuffix('_bound.pdb')
-            
-            # comp_name = pose_name[-8:]
 
             metadata = df_row_to_dict(metadata_df[ metadata_df['crystal_name'] == pose_name ])
             
@@ -124,7 +123,7 @@ class CompoundSet(MutableSet):
             else:
 
                 compound = self[comp_name]
-                pose = Pose.from_bound_pdb(compound, pdb, metadata)
+                pose = Pose.from_bound_pdb(compound, pdb, metadata, tags=tags)
                 compound.add_pose(pose)
 
             ### add a pose
@@ -150,16 +149,17 @@ class CompoundSet(MutableSet):
         return len(self.compounds)
 
     @property
-    def fingerprinted_compounds(self):
-        return [c for c in self.compounds if c.fingerprint is not None]
+    def fingerprinted_poses(self):
+        return [p for p in self.poses if p._fingerprint is not None]
 
     @property
     def fingerprints(self):
-        return [c.fingerprint for c in self.compounds if c.fingerprint is not None]
+        return [p.fingerprint for p in self.poses if p._fingerprint is not None]
 
     @property
     def fingerprint_df(self):
         if self._fingerprint_df is None:
+            import pandas as pd
             fingerprints = self.fingerprints
             if len(fingerprints) < 1:
                 mout.error(f'no fingerprints for {self}')
@@ -173,6 +173,10 @@ class CompoundSet(MutableSet):
     @immutable.setter
     def immutable(self,b):
         self._immutable = b
+
+    @property
+    def poses(self):
+        return sum([c.poses for c in self], [])
 
     @property
     def num_poses(self):

@@ -33,23 +33,34 @@ class HIPPO:
 
         self._compound_sets = CompoundSetList()
 
+        self._protein_feature_strs = None
+
     ### FACTORIES
 
-    ### PUBLIC METHODS
+    @classmethod
+    def from_pickle(self, path):
+        mout.debug('HIPPO.from_pickle()')
+        mout.var('path',str(path),valCol=mcol.file)
+
+        with open(path,'rb') as f:
+            self = pickle.load(f)
+
+        return self
+
+    ### MAIN METHODS
 
     def set_cutoffs(self, max_lead_time, max_bb_price, min_bb_quantity):
         self._max_lead_time = max_lead_time
         self._max_bb_price = max_bb_price # do we need this?
         self._min_bb_quantity = min_bb_quantity
 
-    def add_hits(self, metadata_path, pdb_path, pdb_pattern='**/*-x????_??_bound.pdb', tags=None):
-        
-        mout.debug(f'{self}.add_hits()')
-        
+    def add_hits(self, metadata_path, pdb_path, pdb_pattern='**/*-x????_??_bound.pdb', tags=None, overwrite=False):
+                
         ### checks
         
-        if 'hits' in [s.name for s in self.compound_sets]:
+        if not overwrite and 'hits' in [s.name for s in self.compound_sets]:
             mout.error(f'CompoundSet "hits" already exists')
+            return
 
         if not isinstance(metadata_path, Path):
             metadata_path = Path(metadata_path)
@@ -69,8 +80,8 @@ class HIPPO:
             mout.error(f'FileNotFoundError: {e}')
             return
 
-        mout.header('metadata columns:')
-        pprint(list(metadata_df.columns))
+        # mout.header('metadata columns:')
+        # pprint(list(metadata_df.columns))
 
         mout.success(f'Parsed metadata CSV')
 
@@ -98,6 +109,18 @@ class HIPPO:
 
         mout.success(f'Loaded {comp_set.num_compounds} compounds as "{comp_set.name}" ({self.hits.num_poses} poses)')
 
+    def write_pickle(self,file):
+        import molparse as mp
+        mp.write(file,self)
+
+    ### QUERIES
+
+    def get_poses(self, tag, search=False):
+        if search:
+            return [p for p in self.all_poses if any([tag in t for t in p.tags])]
+        else:
+            return [p for p in self.all_poses if tag in p.tags]
+
     def summary(self):
         mout.header(f'{self}')  
 
@@ -116,8 +139,147 @@ class HIPPO:
             for comp_set in self.compound_sets:
                 mout.out(comp_set)
 
-    ### PRIVATE METHODS
+    ### PLOTTING
 
+    def plot_interaction_histogram(self, poses, subtitle=None):
+
+        import plotly.express as px
+        from .fingerprint import FEATURE_METADATA
+
+        df = self._fingerprint_df(poses)
+
+        plot_data = []
+        
+        for key in df.columns:
+            count = int(df[key].sum())
+
+            if not count:
+                continue
+            
+            data = dict(str=key,count=count)
+
+            data['family'] = FEATURE_METADATA[key]['family']
+            data['res_name'] = FEATURE_METADATA[key]['res_name']
+            data['res_number'] = FEATURE_METADATA[key]['res_number']
+            data['res_chain'] = FEATURE_METADATA[key]['res_chain']
+            data['atom_numbers'] = FEATURE_METADATA[key]['atom_numbers']
+
+            data['res_name_number_chain_str'] = f"{FEATURE_METADATA[key]['res_name']} {FEATURE_METADATA[key]['res_number']} {FEATURE_METADATA[key]['res_chain']}"
+        
+            plot_data.append(data)
+
+        plot_df = pd.DataFrame(plot_data)
+        plot_df.sort_values(['res_chain', 'res_number', 'family'], inplace=True)
+        plot_df
+
+        fig = px.bar(plot_df, x='res_name_number_chain_str', y='count', color='family', hover_data=plot_df.columns)
+
+        title='Leveraged protein features'
+
+        if subtitle:
+            fig.update_layout(title=f'{title} ({subtitle})')
+
+        fig.update_layout(xaxis_title='Residue')
+        fig.update_layout(yaxis_title='#Interactions')
+
+        return fig
+
+    def plot_interaction_punchcard(self, poses, subtitle, opacity=1.0):
+
+        import plotly
+        import plotly.express as px
+        from .fingerprint import FEATURE_METADATA
+
+        plot_data = []
+
+        for pose in poses:
+
+            fingerprint = pose._fingerprint
+
+            # loop over each interaction in the pose
+            for key, value in fingerprint.items():
+                if not value:
+                    continue
+                
+                data = dict(str=key,count=value)
+
+                data['family'] = FEATURE_METADATA[key]['family']
+                data['res_name'] = FEATURE_METADATA[key]['res_name']
+                data['res_number'] = FEATURE_METADATA[key]['res_number']
+                data['res_chain'] = FEATURE_METADATA[key]['res_chain']
+                data['atom_numbers'] = FEATURE_METADATA[key]['atom_numbers'] 
+                data['pose'] = pose.longname 
+
+                data['res_name_number_chain_str'] = f"{FEATURE_METADATA[key]['res_name']} {FEATURE_METADATA[key]['res_number']} {FEATURE_METADATA[key]['res_chain']}"
+
+                plot_data.append(data)
+
+        plot_df = pd.DataFrame(plot_data)
+
+        fig = px.scatter(plot_df, x='res_name_number_chain_str', y='family',marginal_x='histogram',marginal_y='histogram', hover_data=plot_df.columns, color='pose', title='Interaction Punch-Card')
+
+        for trace in fig.data:
+            if type(trace) == plotly.graph_objs._histogram.Histogram:
+                trace.opacity = 1
+                trace.xbins.size = 1
+            else:
+                trace['marker']['size'] = 10
+                trace['marker']['opacity'] = opacity
+
+        fig.update_layout(barmode='stack')
+        fig.update_layout(scattermode='group', scattergap=0.75)
+
+        return fig
+
+    ### INTERNAL METHODS
+
+    def _generate_fingerprints(self, poses):
+
+        n = len(poses)
+
+        fail_count = 0
+        for i,pose in enumerate(poses):
+
+            mout.progress(i, n, prepend='fingerprints', fill='#')
+
+            try:
+                pose.fingerprint
+
+            except FailedToAssignBondOrders:
+                mout.error(f'Failed to assign bond orders for {pose}')
+                pose._fingerprint = None
+                fail_count += 1
+            except Exception as e:
+                mout.error(e)
+                pose._fingerprint = None
+                fail_count += 1
+
+        fingerprinted_poses = [c for c in poses if c.fingerprint is not None]
+
+        protein_feature_strs = set(pose.fingerprint.keys()).intersection(*[set(p.fingerprint.keys()) for p in fingerprinted_poses])
+
+        for pose in fingerprinted_poses:
+            pose.fingerprint.trim_keys(protein_feature_strs)
+
+        mout.finish()
+        if fail_count:
+            mout.error(f"Failed to fingerprint {fail_count} poses")
+        mout.success(f'Fingerprinted {n - fail_count}/{n} poses')
+
+        mout.var('#fingerprint dimensions',len(protein_feature_strs))
+
+        self._protein_feature_strs = protein_feature_strs
+
+    def _fingerprint_df(self, poses):
+
+        fingerprints = [p.fingerprint for p in poses if p._fingerprint is not None]
+
+        if len(fingerprints) < 1:
+            mout.error(f'no fingerprints!')
+            return
+        
+        return pd.DataFrame(fingerprints)
+        
     ### PROPERTIES
 
     @property
@@ -142,6 +304,18 @@ class HIPPO:
     def all_poses(self):
         return sum([c.poses for c in self.all_compounds], [])
 
+    @property
+    def all_tags(self):
+
+        all_tags = []
+
+        for thing in self.all_compounds.compounds + self.all_poses:
+            for tag in thing.tags:
+                if tag not in all_tags:
+                    all_tags.append(tag)
+
+        return all_tags
+    
     @property
     def compound_sets(self):
         return self._compound_sets
