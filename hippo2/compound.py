@@ -6,10 +6,15 @@ from rdkit import Chem
 from pathlib import Path
 
 from .pose import Pose
+from .tset import TagSet
+from .pset import PoseSet
+from .rset import ReactionSet
 
 class Compound:
 
     def __init__(self, name, smiles, tags=None):
+
+        # mout.debug(f'Compound.__init__({name})')
 
         # blanks
         self._name = None
@@ -17,7 +22,11 @@ class Compound:
         self._stereo_smiles = None
         self._orig_smiles = None
         self._mol = None
-        self._poses = []
+        self._poses = PoseSet()
+        self._inspirations = []
+        self._base = None
+        # self._amount = None # mg
+        self._reactions = ReactionSet()
 
         # from XChem crystal structure metadata
         self._crystal_name = None
@@ -26,7 +35,7 @@ class Compound:
         # arguments
         self.name = name
         self.smiles = smiles
-        self.tags = list(tags or [])
+        self.tags = TagSet(tags or [])
 
 ### FACTORIES
 
@@ -38,12 +47,14 @@ class Compound:
         tags = tags or []
         if isinstance(tags,str):
             tags = [tags]
-        assert isinstance(tags,list)
+        tags = TagSet(tags)
 
-        mol = Chem.MolFromMolFile(path)
-        smiles = mp.mol_to_smiles(mol)
+        mol = Chem.MolFromMolFile(str(path))
+        smiles = mp.rdkit.mol_to_smiles(mol)
         
-        self = cls.__init__(name, smiles, tags)
+        self = cls.__new__(cls)
+
+        self.__init__(name, smiles, tags)
 
         return self
 
@@ -60,7 +71,8 @@ class Compound:
         if chain is None:
             chain = pose_name[-1]
 
-        tags = tags or []   
+        tags = tags or []
+        tags = TagSet(tags)
 
         self = cls.__new__(cls)
 
@@ -120,8 +132,12 @@ class Compound:
         return self._orig_smiles
 
     @property
-    def orig_smiles(self):
-        return self._orig_smiles
+    def stereo_smiles(self):
+        return self._stereo_smiles
+
+    @property
+    def base(self):
+        return self._base
 
     @property
     def crystal_name(self):
@@ -150,22 +166,76 @@ class Compound:
         return len(self.poses)
 
     @property
+    def pose(self):
+        if self.num_poses > 1:
+            mout.warning('Returning first of multiple poses')
+        return self.poses[0]
+
+    @property
+    def reaction(self):
+        assert self.num_reactions == 1
+        return self.reactions[0]
+
+    @property
+    def reactions(self):
+        return self._reactions
+
+    @property
+    def num_reactions(self):
+        return len(self.reactions)
+
+    @property
+    def building_blocks(self):
+        return self.reaction.reactants
+
+    @property
     def mol(self):
         if self._mol is None:
             self._mol = Chem.MolFromSmiles(self.smiles)
         return self._mol
+
+    @property
+    def inspirations(self):
+        return self._inspirations
     
+    @inspirations.setter
+    def inspirations(self, s):
+        self._inspirations = s
+
 ### METHODS
 
     def add_pose(self, pose):
-        self.poses.append(pose)
+        self.poses.add(pose)
+
+    def add_reaction(self, reaction):
+        self.reactions.add(reaction)
 
     def summary(self):
 
         mout.header(str(self))
 
-        mout.var('crystal_name',self.crystal_name)
-        mout.var('poses',[p.name for p in self.poses])
+        mout.var('smiles',self.smiles)
+        
+        if self.orig_smiles: mout.var('orig_smiles',self.orig_smiles)
+        if self.stereo_smiles: mout.var('stereo_smiles',self.stereo_smiles)
+        if self.crystal_name: mout.var('crystal_name',self.crystal_name)
+        if self.inspirations: mout.var('inspirations',self.inspirations)
+        # if self.amount is not None: mout.var('amount',self.amount)
+        if self.base: mout.var('base',self.base)
+        if self.alternate_name: mout.var('alternate_name',self.alternate_name)
+        
+        mout.var('tags',self.tags)
+        mout.var('poses',self.poses)
+
+        if self.num_reactions != 1:
+            mout.var('reactions',self.reactions, symbol='')
+        else:
+            # mout.var('reactions:',"\n")
+            mout.out("")
+            self.reaction.summary()
+
+    def get_pose(self, name):
+        return [p for p in self.poses if p.name == name][0]
 
 ### DUNDERS
 

@@ -22,6 +22,26 @@ class CompoundSetList(UserList):
 			else:
 				mout.error(f'No CompoundSet named {key}')
 
+	def __setitem__(self, key, value):
+
+		if isinstance(key,slice):
+			self.data[key] = value
+
+		if isinstance(key,int):
+			data[key] = value
+
+		if isinstance(key,str):
+			for cs in self.data:
+				if cs.name == key:
+					cs = value
+					return
+			else:
+				mout.error(f'No CompoundSet named {key}')
+
+	def __contains__(self, key):
+		assert isinstance(key, str)
+		return key in [cs.name for cs in self.data]
+
 	@property
 	def names(self):
 		return [cs.name for cs in self.data]

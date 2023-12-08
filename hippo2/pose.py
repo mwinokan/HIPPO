@@ -2,50 +2,67 @@
 import mout
 
 from .fingerprint import Fingerprint
+from .tset import TagSet
 
 class Pose:
 
-	def __init__(self, name, compound, pdb_path, site_index, chain=None, tags=None):
-
-		# arguments
-		self._name = name
-		self._compound = compound
-		self._pdb_path = pdb_path
-		self.site_index = site_index
-		self._chain = chain
-
-		self.tags = list(tags or [])
+	def __init__(self, name, compound, pdb_path, site_index=None, chain=None, tags=None):
 
 		# blanks
 		self._fingerprint = None
 		self._pdb_entry = None
 		self._mol = None
+		self._site_index = None
+		self._chain = None
+
+		# arguments
+		self._name = name
+		self._compound = compound
+		self._pdb_path = pdb_path
+
+		if site_index is not None:
+			self.site_index = site_index
+		if chain is not None:
+			self.chain = chain
+
+		self.tags = TagSet(tags or [])
 		
 	### FACTORIES
 
 	@classmethod
-	def from_bound_pdb(cls, compound, pdb_path, metadata, tags=None, site_index=None, chain=None):
+	def from_bound_pdb(cls, compound, pdb_path, metadata=None, tags=None, site_index=None, chain=None):
 
 		self = cls.__new__(cls)
 
-		tags = list(tags or [])
+		tags = TagSet(tags or [])
 
-		if metadata['site_name']:
-			tags.append(metadata['site_name'])
-		
-		if metadata['pdb_entry']:
-			self._pdb_entry = metadata['pdb_entry']
-			self.tags.append('InPDB')
+		if metadata:
 
-		pose_name = metadata['crystal_name']
+			if metadata['site_name']:
+				tags.add(metadata['site_name'])
+			
+			if metadata['pdb_entry']:
+				self._pdb_entry = metadata['pdb_entry']
+				self.tags.add('InPDB')
 
-		if site_index is None:
-			site_index = pose_name[-2]
+			pose_name = metadata['crystal_name']
 
-		if chain is None:
-			chain = pose_name[-1]
+			if site_index is None:
+				site_index = pose_name[-2]
 
-		self.__init__(f'{site_index}{chain}', compound, pdb_path, site_index, chain, tags)
+			if chain is None:
+				chain = pose_name[-1]
+
+			name = f'{site_index}{chain}'
+
+		else:
+
+			if site_index is not None and chain is not None:
+				name = f'{site_index}{chain}'
+			else:
+				name = '??'
+
+		self.__init__(name, compound, pdb_path, site_index, chain, tags)
 		
 		return self
 
@@ -65,15 +82,24 @@ class Pose:
 	
 	@property
 	def site_index(self):
+		assert self._site_index is not None
 		return self._site_index
 
 	@site_index.setter
 	def site_index(self, i):
+		assert i is not None
+		# mout.warning(f'{self.name} changing site index! ({i})')
 		self._site_index = int(i)
 	
 	@property
 	def chain(self):
 		return self._chain
+
+	@chain.setter
+	def chain(self, i):
+		s = str(i)
+		assert len(s) == 1
+		self._chain = s
 
 	@property
 	def pdb_path(self):
@@ -81,10 +107,8 @@ class Pose:
 	
 	@property
 	def fingerprint(self):
-
-		if self._fingerprint is None:
-			self._fingerprint = self.calculate_fingerprint()
-
+		# if self._fingerprint is None:
+		# 	self._fingerprint = self.calculate_fingerprint()
 		return self._fingerprint
 
 	@property
@@ -95,17 +119,30 @@ class Pose:
 
 	@property
 	def mol(self):
+
+		# mout.debug(f'Pose.mol({self.longname})')
 		
 		if self._mol is None:
 		
 			lig_residues = self.bound_system['rLIG']
-			lig_residues = [l for l in lig_residues if l.chain == self.chain]
+
+			if self.chain:
+				lig_residues = [l for l in lig_residues if l.chain == self.chain]
+
+			if len(lig_residues) and self.chain is None:
+				self.chain = lig_residues[0].atoms[0].chain
 			
 			split_lig_residues = []
 			for lig in lig_residues:
 				split_lig_residues += lig.split_by_site()
 			
-			ligand_group = split_lig_residues[self.site_index]
+			if self.site_index is not None:
+				ligand_group = split_lig_residues[self.site_index]
+			elif len(split_lig_residues) == 1:
+				ligand_group = split_lig_residues[0]
+			else:
+				mout.error(f'Bound PDB has multiple ligands and {self.longname}.site_index == {self.site_index}')
+				return self.compound.mol
 			
 			from molparse.rdkit import mol_from_pdb_block
 			
@@ -123,6 +160,8 @@ class Pose:
 		fingerprint = Fingerprint(self, self.mol, sys.protein_system)
 		
 		# fingerprint = None
+		self._fingerprint = fingerprint
+
 		return fingerprint
 
 	### DUNDERS

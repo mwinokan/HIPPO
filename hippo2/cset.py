@@ -6,12 +6,16 @@ from collections.abc import MutableSet
 from .tools import df_row_to_dict
 from .compound import Compound
 from .pose import Pose
+from .tset import TagSet
+from .pset import PoseSet
 
 class CompoundSet(MutableSet):
 
     ### DUNDERS
 
     def __init__(self, name, compounds=(), immutable=False):
+
+        assert isinstance(name, str)
 
         self._name = name
         self._elements = []
@@ -40,6 +44,9 @@ class CompoundSet(MutableSet):
 
     def __getitem__(self, key):
 
+        if isinstance(key, slice):
+            return self._elements[key]
+
         if isinstance(key,list):
             return CompoundSet('queried',[c for c in [self[k] for k in key] if c is not None])
 
@@ -50,7 +57,8 @@ class CompoundSet(MutableSet):
             key = str(key)
 
         elif isinstance(key,int):
-            return [c for c in self][key]
+            return self._elements[key]
+            # return [c for c in self][key]
 
         matches = [comp for comp in self if str(comp) == key]
 
@@ -106,6 +114,7 @@ class CompoundSet(MutableSet):
         self.__init__(name)
 
         tags = tags or []
+        tags = TagSet(tags)
 
         for pdb in pdbs:
             pose_name = os.path.basename(pdb).removesuffix('_bound.pdb')
@@ -150,7 +159,7 @@ class CompoundSet(MutableSet):
 
     @property
     def fingerprinted_poses(self):
-        return [p for p in self.poses if p._fingerprint is not None]
+        return PoseSet([p for p in self.poses if p._fingerprint is not None])
 
     @property
     def fingerprints(self):
@@ -176,15 +185,20 @@ class CompoundSet(MutableSet):
 
     @property
     def poses(self):
-        return sum([c.poses for c in self], [])
+        return PoseSet(sum([c.poses for c in self], PoseSet()))
 
     @property
     def num_poses(self):
         return sum([c.num_poses for c in self])
 
+    @property
+    def smiles(self):
+        return [c.smiles for c in self]    
+
     ### METHODS
 
     def pop(self):
+        assert not self.immutable
         return self._elements.pop()
         # last = self._elements[-1]
         # self._elements = self._elements[:-1]
