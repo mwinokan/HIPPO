@@ -81,3 +81,7 @@ class TagSet(MutableSet):
 
 	def __iter__(self):
 		return iter(self.tags)
+
+	def __add__(self, other):
+		return TagSet(self.tags+other)
+		

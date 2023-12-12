@@ -1,4 +1,5 @@
 
+import molparse as mp
 import plotly.express as px
 import pandas as pd
 
@@ -11,6 +12,50 @@ import pandas as pd
 
 '''
 
+import functools
+
+# hippo_graph decorator
+def hippo_graph(func):
+
+	@functools.wraps(func)
+	def wrapper(animal, *args, **kwargs):
+
+		wrapper_kwargs = {}
+		wrapper_keys = ['show', 'html', 'pdf', 'png']
+		for key in wrapper_keys:
+			wrapper_kwargs[key] = kwargs.pop(key,None)
+
+		fig = func(animal, *args, **kwargs)
+
+		if wrapper_kwargs['show']:
+				fig.show()
+
+		if wrapper_kwargs['html']:
+			file = wrapper_kwargs['html']
+			if not file.endswith('.html'):
+				file = f'{file}.html'
+			mp.write(file, fig)
+
+		if wrapper_kwargs['pdf']:
+			file = wrapper_kwargs['pdf']
+			if not file.endswith('.pdf'):
+				file = f'{file}.pdf'
+			mp.write(file, fig)
+
+		if wrapper_kwargs['png']:
+			file = wrapper_kwargs['png']
+			if not file.endswith('.png'):
+				file = f'{file}.png'
+			mp.write(file, fig)
+
+		if not fig.layout.images:
+			add_hippo_logo(fig)
+
+		return fig
+	
+	return wrapper
+
+@hippo_graph
 def plot_tag_statistics(animal, color=None, subtitle=None):
 
 	plot_data = []
@@ -36,8 +81,9 @@ def plot_tag_statistics(animal, color=None, subtitle=None):
 
 	fig.update_layout(xaxis_title='Tag', yaxis_title='#Poses')
 
-	return add_hippo_logo(fig)
+	return fig
 
+@hippo_graph
 def plot_interaction_histogram(animal, poses, feature_metadata, subtitle=None,):
 
 	df = animal._fingerprint_df(poses)
@@ -80,8 +126,9 @@ def plot_interaction_histogram(animal, poses, feature_metadata, subtitle=None,):
 	fig.update_layout(xaxis_title='Residue')
 	fig.update_layout(yaxis_title='#Interactions')
 
-	return add_hippo_logo(fig)
+	return fig
 
+@hippo_graph
 def plot_interaction_punchcard(animal, poses, feature_metadata, subtitle=None, opacity=1.0):
 
 	import plotly
@@ -138,6 +185,33 @@ def plot_interaction_punchcard(animal, poses, feature_metadata, subtitle=None, o
 
 	# return add_hippo_logo(fig, in_plot=False)
 	return add_punchcard_logo(fig)
+
+@hippo_graph
+def plot_building_blocks(animal, subtitle=None, cset='elabs', color='name_is_smiles'):
+
+	cset = animal.compound_sets[cset]
+
+	bbs = cset.get_building_blocks()
+
+	plot_data = []
+	for bb in bbs:
+		plot_data.append(bb.dict)
+
+
+	fig = px.bar(plot_data, x='name', y='amount', color=color)
+
+	title = 'Building Blocks'
+
+	if not subtitle:
+		subtitle = f'"{cset.name}": #BBs={len(bbs)}'
+
+	title = f'<b>{animal.target_name}</b>: {title}<br><sup><i>{subtitle}</i></sup>'
+
+	fig.update_layout(title=title,title_automargin=False, title_yref='container')
+
+	fig.update_layout(xaxis_title='Reactant', yaxis_title='Quantity')
+
+	return fig
 
 HIPPO_LOGO_URL = 'https://raw.githubusercontent.com/mwinokan/HIPPO/main/logos/hippo_logo_tightcrop.png'
 HIPPO_HEAD_URL = 'https://raw.githubusercontent.com/mwinokan/HIPPO/main/logos/hippo_assets-02.png'

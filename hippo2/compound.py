@@ -3,12 +3,17 @@ import mout
 import mcol
 import molparse as mp
 from rdkit import Chem
+from rdkit.Chem.Fingerprints import FingerprintMols
+from rdkit.Chem.rdMolHash import MolHash, HashFunction
 from pathlib import Path
 
 from .pose import Pose
 from .tset import TagSet
 from .pset import PoseSet
 from .rset import ReactionSet
+from .tools import remove_isotopes_from_smiles
+
+import re
 
 class Compound:
 
@@ -25,6 +30,8 @@ class Compound:
         self._poses = PoseSet()
         self._inspirations = []
         self._base = None
+        self._fp_1024 = None
+        self._canonical_smiles_hash = None
         # self._amount = None # mg
         self._reactions = ReactionSet()
 
@@ -42,14 +49,16 @@ class Compound:
     @classmethod
     def from_mol(cls, name, path, tags=None):
 
-        assert isinstance(path, Path)
+        if isinstance(path, Path):
+            mol = Chem.MolFromMolFile(str(path))
+        else:
+            mol = path
     
         tags = tags or []
         if isinstance(tags,str):
             tags = [tags]
         tags = TagSet(tags)
 
-        mol = Chem.MolFromMolFile(str(path))
         smiles = mp.rdkit.mol_to_smiles(mol)
         
         self = cls.__new__(cls)
@@ -120,10 +129,24 @@ class Compound:
         self._stereo_smiles = s
         self._smiles = s.replace('@','')
 
+        # remove isotopic stuff
+        if re.search(r'([\[][0-9]+[A-Z]+\])',self._smiles):
+            mout.warning(f'Isotope(s) in SMILES: {self._smiles}')
+            self._smiles = remove_isotopes_from_smiles(self._smiles)
+
+        return
+
         if self._smiles != self._orig_smiles:
 
             annotated_smiles_str = self.orig_smiles.replace('.',f'{mcol.error}{mcol.underline}.{mcol.clear}{mcol.warning}')
             annotated_smiles_str = annotated_smiles_str.replace('@',f'{mcol.error}{mcol.underline}@{mcol.clear}{mcol.warning}')
+            
+            # if re.search(r'([\[][0-9]+[A-Z]+\])',self._smiles):
+            #     print(self._smiles)
+
+            #     for match in set(re.findall(r'([\[][0-9]+[A-Z]+\])',self._smiles)):
+            #         print(match)
+            #         annotated_smiles_str.replace(match, f'{mcol.error}{mcol.underline}{match}{mcol.clear}{mcol.warning}')
 
             mout.warning(f'SMILES was changed: {annotated_smiles_str} --> {self.smiles}')
 
@@ -202,6 +225,29 @@ class Compound:
     def inspirations(self, s):
         self._inspirations = s
 
+    @property
+    def fp_1024(self):
+        if self._fp_1024 is None:
+            self._fp_1024 = FingerprintMols.FingerprintMol(self.mol, minPath=1, maxPath=7, fpSize=2048, bitsPerHash=2, useHs=True, tgtDensity=0.0, minSize=128)
+        return self._fp_1024
+
+    @property
+    def canonical_smiles_hash(self):
+        if self._canonical_smiles_hash is None:
+            self._canonical_smiles_hash = hash(MolHash(self.mol, HashFunction.CanonicalSmiles))
+        return self._canonical_smiles_hash
+    
+    # @property
+    # def dict(self):
+    #     return dict(
+    #         name = self.name,
+    #         smiles = self.smiles,
+    #         orig_smiles = self.orig_smiles,
+    #         crystal_name = self.crystal_name,
+    #         crystal_name = self.crystal_name,
+
+    #     )
+
 ### METHODS
 
     def add_pose(self, pose):
@@ -244,3 +290,6 @@ class Compound:
 
     def __eq__(self, other):
         return self.name == other.name
+
+    def __hash__(self):
+        return self.canonical_smiles_hash

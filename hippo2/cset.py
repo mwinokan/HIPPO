@@ -54,13 +54,15 @@ class CompoundSet(MutableSet):
             return [comp for comp in self if comp.name == key][0]
 
         if isinstance(key,Compound):
-            key = str(key)
+            # key = str(key)
+            [comp for comp in self if comp.name == key.name][0]
 
         elif isinstance(key,int):
             return self._elements[key]
             # return [c for c in self][key]
 
-        matches = [comp for comp in self if str(comp) == key]
+        matches = [comp for comp in self if comp == key]
+        # matches = [comp for comp in self if str(comp) == key]
 
         if len(matches) < 1:
             mout.error(f'{key} not in {self}')
@@ -195,6 +197,10 @@ class CompoundSet(MutableSet):
     def smiles(self):
         return [c.smiles for c in self]    
 
+    @property
+    def building_blocks(self):
+        return self.get_building_blocks()
+
     ### METHODS
 
     def pop(self):
@@ -220,12 +226,12 @@ class CompoundSet(MutableSet):
         else:
             raise ValueError(f'{key} not in {self}')
 
-    def add(self, compound):
+    def add(self, compound, error_duplicate=True):
         assert not self.immutable
         if compound not in self._elements:
             self._elements.append(compound)
             compound._set_name = self.name
-        else:
+        elif error_duplicate:
             raise ValueError(f'{compound} already in {self}')
 
     def shuffle(self):
@@ -263,15 +269,26 @@ class CompoundSet(MutableSet):
 
     def get_building_blocks(self,purchaseable_only=False):
 
-        from .block import BuildingBlockSet
+        # from .bb import BuildingBlockSet
 
-        bb_set = BuildingBlockSet()
+        # bb_set = BuildingBlockSet()
+
+        bb_set = CompoundSet(f'{self.name} BBs')
 
         for comp in self:
             if comp.building_blocks is not None:
                 for bb in comp.building_blocks:
                     if not purchaseable_only or bb.purchaseable:
-                        bb_set.add(bb)
+
+                        if bb in bb_set:
+                            
+                            bb_set[bb].amount += 1
+
+                        else:
+
+                            bb = bb.copy()
+                            bb.amount = 1
+                            bb_set.add(bb, error_duplicate=False)
 
         return bb_set
 

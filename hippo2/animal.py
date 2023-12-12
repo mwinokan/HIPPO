@@ -14,12 +14,15 @@ from .bb import BuildingBlock
 from pathlib import Path
 import pandas as pd
 from pprint import pprint
+import json
 
 from rdkit import Chem
 
 from pprint import pprint
 
-from .tools import df_row_to_dict
+from .tools import df_row_to_dict, smiles_has_isotope
+
+SUPPLIERS = ['enamine', 'mcule']
 
 class HIPPO:
 
@@ -107,7 +110,7 @@ class HIPPO:
 
     """
 
-    def __init__(self, project_name, target_name):
+    def __init__(self, project_name, target_name, reactant_catalog='enamine'):
 
         self._name = project_name
         self._target_name = target_name
@@ -122,6 +125,9 @@ class HIPPO:
         self._building_blocks = CompoundSet('building_blocks')
 
         self._protein_feature_strs = None
+
+        assert reactant_catalog in SUPPLIERS
+        self._reactant_catalog = reactant_catalog
 
     ### FACTORIES
 
@@ -201,6 +207,197 @@ class HIPPO:
 
         mout.success(f'Loaded {comp_set.num_compounds} compounds as "{comp_set.name}" ({self.hits.num_poses} poses)')
 
+    def add_elabs(
+        self, 
+        root_path, 
+        tags=None,
+        routes_csv_pattern='routes_data/*.csv', 
+        elabs_csv_pattern='elabs/*/*/*/*.csv', 
+        placements_pattern='elabs/*/*/*/success/*/*.minimised.mol',
+        placements_output_dir_name='success',
+        minimised_mol_suffix='.minimised.mol',
+        elabs_skip_prefix=['.','~$'],
+        elabs_skip_substr=['_batch_'],
+        elabs_skip_exact=['output.csv'],
+        test=False,
+        reference_hit=None,
+        overwrite=False,
+    ):
+
+        if not overwrite and 'elabs' in self.compound_sets:
+            mout.error(f'CompoundSet "elabs" already exists')
+            return
+
+        if not isinstance(elabs_skip_prefix, list):
+            elabs_skip_prefix = [elabs_skip_prefix]
+        if not isinstance(elabs_skip_substr, list):
+            elabs_skip_substr = [elabs_skip_substr]
+        if not isinstance(elabs_skip_exact, list):
+            elabs_skip_exact = [elabs_skip_exact]
+
+        tags = tags or ['Syndirella']
+        tags = TagSet(tags)
+        
+        mout.var('root_path',str(root_path))
+        mout.var('tags',tags)
+
+        # parse the routes_data CSV
+        mout.header('Syndirella Synthetic Routes CSV')
+        routes_csv_paths = root_path.glob(routes_csv_pattern)
+        mout.var('routes_csv_pattern',routes_csv_pattern)
+        mout.var('paths',list(routes_csv_paths))
+
+        # first compound tagged as 'base'?
+
+        # parse the elabs CSV for each batch
+        mout.header('Syndirella Elaborations CSVs')
+        elabs_csv_paths = list(root_path.glob(elabs_csv_pattern))
+        mout.var('elabs_csv_pattern',elabs_csv_pattern)
+        mout.var('minimised_mol_suffix',minimised_mol_suffix)
+        # mout.var('placements_pattern',placements_pattern)
+
+        # filter
+        elabs_csv_paths = [p for p in elabs_csv_paths if not any([p.name.startswith(s) for s in elabs_skip_prefix])]
+        elabs_csv_paths = [p for p in elabs_csv_paths if not any([s in p.name for s in elabs_skip_substr])]
+        elabs_csv_paths = [p for p in elabs_csv_paths if not any([s == p.name for s in elabs_skip_exact])]
+
+        mout.var('elabs_skip_prefix', elabs_skip_prefix)
+        mout.var('elabs_skip_substr', elabs_skip_substr)
+        mout.var('elabs_skip_exact', elabs_skip_exact)
+        mout.var('#elab CSVs', len(elabs_csv_paths))
+
+        count_bases_without_minimized = 0
+        count_isotopic_smiles_skipped = 0
+
+
+        ### Create all the Compounds
+
+        cset = CompoundSet('elabs')
+
+        n_paths = len(elabs_csv_paths)
+        for j, path in enumerate(elabs_csv_paths):
+
+            mout.progress(j, n_paths, append=f'#elabs={len(cset):>07}')
+
+            df = pd.read_csv(path)
+
+            try:
+                names = df['name'].values
+            except KeyError:
+                mout.error(f'No "name" column in CSV: {path}')
+                continue
+
+            if not (path.parent / placements_output_dir_name).is_dir():
+                mout.warning(f'Skipping directory with no subdir named "{placements_output_dir_name}" ({path.name})')
+                continue
+
+            for i, name in enumerate(names):
+
+                if i%100 == 0:
+                    mout.progress(j, n_paths, append=f'#elabs={len(cset):>07}')
+
+                pose_name = name
+                bleach_name = name.replace('_','-')
+
+                # remove conformer info
+                name = pose_name[:-2]
+
+                base = 'base' in name
+
+                # comp_output_dir = path.parent / placements_output_dir_name / name
+                comp_output_dir = path.parent / placements_output_dir_name / bleach_name
+
+                too_contorted = False
+
+                if not comp_output_dir.is_dir():
+
+                    if base:
+
+                        if (path.parent / "output" / bleach_name).is_dir():
+                            mout.warning(f'Using too contorted base {pose_name}') 
+                            comp_output_dir = path.parent / "output" / bleach_name
+                            count_bases_without_minimized += 1
+                            too_contorted = True
+                        else:
+                            mout.error(f'Base has neither "success" nor "output" directory {pose_name}') 
+                            continue
+                    
+                    continue
+                
+                meta_row = df[df['name'] == pose_name]
+                meta_dict = df_row_to_dict(meta_row)
+
+                if smiles_has_isotope(meta_dict["smiles"]):
+                    count_isotopic_smiles_skipped += 1
+                    continue
+
+                mol_path = comp_output_dir / f'{bleach_name}{minimised_mol_suffix}'
+
+                mol = Chem.MolFromMolFile(str(mol_path))
+
+                if base:
+                    comp_tags = tags + ['base']
+                else:
+                    comp_tags = tags
+
+                if too_contorted:
+                    tags.add('too_contorted')
+
+                if not reference_hit:
+                    reference_hit = meta_dict['ref_pdb']
+
+                reference_pdb = self.get_hit_pose(reference_hit).pdb_path
+
+                if name not in cset:
+                    compound = Compound.from_mol(name, mol, tags=tags)
+                    self._add_compound_metadata(compound, meta_dict)
+                    cset.add(compound)
+                else:
+                    compound = cset[name]
+
+                pose = Pose.from_mol_and_reference(compound, mol, reference_pdb)
+
+                compound.add_pose(pose)
+
+            if test:
+                break
+
+
+        if overwrite and 'elabs' in self.compound_sets:
+            self.compound_sets['elabs'] = cset
+        else:
+            self.compound_sets.append(cset)
+        self._elabs = self._compound_sets[-1]
+        
+        mout.finish()
+
+        mout.var('#bases_without_minimized', count_bases_without_minimized)
+        mout.var('#isotopic_smiles_skipped', count_isotopic_smiles_skipped)
+
+        return cset
+
+        ### Add Compound metadata
+
+        # return df
+
+        # pprint([p.name for p in elabs_csv_paths])
+        # pprint(elabs_csv_paths)
+
+        # print(elabs_csv_paths[0])
+
+
+        # parse the 
+
+        # only one compound set?
+
+        # calculate the building blocks required
+
+        ...
+
+    # def quote_bbs(self, cset, quoter):
+
+        
+
     def add_bases(self, mol_paths, pdb_paths, metadata_paths, tags=None, overwrite=False):
 
         ### checks
@@ -258,58 +455,6 @@ class HIPPO:
         self._base_compounds = self._compound_sets[-1]
 
         mout.success(f'Loaded {comp_set.num_compounds} compounds as "{comp_set.name}" ({self.bases.num_poses} poses)')
-
-        # return meta_dict
-
-    def add_elabs(self, mol_paths, pdb_paths, metadata, tags=None, set_name='elabs', append=False, overwrite=False, first_is_base=True):
-
-        ### checks
-        
-        if not overwrite and set_name in self.compound_sets:
-            mout.error(f'CompoundSet "{set_name}" already exists')
-            return
-
-        tags = tags or [set_name]
-        tags = TagSet(tags)
-
-        if append:
-            comp_set = self.compound_sets[set_name]
-        else:
-            comp_set = CompoundSet(set_name)
-
-        meta_df = pd.read_csv(metadata)
-
-        for mol, pdb in zip(mol_paths, pdb_paths):
-
-            if not isinstance(mol, Path):
-                mol = Path(mol)
-
-            comp_name = mol.name.replace('.minimised.mol','')
-
-            compound = Compound.from_mol(comp_name, mol, tags=tags)
-
-            pose = Pose.from_bound_pdb(compound, pdb)
-
-            compound.add_pose(pose)
-
-            comp_set.add(compound)
-
-            ### inspirations
-
-            ### base
-
-            ### synthetic routes
-
-        if not append:
-            if overwrite and set_name in self.compound_sets:
-                self.compound_sets[set_name] = comp_set
-            else:
-                self.compound_sets.append(comp_set)
-            # self._base_compounds = self._compound_sets[-1]
-
-        mout.success(f'Loaded {comp_set.num_compounds} compounds as "{comp_set.name}" ({comp_set.num_poses} poses)')
-
-        return meta_df
 
     def summary(self):
         mout.header(f'{self}')  
@@ -380,19 +525,23 @@ class HIPPO:
 
     ### PLOTTING
 
-    def plot_tag_statistics(self):
+    def plot_tag_statistics(self, *args, **kwargs):
         from .plotting import plot_tag_statistics
-        return plot_tag_statistics(self)
+        return plot_tag_statistics(self, *args, **kwargs)
 
-    def plot_interaction_histogram(self, poses, subtitle=None):
+    def plot_interaction_histogram(self, poses, subtitle=None, **kwargs):
         from .fingerprint import FEATURE_METADATA
         from .plotting import plot_interaction_histogram
-        return plot_interaction_histogram(self, poses, FEATURE_METADATA, subtitle)
+        return plot_interaction_histogram(self, poses, FEATURE_METADATA, subtitle, **kwargs)
 
-    def plot_interaction_punchcard(self, poses, subtitle, opacity=1.0):
+    def plot_interaction_punchcard(self, poses, subtitle, opacity=1.0, **kwargs):
         from .fingerprint import FEATURE_METADATA
         from .plotting import plot_interaction_punchcard
-        return plot_interaction_punchcard(self, poses, FEATURE_METADATA, subtitle, opacity)
+        return plot_interaction_punchcard(self, poses, FEATURE_METADATA, subtitle, opacity, **kwargs)
+
+    def plot_building_blocks(self, subtitle=None, cset='elabs', **kwargs):
+        from .plotting import plot_building_blocks        
+        return plot_building_blocks(self, subtitle, cset, **kwargs)
 
     ### INTERNAL METHODS
 
@@ -444,7 +593,7 @@ class HIPPO:
         return pd.DataFrame(fingerprints)
         
     # @mout.debug_log
-    def _add_compound_metadata(self, compound, meta_dict):
+    def _add_compound_metadata(self, compound, meta_dict, warnings=False):
 
         ### inspirations
 
@@ -472,10 +621,10 @@ class HIPPO:
             # mout.debug('Adding single-step reaction')
 
             # grab metadata
-            mout.warning('Reaction type is unknown')
-            reaction_type = 'Unknown'
+            reaction_type = meta_dict['reaction']
 
-            mout.warning('Assuming equal amounts of reactants')
+            if warnings:
+                mout.warning('Assuming equal amounts of reactants')
             amounts = 1
 
             if 'smi_reactant1' in meta_dict:
@@ -488,6 +637,20 @@ class HIPPO:
             # create the reactants
             reactant1 = self._get_or_create_building_block(reactant1)
             reactant2 = self._get_or_create_building_block(reactant2)
+            
+            if reactant1.name_is_smiles:
+                metadata_reactant1 = eval(meta_dict['metadata_reactant1'])
+                metadata_reactant1 = {d['catalogName']:d for d in metadata_reactant1}
+                for v in [v for k,v in metadata_reactant1.items() if self.reactant_catalog in k]:
+                    reactant1.name = v['catalogId']
+                    break
+
+            if reactant2.name_is_smiles:
+                metadata_reactant2 = eval(meta_dict['metadata_reactant2'])
+                metadata_reactant2 = {d['catalogName']:d for d in metadata_reactant2}
+                for v in [v for k,v in metadata_reactant2.items() if self.reactant_catalog in k]:
+                    reactant2.name = v['catalogId']
+                    break
 
             # create the reaction
             reaction = Reaction(reaction_type, compound, [reactant1, reactant2], product_amount=amounts, amounts=amounts)
@@ -528,7 +691,8 @@ class HIPPO:
     def all_compounds(self):
         if len(self.compound_sets) == 1:
             return self.compound_sets[0]
-        return set().union(*self.compound_sets)
+        # return set().union(*self.compound_sets)
+        return self.compound_sets.all_compounds
 
     @property
     def num_poses(self):
@@ -590,6 +754,14 @@ class HIPPO:
     @property
     def building_blocks(self):
         return self._building_blocks
+
+    @property
+    def elabs(self):
+        return self._elabs
+
+    @property
+    def reactant_catalog(self):
+        return self._reactant_catalog
     
     ### DUNDERS
 

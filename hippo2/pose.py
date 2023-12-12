@@ -31,6 +31,7 @@ class Pose:
 
 	@classmethod
 	def from_bound_pdb(cls, compound, pdb_path, metadata=None, tags=None, site_index=None, chain=None):
+		"""Usually from crystalstructure / Fragalysis LHS"""
 
 		self = cls.__new__(cls)
 
@@ -63,6 +64,22 @@ class Pose:
 				name = '??'
 
 		self.__init__(name, compound, pdb_path, site_index, chain, tags)
+		
+		return self
+
+	@classmethod
+	def from_mol_and_reference(cls, compound, mol, protein_reference, metadata=None, tags=None, site_index=None, chain=None):
+		"""Usually a virtual hit from Syndirella"""
+
+		self = cls.__new__(cls)
+
+		tags = TagSet(tags or [])
+
+		name = compound.name
+
+		self.__init__(name, compound, protein_reference, site_index, chain, tags)
+
+		self._mol = mol
 		
 		return self
 

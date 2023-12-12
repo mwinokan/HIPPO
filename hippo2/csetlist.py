@@ -1,6 +1,7 @@
 
 import mout
 from collections import UserList
+from .cset import CompoundSet
 
 class CompoundSetList(UserList):
 
@@ -52,3 +53,8 @@ class CompoundSetList(UserList):
 			return
 
 		self.data.append(item)
+
+	@property
+	def all_compounds(self):
+		comps = set(sum([cs.compounds for cs in self],[]))
+		return CompoundSet('all_compounds', set() )
