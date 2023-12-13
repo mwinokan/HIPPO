@@ -54,9 +54,29 @@ class Reaction:
 	def product_amount(self):
 		return self._product_amount
 
+	@property
+	def reactant_names(self):
+		return [c.name for c in self.reactants]
+
+	@property
+	def reactant_smiles(self):
+		return [c.smiles for c in self.reactants]
+
 	# @property
 	# def building_blocks(self):
 	# 	return self._reactants
+
+	@property
+	def dict(self):
+		return dict(
+			type=self.type,
+			product_name=self.product.name,
+			product_smiles=self.product.smiles,
+			num_reactants=self.num_reactants,
+			reactant_names=self.reactant_names,
+			reactant_smiles=self.reactant_smiles,
+		)
+	
 	
 	### METHODS
 
@@ -77,3 +97,14 @@ class Reaction:
 
 	def __repr__(self):
 		return f'Reaction(type={self.type}, #reactants={self.num_reactants}, product={self.product.name})'
+
+	def __eq__(self, other):
+
+		if self.num_reactants != other.num_reactants:
+			return False
+
+		for reactant in self.reactants:
+			if reactant not in other.reactants:
+				return False
+
+		return True

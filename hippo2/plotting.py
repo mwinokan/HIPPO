@@ -56,19 +56,21 @@ def hippo_graph(func):
 	return wrapper
 
 @hippo_graph
-def plot_tag_statistics(animal, color=None, subtitle=None):
+def plot_tag_statistics(animal, color='type', subtitle=None):
 
 	plot_data = []
 
 	for tag in animal.all_tags:
 
-		num_poses = len(animal.get_poses(tag))
-
-		data = dict(tag=tag, num_poses=num_poses)
-
+		num_compounds = len(animal.get_compounds(tag))
+		data = dict(tag=tag, number=num_compounds, type='compounds')
 		plot_data.append(data)
 
-	fig = px.bar(plot_data, x='tag', y='num_poses', color=None)
+		num_poses = len(animal.get_poses(tag))
+		data = dict(tag=tag, number=num_poses, type='poses')
+		plot_data.append(data)
+		
+	fig = px.bar(plot_data, x='tag', y='number', color=color)
 
 	title = 'Tag Statistics'
 
@@ -77,9 +79,9 @@ def plot_tag_statistics(animal, color=None, subtitle=None):
 	else:
 		title = f'<b>{animal.target_name}</b>: {title}'
 	
-	fig.update_layout(title=title,title_automargin=False, title_yref='container')
+	fig.update_layout(title=title,title_automargin=False, title_yref='container', barmode='group')
 
-	fig.update_layout(xaxis_title='Tag', yaxis_title='#Poses')
+	fig.update_layout(xaxis_title='Tag', yaxis_title='#')
 
 	return fig
 
@@ -187,23 +189,29 @@ def plot_interaction_punchcard(animal, poses, feature_metadata, subtitle=None, o
 	return add_punchcard_logo(fig)
 
 @hippo_graph
-def plot_building_blocks(animal, subtitle=None, cset='elabs', color='name_is_smiles'):
+# def plot_building_blocks(animal, subtitle=None, cset='elabs', color='name_is_smiles'):
+def plot_reactant_amounts(animal, subtitle=None, color='has_price_picker', named_only=False):
 
-	cset = animal.compound_sets[cset]
+	# cset = animal.compound_sets[cset]
 
-	bbs = cset.get_building_blocks()
+	# bbs = cset.get_building_blocks()
+
+	bbs = animal.building_blocks
 
 	plot_data = []
 	for bb in bbs:
-		plot_data.append(bb.dict)
+		d = bb.dict
+		if not named_only or not d['name_is_smiles']:
+			plot_data.append(d)
 
-
-	fig = px.bar(plot_data, x='name', y='amount', color=color)
+	fig = px.bar(plot_data, x='name', y='amount', color=color, hover_data=plot_data[0].keys())
+	# fig = px.bar(plot_data, x='smiles', y='amount', color=color)
 
 	title = 'Building Blocks'
 
 	if not subtitle:
-		subtitle = f'"{cset.name}": #BBs={len(bbs)}'
+		# subtitle = f'"{cset.name}": #BBs={len(bbs)}'
+		subtitle = f'#BBs={len(bbs)}'
 
 	title = f'<b>{animal.target_name}</b>: {title}<br><sup><i>{subtitle}</i></sup>'
 
@@ -212,6 +220,190 @@ def plot_building_blocks(animal, subtitle=None, cset='elabs', color='name_is_smi
 	fig.update_layout(xaxis_title='Reactant', yaxis_title='Quantity')
 
 	return fig
+
+@hippo_graph
+# def plot_building_blocks(animal, subtitle=None, cset='elabs', color='name_is_smiles'):
+def plot_reactant_price(animal, subtitle=None, amount=20):
+
+	# cset = animal.compound_sets[cset]
+
+	# bbs = cset.get_building_blocks()
+
+	bbs = animal.building_blocks
+
+	plot_data = []
+	for bb in bbs:
+		d = bb.dict
+		if not d['has_price_picker']:
+			continue
+
+		d[f'price_{amount}mg'] = bb.get_price(amount)
+		d[f'min_amount'] = bb.price_picker.min_amount
+
+		plot_data.append(d)
+
+	fig = px.bar(plot_data, x='name', y=f'price_{amount}mg', color='lead_time', log_y=True, hover_data=plot_data[0].keys())
+	# fig = px.bar(plot_data, x='smiles', y='amount', color=color)
+
+	title = 'Building Blocks'
+
+	if not subtitle:
+		# subtitle = f'"{cset.name}": #BBs={len(bbs)}'
+		subtitle = f'#BBs={len(bbs)}'
+
+	title = f'<b>{animal.target_name}</b>: {title}<br><sup><i>{subtitle}</i></sup>'
+
+	fig.update_layout(title=title,title_automargin=False, title_yref='container')
+
+	fig.update_layout(xaxis_title='Reactant', yaxis_title=f'Price for {amount}mg [$USD]')
+
+	return fig
+
+@hippo_graph
+# def plot_building_blocks(animal, subtitle=None, cset='elabs', color='name_is_smiles'):
+def plot_reactants_2d(animal, subtitle=None, amount=20):
+
+	# cset = animal.compound_sets[cset]
+
+	# bbs = cset.get_building_blocks()
+
+	bbs = animal.building_blocks
+
+	plot_data = []
+	for bb in bbs:
+		d = bb.dict
+		if not d['has_price_picker']:
+			continue
+
+		d[f'price_{amount}mg'] = bb.get_price(amount)
+		d[f'min_amount'] = bb.price_picker.min_amount
+
+		plot_data.append(d)
+
+	fig = px.scatter(plot_data, y='amount', x=f'price_{amount}mg', color='name', hover_data=plot_data[0].keys())
+	# fig = px.bar(plot_data, x='smiles', y='amount', color=color)
+
+	title = 'Building Blocks'
+
+	if not subtitle:
+		# subtitle = f'"{cset.name}": #BBs={len(bbs)}'
+		subtitle = f'#BBs={len(bbs)}'
+
+	title = f'<b>{animal.target_name}</b>: {title}<br><sup><i>{subtitle}</i></sup>'
+
+	fig.update_layout(title=title,title_automargin=False, title_yref='container')
+
+	fig.update_layout(scattermode='group', scattergap=0.75)
+
+	fig.update_layout(yaxis_title='Quantity [mg]', xaxis_title=f'Price for {amount}mg [$USD]')
+
+	return fig
+
+@hippo_graph
+# def plot_building_blocks(animal, subtitle=None, cset='elabs', color='name_is_smiles'):
+def plot_building_blocks(animal, subtitle=None, color='name_is_smiles'):
+
+	# cset = animal.compound_sets[cset]
+
+	# bbs = cset.get_building_blocks()
+
+	bbs = animal.building_blocks
+
+	plot_data = []
+	for bb in bbs:
+		plot_data.append(bb.dict)
+
+	fig = px.scatter(plot_data, x='name', y='max', color='amount')
+	# fig = px.bar(plot_data, x='smiles', y='amount', color=color)
+
+	title = 'Building Blocks'
+
+	if not subtitle:
+		# subtitle = f'"{cset.name}": #BBs={len(bbs)}'
+		subtitle = f'#BBs={len(bbs)}'
+
+	title = f'<b>{animal.target_name}</b>: {title}<br><sup><i>{subtitle}</i></sup>'
+
+	fig.update_layout(title=title,title_automargin=False, title_yref='container')
+
+	fig.update_layout(xaxis_title='Reactant', yaxis_title='Quantity')
+
+	return fig
+
+@hippo_graph
+def plot_synthetic_routes(animal, subtitle=None, cset='elabs', color='num_reactants'):
+
+	cset = animal.compound_sets[cset]
+
+	plot_data = []
+	for reax in cset.reactions:
+		plot_data.append(reax.dict)
+
+	# fig = px.bar(plot_data, x='name', y='amount', color=color)
+	fig = px.histogram(plot_data, x='type', color=color)
+
+	title = 'Synthetic Routes'
+
+	if not subtitle:
+		subtitle = f'"{cset.name}": #compounds={len(cset)}'
+
+	title = f'<b>{animal.target_name}</b>: {title}<br><sup><i>{subtitle}</i></sup>'
+
+	fig.update_layout(title=title,title_automargin=False, title_yref='container')
+
+	fig.update_layout(xaxis_title='Compound', yaxis_title='#Routes')
+
+	return fig
+
+@hippo_graph
+def plot_numbers(animal, subtitle=None):
+
+	'''
+		- y-axis: numbers
+		- x-categories
+			* hits
+			* hit poses
+			* bases
+			* base poses
+			* elabs
+			* elab poses
+			* BBs (total)
+			* BBs (in enamine)
+	'''
+
+	# cset = animal.compound_sets[cset]
+
+	plot_data = [
+		dict(category='Experimental Hits', number=len(animal.hits), type='compound'),
+		dict(category='Experimental Hits', number=len(animal.hits.poses), type='poses'),
+		dict(category='Base compounds', number=len(animal.bases), type='compound'),
+		dict(category='Base compounds', number=len(animal.bases.poses), type='poses'),
+		dict(category='Syndirella Elaborations', number=len(animal.elabs), type='compound'),
+		dict(category='Syndirella Elaborations', number=len(animal.elabs.poses), type='poses'),
+		dict(category='Unique Reactants', number=len(animal.building_blocks), type='compound'),
+	]
+
+	fig = px.bar(plot_data, x='category', y='number', log_y=True, color='type')
+
+	title = 'Compounds & Poses'
+
+	title = f'<b>{animal.target_name}</b>: {title}<br>'
+
+	fig.update_layout(title=title,title_automargin=False, title_yref='container', barmode='group')
+
+	fig.update_layout(xaxis_title=None, yaxis_title='Log(Quantity)')
+
+	return fig
+
+def plot_sankey(animal, subtitle):
+
+	'''
+		BBs (total)
+		BBs (in enamine)
+		BBs (within budget)
+		BBs (within lead-time)
+	'''
+	...
 
 HIPPO_LOGO_URL = 'https://raw.githubusercontent.com/mwinokan/HIPPO/main/logos/hippo_logo_tightcrop.png'
 HIPPO_HEAD_URL = 'https://raw.githubusercontent.com/mwinokan/HIPPO/main/logos/hippo_assets-02.png'

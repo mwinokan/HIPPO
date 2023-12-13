@@ -11,7 +11,7 @@ from .pose import Pose
 from .tset import TagSet
 from .pset import PoseSet
 from .rset import ReactionSet
-from .tools import remove_isotopes_from_smiles
+from .tools import clean_smiles 
 
 import re
 
@@ -119,36 +119,11 @@ class Compound:
             mout.warning(f'Overwriting SMILES: {self.name}')
         assert isinstance(s,str)
 
-        self._orig_smiles = s
+        result = clean_smiles(s)
 
-        # if multiple molecules take the largest
-        if '.' in s:
-            s = sorted(s.split('.'), key=lambda x: len(x))[-1]
-        
-        # flatten the smiles
-        self._stereo_smiles = s
-        self._smiles = s.replace('@','')
-
-        # remove isotopic stuff
-        if re.search(r'([\[][0-9]+[A-Z]+\])',self._smiles):
-            mout.warning(f'Isotope(s) in SMILES: {self._smiles}')
-            self._smiles = remove_isotopes_from_smiles(self._smiles)
-
-        return
-
-        if self._smiles != self._orig_smiles:
-
-            annotated_smiles_str = self.orig_smiles.replace('.',f'{mcol.error}{mcol.underline}.{mcol.clear}{mcol.warning}')
-            annotated_smiles_str = annotated_smiles_str.replace('@',f'{mcol.error}{mcol.underline}@{mcol.clear}{mcol.warning}')
-            
-            # if re.search(r'([\[][0-9]+[A-Z]+\])',self._smiles):
-            #     print(self._smiles)
-
-            #     for match in set(re.findall(r'([\[][0-9]+[A-Z]+\])',self._smiles)):
-            #         print(match)
-            #         annotated_smiles_str.replace(match, f'{mcol.error}{mcol.underline}{match}{mcol.clear}{mcol.warning}')
-
-            mout.warning(f'SMILES was changed: {annotated_smiles_str} --> {self.smiles}')
+        self._smiles = result['smiles']
+        self._orig_smiles = result['orig_smiles']
+        self._stereo_smiles = result['stereo_smiles']
 
     @property
     def orig_smiles(self):
@@ -237,24 +212,39 @@ class Compound:
             self._canonical_smiles_hash = hash(MolHash(self.mol, HashFunction.CanonicalSmiles))
         return self._canonical_smiles_hash
     
-    # @property
-    # def dict(self):
-    #     return dict(
-    #         name = self.name,
-    #         smiles = self.smiles,
-    #         orig_smiles = self.orig_smiles,
-    #         crystal_name = self.crystal_name,
-    #         crystal_name = self.crystal_name,
-
-    #     )
+    @property
+    def dict(self):
+        return dict(
+            name = self.name,
+            smiles = self.smiles,
+            orig_smiles = self.orig_smiles,
+            crystal_name = self.crystal_name,
+            num_poses = self.num_poses,
+            num_reactions = self.num_reactions,
+        )
 
 ### METHODS
 
     def add_pose(self, pose):
         self.poses.add(pose)
 
-    def add_reaction(self, reaction):
+    def add_reaction(self, reaction, duplicate_warning=False, debug=False):
+
+        # check if an equivalent reaction exists
+        if reaction in self.reactions:
+            if duplicate_warning: 
+                mout.warning('Skipping duplicate reaction')
+            return False
+
         self.reactions.add(reaction)
+
+        if debug:
+            if self.num_reactions > 1:
+                mout.debug(self)
+                for reaction in self.reactions:
+                    reaction.summary()
+
+        return True
 
     def summary(self):
 
@@ -289,7 +279,8 @@ class Compound:
         return f'Compound({self.name}, {self.smiles}, #poses={self.num_poses})'
 
     def __eq__(self, other):
-        return self.name == other.name
+        # return self.name == other.name
+        return self.canonical_smiles_hash == other.canonical_smiles_hash
 
     def __hash__(self):
         return self.canonical_smiles_hash

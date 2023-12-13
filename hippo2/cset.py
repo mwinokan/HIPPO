@@ -53,9 +53,9 @@ class CompoundSet(MutableSet):
         if isinstance(key, str):
             return [comp for comp in self if comp.name == key][0]
 
-        if isinstance(key,Compound):
-            # key = str(key)
-            [comp for comp in self if comp.name == key.name][0]
+        # if isinstance(key,Compound):
+        #     # key = str(key)
+        #     matches = [comp for comp in self if comp == key][0]
 
         elif isinstance(key,int):
             return self._elements[key]
@@ -194,6 +194,10 @@ class CompoundSet(MutableSet):
         return sum([c.num_poses for c in self])
 
     @property
+    def reactions(self):
+        return sum([[r for r in c.reactions] for c in self],[])
+
+    @property
     def smiles(self):
         return [c.smiles for c in self]    
 
@@ -226,13 +230,20 @@ class CompoundSet(MutableSet):
         else:
             raise ValueError(f'{key} not in {self}')
 
-    def add(self, compound, error_duplicate=True):
+    def add(self, compound, duplicate='error'):
         assert not self.immutable
         if compound not in self._elements:
             self._elements.append(compound)
             compound._set_name = self.name
-        elif error_duplicate:
+
+        elif duplicate == 'error':
+            mout.error(f"Compound already in {self}")
+            mout.var('compound', f'{compound}')
+            mout.var('match', f'{self[compound]}')
             raise ValueError(f'{compound} already in {self}')
+
+        elif duplicate == 'skip':
+            mout.warning(f"Skipping {compound} already in {self}")
 
     def shuffle(self):
         random.shuffle(self._elements)
@@ -267,30 +278,35 @@ class CompoundSet(MutableSet):
 
         print(pd.DataFrame(print_data))
 
-    def get_building_blocks(self,purchaseable_only=False):
+    # def get_building_blocks(self,purchaseable_only=False):
 
-        # from .bb import BuildingBlockSet
+    #     # from .bb import BuildingBlockSet
 
-        # bb_set = BuildingBlockSet()
+    #     # bb_set = BuildingBlockSet()
 
-        bb_set = CompoundSet(f'{self.name} BBs')
+    #     bb_set = CompoundSet(f'{self.name} BBs')
 
-        for comp in self:
-            if comp.building_blocks is not None:
-                for bb in comp.building_blocks:
-                    if not purchaseable_only or bb.purchaseable:
+    #     for comp in self:
+    #         if comp.building_blocks is not None:
+    #             for bb in comp.building_blocks:
+    #                 if not purchaseable_only or bb.purchaseable:
 
-                        if bb in bb_set:
+    #                     if bb in bb_set:
                             
-                            bb_set[bb].amount += 1
+    #                         bb_set[bb].amount += 1
 
-                        else:
+    #                     else:
 
-                            bb = bb.copy()
-                            bb.amount = 1
-                            bb_set.add(bb, error_duplicate=False)
+    #                         bb = bb.copy()
+    #                         bb.amount = 1
+    #                         bb_set.add(bb, error_duplicate=False)
 
-        return bb_set
+    #     return bb_set
+
+    def get_by_smiles(self, smiles):
+        matches = [c for c in self if c.smiles == smiles]
+        assert len(matches) == 1
+        return matches[0]
 
     ### PROTECTION
 

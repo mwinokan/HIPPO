@@ -20,7 +20,8 @@ from rdkit import Chem
 
 from pprint import pprint
 
-from .tools import df_row_to_dict, smiles_has_isotope
+from .tools import df_row_to_dict, smiles_has_isotope, clean_smiles
+from .quoting import NotInCatalogues
 
 SUPPLIERS = ['enamine', 'mcule']
 
@@ -227,6 +228,9 @@ class HIPPO:
         if not overwrite and 'elabs' in self.compound_sets:
             mout.error(f'CompoundSet "elabs" already exists')
             return
+        if not overwrite and 'bases' in self.compound_sets:
+            mout.error(f'CompoundSet "bases" already exists')
+            return
 
         if not isinstance(elabs_skip_prefix, list):
             elabs_skip_prefix = [elabs_skip_prefix]
@@ -273,6 +277,7 @@ class HIPPO:
         ### Create all the Compounds
 
         cset = CompoundSet('elabs')
+        cset_bases = CompoundSet('bases')
 
         n_paths = len(elabs_csv_paths)
         for j, path in enumerate(elabs_csv_paths):
@@ -321,9 +326,10 @@ class HIPPO:
                         else:
                             mout.error(f'Base has neither "success" nor "output" directory {pose_name}') 
                             continue
-                    
-                    continue
-                
+
+                    else:
+                        continue
+                                    
                 meta_row = df[df['name'] == pose_name]
                 meta_dict = df_row_to_dict(meta_row)
 
@@ -338,66 +344,102 @@ class HIPPO:
                 if base:
                     comp_tags = tags + ['base']
                 else:
-                    comp_tags = tags
+                    comp_tags = tags + ['elab']
 
                 if too_contorted:
-                    tags.add('too_contorted')
+                    comp_tags.add('too_contorted')
 
                 if not reference_hit:
                     reference_hit = meta_dict['ref_pdb']
 
                 reference_pdb = self.get_hit_pose(reference_hit).pdb_path
 
-                if name not in cset:
-                    compound = Compound.from_mol(name, mol, tags=tags)
-                    self._add_compound_metadata(compound, meta_dict)
-                    cset.add(compound)
+                if not base:
+
+                    if name not in cset:
+
+                        # compound doesn't exist under this name
+                        compound = Compound.from_mol(name, mol, tags=comp_tags)
+                        self._add_compound_metadata(compound, meta_dict)
+
+                        # if it exists under a different name just add the synthetic route
+                        if compound in cset:
+                            cset[compound].add_reaction(compound.reaction)
+                        else:
+                            cset.add(compound, duplicate='error')
+
+                    else:
+                        compound = cset[name]
+
+                    pose = Pose.from_mol_and_reference(compound, mol, reference_pdb)
+                    compound.add_pose(pose)
+
                 else:
-                    compound = cset[name]
 
-                pose = Pose.from_mol_and_reference(compound, mol, reference_pdb)
+                    if name not in cset_bases:
 
-                compound.add_pose(pose)
+                        # compound doesn't exist under this name
+                        compound = Compound.from_mol(name, mol, tags=comp_tags)
+                        self._add_compound_metadata(compound, meta_dict)
+
+                        # if it exists under a different name just add the synthetic route
+                        if compound in cset_bases:
+                            not_duplicate = cset_bases[compound].add_reaction(compound.reaction)
+
+                        else:
+                            cset_bases.add(compound, duplicate='error')
+
+                            # increment reactant quantities (a new pose can be made)
+
+                    else:
+                        compound = cset_bases[name]
+
+                    pose = Pose.from_mol_and_reference(compound, mol, reference_pdb)
+                    compound.add_pose(pose)
 
             if test:
                 break
 
+        if overwrite and 'bases' in self.compound_sets:
+            self.compound_sets['bases'] = cset_bases
+        else:
+            self.compound_sets.append(cset_bases)
+        self._bases = self._compound_sets[-1]
 
         if overwrite and 'elabs' in self.compound_sets:
             self.compound_sets['elabs'] = cset
         else:
             self.compound_sets.append(cset)
         self._elabs = self._compound_sets[-1]
+
+        self._update_bb_amounts()
         
         mout.finish()
 
         mout.var('#bases_without_minimized', count_bases_without_minimized)
         mout.var('#isotopic_smiles_skipped', count_isotopic_smiles_skipped)
 
-        return cset
+        return cset_bases, cset
 
-        ### Add Compound metadata
+    def quote_reactants(self, quoter):
 
-        # return df
+        count_not_found = 0
 
-        # pprint([p.name for p in elabs_csv_paths])
-        # pprint(elabs_csv_paths)
+        try:
+            for bb in self.building_blocks:
+                try: 
+                    quoter(bb)
+                except NotInCatalogues:
+                    count_not_found += 1
+                    continue
+        except Exception as e:
+            mout.error(f'Quoting error: {e}')
 
-        # print(elabs_csv_paths[0])
+        quoter.write_json(f'{self.name}_quoter.json')
 
-
-        # parse the 
-
-        # only one compound set?
-
-        # calculate the building blocks required
-
-        ...
-
-    # def quote_bbs(self, cset, quoter):
-
+        mout.var('#NotInCatalogue',count_not_found)
+        mout.success('Finished.')
         
-
     def add_bases(self, mol_paths, pdb_paths, metadata_paths, tags=None, overwrite=False):
 
         ### checks
@@ -494,9 +536,11 @@ class HIPPO:
 
     ### QUERIES
 
-    def get_compounds(self, tag, search=False):
+    def get_compounds(self, tag, search=False, inverse=False):
         if search:
             return CompoundSet(f'{tag} in tags (search)',[c for c in self.all_compounds if any([tag in t for t in c.tags])])
+        elif inverse:
+            return CompoundSet(f'{tag} not in tags',[c for c in self.all_compounds if tag not in c.tags])
         else:
             return CompoundSet(f'{tag} in tags',[c for c in self.all_compounds if tag in c.tags])
 
@@ -539,9 +583,29 @@ class HIPPO:
         from .plotting import plot_interaction_punchcard
         return plot_interaction_punchcard(self, poses, FEATURE_METADATA, subtitle, opacity, **kwargs)
 
-    def plot_building_blocks(self, subtitle=None, cset='elabs', **kwargs):
+    def plot_building_blocks(self, subtitle=None, **kwargs):
         from .plotting import plot_building_blocks        
-        return plot_building_blocks(self, subtitle, cset, **kwargs)
+        return plot_building_blocks(self, subtitle, **kwargs)
+
+    def plot_reactant_amounts(self, subtitle=None, **kwargs):
+        from .plotting import plot_reactant_amounts        
+        return plot_reactant_amounts(self, subtitle, **kwargs)
+
+    def plot_reactant_price(self, subtitle=None, **kwargs):
+        from .plotting import plot_reactant_price        
+        return plot_reactant_price(self, subtitle, **kwargs)
+
+    # def plot_reactants_2d(self, subtitle=None, **kwargs):
+    #     from .plotting import plot_reactants_2d        
+    #     return plot_reactants_2d(self, subtitle, **kwargs)
+
+    def plot_synthetic_routes(self, subtitle=None, cset='elabs', color='num_reactants', **kwargs):
+        from .plotting import plot_synthetic_routes        
+        return plot_synthetic_routes(self, subtitle, cset, color, **kwargs)
+
+    def plot_numbers(self, subtitle=None, **kwargs):
+        from .plotting import plot_numbers        
+        return plot_numbers(self, subtitle, **kwargs)
 
     ### INTERNAL METHODS
 
@@ -665,17 +729,34 @@ class HIPPO:
             mout.error(f'reactants for {compound} = {num_reactants}')
             raise Exception('Unsupported number of reactants')
 
-    def _get_or_create_building_block(self, smiles):
+    def _get_or_create_building_block(self, smiles, debug=False):
 
-        # N.B. BuildingBlock.smiles == BuildingBlock.name
+        if debug: mout.header(smiles)
+        smiles = clean_smiles(smiles, verbosity=1)['smiles']
 
-        if smiles in self.building_blocks:
-            return self.building_blocks[smiles]
+        if smiles in self.building_blocks.smiles:
+            if debug: mout.debug('returning existing BB')
+            return self.building_blocks.get_by_smiles(smiles)
 
         else:
             bb = BuildingBlock(smiles)
             self.building_blocks.add(bb)
+            if debug: mout.debug('returning new BB')
             return bb
+
+    def _update_bb_amounts(self):
+
+        for bb in self.building_blocks:
+            bb.amount = 0
+
+        syndirella_comps = self.get_compounds('Syndirella')
+
+        mout.var('#syndirella_comps', len(syndirella_comps))
+
+        for comp in syndirella_comps:
+            for reaction in comp.reactions:
+                for reactant in reaction.reactants:
+                    self.building_blocks[reactant].amount += 1
 
     ### PROPERTIES
 

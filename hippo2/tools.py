@@ -3,6 +3,7 @@ import mout
 import numpy as np
 from rdkit import Chem
 import re
+import mcol
 
 def df_row_to_dict(df_row):
 
@@ -42,3 +43,34 @@ def smiles_has_isotope(smiles, regex=True):
 	else:
 		mol = Chem.MolFromSmiles(smiles)
 		return any(atom.GetIsotope() for atom in mol.GetAtoms())
+
+def clean_smiles(s, verbosity=0):
+
+	orig_smiles = s
+
+	# if multiple molecules take the largest
+	if '.' in s:
+		s = sorted(s.split('.'), key=lambda x: len(x))[-1]
+	
+	# flatten the smiles
+	stereo_smiles = s
+	smiles = s.replace('@','')
+
+	# remove isotopic stuff
+	if smiles_has_isotope(smiles):
+		mout.warning(f'Isotope(s) in SMILES: {smiles}')
+		smiles = remove_isotopes_from_smiles(smiles)
+
+	if verbosity:
+
+		if smiles != orig_smiles:
+
+			annotated_smiles_str = orig_smiles.replace('.',f'{mcol.error}{mcol.underline}.{mcol.clear}{mcol.warning}')
+			annotated_smiles_str = annotated_smiles_str.replace('@',f'{mcol.error}{mcol.underline}@{mcol.clear}{mcol.warning}')
+			
+			mout.warning(f'SMILES was changed: {annotated_smiles_str} --> {smiles}')
+
+	# canonicalise
+	smiles = Chem.MolToSmiles(Chem.MolFromSmiles(smiles),True)
+
+	return dict(smiles=smiles, orig_smiles=orig_smiles, stereo_smiles=stereo_smiles)

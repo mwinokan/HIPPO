@@ -57,4 +57,5 @@ class CompoundSetList(UserList):
 	@property
 	def all_compounds(self):
 		comps = set(sum([cs.compounds for cs in self],[]))
-		return CompoundSet('all_compounds', set() )
+		cset = CompoundSet('all_compounds', comps)
+		return cset
