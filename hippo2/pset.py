@@ -53,10 +53,10 @@ class PoseSet(MutableSet):
 
 	def add(self, compound):
 		assert not self.immutable
-		if compound not in self._elements:
-			self._elements.append(compound)
-		else:
-			raise ValueError(f'{compound} already in {self}')
+		# if compound not in self._elements:
+		self._elements.append(compound)
+		# else:
+			# raise ValueError(f'{compound} already in {self}')
 
 	### DUNDERS
 

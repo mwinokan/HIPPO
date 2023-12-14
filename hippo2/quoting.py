@@ -4,6 +4,7 @@ import mout
 import mcol
 import json
 from pprint import pprint
+from pathlib import Path
 from requests import TooManyRedirects
 
 from .bb import BuildingBlock, PricePicker
@@ -18,11 +19,20 @@ class Quoter:
 		# self.catalogue = catalogue
 		self.force = force
 
+		mout.var('supplier', supplier)
+		if force:
+			mout.warning('Not using cache!')
+		mout.var('pycule', str(Path(pycule.__file__).parent), valCol=mcol.file)
+
 		self.requests_data = dict(id_queries={}, smiles_queries={})
 
 		if self.supplier == 'enamine':
 			self.query = self.get_bb_info
 			self.wrapper = pycule.core.EnamineWrapper(username=username, password=password)
+
+			from pycule.decorators import ENAMINE_MAXIMUM_REQUESTS_PER_MINUTE, ENAMINE_MAXIMUM_REQUESTS_PER_DAY
+			mout.var('max frequency', ENAMINE_MAXIMUM_REQUESTS_PER_MINUTE, unit='per minute')
+			mout.var('max requests', ENAMINE_MAXIMUM_REQUESTS_PER_DAY, unit='per day')
 		
 		else:
 			mout.error(f'Unsupported supplier: "{supplier}"')
@@ -66,38 +76,39 @@ class Quoter:
 
 	def get_bb_info(self, comp):
 
-		mout.header(f'Quoting: {comp.name}, {comp.smiles}')
-
 		try:
 
-			# assert isinstance(comp, BuildingBlock), type(BuildingBlock)
+			### CACHE
 
 			if comp.name_is_smiles and comp.smiles in self.requests_data['smiles_queries']:
 				entry = self.requests_data['smiles_queries'][comp.smiles]
 				if entry is None:
-					raise NotInCatalogues('cached')
+					raise NotInCatalogues(f'Cached entry is None: {comp.smiles}')
 				comp.name = entry
 
 			elif not comp.name_is_smiles and comp.name in self.requests_data['smiles_queries']:
 				entry = self.requests_data['smiles_queries'][comp.name]
 				if entry is None:
-					raise NotInCatalogues('cached')
+					raise NotInCatalogues(f'Cached entry is None: {comp.name}')
 				comp.name = entry
-			
+            
+			### QUERY
+
 			# we have a name
 			if not comp.name_is_smiles:
-
-				mout.out(f"Enamine ID search...", end='')
 
 				comp_id = comp.name
 
 				if not self.force and comp_id in self.requests_data['id_queries']:
 					result = self.requests_data['id_queries'][comp_id]
-					mout.out(f"{mcol.success}using cache.")
+					# mout.out(f"{mcol.success}using cache.")
 					return self.parse_enamine_response(result, comp)
 
 				else:
 
+					# mout.header(f'Quoting: {comp.name}, {comp.smiles}')
+
+					# mout.out(f"Enamine ID search...", end='')
 					try:
 						parsed, result = self.enamine_comp_id_query(comp)
 					
@@ -116,12 +127,12 @@ class Quoter:
 				
 			# search by smiles
 				
-			mout.out("Enamine SMILES search...", end=' ')
+			# mout.out("Enamine SMILES search...", end=' ')
 
 			smiles = comp.smiles
 			
-			if not self.force and smiles in self.requests_data['smiles_queries']:
-				result = self.requests_data['smiles_queries'][smiles]
+			# if not self.force and smiles in self.requests_data['smiles_queries']:
+				# result = self.requests_data['smiles_queries'][smiles]
 
 			comp_id = self.enamine_exact_search(comp)
 
@@ -170,9 +181,9 @@ class Quoter:
 
 		if result['response']['result']['code'] == 0:
 			try:
-				assert len(result['response']['data']) == 1
-				mout.out(f'{mcol.success}found in BB.')
-				return result['response']['data'][0]['Id']
+				comp_id = self.pick_enamine_exact_data(smiles, result['response']['data'])
+				mout.header(f'{mcol.success}found in BB ({smiles} ==> {comp_id}).')
+				return comp_id
 			except NoDataInReponse:
 				pass
 		
@@ -180,9 +191,9 @@ class Quoter:
 
 		if result['response']['result']['code'] == 0:
 			try:
-				assert len(result['response']['data']) == 1
-				mout.out(f'{mcol.success}found in SCR.')
-				return result['response']['data'][0]['Id']
+				comp_id = self.pick_enamine_exact_data(smiles, result['response']['data'])
+				mout.header(f'{mcol.success}found in SCR ({smiles} ==> {comp_id}).')
+				return comp_id
 			except NoDataInReponse:
 				pass
 
@@ -190,9 +201,9 @@ class Quoter:
 
 		if result['response']['result']['code'] == 0:
 			try:
-				assert len(result['response']['data']) == 1
-				mout.out(f'{mcol.success}found in MADE.')
-				return result['response']['data'][0]['Id']
+				comp_id = self.pick_enamine_exact_data(smiles, result['response']['data'])
+				mout.header(f'{mcol.success}found in MADE ({smiles} ==> {comp_id}).')
+				return comp_id
 			except NoDataInReponse:
 				pass
 
@@ -200,13 +211,13 @@ class Quoter:
 
 		if result['response']['result']['code'] == 0:
 			try:
-				assert len(result['response']['data']) == 1
-				mout.out(f'{mcol.success}found in REAL.')
-				return result['response']['data'][0]['Id']
+				comp_id = self.pick_enamine_exact_data(smiles, result['response']['data'])
+				mout.header(f'{mcol.success}found in REAL ({smiles} ==> {comp_id}).')
+				return comp_id
 			except NoDataInReponse:
 				pass
 
-		mout.out(f'{mcol.error}not found.')
+		mout.out(f'{mcol.error}not found ({smiles=}).')
 		return None
 
 	def enamine_comp_id_query(self, compound):
@@ -217,7 +228,7 @@ class Quoter:
 
 		if result['response']['result']['code'] == 0:
 			try:
-				mout.out(f'{mcol.success}found in BB.')
+				mout.header(f'{mcol.success}found in BB ({compound.name}).')
 				return self.parse_enamine_response(result, compound), result
 			except NoDataInReponse:
 				pass
@@ -228,7 +239,7 @@ class Quoter:
 
 		if result['response']['result']['code'] == 0:
 			try:
-				mout.out(f'{mcol.success}found in SCR.')
+				mout.header(f'{mcol.success}found in SCR ({compound.name}).')
 				return self.parse_enamine_response(result, compound), result
 			except NoDataInReponse:
 				pass
@@ -239,7 +250,7 @@ class Quoter:
 
 		if result['response']['result']['code'] == 0:
 			try:
-				mout.out(f'{mcol.success}found in MADE.')
+				mout.header(f'{mcol.success}found in MADE ({compound.name}).')
 				return self.parse_enamine_response(result, compound), result
 			except NoDataInReponse:
 				pass
@@ -250,13 +261,24 @@ class Quoter:
 
 		if result['response']['result']['code'] == 0:
 			try:
-				mout.out(f'{mcol.success}found in REAL.')
+				mout.header(f'{mcol.success}found in REAL ({compound.name}).')
 				return self.parse_enamine_response(result, compound), result
+				# return self.parse_enamine_REAL_response(result, compound), result
 			except NoDataInReponse:
 				pass
 
-		raise NotInCatalogues("Couldn't find comp_id in BB, SCR, MADE, or REAL")
+		raise NotInCatalogues(f"Couldn't find {compound.name=} in BB, SCR, MADE, or REAL")
 
+	# def parse_enamine_REAL_response(self, result, compound):
+
+	# 	pprint(result)
+
+	# 	delivery = data['deliveryDays']
+	# 	days = self.parse_enamine_delivery_string(delivery)
+	# 	packs = [dict()]
+		
+	# 	raise Exception('needs work')
+	
 	def parse_enamine_response(self, result, compound):
 
 		from pprint import pprint
@@ -277,11 +299,14 @@ class Quoter:
 
 		# purity = float(data['purity'])
 		# mout.var("purity", purity, unit='%')
-		
-		packs = []
-		for pack in data['packs']:
-			packs.append(self.parse_enamine_ice_pack(pack))
-		# pprint(packs)
+
+		if not data['packs'] and 'synthesis' in delivery:
+			packs = [dict(amount=1, price=207)]
+
+		else:
+			packs = []
+			for pack in data['packs']:
+				packs.append(self.parse_enamine_ice_pack(pack))
 
 		#### DO STUFF TO THE COMPOUND
 
@@ -298,6 +323,9 @@ class Quoter:
 
 		if string.startswith('backorder, ') and string.endswith('days'):
 			return int(string.removeprefix('backorder, ').removesuffix(' days'))
+
+		if string == '3 weeks synthesis time':
+			return 15
 
 		raise Exception(f'Unexpected delivery string: {string}')
 
@@ -331,10 +359,21 @@ class Quoter:
 		# assert len(data) == 1, data
 		return data[0]
 
-	# def is_enamine_data_ok(self, response):
+	def pick_enamine_exact_data(self, smiles, data):
+	
+		if len(data) == 1:
+			return data[0]['Id']
 
-	# 	if result['response']['result']['code']:
-	# 		return False
+		if len(data) == 0:
+			raise NoDataInResponse(smiles)
+
+		# sort the results by increasing lead_time, and increasing stereo-complexity
+		data = sorted(data, key=lambda x: (self.parse_enamine_delivery_string(x['deliveryDays']), stereo_complexity(x['smile'])))
+		mout.warning(f'Picking quickest and least stereo complex result from: {[x["Id"] for x in data]}')
+		return data[0]['Id']
+
+def stereo_complexity(smiles):
+	return smiles.count('@') + smiles.count('/') + smiles.count('\\')
 
 class NoDataInReponse(Exception):
 	...

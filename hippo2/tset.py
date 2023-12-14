@@ -55,13 +55,13 @@ class TagSet(MutableSet):
 		else:
 			raise ValueError(f'{key} not in {self}')
 
-	def add(self, tag):
+	def add(self, tag, duplicate_error=True):
 		assert not self.immutable
 		# if isinstance(tag, str):
 		# 	tag = Tag(tag)
 		if tag not in self._elements:
 			self._elements.append(tag)
-		else:
+		elif duplicate_error:
 			raise ValueError(f'{tag} already in {self}')
 
 	### DUNDERS

@@ -3,6 +3,7 @@ import mout
 
 from .fingerprint import Fingerprint
 from .tset import TagSet
+from rdkit import Chem
 
 class Pose:
 
@@ -15,6 +16,9 @@ class Pose:
 		self._site_index = None
 		self._chain = None
 
+		self._stereo_smiles = None # smiles from syndirella
+		self._smiles = None
+
 		# arguments
 		self._name = name
 		self._compound = compound
@@ -25,7 +29,7 @@ class Pose:
 		if chain is not None:
 			self.chain = chain
 
-		self.tags = TagSet(tags or [])
+		self._tags = TagSet(tags or [])
 		
 	### FACTORIES
 
@@ -84,6 +88,16 @@ class Pose:
 		return self
 
 	### PROPERTIES
+
+	@property
+	def smiles(self):
+		if not self._smiles:
+			self._smiles = Chem.MolToSmiles(self.mol)
+		return self._smiles
+
+	@property
+	def tags(self):
+		return self._tags
 
 	@property
 	def compound(self):
@@ -180,6 +194,21 @@ class Pose:
 		self._fingerprint = fingerprint
 
 		return fingerprint
+
+	def summary(self):
+	
+		mout.header(self)
+		mout.var('smiles', self.smiles)
+		mout.var('fingerprint', self.fingerprint)
+		# mout.var('pdb_entry', self.pdb_entry)
+		# mout.var('mol', self.mol)
+		mout.var('name', self.name)
+		mout.var('compound', str(self.compound))
+		mout.var('pdb_path', str(self.pdb_path))
+		mout.var('_site_index', self._site_index)
+		mout.var('_chain', self._chain)
+		mout.var('tags', self.tags)
+		mout.var('_stereo_smiles', self._stereo_smiles)
 
 	### DUNDERS
 

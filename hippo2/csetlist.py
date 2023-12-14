@@ -56,6 +56,9 @@ class CompoundSetList(UserList):
 
 	@property
 	def all_compounds(self):
-		comps = set(sum([cs.compounds for cs in self],[]))
-		cset = CompoundSet('all_compounds', comps)
+		# comps = set(sum([cs.compounds for cs in self],[]))
+		comps = sum([cs.compounds for cs in self],[])
+		cset = CompoundSet('all_compounds', ())
+		for c in comps:
+			cset.add(c, duplicate='quiet')
 		return cset

@@ -40,6 +40,7 @@ class BuildingBlock(Compound):
 			name_is_smiles = self.name_is_smiles,
 			has_price_picker = self.price_picker is not None,
 			lead_time = self.lead_time,
+			quote_attempted = 'quote_attempted' in self.tags,
 		)
 
 	@property

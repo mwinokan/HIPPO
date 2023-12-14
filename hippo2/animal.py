@@ -21,7 +21,6 @@ from rdkit import Chem
 from pprint import pprint
 
 from .tools import df_row_to_dict, smiles_has_isotope, clean_smiles
-from .quoting import NotInCatalogues
 
 SUPPLIERS = ['enamine', 'mcule']
 
@@ -123,6 +122,8 @@ class HIPPO:
         self._hit_compounds = None
 
         self._compound_sets = CompoundSetList()
+        self._compounds = CompoundSet('compounds')
+        # self._poses = PoseSet('poses')
         self._building_blocks = CompoundSet('building_blocks')
 
         self._protein_feature_strs = None
@@ -197,6 +198,7 @@ class HIPPO:
             metadata_df=metadata_df,
             pdb_pattern=pdb_pattern,
             tags=tags,
+            animal=self,
         )
 
         if 'hits' in self.compound_sets:
@@ -223,6 +225,9 @@ class HIPPO:
         test=False,
         reference_hit=None,
         overwrite=False,
+        restart_j=0,
+        pickle_dump=None,
+        debug=False,
     ):
 
         if not overwrite and 'elabs' in self.compound_sets:
@@ -271,18 +276,60 @@ class HIPPO:
         mout.var('#elab CSVs', len(elabs_csv_paths))
 
         count_bases_without_minimized = 0
+        count_bases_missing = 0
         count_isotopic_smiles_skipped = 0
 
+        n_paths = len(elabs_csv_paths)
+
+        # mout.header(f'{n_paths=}')
+        # return
 
         ### Create all the Compounds
 
-        cset = CompoundSet('elabs')
-        cset_bases = CompoundSet('bases')
+        # continue from restart
+        if restart_j:
+            if 'bases' in self.compound_sets:
+                cset_bases = self.compound_sets['bases']
+            else:
+                cset_bases = CompoundSet('bases')
+                self.compound_sets.append(cset_bases)
+            if 'elabs' in self.compound_sets:
+                cset = self.compound_sets['elabs']
+            else:
+                cset = CompoundSet('elabs')
+                self.compound_sets.append(cset)
 
-        n_paths = len(elabs_csv_paths)
+        else:
+            cset = CompoundSet('elabs')
+            cset_bases = CompoundSet('bases')
+
+            if overwrite and 'bases' in self.compound_sets:
+                self.compound_sets['bases'] = cset_bases
+                mout.debug(f'Overwriting "bases": {cset_bases}')
+            else:
+                self.compound_sets.append(cset_bases)
+                mout.debug(f'Appending "bases": {cset_bases}')
+
+            if overwrite and 'elabs' in self.compound_sets:
+                self.compound_sets['elabs'] = cset
+                mout.debug(f'Overwriting "elabs": {cset_bases}')
+            else:
+                self.compound_sets.append(cset)
+                mout.debug(f'Appending "elabs": {cset_bases}')
+
+        if debug:
+            mout.debug(cset_bases)
+            mout.debug(cset)
+
         for j, path in enumerate(elabs_csv_paths):
 
-            mout.progress(j, n_paths, append=f'#elabs={len(cset):>07}')
+            if j < restart_j:
+                continue
+
+            # if debug:
+            mout.debug(f'{j=}/{n_paths}')
+
+            mout.progress(j, n_paths, append=f'{j=} #elabs={len(cset):>07}')
 
             df = pd.read_csv(path)
 
@@ -297,6 +344,9 @@ class HIPPO:
                 continue
 
             for i, name in enumerate(names):
+
+                if debug:
+                    mout.debug(f'{i=}/{len(names)}: {name}')
 
                 if i%100 == 0:
                     mout.progress(j, n_paths, append=f'#elabs={len(cset):>07}')
@@ -319,15 +369,22 @@ class HIPPO:
                     if base:
 
                         if (path.parent / "output" / bleach_name).is_dir():
-                            mout.warning(f'Using too contorted base {pose_name}') 
                             comp_output_dir = path.parent / "output" / bleach_name
-                            count_bases_without_minimized += 1
-                            too_contorted = True
+                            if (comp_output_dir / f'{bleach_name}{minimised_mol_suffix}').exists:
+                                mout.warning(f'Using too contorted base {pose_name}') 
+                                count_bases_without_minimized += 1
+                                too_contorted = True
+                            else:
+                                mout.error(f'Missing base compound {pose_name}')
+                                count_bases_missing += 1
+                                continue
                         else:
                             mout.error(f'Base has neither "success" nor "output" directory {pose_name}') 
                             continue
 
                     else:
+                        if debug:
+                            mout.warning(f'No "success" directory {pose_name}') 
                         continue
                                     
                 meta_row = df[df['name'] == pose_name]
@@ -339,7 +396,16 @@ class HIPPO:
 
                 mol_path = comp_output_dir / f'{bleach_name}{minimised_mol_suffix}'
 
-                mol = Chem.MolFromMolFile(str(mol_path))
+                if not mol_path.exists:
+                    continue
+
+                try:
+                    mol = Chem.MolFromMolFile(str(mol_path))
+                except OSError:
+                    mout.error(f'Problem w/ mol file for {name}')
+                    if base:
+                        count_bases_missing += 1
+                    continue
 
                 if base:
                     comp_tags = tags + ['base']
@@ -359,34 +425,40 @@ class HIPPO:
                     if name not in cset:
 
                         # compound doesn't exist under this name
-                        compound = Compound.from_mol(name, mol, tags=comp_tags)
+                        # self._get_or_create_compounds(name, 
+                        compound = Compound.from_mol(name, mol, tags=comp_tags, animal=self)
                         self._add_compound_metadata(compound, meta_dict)
 
                         # if it exists under a different name just add the synthetic route
                         if compound in cset:
+                            if debug:
+                                mout.debug(f'Adding reaction to elab: {name}')
                             cset[compound].add_reaction(compound.reaction)
                         else:
+                            if debug:
+                                mout.debug(f'Adding elab: {name}')
                             cset.add(compound, duplicate='error')
 
                     else:
                         compound = cset[name]
-
-                    pose = Pose.from_mol_and_reference(compound, mol, reference_pdb)
-                    compound.add_pose(pose)
 
                 else:
 
                     if name not in cset_bases:
 
                         # compound doesn't exist under this name
-                        compound = Compound.from_mol(name, mol, tags=comp_tags)
+                        compound = Compound.from_mol(name, mol, tags=comp_tags, animal=self)
                         self._add_compound_metadata(compound, meta_dict)
 
                         # if it exists under a different name just add the synthetic route
                         if compound in cset_bases:
+                            if debug:
+                                mout.debug(f'Adding reaction to base: {name}')
                             not_duplicate = cset_bases[compound].add_reaction(compound.reaction)
 
                         else:
+                            if debug:
+                                mout.debug(f'Adding base: {name}')
                             cset_bases.add(compound, duplicate='error')
 
                             # increment reactant quantities (a new pose can be made)
@@ -394,50 +466,68 @@ class HIPPO:
                     else:
                         compound = cset_bases[name]
 
-                    pose = Pose.from_mol_and_reference(compound, mol, reference_pdb)
-                    compound.add_pose(pose)
+                if debug:
+                    mout.debug(f'Adding pose to: {name}')
+				
+                conformer = meta_dict['conformer']
+                site_index = ord(conformer.lower()) - 97
+                pose = Pose.from_mol_and_reference(compound, mol, reference_pdb, site_index=site_index, tags=comp_tags)
+                pose._stereo_smiles = meta_dict['smiles']
+                pose._name = conformer
+                compound.add_pose(pose)
 
-            if test:
+            if pickle_dump:
+                self.write_pickle(pickle_dump)
+
+            mout.debug(cset_bases)
+            mout.debug(cset)
+
+            if test and test == j+1:
                 break
-
-        if overwrite and 'bases' in self.compound_sets:
-            self.compound_sets['bases'] = cset_bases
-        else:
-            self.compound_sets.append(cset_bases)
-        self._bases = self._compound_sets[-1]
-
-        if overwrite and 'elabs' in self.compound_sets:
-            self.compound_sets['elabs'] = cset
-        else:
-            self.compound_sets.append(cset)
-        self._elabs = self._compound_sets[-1]
 
         self._update_bb_amounts()
         
         mout.finish()
 
         mout.var('#bases_without_minimized', count_bases_without_minimized)
+        mout.var('#missing_bases', count_bases_missing)
         mout.var('#isotopic_smiles_skipped', count_isotopic_smiles_skipped)
 
         return cset_bases, cset
 
     def quote_reactants(self, quoter):
 
+        from .quoting import NotInCatalogues
+        
         count_not_found = 0
 
-        try:
-            for bb in self.building_blocks:
-                try: 
-                    quoter(bb)
-                except NotInCatalogues:
-                    count_not_found += 1
-                    continue
-        except Exception as e:
-            mout.error(f'Quoting error: {e}')
+        n_bbs = len(self.building_blocks)
+
+        mout.var('#BBs', n_bbs)
+		
+        # try:
+        for i,bb in enumerate(self.building_blocks):
+            mout.progress(i, n_bbs, prepend='quoting BBs', append=bb.name)
+            try: 
+                bb.tags.add('quote_attempted', duplicate_error=False)
+                quoter(bb)
+            except NotInCatalogues:
+                count_not_found += 1
+                continue
+            except AssertionError as e:
+                raise e
+            except KeyboardInterrupt:
+                break
+            # except Exception as e:
+            #     mout.error(f'Quoting error: {e}')
+            #     continue
+
+        mout.finish()
 
         quoter.write_json(f'{self.name}_quoter.json')
 
         mout.var('#NotInCatalogue',count_not_found)
+        mout.var('#Attempted',i)
         mout.success('Finished.')
         
     def add_bases(self, mol_paths, pdb_paths, metadata_paths, tags=None, overwrite=False):
@@ -504,14 +594,23 @@ class HIPPO:
         mout.var('target_name', self.target_name)      
         mout.var('max_lead_time', self.max_lead_time, unit='workdays')      
         mout.var('max_bb_price', self.max_bb_price, unit='$')      
-        mout.var('min_bb_quantity', self.min_bb_quantity, unit='mg')      
+        mout.var('min_bb_quantity', self.min_bb_quantity, unit='mg')
+
+        mout.var('#compound_sets',len(self.compound_sets))
+        
+        all_compounds = self.all_compounds
+        mout.var('#compounds',len(all_compounds))
+        
+        all_poses = self.get_all_poses(all_compounds)
+        mout.var('#poses',len(all_poses))
+        
+        tag_stats = self.get_tag_statistics(all_compounds)
 
         # mout.var('#building_blocks',len(self.building_blocks))
-        mout.var('#compound_sets',len(self.compound_sets))
-        mout.var('#compounds',self.num_compounds)
-        mout.var('#poses',self.num_poses)
-        if self.num_poses:
-            mout.var('#tags',self.num_tags)
+
+
+        if tag_stats:
+            mout.var('#tags',len(tag_stats))
 
         if self.compound_sets:
             mout.out('')
@@ -519,16 +618,16 @@ class HIPPO:
             for comp_set in self.compound_sets:
                 mout.out(comp_set)
         
-            all_tags = self.all_tags
-            if all_tags:
+            # all_tags = self.all_tags
+            if tag_stats:
                 mout.out('')
                 mout.underline('tags:')
-                for tag in all_tags:
+                for tag in tag_stats:
 
-                    num_compounds = len(self.get_compounds(tag))
-                    num_poses = len(self.get_poses(tag))
+                    # num_compounds = len(self.get_compounds(tag))
+                    # num_poses = len(self.get_poses(tag))
 
-                    mout.out(f'{tag} #compounds={num_compounds}, #poses={num_poses}')
+                    mout.out(f'{tag} #compounds={tag_stats[tag]["compounds"]}, #poses={tag_stats[tag]["poses"]}')
 
     def write_pickle(self,file):
         import molparse as mp
@@ -536,19 +635,66 @@ class HIPPO:
 
     ### QUERIES
 
-    def get_compounds(self, tag, search=False, inverse=False):
-        if search:
-            return CompoundSet(f'{tag} in tags (search)',[c for c in self.all_compounds if any([tag in t for t in c.tags])])
-        elif inverse:
-            return CompoundSet(f'{tag} not in tags',[c for c in self.all_compounds if tag not in c.tags])
-        else:
-            return CompoundSet(f'{tag} in tags',[c for c in self.all_compounds if tag in c.tags])
+    def get_tag_statistics(self, all_compounds=None):#, all_poses=None):
+        all_compounds = all_compounds or self.all_compounds
+        # all_poses = all_poses or self.get_all_poses(all_compounds)
 
-    def get_poses(self, tag, search=False):
+        data = {}
+        
+        for c in all_compounds:
+
+            for t in c.tags:
+                if t in data:
+                    if 'compounds' in data[t]:
+                        data[t]['compounds'] += 1
+                    else:
+                        data[t]['compounds'] = 1
+                else:
+                    data[t] = {}
+            
+            for p in c.poses:
+                for t in p.tags:
+                    if t in data:
+                        if 'poses' in data[t]:
+                            data[t]['poses'] += 1
+                        else:
+                            data[t]['poses'] = 1
+                    else:
+                        data[t] = {}
+
+        for k,v in data.items():
+            if 'compounds' not in v:
+                v['compounds'] = 0
+            if 'poses' not in v:
+                v['poses'] = 0
+
+        return data
+
+    def get_all_poses(self, all_compounds=None):
+        all_compounds = all_compounds or self.all_compounds
+        poses = sum([[p for p in c.poses] for c in all_compounds],[])
+        return PoseSet(poses)
+
+    def get_compounds(self, tag, search=False, inverse=False, all_compounds=None):
+        all_compounds = all_compounds or self.all_compounds
         if search:
-            return PoseSet([p for p in self.all_poses if any([tag in t for t in p.tags])])
+            return CompoundSet(f'{tag} in tags (search)',[c for c in all_compounds if any([tag in t for t in c.tags])])
+        elif inverse:
+            assert not search
+            return CompoundSet(f'{tag} not in tags',[c for c in all_compounds if tag not in c.tags])
         else:
-            return PoseSet([p for p in self.all_poses if tag in p.tags])
+            return CompoundSet(f'{tag} in tags',[c for c in all_compounds if tag in c.tags])
+
+    def get_poses(self, tag, search=False, inverse=False, all_poses=None, all_compounds=None):
+        all_compounds = all_compounds or self.all_compounds
+        all_poses = all_poses or self.get_all_poses(all_compounds)
+        if search:
+            return PoseSet([p for p in all_poses if any([tag in t for t in p.tags])])
+        elif inverse:
+            assert not search
+            return PoseSet([p for p in all_poses if tag not in p.tags])
+        else:
+            return PoseSet([p for p in all_poses if tag in p.tags])
 
     def get_hit_pose(self, key):
 
@@ -594,6 +740,10 @@ class HIPPO:
     def plot_reactant_price(self, subtitle=None, **kwargs):
         from .plotting import plot_reactant_price        
         return plot_reactant_price(self, subtitle, **kwargs)
+
+    def plot_reactant_sankey(self, subtitle=None, **kwargs):
+        from .plotting import plot_reactant_sankey        
+        return plot_reactant_sankey(self, subtitle, **kwargs)
 
     # def plot_reactants_2d(self, subtitle=None, **kwargs):
     #     from .plotting import plot_reactants_2d        
@@ -669,6 +819,19 @@ class HIPPO:
         else:
             mout.error(f'No inspiration data for {compound}')
 
+        ### base
+
+        if 'Syndirella' in compound.tags and 'base' not in compound.tags:
+            
+            # strip the conformer
+            base_name = meta_dict['base_name']
+
+            # hyphen bleaching
+            base_name = base_name.replace('_','-')
+
+            if base_name in self.bases:
+                compound.base = self.bases[base_name]
+
         ### synthetic routes
 
         num_reactants = len([k for k in meta_dict if 'reactant' in k and 'smi' in k]) ### OLD FORMAT
@@ -732,7 +895,7 @@ class HIPPO:
     def _get_or_create_building_block(self, smiles, debug=False):
 
         if debug: mout.header(smiles)
-        smiles = clean_smiles(smiles, verbosity=1)['smiles']
+        smiles = clean_smiles(smiles, verbosity=debug)['smiles']
 
         if smiles in self.building_blocks.smiles:
             if debug: mout.debug('returning existing BB')
@@ -743,6 +906,36 @@ class HIPPO:
             self.building_blocks.add(bb)
             if debug: mout.debug('returning new BB')
             return bb
+
+    def _get_or_create_compound(self, name, smiles, debug=False, duplicate='error'):
+
+        if debug: mout.header(name)
+        # smiles = clean_smiles(smiles, verbosity=debug)['smiles']
+
+        if name in self.compounds.names:
+            if debug: mout.debug('returning existing Compound')
+            return self.compounds.get_by_name(name)
+
+        else:
+            comp = Compound(name, smiles)
+            self.compounds.add(comp, duplicate=duplicate)
+            if debug: mout.debug('returning new Compound')
+            return comp
+
+    # def _get_or_create_pose(self, longname, debug=False):
+
+    #     if debug: mout.header(name)
+    #     # smiles = clean_smiles(smiles, verbosity=debug)['smiles']
+
+    #     if name in self.compounds.names:
+    #         if debug: mout.debug('returning existing Compound')
+    #         return self.compounds.get_by_name(name)
+
+    #     else:
+    #         comp = Compound(name, smiles)
+    #         self.compounds.add(comp)
+    #         if debug: mout.debug('returning new Compound')
+    #         return comp
 
     def _update_bb_amounts(self):
 
@@ -761,6 +954,10 @@ class HIPPO:
     ### PROPERTIES
 
     @property
+    def compounds(self):
+        return self._compounds
+
+    @property
     def name(self):
         return self._name
 
@@ -770,10 +967,11 @@ class HIPPO:
 
     @property
     def all_compounds(self):
-        if len(self.compound_sets) == 1:
-            return self.compound_sets[0]
+        # if len(self.compound_sets) == 1:
+            # return self.compound_sets[0]
         # return set().union(*self.compound_sets)
-        return self.compound_sets.all_compounds
+        # return self.compound_sets.all_compounds
+        return self.compounds
 
     @property
     def num_poses(self):
@@ -781,7 +979,10 @@ class HIPPO:
 
     @property
     def all_poses(self):
-        return PoseSet(sum([c.poses for c in self.all_compounds], PoseSet()))
+        return self.get_all_poses()
+        # mout.debug('v2')
+
+        # return PoseSet(sum([c.poses for c in self.all_compounds], PoseSet()))
 
     @property
     def all_tags(self):
@@ -837,8 +1038,12 @@ class HIPPO:
         return self._building_blocks
 
     @property
+    def num_building_blocks(self):
+        return len(self.building_blocks)
+
+    @property
     def elabs(self):
-        return self._elabs
+        return self.compound_sets['elabs']
 
     @property
     def reactant_catalog(self):

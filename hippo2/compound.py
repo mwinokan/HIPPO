@@ -47,7 +47,7 @@ class Compound:
 ### FACTORIES
 
     @classmethod
-    def from_mol(cls, name, path, tags=None):
+    def from_mol(cls, name, path, tags=None, animal=None):
 
         if isinstance(path, Path):
             mol = Chem.MolFromMolFile(str(path))
@@ -60,15 +60,18 @@ class Compound:
         tags = TagSet(tags)
 
         smiles = mp.rdkit.mol_to_smiles(mol)
-        
-        self = cls.__new__(cls)
 
-        self.__init__(name, smiles, tags)
+        if animal:
+            self = animal._get_or_create_compound(name, smiles, duplicate='quiet')
+            self.tags = tags
+        else:
+            self = cls.__new__(cls)
+            self.__init__(name, smiles, tags)
 
         return self
 
     @classmethod
-    def from_bound_pdb(cls, name, path, metadata, site_index=None, chain=None, tags=None):
+    def from_bound_pdb(cls, name, path, metadata, site_index=None, chain=None, tags=None, animal=None):
 
         assert isinstance(path, Path)
 
@@ -83,9 +86,12 @@ class Compound:
         tags = tags or []
         tags = TagSet(tags)
 
-        self = cls.__new__(cls)
-
-        self.__init__(name, metadata['new_smiles'] or metadata['smiles'], tags)
+        if animal:
+            self = animal._get_or_create_compound(name, metadata['new_smiles'] or metadata['smiles'])
+            self.tags = tags
+        else:
+            self = cls.__new__(cls)
+            self.__init__(name, metadata['new_smiles'] or metadata['smiles'], tags)
         
         self.crystal_name = metadata['RealCrystalName']
         self.alternate_name = metadata['alternate_name']
@@ -136,6 +142,10 @@ class Compound:
     @property
     def base(self):
         return self._base
+
+    @base.setter
+    def base(self, c):
+        self._base = c
 
     @property
     def crystal_name(self):
@@ -257,7 +267,7 @@ class Compound:
         if self.crystal_name: mout.var('crystal_name',self.crystal_name)
         if self.inspirations: mout.var('inspirations',self.inspirations)
         # if self.amount is not None: mout.var('amount',self.amount)
-        if self.base: mout.var('base',self.base)
+        if self.base: mout.var('base',str(self.base))
         if self.alternate_name: mout.var('alternate_name',self.alternate_name)
         
         mout.var('tags',self.tags)

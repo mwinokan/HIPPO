@@ -107,7 +107,7 @@ class CompoundSet(MutableSet):
         return self
 
     @classmethod
-    def from_bound_pdbs(cls, name, pdbs, metadata_df, pdb_pattern, tags=None):
+    def from_bound_pdbs(cls, name, pdbs, metadata_df, pdb_pattern, tags=None, animal=None):
 
         import os
 
@@ -127,7 +127,7 @@ class CompoundSet(MutableSet):
 
             if comp_name not in self:
 
-                compound = Compound.from_bound_pdb(comp_name, pdb, metadata, tags=tags)
+                compound = Compound.from_bound_pdb(comp_name, pdb, metadata, tags=tags, animal=animal)
                 compound._set_name = name
                 self.add(compound)
 
@@ -202,6 +202,10 @@ class CompoundSet(MutableSet):
         return [c.smiles for c in self]    
 
     @property
+    def names(self):
+        return [c.name for c in self]    
+
+    @property
     def building_blocks(self):
         return self.get_building_blocks()
 
@@ -244,6 +248,9 @@ class CompoundSet(MutableSet):
 
         elif duplicate == 'skip':
             mout.warning(f"Skipping {compound} already in {self}")
+
+        elif duplicate == 'quiet':
+            return
 
     def shuffle(self):
         random.shuffle(self._elements)
@@ -305,6 +312,11 @@ class CompoundSet(MutableSet):
 
     def get_by_smiles(self, smiles):
         matches = [c for c in self if c.smiles == smiles]
+        assert len(matches) == 1
+        return matches[0]
+
+    def get_by_name(self, name):
+        matches = [c for c in self if c.name == name]
         assert len(matches) == 1
         return matches[0]
 
