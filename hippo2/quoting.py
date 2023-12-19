@@ -74,11 +74,23 @@ class Quoter:
 		json.dump(data, f)
 		mout.out('Done.')
 
+	def in_cache(self, comp):
+		if comp.name_is_smiles and comp.smiles in self.requests_data['smiles_queries']:
+			return True
+
+		elif not comp.name_is_smiles and comp.name in self.requests_data['smiles_queries']:
+			return True
+
+		elif not comp.name_is_smiles and comp.name in self.requests_data['id_queries']:
+			return True
+
+		return False
+
 	def get_bb_info(self, comp):
 
 		try:
 
-			### CACHE
+			# ### CACHE
 
 			if comp.name_is_smiles and comp.smiles in self.requests_data['smiles_queries']:
 				entry = self.requests_data['smiles_queries'][comp.smiles]
@@ -123,7 +135,7 @@ class Quoter:
 
 					except NotInCatalogues as e:
 						# mout.error(f'{e}: {comp.name}')
-						mout.out(f'{mcol.error}not found.')
+						mout.header(f'{mcol.error}not found ({comp_id=}).')
 				
 			# search by smiles
 				
@@ -217,7 +229,7 @@ class Quoter:
 			except NoDataInReponse:
 				pass
 
-		mout.out(f'{mcol.error}not found ({smiles=}).')
+		mout.header(f'{mcol.error}not found ({smiles=}).')
 		return None
 
 	def enamine_comp_id_query(self, compound):
@@ -348,13 +360,26 @@ class Quoter:
 	def pick_enamine_data(self, comp_id,data):
 		data = [d for d in data if d['Id'] == comp_id]
 
+		# new_data = [d for d in data if not any([p['price'] == 0.0 for p in d['packs']])]
+
+		# if len(new_data) == 0:
+		# 	print(data)
+
+		# data = new_data
+        
 		if len(data) == 0:
 			raise NoDataInReponse
 
 		elif len(data) == 1:
 			return data[0]
+
+		data = [d for d in data if not any([p['price'] == 0.0 for p in d['packs']])]
+
+		if len(data) > 1:
+			mout.warning(f'Taking first data entry after stripping non-priced ({comp_id})')
+		return data[0]
 		
-		raise Exception(f'ambiguous enamine response {data}')
+		# raise Exception(f'ambiguous enamine response {data}')
 		
 		# assert len(data) == 1, data
 		return data[0]

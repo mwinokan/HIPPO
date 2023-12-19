@@ -78,6 +78,9 @@ class CompoundSet(MutableSet):
         assert isinstance(key,int)
         [c for c in self][key] = value
 
+    def __delitem__(self, key):
+        return self.discard(key)
+
     ### FACTORIES
 
     @classmethod
@@ -236,7 +239,12 @@ class CompoundSet(MutableSet):
 
     def add(self, compound, duplicate='error'):
         assert not self.immutable
-        if compound not in self._elements:
+
+        if duplicate == 'no_check':
+            self._elements.append(compound)
+            compound._set_name = self.name
+
+        elif compound not in self._elements:
             self._elements.append(compound)
             compound._set_name = self.name
 

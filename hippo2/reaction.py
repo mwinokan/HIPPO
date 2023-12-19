@@ -6,20 +6,20 @@ from .cset import CompoundSet
 
 class Reaction:
 
-	def __init__(self, reaction_type, product, reactants, product_amount=None, amounts=None):
+	def __init__(self, reaction_type, product, reactants, product_amount=None, amounts=1):
 		
 		self._type = reaction_type
 		self._product = product
 		self._product_amount = product_amount
 		self._reactants = CompoundSet(f"{self.type} reactants",reactants)
-
-		if amounts is not None:
-			if isinstance(amounts, list):
-				for comp, amount in zip(self.reactants, amounts):
-					comp.amount = amount
-			else:
-				for comp in self.reactants:
-					comp.amount = amounts
+		self._amounts = {}
+		
+		if isinstance(amounts, list):
+			for comp, amount in zip(self.reactants, amounts):
+				self.amounts[comp.smiles] = amount
+		else:
+			for comp in self.reactants:
+				self.amounts[comp.smiles] = amounts
 		
 	### FACTORIES
 
@@ -33,6 +33,10 @@ class Reaction:
 	#         return self
 
 	### PROPERTIES
+
+	@property
+	def amounts(self):
+		return self._amounts
 
 	@property
 	def reactants(self):
@@ -91,7 +95,7 @@ class Reaction:
 
 		mout.out(f'\n{mcol.func}reactants [#={len(self.reactants)}]')
 		for reactant in self.reactants:
-			mout.var(reactant.name, reactant.amount, unit='mg', symbol='x')
+			mout.var(reactant.name, self.amounts[reactant.smiles], unit='mg', symbol='x')
 
 	### DUNDERS
 

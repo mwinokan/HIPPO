@@ -192,7 +192,7 @@ def plot_interaction_punchcard(animal, poses, feature_metadata, subtitle=None, o
 
 @hippo_graph
 # def plot_building_blocks(animal, subtitle=None, cset='elabs', color='name_is_smiles'):
-def plot_reactant_amounts(animal, subtitle=None, color='has_price_picker', named_only=False):
+def plot_reactant_amounts(animal, subtitle=None, color='has_price_picker', named_only=False, most_common=None):
 
 	# cset = animal.compound_sets[cset]
 
@@ -200,11 +200,18 @@ def plot_reactant_amounts(animal, subtitle=None, color='has_price_picker', named
 
 	bbs = animal.building_blocks
 
+	mout.debug('making plot_data')
 	plot_data = []
 	for bb in bbs:
 		d = bb.dict
+		# if most_common and d['amount'] is not None:
+			
 		if not named_only or not d['name_is_smiles']:
 			plot_data.append(d)
+
+	if most_common:
+		mout.debug('sorting')
+		plot_data = sorted(plot_data, key=lambda x: x['amount'], reverse=True)[:most_used_number]
 
 	fig = px.bar(plot_data, x='name', y='amount', color=color, hover_data=plot_data[0].keys())
 	# fig = px.bar(plot_data, x='smiles', y='amount', color=color)
@@ -398,6 +405,7 @@ def plot_numbers(animal, subtitle=None):
 
 	return fig
 
+@hippo_graph
 def plot_reactant_sankey(animal, subtitle):
 
 	'''

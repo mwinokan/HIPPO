@@ -33,7 +33,7 @@ class HIPPO:
 
     * lead time: working days
     * reagant/product quantities: mg
-    * pricing: arbitrary / whatever the quoting is
+    * pricing: $USD
 
     SMILES
     ------
@@ -278,6 +278,9 @@ class HIPPO:
         count_bases_without_minimized = 0
         count_bases_missing = 0
         count_isotopic_smiles_skipped = 0
+        count_base_with_no_success_or_output = 0
+        count_elab_without_base = 0
+        count_skipped_multi_name_match = 0
 
         n_paths = len(elabs_csv_paths)
 
@@ -286,36 +289,40 @@ class HIPPO:
 
         ### Create all the Compounds
 
-        # continue from restart
-        if restart_j:
-            if 'bases' in self.compound_sets:
-                cset_bases = self.compound_sets['bases']
-            else:
-                cset_bases = CompoundSet('bases')
-                self.compound_sets.append(cset_bases)
-            if 'elabs' in self.compound_sets:
-                cset = self.compound_sets['elabs']
-            else:
-                cset = CompoundSet('elabs')
-                self.compound_sets.append(cset)
+        # if 'bases' not in self.compound_sets:
+            # cset_bases = 
 
-        else:
-            cset = CompoundSet('elabs')
-            cset_bases = CompoundSet('bases')
+        # # continue from restart (not verified)
+        # if restart_j:
+        #     if 'bases' in self.compound_sets:
+        #         cset_bases = self.compound_sets['bases']
+        #     else:
+        #         cset_bases = CompoundSet('bases')
+        #         self.compound_sets.append(cset_bases)
+        #     if 'elabs' in self.compound_sets:
+        #         cset = self.compound_sets['elabs']
+        #     else:
+        #         cset = CompoundSet('elabs')
+        #         self.compound_sets.append(cset)
 
-            if overwrite and 'bases' in self.compound_sets:
-                self.compound_sets['bases'] = cset_bases
-                mout.debug(f'Overwriting "bases": {cset_bases}')
-            else:
-                self.compound_sets.append(cset_bases)
-                mout.debug(f'Appending "bases": {cset_bases}')
+        # # starting afresh
+        # else:
+        #     cset = CompoundSet('elabs')
+        #     cset_bases = CompoundSet('bases')
 
-            if overwrite and 'elabs' in self.compound_sets:
-                self.compound_sets['elabs'] = cset
-                mout.debug(f'Overwriting "elabs": {cset_bases}')
-            else:
-                self.compound_sets.append(cset)
-                mout.debug(f'Appending "elabs": {cset_bases}')
+        #     if overwrite and 'bases' in self.compound_sets:
+        #         self.compound_sets['bases'] = cset_bases
+        #         mout.debug(f'Overwriting "bases": {cset_bases}')
+        #     else:
+        #         self.compound_sets.append(cset_bases)
+        #         mout.debug(f'Appending "bases": {cset_bases}')
+
+        #     if overwrite and 'elabs' in self.compound_sets:
+        #         self.compound_sets['elabs'] = cset
+        #         mout.debug(f'Overwriting "elabs": {cset}')
+        #     else:
+        #         self.compound_sets.append(cset)
+        #         mout.debug(f'Appending "elabs": {cset}')
 
         if debug:
             mout.debug(cset_bases)
@@ -329,7 +336,9 @@ class HIPPO:
             # if debug:
             mout.debug(f'{j=}/{n_paths}')
 
-            mout.progress(j, n_paths, append=f'{j=} #elabs={len(cset):>07}')
+            mout.var('csv',str(path), valCol=mcol.file)
+
+            mout.progress(j, n_paths, append=f'{j=} #elabs={self.num_compounds:>07}')
 
             df = pd.read_csv(path)
 
@@ -349,7 +358,7 @@ class HIPPO:
                     mout.debug(f'{i=}/{len(names)}: {name}')
 
                 if i%100 == 0:
-                    mout.progress(j, n_paths, append=f'#elabs={len(cset):>07}')
+                    mout.progress(j, n_paths, append=f'#elabs={self.num_compounds:>07}')
 
                 pose_name = name
                 bleach_name = name.replace('_','-')
@@ -371,23 +380,29 @@ class HIPPO:
                         if (path.parent / "output" / bleach_name).is_dir():
                             comp_output_dir = path.parent / "output" / bleach_name
                             if (comp_output_dir / f'{bleach_name}{minimised_mol_suffix}').exists:
-                                mout.warning(f'Using too contorted base {pose_name}') 
+                                # mout.warning(f'Using too contorted base {pose_name}') 
                                 count_bases_without_minimized += 1
                                 too_contorted = True
                             else:
-                                mout.error(f'Missing base compound {pose_name}')
+                                # mout.error(f'Missing base compound {pose_name}')
                                 count_bases_missing += 1
                                 continue
                         else:
-                            mout.error(f'Base has neither "success" nor "output" directory {pose_name}') 
+                            # mout.error(f'Base has neither "success" nor "output" directory {pose_name}') 
+                            count_base_with_no_success_or_output += 1
                             continue
 
                     else:
                         if debug:
                             mout.warning(f'No "success" directory {pose_name}') 
+                            count_elab_without_base += 1
                         continue
                                     
                 meta_row = df[df['name'] == pose_name]
+                ### THIS MAY BE PROBLEMATIC IN THE FUTURE! (missing compounds)
+                if len(meta_row) != 0:
+                    count_skipped_multi_name_match += 1
+                    continue
                 meta_dict = df_row_to_dict(meta_row)
 
                 if smiles_has_isotope(meta_dict["smiles"]):
@@ -402,7 +417,7 @@ class HIPPO:
                 try:
                     mol = Chem.MolFromMolFile(str(mol_path))
                 except OSError:
-                    mout.error(f'Problem w/ mol file for {name}')
+                    # mout.error(f'Problem w/ mol file for {name}')
                     if base:
                         count_bases_missing += 1
                     continue
@@ -420,51 +435,23 @@ class HIPPO:
 
                 reference_pdb = self.get_hit_pose(reference_hit).pdb_path
 
-                if not base:
+                if name not in self.compounds:
 
-                    if name not in cset:
+                    compound = Compound.from_mol(name, mol, tags=comp_tags, animal=self)
+                    self._add_compound_metadata(compound, meta_dict)
 
-                        # compound doesn't exist under this name
-                        # self._get_or_create_compounds(name, 
-                        compound = Compound.from_mol(name, mol, tags=comp_tags, animal=self)
-                        self._add_compound_metadata(compound, meta_dict)
-
-                        # if it exists under a different name just add the synthetic route
-                        if compound in cset:
-                            if debug:
-                                mout.debug(f'Adding reaction to elab: {name}')
-                            cset[compound].add_reaction(compound.reaction)
-                        else:
-                            if debug:
-                                mout.debug(f'Adding elab: {name}')
-                            cset.add(compound, duplicate='error')
-
+                    # if it exists under a different name just add the synthetic route
+                    if compound in self.compounds:
+                        if debug:
+                            mout.debug(f'Adding reaction to elab: {name}')
+                        self.compounds[compound].add_reaction(compound.reaction)
                     else:
-                        compound = cset[name]
-
+                        if debug:
+                            mout.debug(f'Adding elab: {name}')
+                        self.compounds.add(compound, duplicate='error')
+                
                 else:
-
-                    if name not in cset_bases:
-
-                        # compound doesn't exist under this name
-                        compound = Compound.from_mol(name, mol, tags=comp_tags, animal=self)
-                        self._add_compound_metadata(compound, meta_dict)
-
-                        # if it exists under a different name just add the synthetic route
-                        if compound in cset_bases:
-                            if debug:
-                                mout.debug(f'Adding reaction to base: {name}')
-                            not_duplicate = cset_bases[compound].add_reaction(compound.reaction)
-
-                        else:
-                            if debug:
-                                mout.debug(f'Adding base: {name}')
-                            cset_bases.add(compound, duplicate='error')
-
-                            # increment reactant quantities (a new pose can be made)
-
-                    else:
-                        compound = cset_bases[name]
+                    compound = self.compounds[name]
 
                 if debug:
                     mout.debug(f'Adding pose to: {name}')
@@ -479,21 +466,47 @@ class HIPPO:
             if pickle_dump:
                 self.write_pickle(pickle_dump)
 
-            mout.debug(cset_bases)
-            mout.debug(cset)
+            # self.compound_sets['bases'] = cset_bases
+            # self.compound_sets['elabs'] = cset
+
+            # mout.debug(cset_bases)
+            # mout.debug(cset)
 
             if test and test == j+1:
                 break
 
+        if 'bases' in self.compound_sets:
+            self.compound_sets['bases'] = self.get_compounds('base')
+        else:
+            bases = CompoundSet('bases', self.get_compounds('base'))
+            self.compound_sets.append(bases)
+            
+        if 'elabs' in self.compound_sets:
+            self.compound_sets['elabs'] = self.get_compounds('elab')
+        else:
+            elabs = CompoundSet('elabs', self.get_compounds('elab'))
+            self.compound_sets.append(elabs)
+        
         self._update_bb_amounts()
         
         mout.finish()
 
-        mout.var('#bases_without_minimized', count_bases_without_minimized)
-        mout.var('#missing_bases', count_bases_missing)
-        mout.var('#isotopic_smiles_skipped', count_isotopic_smiles_skipped)
+        if pickle_dump:
+                self.write_pickle(pickle_dump)
 
-        return cset_bases, cset
+        mout.var('count_bases_without_minimized', count_bases_without_minimized)
+        mout.var('count_bases_missing', count_bases_missing)
+        mout.var('count_isotopic_smiles_skipped', count_isotopic_smiles_skipped)
+        mout.var('count_base_with_no_success_or_output', count_base_with_no_success_or_output)
+        mout.var('count_elab_without_base', count_elab_without_base)
+        mout.var('count_skipped_multi_name_match', count_skipped_multi_name_match)
+
+        # mout.var('#bases_without_minimized', count_bases_without_minimized)
+        # mout.var('#missing_bases', count_bases_missing)
+        # mout.var('#isotopic_smiles_skipped', count_isotopic_smiles_skipped)
+        # mout.var('#isotopic_smiles_skipped', count_isotopic_smiles_skipped)
+
+        return self.bases, self.elabs
 
     def quote_reactants(self, quoter):
 
@@ -504,10 +517,25 @@ class HIPPO:
         n_bbs = len(self.building_blocks)
 
         mout.var('#BBs', n_bbs)
+
+        in_cache = False
+        last_was_cached = False
 		
         # try:
         for i,bb in enumerate(self.building_blocks):
-            mout.progress(i, n_bbs, prepend='quoting BBs', append=bb.name)
+
+            if bb.price_picker is not None:
+                continue
+			
+            last_was_cached = in_cache
+            in_cache = quoter.in_cache(bb)
+
+            if last_was_cached and in_cache:
+                if i%50 == 0:
+                    mout.progress(i, n_bbs, prepend='quoting BBs', append=bb.name)
+            else:
+                mout.progress(i, n_bbs, prepend='quoting BBs', append=bb.name)
+                
             try: 
                 bb.tags.add('quote_attempted', duplicate_error=False)
                 quoter(bb)
@@ -829,8 +857,10 @@ class HIPPO:
             # hyphen bleaching
             base_name = base_name.replace('_','-')
 
-            if base_name in self.bases:
-                compound.base = self.bases[base_name]
+            bases = self.get_compounds('base')
+
+            if base_name in bases:
+                compound.base = bases[base_name]
 
         ### synthetic routes
 
@@ -937,19 +967,81 @@ class HIPPO:
     #         if debug: mout.debug('returning new Compound')
     #         return comp
 
-    def _update_bb_amounts(self):
+    def _update_bb_amounts(self, debug=False):
 
         for bb in self.building_blocks:
             bb.amount = 0
 
-        syndirella_comps = self.get_compounds('Syndirella')
+        # if debug:
+            # mout.debug('getting Syndirella compounds')
+        # syndirella_comps = self.get_compounds('Syndirella')
 
-        mout.var('#syndirella_comps', len(syndirella_comps))
-
-        for comp in syndirella_comps:
+        n = len(self.compounds)
+        mout.var('#comps', n)
+		
+        for i, comp in enumerate(self.compounds):
+            if debug and i%100 == 0:
+                mout.progress(i,n)
             for reaction in comp.reactions:
                 for reactant in reaction.reactants:
                     self.building_blocks[reactant].amount += 1
+        if debug:
+            mout.finish()
+
+    def _delete_compounds(self, delete_list, debug=False):
+
+        delete_references = 0
+        for cset in self.compound_sets:
+            if debug:
+                mout.debug(cset)
+                n = len(cset)
+            for i,comp in enumerate(cset):
+                if debug and i%100 == 0:
+                    mout.progress(i,n)
+                if comp in delete_list:
+                    del cset[comp]
+                    delete_references += 1
+            if debug:
+                mout.finish()
+                    
+        delete_compounds = 0
+        n = self.num_compounds
+        if debug:
+            mout.debug('Deleting from animal.compounds')
+            mout.debug(self.compounds)
+        for i,comp in enumerate(self.compounds):
+            if debug and i%100 == 0:
+                mout.progress(i,n)
+            if comp in delete_list:
+                del self.compounds[comp]
+                delete_compounds += 1
+
+        if debug:
+            mout.finish()
+            mout.debug(self.compounds)
+
+        mout.var('references deleted', delete_references)
+        mout.var('compounds deleted', delete_compounds)
+
+    def _delete_reactants(self, delete_list, debug=False):
+                    
+        delete_compounds = 0
+        n = self.num_compounds
+        if debug:
+            mout.debug('Deleting from animal.building_blocks')
+            mout.debug(self.building_blocks)
+        for i,comp in enumerate(self.building_blocks):
+            if debug and i%100 == 0:
+                mout.progress(i,n)
+            if comp in delete_list:
+                del self.building_blocks[comp]
+                delete_compounds += 1
+
+        if debug:
+            mout.finish()
+            mout.debug(self.building_blocks)
+
+        mout.var('reactants deleted', delete_compounds)
 
     ### PROPERTIES
 
@@ -1027,7 +1119,10 @@ class HIPPO:
 
     @property
     def bases(self):
-        return self.compound_sets['bases']
+        if 'bases' in self.compound_sets:
+            return self.compound_sets['bases']
+        else:
+            return self.get_compounds('base')
     
     @property
     def target_name(self):
@@ -1043,7 +1138,10 @@ class HIPPO:
 
     @property
     def elabs(self):
-        return self.compound_sets['elabs']
+        if 'elabs' in self.compound_sets:
+            return self.compound_sets['elabs']
+        else:
+            return self.get_compounds('elab')
 
     @property
     def reactant_catalog(self):

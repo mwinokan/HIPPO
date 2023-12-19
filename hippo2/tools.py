@@ -7,7 +7,7 @@ import mcol
 
 def df_row_to_dict(df_row):
 
-	assert len(df_row) == 1
+	assert len(df_row) == 1, f'{len(df_row)=}'
 
 	data = {}
 

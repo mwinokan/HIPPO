@@ -58,6 +58,15 @@ class PoseSet(MutableSet):
 		# else:
 			# raise ValueError(f'{compound} already in {self}')
 
+	def remove_unfingerprinted(self, animal):
+
+		new = []
+		for pose in self:
+			if pose.fingerprint is not None:
+				new.append(pose)
+
+		self.__init__(new)
+
 	### DUNDERS
 
 	def __contains__(self, pose):

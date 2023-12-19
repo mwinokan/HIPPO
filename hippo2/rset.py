@@ -58,6 +58,27 @@ class ReactionSet(MutableSet):
 		else:
 			raise ValueError(f'{compound} already in {self}')
 
+	def remove_unpurchaseable(self, animal):
+
+		new = []
+		for reaction in self:
+
+			for bb in reaction.reactants:
+
+				if not bb.price_picker:
+					break
+
+				if bb.lead_time > animal.max_lead_time:
+					break
+
+				if bb.get_price(animal.min_bb_quantity) > animal.max_bb_price:
+					break
+
+			else:
+				new.append(reaction)
+
+		self.__init__(new)
+
 	### DUNDERS
 
 	def __getitem__(self, key):
