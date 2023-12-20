@@ -33,7 +33,7 @@ class BuildingBlock(Compound):
 	
 	@property
 	def dict(self):
-		return dict(
+		d = dict(
 			name = self.name,
 			smiles = self.smiles,
 			amount = self.amount,
@@ -42,6 +42,11 @@ class BuildingBlock(Compound):
 			lead_time = self.lead_time,
 			quote_attempted = 'quote_attempted' in self.tags,
 		)
+
+		if self.price_picker and self.amount:
+			d['price'] = self.get_price(self.amount)
+
+		return d
 
 	@property
 	def name(self):
@@ -78,6 +83,8 @@ class BuildingBlock(Compound):
 		bb = BuildingBlock(self.smiles, self.tags, amount=self.amount)
 		bb._name = self.name
 		bb._name_is_smiles = self.name_is_smiles
+		bb._price_picker = self._price_picker
+		bb._lead_time = self._lead_time
 		return bb
 
 	def get_price(self, *args, **kwargs):
@@ -99,12 +106,30 @@ class PricePicker:
 
 		self._data = {}
 		for d in sorted(price_dict, key=lambda x: x['amount']):
-			self._data[d['amount']] = d['price']
+			if d['price'] > 0:
+				self._data[d['amount']] = d['price']
 
-		self._min_amount = min(self.data.keys())
-		self._min_price = self.data[self.min_amount]
-		self._max_amount = max(self.data.keys())
-		self._max_price = self.data[self.max_amount]
+		if not self._data:
+			self._min_amount = None
+			self._min_price = None
+			self._max_amount = None
+			self._max_price = None
+
+		else:
+			self._min_amount = min(self.data.keys())
+			self._min_price = self.data[self.min_amount]
+			self._max_amount = max(self.data.keys())
+			self._max_price = self.data[self.max_amount]
+
+	def __bool__(self):
+		return len(self.data) > 0
+
+	def reinit(self):
+		# try:
+		data = []
+		for key, value in self.data.items():
+			data.append(dict(amount=key, price=value))
+		return PricePicker(data)
 
 	def get_pack(self, amount):
 
@@ -118,6 +143,10 @@ class PricePicker:
 		return dict(amount=order, price=budget)
 
 	def get_price(self, query):
+
+		# mout.debug(self.data)
+		# mout.debug(query)
+
 		for amount, price in self.data.items():
 			if amount >= query:
 				return price

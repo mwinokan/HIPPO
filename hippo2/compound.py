@@ -184,6 +184,10 @@ class Compound:
         assert self.num_reactions == 1
         return self.reactions[0]
 
+    @reaction.setter
+    def reaction(self, r):
+        self._reactions = ReactionSet([r])
+
     @property
     def reactions(self):
         return self._reactions
@@ -224,14 +228,26 @@ class Compound:
     
     @property
     def dict(self):
-        return dict(
+        d = dict(
             name = self.name,
             smiles = self.smiles,
             orig_smiles = self.orig_smiles,
             crystal_name = self.crystal_name,
             num_poses = self.num_poses,
             num_reactions = self.num_reactions,
+            # base = self.base,
         )
+
+        if self.reactions:
+            d['reactions'] = [r.dict for r in self.reactions]
+
+        if self.base:
+            d['base'] = self.base.dict
+
+        if self.inspirations:
+            d['inspirations'] = [i.longname for i in self.inspirations]
+
+        return d
 
 ### METHODS
 

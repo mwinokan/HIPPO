@@ -9,6 +9,8 @@ class PoseSet(MutableSet):
 		
 		self._elements = []
 		self._immutable = immutable
+		self._fingerprint_df = None
+		self._metadata_cols = []
 
 		for pose in poses:
 			self.add(pose)
@@ -28,6 +30,20 @@ class PoseSet(MutableSet):
 	@property
 	def poses(self):
 		return self._elements
+
+	@property
+	def fingerprints(self):
+		return [p.fingerprint for p in self.poses if p._fingerprint is not None]
+
+	@property
+	def fingerprint_df(self):
+		if self._fingerprint_df is None:
+			import pandas as pd
+			fingerprints = self.fingerprints
+			if len(fingerprints) < 1:
+				mout.error(f'no fingerprints for {self}')
+			self._fingerprint_df = pd.DataFrame(fingerprints)
+		return self._fingerprint_df
 
 	### METHODS
 
@@ -66,6 +82,16 @@ class PoseSet(MutableSet):
 				new.append(pose)
 
 		self.__init__(new)
+
+	def get_present_features(self):
+
+		features = set()
+		for col in [c for c in self.fingerprint_df.columns if c not in self._metadata_cols]:
+			covered = any(self.fingerprint_df[col].values)
+			if covered:
+				features.add(col)
+
+		return features
 
 	### DUNDERS
 

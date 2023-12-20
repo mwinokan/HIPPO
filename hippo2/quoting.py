@@ -320,6 +320,11 @@ class Quoter:
 			for pack in data['packs']:
 				packs.append(self.parse_enamine_ice_pack(pack))
 
+			packs = [p for p in packs if p['price'] > 0]
+
+			if not packs:
+				raise NoDataInReponse
+
 		#### DO STUFF TO THE COMPOUND
 
 		compound.lead_time = days

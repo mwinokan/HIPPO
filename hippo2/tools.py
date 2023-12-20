@@ -74,3 +74,25 @@ def clean_smiles(s, verbosity=0):
 	smiles = Chem.MolToSmiles(Chem.MolFromSmiles(smiles),True)
 
 	return dict(smiles=smiles, orig_smiles=orig_smiles, stereo_smiles=stereo_smiles)
+
+def number_to_base(n, b):
+	if n == 0:
+		return [0]
+	digits = []
+	while n:
+		digits.append(int(n%b))
+		n //= b
+	return digits[::-1]
+
+def alphabet_index(index, size=3):
+
+	if index >= pow(26,size):
+		raise Exception('index too big for string length')
+
+	digits = number_to_base(index, 26)
+
+	for i in range(size - len(digits)):
+		digits = [0] + digits
+	
+	return ''.join([chr(65+d) for d in digits])
+   
