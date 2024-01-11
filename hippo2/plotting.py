@@ -265,7 +265,7 @@ def plot_reactant_price(animal, subtitle=None, amount=20):
 
 	fig.update_layout(title=title,title_automargin=False, title_yref='container')
 
-	fig.update_layout(xaxis_title='Reactant', yaxis_title=f'Price for {amount}mg [$USD]')
+	fig.update_layout(yaxis_title='Number of reactants', xaxis_title=f'Price for {amount}mg [$USD]')
 
 	return fig
 
