@@ -114,7 +114,10 @@ class Quoter:
 				if not self.force and comp_id in self.requests_data['id_queries']:
 					result = self.requests_data['id_queries'][comp_id]
 					# mout.out(f"{mcol.success}using cache.")
-					return self.parse_enamine_response(result, comp)
+					try:
+						return self.parse_enamine_response(result, comp)
+					except NoDataInReponse:
+						mout.header(f'{mcol.error}null data in cache ({comp_id=}).')
 
 				else:
 
@@ -136,6 +139,10 @@ class Quoter:
 					except NotInCatalogues as e:
 						# mout.error(f'{e}: {comp.name}')
 						mout.header(f'{mcol.error}not found ({comp_id=}).')
+
+						if hasattr(comp,'_catalogue_renamed'):
+							if getattr(comp,'_catalogue_renamed'):
+								raise NotInCatalogues(f'Renamed entry not found {comp_id}')
 				
 			# search by smiles
 				
@@ -161,6 +168,7 @@ class Quoter:
 
 			mout.out(f"Renaming and retrying...")
 			comp.name = comp_id
+			comp._catalogue_renamed = True
 
 			return self.get_bb_info(comp)
 
@@ -323,7 +331,13 @@ class Quoter:
 			packs = [p for p in packs if p['price'] > 0]
 
 			if not packs:
-				raise NoDataInReponse
+
+				# print(compound)
+				# print(data)
+				mout.error(f'No packs {compound.name}')
+
+				# raise NoDataInReponse
+				return None
 
 		#### DO STUFF TO THE COMPOUND
 

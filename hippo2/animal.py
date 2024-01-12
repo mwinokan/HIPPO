@@ -230,6 +230,7 @@ class HIPPO:
 		restart_j=0,
 		pickle_dump=None,
 		debug=False,
+		rmsd_cut=None,
 	):
 
 		if not overwrite and 'elabs' in self.compound_sets:
@@ -245,6 +246,9 @@ class HIPPO:
 			elabs_skip_substr = [elabs_skip_substr]
 		if not isinstance(elabs_skip_exact, list):
 			elabs_skip_exact = [elabs_skip_exact]
+
+		if rmsd_cut is not None:
+			assert rmsd_cut > 0
 
 		tags = tags or ['Syndirella']
 		tags = TagSet(tags)
@@ -283,6 +287,7 @@ class HIPPO:
 		count_base_with_no_success_or_output = 0
 		count_elab_without_base = 0
 		count_skipped_multi_name_match = 0
+		count_rmsd_cutoff = 0
 
 		n_paths = len(elabs_csv_paths)
 
@@ -340,7 +345,7 @@ class HIPPO:
 
 			mout.var('csv',str(path), valCol=mcol.file)
 
-			mout.progress(j, n_paths, append=f'{j=} #elabs={self.num_compounds:>07}')
+			mout.progress(j, n_paths, append=f'{j=} #comps={self.num_compounds:>07}')
 
 			df = pd.read_csv(path)
 
@@ -360,7 +365,7 @@ class HIPPO:
 					mout.debug(f'{i=}/{len(names)}: {name}')
 
 				if i%100 == 0:
-					mout.progress(j, n_paths, append=f'#elabs={self.num_compounds:>07}')
+					mout.progress(j, n_paths, append=f'#comps={self.num_compounds:>07}')
 
 				pose_name = name
 				bleach_name = name.replace('_','-')
@@ -401,10 +406,44 @@ class HIPPO:
 						continue
 									
 				meta_row = df[df['name'] == pose_name]
+
+				# mout.debug(len(meta_row))
+				# mout.debug(len(meta_row.index))
+				# print(meta_row['name'])
+
+				if len(meta_row) == 0:
+					meta_row = df[df['name'] == pose_name.replace('-','_')]
+
+				# mout.debug(len(meta_row))
+				# mout.debug(len(meta_row.index))
+				# print(meta_row['name'])
+
+				# break
+
 				### THIS MAY BE PROBLEMATIC IN THE FUTURE! (missing compounds)
-				if len(meta_row) != 0:
+				
+				if len(meta_row) == 0:
 					count_skipped_multi_name_match += 1
+					mout.error(f'No rows have "name" == "{pose_name}"')
 					continue
+
+				if len(meta_row) > 1:
+					count_skipped_multi_name_match += 1
+					mout.error(f'Multiple rows have "name" == "{pose_name}"')
+					continue
+
+				assert len(meta_row) == 1
+
+				# get Fragmenstein pose metadata from JSON
+				fstein_json = list(comp_output_dir.glob('*.json'))
+				if len(fstein_json) == 1:
+					fstein_json = json.load(open(fstein_json[0],'rt'))
+					if rmsd_cut and fstein_json['mRMSD'] > rmsd_cut:
+						count_rmsd_cutoff += 1
+						continue
+				else:
+					raise Exception("Fragmenstein JSON missing!!!")
+
 				meta_dict = df_row_to_dict(meta_row)
 
 				if smiles_has_isotope(meta_dict["smiles"]):
@@ -463,6 +502,11 @@ class HIPPO:
 				pose = Pose.from_mol_and_reference(compound, mol, reference_pdb, site_index=site_index, tags=comp_tags)
 				pose._stereo_smiles = meta_dict['smiles']
 				pose._name = conformer
+
+				if fstein_json:
+					pose._placement_mRMSD = fstein_json['mRMSD']
+					pose._placement_ddG = fstein_json['Energy']['bound']['total_score'] - fstein_json['Energy']['unbound']['total_score']
+
 				compound.add_pose(pose)
 
 			if pickle_dump:
@@ -502,6 +546,7 @@ class HIPPO:
 		mout.var('count_base_with_no_success_or_output', count_base_with_no_success_or_output)
 		mout.var('count_elab_without_base', count_elab_without_base)
 		mout.var('count_skipped_multi_name_match', count_skipped_multi_name_match)
+		mout.var('count_rmsd_cutoff', count_rmsd_cutoff)
 
 		# mout.var('#bases_without_minimized', count_bases_without_minimized)
 		# mout.var('#missing_bases', count_bases_missing)
@@ -949,6 +994,14 @@ class HIPPO:
 		from .plotting import plot_numbers        
 		return plot_numbers(self, subtitle, **kwargs)
 
+	def plot_compound_property(self, prop, **kwargs): 
+		from .plotting import plot_compound_property
+		return plot_compound_property(self, prop, **kwargs)
+
+	def plot_pose_property(self, prop, **kwargs): 
+		from .plotting import plot_pose_property
+		return plot_pose_property(self, prop, **kwargs)
+
 	### INTERNAL METHODS
 
 	def _generate_fingerprints(self, poses):
@@ -1010,6 +1063,11 @@ class HIPPO:
 
 		else:
 			mout.error(f'No inspiration data for {compound}')
+
+		### number of atoms added w.r.t base compound
+
+		num_atom_difference = meta_dict['num_atom_difference']
+		compound._num_atoms_added_wrt_base = num_atom_difference
 
 		### base
 

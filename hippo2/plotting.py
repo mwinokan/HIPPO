@@ -406,6 +406,130 @@ def plot_numbers(animal, subtitle=None):
 	return fig
 
 @hippo_graph
+def plot_compound_property(animal, prop, style='bar', null=None):
+
+	"""
+	Get an arbitrary property from all the compounds in animal.compounds
+	
+	If one property, plot a 1D histogram
+	If 2D plot a bar/scatter
+
+	"""
+
+	if not isinstance(prop, list):
+		prop = [prop]
+
+	plot_data = []
+
+	for comp in animal.compounds:
+
+		data = comp.dict
+
+		for p in prop:
+
+			# has attr
+
+			if p not in data:
+
+				# get attr
+				if hasattr(comp,p):
+					v = getattr(comp,p)
+				else:
+					v = null
+
+				data[p] = v
+
+		plot_data.append(data)
+
+	if len(prop) == 1:
+
+		title = f'Compound {prop[0]}'
+
+		fig = px.histogram(plot_data, x=prop[0])
+		
+		fig.update_layout(xaxis_title=prop[0], yaxis_title='Quantity')
+
+	elif len(prop) == 2:
+
+		title = f'Compound {prop[0]} vs {prop[1]}'
+		
+		func = eval(f'px.{style}')
+		fig = func(plot_data, x=prop[0], y=prop[1])
+
+		fig.update_layout(xaxis_title=prop[1], yaxis_title=prop[1])
+
+	else:
+		mout.error('Unsupported', code='plotting.plot_compound_property.1')
+
+	title = f'<b>{animal.target_name}</b>: {title}<br>'
+
+	fig.update_layout(title=title,title_automargin=False, title_yref='container', barmode='group')
+
+	return fig
+
+@hippo_graph
+def plot_pose_property(animal, prop, style='bar', null=None):
+
+	"""
+	Get an arbitrary property from all the poses in animal.poses
+	
+	If one property, plot a 1D histogram
+	If 2D plot a bar/scatter
+
+	"""
+
+	if not isinstance(prop, list):
+		prop = [prop]
+
+	plot_data = []
+
+	for pose in animal.all_poses:
+
+		data = pose.dict
+
+		for p in prop:
+
+			# has attr
+
+			if p not in data:
+
+				# get attr
+				if hasattr(pose,p):
+					v = getattr(pose,p)
+				else:
+					v = null
+
+				data[p] = v
+
+		plot_data.append(data)
+
+	if len(prop) == 1:
+
+		title = f'Pose {prop[0]}'
+
+		fig = px.histogram(plot_data, x=prop[0])
+		
+		fig.update_layout(xaxis_title=prop[0], yaxis_title='Quantity')
+
+	elif len(prop) == 2:
+
+		title = f'Pose {prop[0]} vs {prop[1]}'
+		
+		func = eval(f'px.{style}')
+		fig = func(plot_data, x=prop[0], y=prop[1])
+
+		fig.update_layout(xaxis_title=prop[1], yaxis_title=prop[1])
+
+	else:
+		mout.error('Unsupported', code='plotting.plot_pose_property.1')
+
+	title = f'<b>{animal.target_name}</b>: {title}<br>'
+
+	fig.update_layout(title=title,title_automargin=False, title_yref='container', barmode='group')
+
+	return fig
+
+@hippo_graph
 def plot_reactant_sankey(animal, subtitle):
 
 	'''
@@ -483,8 +607,6 @@ def plot_reactant_sankey(animal, subtitle):
 	title = f'<b>{animal.target_name}</b>: {title}<br><sup><i>{subtitle}</i></sup>'
 
 	fig.update_layout(title=title,title_automargin=False, title_yref='container')
-
-	# fig.update_layout(xaxis_title='Compound', yaxis_title='#Routes')
 
 	return fig
 

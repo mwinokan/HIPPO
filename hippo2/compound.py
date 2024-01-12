@@ -32,6 +32,7 @@ class Compound:
         self._base = None
         self._fp_1024 = None
         self._canonical_smiles_hash = None
+        self._num_atoms_added_wrt_base = None
         # self._amount = None # mg
         self._reactions = ReactionSet()
 

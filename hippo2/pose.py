@@ -181,6 +181,30 @@ class Pose:
 			
 		return self._mol
 
+	@property
+	def dict(self):
+		d = dict(
+			name = self.name,
+			# smiles = self.smiles,
+			longname = self.longname,
+			# orig_smiles = self.orig_smiles,
+			site_index = self.site_index,
+			chain = self.chain,
+			pdb_path = self.pdb_path,
+			# base = self.base,
+		)
+
+		# if self.reactions:
+		#     d['reactions'] = [r.dict for r in self.reactions]
+
+		# if self.base:
+		#     d['base'] = self.base.dict
+
+		# if self.inspirations:
+		#     d['inspirations'] = [i.longname for i in self.inspirations]
+
+		return d
+
 	### METHODS
 	
 	def calculate_fingerprint(self):
