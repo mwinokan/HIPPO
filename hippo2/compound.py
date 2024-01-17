@@ -300,6 +300,29 @@ class Compound:
     def get_pose(self, name):
         return [p for p in self.poses if p.name == name][0]
 
+    def plot_inspirations(self,show=True):
+
+        import plotly.graph_objects as go
+
+        colors = ['red','blue','green','yellow']
+
+        fig = mp.rdkit.mol_to_AtomGroup(self.pose.mol).plot3d(show=False)
+        
+        for c,inspiration in zip(colors,self.inspirations):
+
+            this_fig = mp.rdkit.mol_to_AtomGroup(inspiration.mol).plot3d(show=False)
+
+            bonds = this_fig.data[0]
+            bonds.name = f'{inspiration.longname} bonds'
+            bonds.line.color = c
+
+            fig.add_trace(bonds)
+
+        if show:
+            fig.show()
+        
+        return fig
+
 ### DUNDERS
 
     def __repr__(self):
