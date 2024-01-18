@@ -870,6 +870,15 @@ class HIPPO:
 		import molparse as mp
 		mp.write(file,self)
 
+	# def write_compound_sdf(self,compounds):
+
+	# 	data = []
+
+	# 	for comp in compounds:
+	# 		data.append(comp.dict)
+
+	# 	return pd.DataFrame(data)
+
 	### QUERIES
 
 	def get_tag_statistics(self, all_compounds=None):#, all_poses=None):

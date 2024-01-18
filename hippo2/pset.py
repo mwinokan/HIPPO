@@ -1,6 +1,7 @@
 
 # set of Poses
 
+import pandas as pd
 from collections.abc import MutableSet
 
 class PoseSet(MutableSet):
@@ -44,6 +45,26 @@ class PoseSet(MutableSet):
 				mout.error(f'no fingerprints for {self}')
 			self._fingerprint_df = pd.DataFrame(fingerprints)
 		return self._fingerprint_df
+
+	@property
+	def df(self, compound_dict=True):
+		data = []
+
+		for pose in self:
+
+			d = {}
+
+			d['_Name'] = pose.longname
+			d['ROMol'] = pose.mol
+
+			if compound_dict:
+				d['compound'] = pose.compound.dict
+
+			d.update(pose.dict)
+
+			data.append(d)
+
+		return pd.DataFrame(data)
 
 	### METHODS
 

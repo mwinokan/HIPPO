@@ -11,6 +11,7 @@ from .pset import PoseSet
 
 import random
 import molparse as mp
+import pandas as pd
 
 class CompoundSet(MutableSet):
 
@@ -183,6 +184,23 @@ class CompoundSet(MutableSet):
 			self._fingerprint_df = pd.DataFrame(fingerprints)
 		return self._fingerprint_df
 	
+	@property
+	def df(self):
+		data = []
+
+		for comp in self:
+
+			d = {}
+
+			d['_Name'] = comp.name
+			d['ROMol'] = comp.mol
+
+			d.update(comp.dict)
+
+			data.append(d)
+
+		return pd.DataFrame(data)
+
 	@property
 	def immutable(self):
 		return self._immutable
