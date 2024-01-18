@@ -194,6 +194,12 @@ class Pose:
 			# base = self.base,
 		)
 
+		if hasattr(self,'_placement_mRMSD'):
+			d['_placement_mRMSD'] = self._placement_mRMSD
+
+		if hasattr(self,'_placement_ddG'):
+			d['_placement_ddG'] = self._placement_ddG
+
 		# if self.reactions:
 		#     d['reactions'] = [r.dict for r in self.reactions]
 
