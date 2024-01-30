@@ -24,6 +24,9 @@ class Pose:
 		self._compound = compound
 		self._pdb_path = pdb_path
 
+		self._placement_mRMSD = None
+		self._placement_ddG = None
+
 		if site_index is not None:
 			self.site_index = site_index
 		if chain is not None:
@@ -210,6 +213,14 @@ class Pose:
 		#     d['inspirations'] = [i.longname for i in self.inspirations]
 
 		return d
+
+	@property
+	def placement_ddG(self):
+		return self._placement_ddG
+
+	@property
+	def placement_RMSD(self):
+		return self._placement_mRMSD
 
 	### METHODS
 	
