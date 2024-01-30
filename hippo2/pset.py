@@ -59,6 +59,11 @@ class PoseSet(MutableSet):
 
 			if compound_dict:
 				d['compound'] = pose.compound.dict
+				d['compound_mol'] = pose.compound.mol
+
+			if compound_dict:
+				d['base'] = pose.compound.base.dict
+				d['base_mol'] = pose.compound.base.mol
 
 			d.update(pose.dict)
 
