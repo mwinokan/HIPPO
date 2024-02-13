@@ -2,6 +2,7 @@
 import pandas as pd
 
 from .cset import CompoundSet
+from .pset import PoseSet
 
 from .db import Database
 from pathlib import Path
@@ -11,18 +12,21 @@ logger = setup_logger('HIPPO', debug=True)
 
 class HIPPO:
 		
-	def __init__(self, name, target, db_path=None):
+	def __init__(self, 
+		name: str,  
+		db_path: str | Path,
+	):
 
 		logger.header('Creating HIPPO animal')
 
 		self._name = name
-		self._target_name = target
+		# self._target_name = target
 
 		logger.var('name', name, dict(color='arg'))
-		logger.var('target', target, dict(color='arg'))
+		# logger.var('target', target, dict(color='arg'))
 
-		db_path = db_path or f'{name}.db'
-		db_path = Path(db_path)
+		if not isinstance(db_path, Path):
+			db_path = Path(db_path)
 		
 		logger.var('db_path', db_path, dict(color='file'))
 
@@ -30,6 +34,7 @@ class HIPPO:
 		self._db = Database(self.db_path)
 
 		self._compounds = CompoundSet(self.db, 'compound')
+		self._poses = PoseSet(self.db, 'pose')
 
 		logger.success(f"Initialised animal {self}")
 		
@@ -41,9 +46,9 @@ class HIPPO:
 	def name(self):
 		return self._name
 
-	@property
-	def target_name(self):
-		return self._target_name
+	# @property
+	# def target_name(self):
+	# 	return self._target_name
 
 	@property
 	def db_path(self):
@@ -56,6 +61,10 @@ class HIPPO:
 	@property
 	def compounds(self):
 		return self._compounds
+
+	@property
+	def poses(self):
+		return self._poses
 	
 	### PUBLIC METHODS
 

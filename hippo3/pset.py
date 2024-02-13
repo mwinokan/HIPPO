@@ -1,30 +1,28 @@
 
 # from .tools import df_row_to_dict
 
-from .compound import Compound
 from .db import Database
+from .pose import Pose
 
 import os
 
 import logging
 logger = logging.getLogger('HIPPO')
 
-class CompoundSet:
+class PoseSet:
 
-	# class to access entries in database tables containing compounds
-
-	def __init__(self, 
-		db: Database, 
-		table: str = 'compound',
+	def __init__(self,
+		db: Database,
+		table: str = 'pose',
 	) -> None:
-		
+
 		self._db = db
 		self._table = table
 		
 	### FACTORIES
 
 	### PROPERTIES
-
+	
 	@property
 	def db(self) -> Database:
 		return self._db
@@ -37,15 +35,15 @@ class CompoundSet:
 
 	### DUNDERS
 
-	def __getitem__(self, key) -> Compound:
+	def __getitem__(self, key) -> Pose:
 		
 		match key:
 
 			case int():
-				return self.db.get_compound(table=self.table, id=key)
+				return self.db.get_pose(id=key)
 
 			case str():
-				return self.db.get_compound(table=self.table, name=key)
+				return self.db.get_pose(longname=key)
 
 			case _:
 				logger.error(f'Unsupported type for CompoundSet.__getitem__(): {type(key)}')
@@ -53,7 +51,7 @@ class CompoundSet:
 		return None
 
 	def __repr__(self) -> str:
-		return f'CompoundSet(table="{self.table}"")'
+		return f'PoseSet(table="{self.table}"")'
 
 	def __len__(self) -> int:
 		return self.db.count(self.table)
