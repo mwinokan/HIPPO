@@ -4,6 +4,8 @@
 from .db import Database
 from .pose import Pose
 
+import mcol
+
 import os
 
 import logging
@@ -51,7 +53,8 @@ class PoseSet:
 		return None
 
 	def __repr__(self) -> str:
-		return f'PoseSet(table="{self.table}"")'
+		# return f'PoseSet(table="{self.table}")'
+		return f'{mcol.bold}{mcol.underline}set(P x {len(self)}){mcol.unbold}{mcol.ununderline}'
 
 	def __len__(self) -> int:
 		return self.db.count(self.table)

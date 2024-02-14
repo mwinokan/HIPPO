@@ -4,6 +4,8 @@
 from .compound import Compound
 from .db import Database
 
+import mcol
+
 import os
 
 import logging
@@ -53,7 +55,9 @@ class CompoundSet:
 		return None
 
 	def __repr__(self) -> str:
-		return f'CompoundSet(table="{self.table}"")'
+		# return f'CompoundSet(table="{self.table}"")'
+		return f'{mcol.bold}{mcol.underline}set(C x {len(self)}){mcol.unbold}{mcol.ununderline}'
+
 
 	def __len__(self) -> int:
 		return self.db.count(self.table)

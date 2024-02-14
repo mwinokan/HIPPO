@@ -29,13 +29,10 @@ class Database:
 
 		logger.debug(f'Database.path = {self.path}')
 
-
 		try:
-			# create connection
 			path = path.resolve(strict=True)
 
 		except FileNotFoundError:
-			# doesn't exist
 			# create a blank database
 			self.connect()
 			self.create_blank_db()
@@ -144,6 +141,8 @@ class Database:
 		self.create_table_pose()
 		self.create_table_tag()
 		self.create_table_quote()
+		self.create_table_binary_fp()
+		self.create_table_morgan_fp()
 
 	def create_table_compound(self):
 		logger.debug('HIPPO.Database.create_table_compound()')
@@ -159,30 +158,23 @@ class Database:
 			CONSTRAINT UC_compound_smiles UNIQUE (compound_smiles)
 		);
 		"""
+		# -- compound_binary_fp
 
 		self.execute(sql)
-
-		# if logging.root.level >= logging.DEBUG:
-		# 	self.execute(f'PRAGMA table_info(compound);')
-		# 	pprint(self.cursor.fetchall())
 
 	def create_table_inspiration(self):
 		logger.debug('HIPPO.Database.create_table_inspiration()')
 
 		sql = """CREATE TABLE inspiration(
-			inspiration_compound INTEGER,
-			inspiration_pose INTEGER,
-			FOREIGN KEY (inspiration_compound) REFERENCES compound(compound_id),
-			FOREIGN KEY (inspiration_pose) REFERENCES pose(pose_id),
-			CONSTRAINT UC_inspiration UNIQUE (inspiration_compound, inspiration_pose)
+			inspiration_original INTEGER,
+			inspiration_derivative INTEGER,
+			FOREIGN KEY (inspiration_original) REFERENCES pose(pose_id),
+			FOREIGN KEY (inspiration_derivative) REFERENCES pose(pose_id),
+			CONSTRAINT UC_inspiration UNIQUE (inspiration_original, inspiration_derivative)
 		);
 		"""
 
 		self.execute(sql)
-
-		# if logging.root.level >= logging.DEBUG:
-		# 	self.execute(f'PRAGMA table_info(inspiration);')
-		# 	pprint(self.cursor.fetchall())
 
 	def create_table_reaction(self):
 		logger.debug('HIPPO.Database.create_table_reaction()')
@@ -198,10 +190,6 @@ class Database:
 
 		self.execute(sql)
 
-		# if logging.root.level >= logging.DEBUG:
-		# 	self.execute(f'PRAGMA table_info(reaction);')
-		# 	pprint(self.cursor.fetchall())
-
 	def create_table_reactant(self):
 		logger.debug('HIPPO.Database.create_table_reactant()')
 
@@ -209,17 +197,13 @@ class Database:
 			reactant_amount REAL,
 			reactant_reaction INTEGER,
 			reactant_compound INTEGER,
-			FOREIGN KEY (reactant_reaction) REFERENCES reaction(reaction_id)
-			FOREIGN KEY (reactant_compound) REFERENCES compound(compound_id)
+			FOREIGN KEY (reactant_reaction) REFERENCES reaction(reaction_id),
+			FOREIGN KEY (reactant_compound) REFERENCES compound(compound_id),
 			CONSTRAINT UC_reactant UNIQUE (reactant_reaction, reactant_compound)
 		);
 		"""
 
 		self.execute(sql)
-
-		# if logging.root.level >= logging.DEBUG:
-		# 	self.execute(f'PRAGMA table_info(reactant);')
-		# 	pprint(self.cursor.fetchall())
 
 	def create_table_pose(self):
 		logger.debug('HIPPO.Database.create_table_pose()')
@@ -235,15 +219,12 @@ class Database:
 			pose_mol BLOB,
 			pose_fingerprint BLOB,
 			FOREIGN KEY (pose_compound) REFERENCES compound(compound_id),
-			CONSTRAINT UC_pose_longname UNIQUE (pose_longname)
+			CONSTRAINT UC_pose_longname UNIQUE (pose_longname),
+			CONSTRAINT UC_pose_path UNIQUE (pose_path)
 		);
 		"""
 
 		self.execute(sql)
-
-		# if logging.root.level >= logging.DEBUG:
-		# 	self.execute(f'PRAGMA table_info(pose);')
-		# 	pprint(self.cursor.fetchall())
 
 	def create_table_tag(self):
 		logger.debug('HIPPO.Database.create_table_tag()')
@@ -252,16 +233,14 @@ class Database:
 			tag_name TEXT,
 			tag_compound INTEGER,
 			tag_pose INTEGER,
-			FOREIGN KEY (tag_compound) REFERENCES compound(compound_id)
-			FOREIGN KEY (tag_pose) REFERENCES pose(pose_id)
+			FOREIGN KEY (tag_compound) REFERENCES compound(compound_id),
+			FOREIGN KEY (tag_pose) REFERENCES pose(pose_id),
+			CONSTRAINT UC_tag_compound UNIQUE (tag_name, tag_compound),
+			CONSTRAINT UC_tag_pose UNIQUE (tag_name, tag_pose)
 		);
 		"""
 
 		self.execute(sql)
-
-		# if logging.root.level >= logging.DEBUG:
-		# 	self.execute(f'PRAGMA table_info(tag);')
-		# 	pprint(self.cursor.fetchall())
 
 	def create_table_quote(self):
 		logger.debug('HIPPO.Database.create_table_quote()')
@@ -278,6 +257,7 @@ class Database:
 			quote_date TEXT,
 			quote_compound INTEGER,
 			FOREIGN KEY (quote_compound) REFERENCES compound(compound_id)
+			CONSTRAINT UC_quote UNIQUE (quote_amount, quote_supplier, quote_catalogue, quote_entry)
 		);
 		"""
 
@@ -287,9 +267,24 @@ class Database:
 		# 	self.execute(f'PRAGMA table_info(quote);')
 		# 	pprint(self.cursor.fetchall())
 
+	def create_table_binary_fp(self):
+		logger.debug('HIPPO.Database.create_table_binary_fp()')
+
+		sql = "CREATE VIRTUAL TABLE compound_bfp USING rdtree(id, fp bits(2048))"
+ 
+		self.execute(sql)
+
+	def create_table_morgan_fp(self):
+		logger.debug('HIPPO.Database.create_table_morgan_fp()')
+ 
+		sql = "CREATE VIRTUAL TABLE compound_mfp USING rdtree(compound_id, fp bits(1024))"
+ 
+		self.execute(sql)
+
 	### INSERTION
 
 	def insert_compound(self, 
+		*,
 		name: str, 
 		smiles: str, 
 		base: Compound | None = None, 
@@ -313,9 +308,9 @@ class Database:
 
 		except sqlite3.IntegrityError as e:
 			if 'UNIQUE constraint failed: compound.compound_name' in str(e):
-				logger.error(f"Can't add compound with existing name \"{name}\"")
+				logger.warning(f"Skipping compound with existing name \"{name}\"")
 			elif 'UNIQUE constraint failed: compound.compound_smiles' in str(e):
-				logger.error(f"Can't add compound with existing smiles \"{smiles}\"")
+				logger.warning(f"Skipping compound with existing smiles \"{smiles}\"")
 			else:
 				logger.exception(e)
 
@@ -326,15 +321,74 @@ class Database:
 			
 			compound_id = self.cursor.lastrowid
 
+			### register the tags
+
 			if tags:
 				for tag in tags:
 					self.insert_tag(name=tag, compound=compound_id)
+
+			### register the binary fingerprint
+
+			self.insert_compound_bfp(compound_id, smiles)
+
+			### register the morgan fingerprint
+
+			self.insert_compound_mfp(compound_id, smiles)
 
 			return compound_id
 
 		return None
 
+	def insert_compound_bfp(self,
+		compound_id,
+		smiles,
+	):
+
+		sql = """
+		INSERT INTO compound_bfp(id, fp)
+		VALUES(?1, mol_pattern_bfp(mol_from_smiles(?2), 2048))
+		"""
+
+		try:
+			self.execute(sql, (compound_id, smiles))
+
+		except Exception as e:
+			logger.exception(e)
+
+		finally:
+
+			bfp_id = self.cursor.lastrowid
+
+			logger.debug(f'bfp created with id={bfp_id}')
+
+			return bfp_id
+
+	def insert_compound_mfp(self,
+		compound_id,
+		smiles,
+	):
+
+		sql = """
+		INSERT INTO compound_mfp(compound_id, fp)
+		VALUES(?1, mol_morgan_bfp(mol_from_smiles(?2), 2, 1024))
+		"""
+
+		try:
+			self.execute(sql, (compound_id, smiles))
+
+		except Exception as e:
+			logger.exception(e)
+
+		finally:
+
+			mfp_id = self.cursor.lastrowid
+
+			logger.debug(f'mfp created with id={mfp_id}')
+
+			return mfp_id
+
 	def insert_pose(self,
+		*,
 		compound: Compound,
 		name: str,
 		# smiles: str,
@@ -350,9 +404,15 @@ class Database:
 		longname = f'{target}_{compound.name}_{name}'
 
 		if path:
-			path = Path(path)
-			path = path.resolve(strict=True)
-			path = str(path)
+
+			try:
+				path = Path(path)
+				path = path.resolve(strict=True)
+				path = str(path)
+
+			except FileNotFoundError as e:
+				logger.error(f'Path cannot be resolved: {mcol.file}{path}')
+				return None
 
 		sql = """
 		INSERT INTO pose(pose_name, pose_longname, pose_smiles, pose_compound, pose_target, pose_path)
@@ -363,7 +423,12 @@ class Database:
 			self.execute(sql, (name, longname, compound.smiles, compound.id, target, path))
 
 		except sqlite3.IntegrityError as e:
-			logger.error(f"Can't add pose with existing longname \"{longname}\"")
+			if 'UNIQUE constraint failed: pose.pose_longname' in str(e):
+				logger.warning(f"Skipping pose with existing longname \"{longname}\"")
+			elif 'UNIQUE constraint failed: pose.pose_path' in str(e):
+				logger.warning(f"Skipping pose with existing path \"{longname}\"")
+			else:
+				logger.exception(e)
 
 		except Exception as e:
 			logger.exception(e)
@@ -381,6 +446,7 @@ class Database:
 		return None
 
 	def insert_tag(self, 
+		*,
 		name, 
 		compound: int = None, 
 		pose: int = None
@@ -398,9 +464,9 @@ class Database:
 
 		except sqlite3.IntegrityError as e:
 			if 'UNIQUE constraint failed: compound.compound_name' in str(e):
-				logger.error(f"Can't add compound with existing name \"{name}\"")
+				logger.warning(f"Skipping compound with existing name \"{name}\"")
 			elif 'UNIQUE constraint failed: compound.compound_smiles' in str(e):
-				logger.error(f"Can't add compound with existing smiles \"{smiles}\"")
+				logger.warning(f"Skipping compound with existing smiles \"{smiles}\"")
 			else:
 				logger.exception(e)
 
@@ -414,26 +480,24 @@ class Database:
 		return None
 
 	def insert_inspiration(self, 
-		compound: Compound, 
-		pose: Pose,
+		*,
+		original: Pose, 
+		derivative: Pose,
 	) -> int:
 
-		assert isinstance(compound, Compound), f'incompatible compound={compound}'
-		assert isinstance(pose, Pose), f'incompatible pose={pose}'
-
-		# assert isinstance(compound_id, int) or compound_id is None
-		# assert isinstance(pose_id, int) or pose_id is None
+		assert isinstance(original, Pose), f'incompatible {original=}'
+		assert isinstance(derivative, Pose), f'incompatible {derivative=}'
 
 		sql = """
-		INSERT INTO inspiration(inspiration_compound, inspiration_pose)
+		INSERT INTO inspiration(inspiration_original, inspiration_derivative)
 		VALUES(?1, ?2)
 		"""
 
 		try:
-			self.execute(sql, (compound.id, pose.id))
+			self.execute(sql, (original.id, derivative.id))
 
 		except sqlite3.IntegrityError as e:
-			logger.warning(f"Can't add existing inspiration: {compound} {pose}")
+			logger.warning(f"Skipping existing inspiration: {original} {derivative}")
 
 		except Exception as e:
 			logger.exception(e)
@@ -445,6 +509,7 @@ class Database:
 		return None
 
 	def insert_reaction(self,
+		*,
 		type: str,
 		product: Compound,
 		product_amount: float,
@@ -472,6 +537,7 @@ class Database:
 		return None
 
 	def insert_reactant(self,
+		*,
 		compound: Compound,
 		reaction: Reaction,
 		amount: float,
@@ -488,6 +554,9 @@ class Database:
 		try:
 			self.execute(sql, (amount, reaction.id, compound.id))
 
+		except sqlite3.IntegrityError as e:
+			logger.warning(f"Skipping existing reactant: {reaction=} {compound=}")
+
 		except Exception as e:
 			logger.exception(e)
 
@@ -499,6 +568,7 @@ class Database:
 		return None
 
 	def insert_quote(self,
+		*,
 		compound: Compound,
 		supplier: str,
 		catalogue: str,
@@ -680,6 +750,79 @@ class Database:
 		)
 
 		return entry
+
+	### COMPOUND QUERY
+
+	def query_substructure(self, query, fast=True, none='error'):
+
+		# smiles
+		if isinstance(query, str):
+
+			if fast:
+				sql = f"SELECT compound_id FROM compound, compound_bfp AS bfp WHERE compound.compound_id = bfp.id AND mol_is_substruct(compound.compound_mol, mol_from_smiles(?))"
+			else:
+				sql = f"SELECT compound_id FROM compound WHERE mol_is_substruct(compound_mol, mol_from_smiles(?))"
+
+		else:
+
+			raise NotImplementedError
+
+		try:
+			self.execute(sql, (query, ))
+		except sqlite3.OperationalError as e:
+			logger.var('sql',sql)
+			raise
+
+		result = self.cursor.fetchall()
+
+		if not result and none == 'error':
+			logger.error(f'No compounds with substructure {query}')
+			return None
+
+		compounds = []
+		for id, in result:
+			compounds.append(self.get_compound(id=id))
+
+		return compounds
+
+	def query_similarity(self, query, threshold, return_similarity=False, none='error'):
+
+		# smiles
+		if isinstance(query, str):
+
+			if return_similarity:
+				sql = f"SELECT compound_id, bfp_tanimoto(mol_morgan_bfp(mol_from_smiles(?1), 2, 1024), mol_morgan_bfp(compound.compound_mol, 2, 1024)) as t FROM compound JOIN compound_mfp AS mfp USING(compound_id) WHERE mfp.compound_id match rdtree_tanimoto(mol_morgan_bfp(mol_from_smiles(?1), 2, 1024), ?2) ORDER BY t DESC "
+			else:
+				sql = f"SELECT compound_id FROM compound_mfp AS mfp WHERE mfp.compound_id match rdtree_tanimoto(mol_morgan_bfp(mol_from_smiles(?1), 2, 1024), ?2) "
+
+		else:
+			raise NotImplementedError
+
+		try:
+			self.execute(sql, (query, threshold))
+		except sqlite3.OperationalError as e:
+			logger.var('sql',sql)
+			raise
+
+		result = self.cursor.fetchall()
+
+		if not result and none == 'error':
+			logger.error(f'No compounds with similarity >= {threshold} to {query}')
+			return None
+
+		compounds = []
+
+		if return_similarity:
+			for id, similarity in result:
+				compounds.append((self.get_compound(id=id), similarity))
+		else:
+			for id, in result:
+				compounds.append(self.get_compound(id=id))
+
+		return compounds
+
+	def query_exact(self, query):
+		return self.query_similarity(query, 0.95, return_similarity=True)
 
 	### COUNTING
 

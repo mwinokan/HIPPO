@@ -1,4 +1,6 @@
 
+import mcol
+
 class Reaction:
 
 	def __init__(self,
@@ -22,3 +24,7 @@ class Reaction:
 	### METHODS
 
 	### DUNDERS
+
+	def __repr__(self):
+		# return f'Reaction(#{self.id})'
+		return f'{mcol.bold}{mcol.underline}R{self.id}{mcol.unbold}{mcol.ununderline}'

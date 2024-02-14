@@ -1,5 +1,9 @@
 
+import mcol
+
 from rdkit import Chem
+
+from .pose import Pose
 
 
 class Compound:
@@ -54,8 +58,9 @@ class Compound:
 		return self.get_tags()
 
 	@property
-	def inspirations(self):
-		return self.get_inspirations()
+	def poses(self):
+		return self.get_poses()
+
 	
 	### METHODS
 
@@ -63,26 +68,42 @@ class Compound:
 		tags = self.db.select_where(query='tag_name', table='tag', key='compound', value=self.id, multiple=True)
 		return {t[0] for t in tags}
 
-	def get_inspirations(self):
-		inspirations = self.db.select_where(query='inspiration_pose', table='inspiration', key='compound', value=self.id, multiple=True, none='quiet')
-		
-		if inspirations:
-			inspirations = [self.db.get_pose(id=id[0]) for id in inspirations]
-
-		return inspirations
-
 	def get_quotes(self, supplier=None):
 
 		quote_ids = self.db.select_where(query='quote_id', table='quote', key='compound', value=self.id, multiple=True)
 
-		quotes = [self.db.get_quote(id=q[0]) for q in quote_ids]
+		if quote_ids:
+			quotes = [self.db.get_quote(id=q[0]) for q in quote_ids]
+		else:
+			return []
 
 		if supplier:
 			quotes = [q for q in quotes if q['supplier'] == supplier]
 
 		return quotes
 
+	def get_poses(self, 
+		target: str = None
+	) -> list[Pose]:
+
+		pose_ids = self.db.select_where(query='pose_id', table='pose', key='compound', value=self.id, multiple=True)
+
+		poses = [self.db.get_pose(id=q[0]) for q in pose_ids]
+
+		if target:
+			poses = [q for q in poses if q['target'] == target]
+
+		return poses
+
+
 	### DUNDERS
 
+	def __str__(self):
+		return f'C{self.id}'
+
 	def __repr__(self):
-		return f'Compound({self.name}, {self.smiles})'
+		# return f'Compound(#{self.id}, "{self.name}", {self.smiles})'
+		# return f'[C{self.id} "{self.name}"]'
+		return f'{mcol.bold}{mcol.underline}{self} "{self.name}"{mcol.unbold}{mcol.ununderline}'
+		# return f'{mcol.bold}{mcol.underline}C{self.id}{mcol.unbold}{mcol.ununderline}'
+
