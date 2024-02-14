@@ -1,5 +1,11 @@
 
 import mcol
+import molparse as mp
+
+from rdkit import Chem
+
+import logging
+logger = logging.getLogger('HIPPO')
 
 class Pose:
 
@@ -24,8 +30,12 @@ class Pose:
 		self._compound_id = compound
 		self._target = target
 		self._path = path
-		self._mol = mol
 		self._fingerprint = fingerprint
+
+		if isinstance(mol, bytes):
+			self._mol = Chem.Mol(mol)
+		else: 
+			self._mol = mol
 		
 	### FACTORIES
 
@@ -69,7 +79,25 @@ class Pose:
 
 	@property
 	def mol(self):
+
+		if not self._mol and self.path:
+			logger.reading(self.path)
+			sys = mp.parse(self.path, verbosity=False)
+			lig_residues = sys['rLIG']
+			if len(lig_residues) > 1:
+				logger.warning('Multiple ligands in PDB')
+			lig_res = lig_residues[0]
+			self.mol = lig_res.rdkit_mol
+			return self.mol
+
 		return self._mol
+
+	@mol.setter
+	def mol(self, m):
+
+		self._mol = m
+
+		self.db.update(table='pose', id=self.id, key='pose_mol', value=m.ToBinary())
 
 	@property
 	def fingerprint(self):

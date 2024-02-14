@@ -22,7 +22,7 @@ class CompoundSet:
 		
 		self._db = db
 		self._table = table
-		
+
 	### FACTORIES
 
 	### PROPERTIES
@@ -61,3 +61,6 @@ class CompoundSet:
 
 	def __len__(self) -> int:
 		return self.db.count(self.table)
+
+	def __iter__(self):
+		return iter(self[i+1] for i in range(len(self)))

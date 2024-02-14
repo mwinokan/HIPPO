@@ -58,3 +58,6 @@ class PoseSet:
 
 	def __len__(self) -> int:
 		return self.db.count(self.table)
+
+	def __iter__(self):
+		return iter(self[i+1] for i in range(len(self)))

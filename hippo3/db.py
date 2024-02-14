@@ -129,7 +129,7 @@ class Database:
 	def commit(self):
 		self.connection.commit()
 
-	### CREATION
+	### CREATE TABLES
 
 	def create_blank_db(self):
 
@@ -142,7 +142,7 @@ class Database:
 		self.create_table_tag()
 		self.create_table_quote()
 		self.create_table_pattern_bfp()
-		self.create_table_morgan_bfp()
+		# self.create_table_morgan_bfp()
 
 	def create_table_compound(self):
 		logger.debug('HIPPO.Database.create_table_compound()')
@@ -340,12 +340,12 @@ class Database:
 		if not result:
 			logger.error('Could not insert compound pattern bfp')
 
-		### register the morgan fingerprint
+		# ### register the morgan fingerprint
 
-		result = self.insert_compound_morgan_bfp(compound_id)
+		# result = self.insert_compound_morgan_bfp(compound_id)
 
-		if not result:
-			logger.error('Could not insert compound morgan bfp')
+		# if not result:
+		# 	logger.error('Could not insert compound morgan bfp')
 
 		return compound_id
 
@@ -603,13 +603,10 @@ class Database:
 
 		except Exception as e:
 			logger.exception(e)
-
-		finally:
+			return None
 			
-			quote_id = self.cursor.lastrowid
-			return quote_id
-
-		return None
+		quote_id = self.cursor.lastrowid
+		return quote_id
 
 	### SELECTION
 
@@ -641,6 +638,30 @@ class Database:
 
 	def select_all_where(self, table, key, value, multiple=False):
 		return self.select_where(query='*', table=table, key=key, value=value, multiple=multiple)
+
+	def update(self, table, id, key, value):
+
+		# sql = f"""
+		# UPDATE ?1
+		# SET ?2 = ?3
+		# WHERE ?4 = ?5;
+		# """
+		
+		sql = f"""
+		UPDATE {table}
+		SET {key} = ?
+		WHERE {table}_id = {id};
+		"""
+		
+		try:
+			# self.execute(sql, (table, key, value, f'{table}_id', id))
+			self.execute(sql, (value, ))
+		except sqlite3.OperationalError as e:
+			logger.var('sql',sql)
+			raise
+
+		id = self.cursor.lastrowid
+		return id
 
 	### GETTERS
 
@@ -760,7 +781,7 @@ class Database:
 		if isinstance(query, str):
 
 			if fast:
-				sql = f"SELECT compound_id FROM compound, compound_pattern_bfp AS bfp WHERE compound.compound_id = bfp.compound_id AND mol_is_substruct(compound.compound_mol, mol_from_smiles(?))"
+				sql = f"SELECT compound.compound_id FROM compound, compound_pattern_bfp AS bfp WHERE compound.compound_id = bfp.compound_id AND mol_is_substruct(compound.compound_mol, mol_from_smiles(?))"
 			else:
 				sql = f"SELECT compound_id FROM compound WHERE mol_is_substruct(compound_mol, mol_from_smiles(?))"
 
@@ -792,9 +813,11 @@ class Database:
 		if isinstance(query, str):
 
 			if return_similarity:
-				sql = f"SELECT compound_id, bfp_tanimoto(mol_morgan_bfp(mol_from_smiles(?1), 2, 1024), mol_morgan_bfp(compound.compound_mol, 2, 1024)) as t FROM compound JOIN compound_morgan_bfp AS mfp USING(compound_id) WHERE mfp.compound_id match rdtree_tanimoto(mol_morgan_bfp(mol_from_smiles(?1), 2, 1024), ?2) ORDER BY t DESC "
+				# sql = f"SELECT compound_id, bfp_tanimoto(mol_morgan_bfp(mol_from_smiles(?1), 2, 1024), mol_morgan_bfp(compound.compound_mol, 2, 1024)) as t FROM compound JOIN compound_morgan_bfp AS mfp USING(compound_id) WHERE mfp.compound_id match rdtree_tanimoto(mol_morgan_bfp(mol_from_smiles(?1), 2, 1024), ?2) ORDER BY t DESC "
+				sql = f"SELECT compound_id, bfp_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), mol_pattern_bfp(compound.compound_mol, 2048)) as t FROM compound JOIN compound_pattern_bfp AS mfp USING(compound_id) WHERE mfp.compound_id match rdtree_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), ?2) ORDER BY t DESC "
 			else:
-				sql = f"SELECT compound_id FROM compound_morgan_bfp AS mfp WHERE mfp.compound_id match rdtree_tanimoto(mol_morgan_bfp(mol_from_smiles(?1), 2, 1024), ?2) "
+				# sql = f"SELECT compound_id FROM compound_morgan_bfp AS mfp WHERE mfp.compound_id match rdtree_tanimoto(mol_morgan_bfp(mol_from_smiles(?1), 2, 1024), ?2) "
+				sql = f"SELECT compound_id FROM compound_pattern_bfp AS mfp WHERE mfp.compound_id match rdtree_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), ?2) "
 
 		else:
 			raise NotImplementedError
@@ -823,7 +846,7 @@ class Database:
 		return compounds
 
 	def query_exact(self, query):
-		return self.query_similarity(query, 0.95, return_similarity=True)
+		return self.query_similarity(query, 1.0, return_similarity=False)
 
 	### COUNTING
 
