@@ -141,8 +141,8 @@ class Database:
 		self.create_table_pose()
 		self.create_table_tag()
 		self.create_table_quote()
-		self.create_table_binary_fp()
-		self.create_table_morgan_fp()
+		self.create_table_pattern_bfp()
+		self.create_table_morgan_bfp()
 
 	def create_table_compound(self):
 		logger.debug('HIPPO.Database.create_table_compound()')
@@ -153,12 +153,15 @@ class Database:
 			compound_smiles TEXT,
 			compound_base INTEGER,
 			compound_mol MOL,
+			compound_pattern_bfp bits(2048),
+			compound_morgan_bfp bits(1024),
 			FOREIGN KEY (compound_base) REFERENCES compound(compound_id),
 			CONSTRAINT UC_compound_name UNIQUE (compound_name),
 			CONSTRAINT UC_compound_smiles UNIQUE (compound_smiles)
+			CONSTRAINT UC_compound_pattern_bfp UNIQUE (compound_pattern_bfp)
+			CONSTRAINT UC_compound_morgan_bfp UNIQUE (compound_morgan_bfp)
 		);
 		"""
-		# -- compound_binary_fp
 
 		self.execute(sql)
 
@@ -267,17 +270,17 @@ class Database:
 		# 	self.execute(f'PRAGMA table_info(quote);')
 		# 	pprint(self.cursor.fetchall())
 
-	def create_table_binary_fp(self):
-		logger.debug('HIPPO.Database.create_table_binary_fp()')
+	def create_table_pattern_bfp(self):
+		logger.debug('HIPPO.Database.create_table_pattern_bfp()')
 
-		sql = "CREATE VIRTUAL TABLE compound_bfp USING rdtree(id, fp bits(2048))"
+		sql = "CREATE VIRTUAL TABLE compound_pattern_bfp USING rdtree(compound_id, fp bits(2048))"
  
 		self.execute(sql)
 
-	def create_table_morgan_fp(self):
-		logger.debug('HIPPO.Database.create_table_morgan_fp()')
+	def create_table_morgan_bfp(self):
+		logger.debug('HIPPO.Database.create_table_morgan_bfp()')
  
-		sql = "CREATE VIRTUAL TABLE compound_mfp USING rdtree(compound_id, fp bits(1024))"
+		sql = "CREATE VIRTUAL TABLE compound_morgan_bfp USING rdtree(compound_id, fp bits(1024))"
  
 		self.execute(sql)
 
@@ -299,8 +302,8 @@ class Database:
 			base = base.id
 
 		sql = """
-		INSERT INTO compound(compound_name, compound_smiles, compound_base, compound_mol)
-		VALUES(?1, ?2, ?3, mol_from_smiles(?2))
+		INSERT INTO compound(compound_name, compound_smiles, compound_base, compound_mol, compound_pattern_bfp, compound_morgan_bfp)
+		VALUES(?1, ?2, ?3, mol_from_smiles(?2), mol_pattern_bfp(mol_from_smiles(?2), 2048), mol_morgan_bfp(mol_from_smiles(?2), 2, 1024))
 		"""
 
 		try:
@@ -311,81 +314,79 @@ class Database:
 				logger.warning(f"Skipping compound with existing name \"{name}\"")
 			elif 'UNIQUE constraint failed: compound.compound_smiles' in str(e):
 				logger.warning(f"Skipping compound with existing smiles \"{smiles}\"")
+			elif 'UNIQUE constraint failed: compound.compound_pattern_bfp' in str(e):
+				logger.warning(f"Skipping compound with existing pattern binary fingerprint \"{smiles}\"")
+			elif 'UNIQUE constraint failed: compound.compound_morgan_bfp' in str(e):
+				logger.warning(f"Skipping compound with existing morgan binary fingerprint \"{smiles}\"")
 			else:
 				logger.exception(e)
+			return None
 
 		except Exception as e:
 			logger.exception(e)
-
-		finally:
 			
-			compound_id = self.cursor.lastrowid
+		compound_id = self.cursor.lastrowid
 
-			### register the tags
+		### register the tags
 
-			if tags:
-				for tag in tags:
-					self.insert_tag(name=tag, compound=compound_id)
+		if tags:
+			for tag in tags:
+				self.insert_tag(name=tag, compound=compound_id)
 
-			### register the binary fingerprint
+		### register the binary fingerprints
 
-			self.insert_compound_bfp(compound_id, smiles)
+		result = self.insert_compound_pattern_bfp(compound_id)
 
-			### register the morgan fingerprint
+		if not result:
+			logger.error('Could not insert compound pattern bfp')
 
-			self.insert_compound_mfp(compound_id, smiles)
+		### register the morgan fingerprint
 
-			return compound_id
+		result = self.insert_compound_morgan_bfp(compound_id)
 
-		return None
+		if not result:
+			logger.error('Could not insert compound morgan bfp')
 
-	def insert_compound_bfp(self,
-		compound_id,
-		smiles,
-	):
+		return compound_id
+
+
+	def insert_compound_pattern_bfp(self, compound_id):
 
 		sql = """
-		INSERT INTO compound_bfp(id, fp)
-		VALUES(?1, mol_pattern_bfp(mol_from_smiles(?2), 2048))
+		INSERT INTO compound_pattern_bfp(compound_id, fp)
+		VALUES(?1, ?2)
 		"""
+		
+		bfp, = self.select_where('compound_pattern_bfp', 'compound', 'id', compound_id)
 
 		try:
-			self.execute(sql, (compound_id, smiles))
+			self.execute(sql, (compound_id, bfp))
 
 		except Exception as e:
 			logger.exception(e)
 
-		finally:
+		bfp_id = self.cursor.lastrowid
 
-			bfp_id = self.cursor.lastrowid
+		return bfp_id
 
-			logger.debug(f'bfp created with id={bfp_id}')
-
-			return bfp_id
-
-	def insert_compound_mfp(self,
-		compound_id,
-		smiles,
-	):
+	def insert_compound_morgan_bfp(self, compound_id):
 
 		sql = """
-		INSERT INTO compound_mfp(compound_id, fp)
-		VALUES(?1, mol_morgan_bfp(mol_from_smiles(?2), 2, 1024))
+		INSERT INTO compound_morgan_bfp(compound_id, fp)
+		VALUES(?1, ?2)
 		"""
 
+		bfp, = self.select_where('compound_morgan_bfp', 'compound', 'id', compound_id)
+
 		try:
-			self.execute(sql, (compound_id, smiles))
+			self.execute(sql, (compound_id, bfp))
 
 		except Exception as e:
 			logger.exception(e)
 
-		finally:
+		mfp_id = self.cursor.lastrowid
 
-			mfp_id = self.cursor.lastrowid
-
-			logger.debug(f'mfp created with id={mfp_id}')
-
-			return mfp_id
+		return mfp_id
 
 	def insert_pose(self,
 		*,
@@ -759,7 +760,7 @@ class Database:
 		if isinstance(query, str):
 
 			if fast:
-				sql = f"SELECT compound_id FROM compound, compound_bfp AS bfp WHERE compound.compound_id = bfp.id AND mol_is_substruct(compound.compound_mol, mol_from_smiles(?))"
+				sql = f"SELECT compound_id FROM compound, compound_pattern_bfp AS bfp WHERE compound.compound_id = bfp.compound_id AND mol_is_substruct(compound.compound_mol, mol_from_smiles(?))"
 			else:
 				sql = f"SELECT compound_id FROM compound WHERE mol_is_substruct(compound_mol, mol_from_smiles(?))"
 
@@ -791,9 +792,9 @@ class Database:
 		if isinstance(query, str):
 
 			if return_similarity:
-				sql = f"SELECT compound_id, bfp_tanimoto(mol_morgan_bfp(mol_from_smiles(?1), 2, 1024), mol_morgan_bfp(compound.compound_mol, 2, 1024)) as t FROM compound JOIN compound_mfp AS mfp USING(compound_id) WHERE mfp.compound_id match rdtree_tanimoto(mol_morgan_bfp(mol_from_smiles(?1), 2, 1024), ?2) ORDER BY t DESC "
+				sql = f"SELECT compound_id, bfp_tanimoto(mol_morgan_bfp(mol_from_smiles(?1), 2, 1024), mol_morgan_bfp(compound.compound_mol, 2, 1024)) as t FROM compound JOIN compound_morgan_bfp AS mfp USING(compound_id) WHERE mfp.compound_id match rdtree_tanimoto(mol_morgan_bfp(mol_from_smiles(?1), 2, 1024), ?2) ORDER BY t DESC "
 			else:
-				sql = f"SELECT compound_id FROM compound_mfp AS mfp WHERE mfp.compound_id match rdtree_tanimoto(mol_morgan_bfp(mol_from_smiles(?1), 2, 1024), ?2) "
+				sql = f"SELECT compound_id FROM compound_morgan_bfp AS mfp WHERE mfp.compound_id match rdtree_tanimoto(mol_morgan_bfp(mol_from_smiles(?1), 2, 1024), ?2) "
 
 		else:
 			raise NotImplementedError
