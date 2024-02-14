@@ -1,4 +1,4 @@
-![hippopotamus_1f99b](https://github.com/mwinokan/HIPPO/assets/36866506/90381bb6-2832-4b12-856f-b8878dfc0dd2)
+![hippo_logo](logos/hippo_assets-01.png)
 
 HIPPO
 =====
