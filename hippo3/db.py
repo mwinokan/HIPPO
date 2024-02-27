@@ -9,6 +9,7 @@ import json
 from .compound import Compound
 from .pose import Pose
 from .reaction import Reaction
+from .quote import Quote
 
 from pathlib import Path
 
@@ -156,7 +157,7 @@ class Database:
 			compound_pattern_bfp bits(2048),
 			compound_morgan_bfp bits(1024),
 			FOREIGN KEY (compound_base) REFERENCES compound(compound_id),
-			CONSTRAINT UC_compound_name UNIQUE (compound_name),
+			CONSTRAINT UC_compound_name UNIQUE (compound_name)
 			CONSTRAINT UC_compound_smiles UNIQUE (compound_smiles)
 			CONSTRAINT UC_compound_pattern_bfp UNIQUE (compound_pattern_bfp)
 			CONSTRAINT UC_compound_morgan_bfp UNIQUE (compound_morgan_bfp)
@@ -186,7 +187,7 @@ class Database:
 			reaction_id INTEGER PRIMARY KEY,
 			reaction_type TEXT,
 			reaction_product INTEGER,
-			reaction_product_amount REAL,
+			reaction_product_yield REAL,
 			FOREIGN KEY (reaction_product) REFERENCES compound(compound_id)
 		);
 		"""
@@ -222,7 +223,7 @@ class Database:
 			pose_mol BLOB,
 			pose_fingerprint BLOB,
 			FOREIGN KEY (pose_compound) REFERENCES compound(compound_id),
-			CONSTRAINT UC_pose_longname UNIQUE (pose_longname),
+			CONSTRAINT UC_pose_longname UNIQUE (pose_longname)
 			CONSTRAINT UC_pose_path UNIQUE (pose_path)
 		);
 		"""
@@ -238,7 +239,7 @@ class Database:
 			tag_pose INTEGER,
 			FOREIGN KEY (tag_compound) REFERENCES compound(compound_id),
 			FOREIGN KEY (tag_pose) REFERENCES pose(pose_id),
-			CONSTRAINT UC_tag_compound UNIQUE (tag_name, tag_compound),
+			CONSTRAINT UC_tag_compound UNIQUE (tag_name, tag_compound)
 			CONSTRAINT UC_tag_pose UNIQUE (tag_name, tag_pose)
 		);
 		"""
@@ -259,7 +260,7 @@ class Database:
 			quote_currency TEXT,
 			quote_date TEXT,
 			quote_compound INTEGER,
-			FOREIGN KEY (quote_compound) REFERENCES compound(compound_id)
+			FOREIGN KEY (quote_compound) REFERENCES compound(compound_id),
 			CONSTRAINT UC_quote UNIQUE (quote_amount, quote_supplier, quote_catalogue, quote_entry)
 		);
 		"""
@@ -513,19 +514,19 @@ class Database:
 		*,
 		type: str,
 		product: Compound,
-		product_amount: float,
+		product_yield: float = 1.0,
 	) -> int:
 
 		assert isinstance(product, Compound), f'incompatible {product=}'
 		assert isinstance(type, str), f'incompatible {type=}'
 
 		sql = """
-		INSERT INTO reaction(reaction_type, reaction_product, reaction_product_amount)
+		INSERT INTO reaction(reaction_type, reaction_product, reaction_product_yield)
 		VALUES(?1, ?2, ?3)
 		"""
 
 		try:
-			self.execute(sql, (type, product.id, product_amount))
+			self.execute(sql, (type, product.id, product_yield))
 
 		except Exception as e:
 			logger.exception(e)
@@ -740,26 +741,28 @@ class Database:
 	def get_reaction(self,
 		table: str = 'reaction',
 		id: int | None = None,
+		none: str | None = None,
 	) -> Reaction:
 		
 		if not id:
 			logger.error(f'Invalid {id=}')
 			return None
 
-		query = 'reaction_id, reaction_type, reaction_product, reaction_product_amount'
-		entry = self.select_where(query=query, table=table, key='id', value=id)
+		query = 'reaction_id, reaction_type, reaction_product, reaction_product_yield'
+		entry = self.select_where(query=query, table=table, key='id', value=id, none=none)
 		reaction = Reaction(self, *entry)
 		return reaction
 
 	def get_quote(self,
 		table: str = 'quote',
 		id: int | None = None,
+		none: str | None = None,
 	) -> list[dict]:
 		
 		query = 'quote_compound, quote_supplier, quote_catalogue, quote_entry, quote_amount, quote_price, quote_currency, quote_lead_time, quote_date'
-		entry = self.select_where(query=query, table=table, key='id', value=id)
+		entry = self.select_where(query=query, table=table, key='id', value=id, none=none)
 
-		return dict(
+		return Quote(
 			compound=entry[0],
 			supplier=entry[1],
 			catalogue=entry[2],
@@ -770,8 +773,6 @@ class Database:
 			lead_time=entry[7],
 			date=entry[8],
 		)
-
-		return entry
 
 	### COMPOUND QUERY
 

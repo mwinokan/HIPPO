@@ -61,16 +61,20 @@ class Compound:
 	def poses(self):
 		return self.get_poses()
 
+	@property
+	def base(self):
+		return self._base
+
 	
 	### METHODS
 
-	def get_tags(self):
+	def get_tags(self) -> set:
 		tags = self.db.select_where(query='tag_name', table='tag', key='compound', value=self.id, multiple=True)
 		return {t[0] for t in tags}
 
-	def get_quotes(self, supplier=None):
+	def get_quotes(self, min_amount=None, supplier=None, max_lead_time=None, none='error', pick_cheapest=False) -> list[dict]:
 
-		quote_ids = self.db.select_where(query='quote_id', table='quote', key='compound', value=self.id, multiple=True)
+		quote_ids = self.db.select_where(query='quote_id', table='quote', key='compound', value=self.id, multiple=True, none=none)
 
 		if quote_ids:
 			quotes = [self.db.get_quote(id=q[0]) for q in quote_ids]
@@ -78,9 +82,29 @@ class Compound:
 			return []
 
 		if supplier:
-			quotes = [q for q in quotes if q['supplier'] == supplier]
+			quotes = [q for q in quotes if q.supplier == supplier]
 
+		if min_amount:
+			quotes = [q for q in quotes if q.amount >= min_amount]
+
+		if max_lead_time:
+			quotes = [q for q in quotes if q.lead_time <= max_lead_time]
+
+		if pick_cheapest:
+			return sorted(quotes, key=lambda x: x.price)[0]
+		
 		return quotes
+
+	def get_reactions(self, none='error') -> list:
+
+		reaction_ids = self.db.select_where(query='reaction_id', table='reaction', key='product', value=self.id, multiple=True, none=none)
+
+		if reaction_ids:
+			reactions = [self.db.get_reaction(id=q[0]) for q in reaction_ids]
+		else:
+			return []
+
+		return reactions
 
 	def get_poses(self, 
 		target: str = None
@@ -95,6 +119,16 @@ class Compound:
 
 		return poses
 
+	def as_ingredient(self, amount, max_lead_time=None, supplier=None):
+		
+		quote = self.get_quotes(
+			pick_cheapest=True, 
+			min_amount=amount, 
+			max_lead_time=max_lead_time, 
+			supplier=supplier
+		)
+		
+		return Ingredient(self, amount, quote)
 
 	### DUNDERS
 
@@ -102,8 +136,30 @@ class Compound:
 		return f'C{self.id}'
 
 	def __repr__(self):
-		# return f'Compound(#{self.id}, "{self.name}", {self.smiles})'
-		# return f'[C{self.id} "{self.name}"]'
 		return f'{mcol.bold}{mcol.underline}{self} "{self.name}"{mcol.unbold}{mcol.ununderline}'
-		# return f'{mcol.bold}{mcol.underline}C{self.id}{mcol.unbold}{mcol.ununderline}'
 
+class Ingredient(Compound):
+
+	"""An ingredient is a Compound with a fixed quanitity and an attached quote"""
+
+	def __init__(self, inherit, amount, quote):
+		self._id = inherit.id
+		self._name = inherit.name
+		self._smiles = inherit.smiles
+		self._base = inherit.base			
+		self._mol = inherit.mol
+		self._db = inherit.db
+
+		self._required_amount = amount
+		self._quote = quote
+
+	@property
+	def required_amount(self):
+		return self._required_amount
+
+	@property
+	def quote(self):
+		return self._quote
+
+	def __repr__(self):
+		return f'{self.required_amount:.2f}mg of {mcol.bold}{mcol.underline}{self} "{self.name}"{mcol.unbold}{mcol.ununderline}'
