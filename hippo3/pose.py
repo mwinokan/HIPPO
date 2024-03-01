@@ -4,10 +4,29 @@ import molparse as mp
 
 from rdkit import Chem
 
-from .tags import TagSet
+import numpy as np
+
+from .tags import TagSubset
+
+import pickle
 
 import logging
 logger = logging.getLogger('HIPPO')
+
+from molparse.rdkit.features import FEATURE_FAMILIES, COMPLEMENTARY_FEATURES
+
+CUTOFF_PADDING = 1.0
+
+FEATURE_PAIR_CUTOFFS = {
+	'Donor Acceptor': 3.5 + CUTOFF_PADDING,
+	'Acceptor Donor': 3.5 + CUTOFF_PADDING,
+	'NegIonizable PosIonizable': 4.5 + CUTOFF_PADDING,
+	'PosIonizable NegIonizable': 4.5 + CUTOFF_PADDING,
+	'Aromatic PosIonizable': 4.5 + CUTOFF_PADDING,
+	'PosIonizable Aromatic': 4.5 + CUTOFF_PADDING,
+	'Aromatic Aromatic': 6.0 + CUTOFF_PADDING,
+	'Hydrophobe Hydrophobe': 4.5 + CUTOFF_PADDING,
+}
 
 class Pose:
 
@@ -22,7 +41,7 @@ class Pose:
 		compound: int,
 		target: str,
 		mol: Chem.Mol | bytes | None,
-		fingerprint: str,
+		fingerprint: bytes,
 		metadata: dict | None = None,
 	):
 
@@ -34,7 +53,13 @@ class Pose:
 		self._compound_id = compound
 		self._target = target
 		self._path = path
+		self._protein_system = None
+
+		if fingerprint:
+			# logger.debug('unpickling fingerprint')
+			fingerprint = pickle.loads(fingerprint)		
 		self._fingerprint = fingerprint
+
 		self._metadata = metadata
 		self._tags = None
 		self._table = 'pose'
@@ -96,8 +121,12 @@ class Pose:
 	@property
 	def mol(self):
 		if not self._mol and self.path:
-			logger.reading(self.path)
+
+			assert self.path.endswith('.pdb')
+
+			# logger.reading(self.path)
 			sys = mp.parse(self.path, verbosity=False)
+			self._protein_system = sys.protein_system
 			lig_residues = sys['rLIG']
 			if len(lig_residues) > 1:
 				logger.warning('Multiple ligands in PDB')
@@ -107,10 +136,13 @@ class Pose:
 
 	@mol.setter
 	def mol(self, m):
-
 		self._mol = m
-
 		self.db.update(table='pose', id=self.id, key='pose_mol', value=m.ToBinary())
+
+	@property
+	def protein_system(self):
+		return self._protein_system
+	
 
 	@property
 	def metadata(self):
@@ -121,6 +153,18 @@ class Pose:
 	@property
 	def fingerprint(self):
 		return self._fingerprint
+
+	@fingerprint.setter
+	def fingerprint(self, fp):
+
+		# remove features that don't exist in this fingerprint?
+
+		self._fingerprint = fp
+
+		# store in the database
+		fp = pickle.dumps(fp)
+		# logger.debug('pickling fingerprint')
+		self.db.update(table=self.table, id=self.id, key=f'{self.table}_fingerprint', value=fp)
 
 	@property
 	def tags(self):
@@ -135,7 +179,28 @@ class Pose:
 	@property
 	def table(self):
 		return self._table
+
+	@property
+	def features(self):
+		return mp.rdkit.features_from_mol(self.mol)
 	
+	@property
+	def dict(self):
+
+		serialisable_fields = ['id','name','longname','smiles','path','reference']
+
+		data = {}
+		for key in serialisable_fields:
+			data[key] = getattr(self, key)
+
+		data['compound'] = self.compound.name
+		data['target'] = self.target.name
+
+		if metadata := self.metadata:
+			for key in metadata:
+				data[key] = metadata[key]
+
+		return data
 
 	### METHODS
 
@@ -144,7 +209,7 @@ class Pose:
 
 	def get_tags(self):
 		tags = self.db.select_where(query='tag_name', table='tag', key='pose', value=self.id, multiple=True)
-		return TagSet(self, {t[0] for t in tags})
+		return TagSubset(self, {t[0] for t in tags})
 	
 	def get_inspirations(self):
 		inspirations = self.db.select_where(query='inspiration_original', table='inspiration', key='derivative', value=self.id, multiple=True, none='quiet')
@@ -154,6 +219,59 @@ class Pose:
 
 		return inspirations
 
+	def calculate_fingerprint(self):
+
+		if self.path.endswith('.pdb'):
+
+			import molparse as mp
+
+			comp_features = self.features
+			
+			protein_system = self.protein_system
+			if not self.protein_system:
+				# logger.reading(self.path)
+				protein_system = mp.parse(self.path, verbosity=False).protein_system
+
+			comp_features_by_family = {}
+			for family in FEATURE_FAMILIES:
+				comp_features_by_family[family] = [f for f in comp_features if f.family == family]
+
+			protein_features = self.target.features
+			if not protein_features:
+				protein_features = self.target.calculate_features(protein_system)
+
+			fingerprint = {}
+
+			for prot_feature in protein_features:
+
+				prot_family = prot_feature.family
+
+				prot_residue = protein_system.get_chain(prot_feature.chain_name).residues[f'n{prot_feature.residue_number}']
+
+				if not prot_residue:
+					continue
+
+				prot_atoms = [prot_residue.get_atom(a).np_pos for a in prot_feature.atom_names.split(' ')]
+				
+				prot_coord = np.array(np.sum(prot_atoms,axis=0)/len(prot_atoms))
+
+				complementary_family = COMPLEMENTARY_FEATURES[prot_family]
+
+				complementary_comp_features = comp_features_by_family[complementary_family]
+
+				cutoff = FEATURE_PAIR_CUTOFFS[f'{prot_family} {complementary_family}']
+
+				valid_features = [f for f in complementary_comp_features if np.linalg.norm(f - prot_coord) <= cutoff]
+
+				fingerprint[prot_feature.id] = len(valid_features)
+
+			self.fingerprint = fingerprint
+
+		else:
+
+			logger.debug('calculate_fingerprint()')
+			raise NotImplementedError
+
 	### DUNDERS
 
 	def __str__(self):
@@ -161,4 +279,3 @@ class Pose:
 
 	def __repr__(self):
 		return f'{mcol.bold}{mcol.underline}{self.compound}->{self} "{self.longname}"{mcol.unbold}{mcol.ununderline}'
-		

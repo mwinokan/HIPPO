@@ -12,6 +12,7 @@ from .reaction import Reaction
 from .quote import Quote
 from .metadata import MetaData
 from .target import Target
+from .feature import Feature
 
 from .tools import inchikey_from_smiles
 
@@ -286,14 +287,13 @@ class Database:
 		logger.debug('HIPPO.Database.create_table_feature()')
 		sql = """CREATE TABLE feature(
 			feature_id INTEGER PRIMARY KEY,
-			feature_type TEXT,
+			feature_family TEXT,
 			feature_target INTEGER,
 			feature_chain_name TEXT,
 			feature_residue_name TEXT,
 			feature_residue_number INTEGER,
-			feature_atom_name TEXT,
-			feature_atom_number INTEGER,
-			CONSTRAINT UC_feature UNIQUE (feature_type, feature_target, feature_chain_name, feature_residue_number, feature_atom_name)
+			feature_atom_names TEXT,
+			CONSTRAINT UC_feature UNIQUE (feature_family, feature_target, feature_chain_name, feature_residue_number, feature_atom_names)
 		);
 		"""
 
@@ -690,30 +690,32 @@ class Database:
 
 	def insert_feature(self,
 		*,
-		type: str,
+		family: str,
 		target: int,
 		chain_name: str,
 		residue_name: str,
 		residue_number: int,
-		atom_name: str,
-		atom_number: int,
+		atom_names: list,
 	) -> int:
 
 		assert len(chain_name) == 1
 		assert len(residue_name) <= 4
-		assert len(atom_name) <= 4
+		for a in atom_names:
+			assert len(a) <= 4
 
 		if isinstance(target, str):
 			target = self.get_target_id(name=target)
 		assert isinstance(target, int)
 
 		sql = """
-		INSERT INTO feature(feature_type, feature_target, feature_chain_name, feature_residue_name, feature_residue_number, feature_atom_name, feature_atom_number)
-		VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7)
+		INSERT INTO feature(feature_family, feature_target, feature_chain_name, feature_residue_name, feature_residue_number, feature_atom_names)
+		VALUES(?1, ?2, ?3, ?4, ?5, ?6)
 		"""
 
+		atom_names = ' '.join(atom_names)
+
 		try:
-			self.execute(sql, (type, target, chain_name, residue_name, residue_number, atom_name, atom_number))
+			self.execute(sql, (family, target, chain_name, residue_name, residue_number, atom_names))
 
 		# except sqlite3.IntegrityError as e:
 		# 	logger.warning(f"Target with {name=} already exists")
@@ -757,11 +759,14 @@ class Database:
 
 		return result
 
-	def select_where(self, query, table, key, value, multiple=False, none='error'):
+	def select_where(self, query, table, key, value, multiple=False, none='error', sort=None):
 		if isinstance(value, str):
 			value = f"'{value}'"
 
-		sql = f'SELECT {query} FROM {table} WHERE {table}_{key}={value}'
+		if sort:
+			sql = f'SELECT {query} FROM {table} WHERE {table}_{key}={value} ORDER BY {sort}'
+		else:
+			sql = f'SELECT {query} FROM {table} WHERE {table}_{key}={value}'
 
 		try:
 			self.execute(sql)
@@ -975,7 +980,7 @@ class Database:
 		*,
 		id=int
 	) -> Target:
-		return Target(id=id,name=self.get_target_name(id=id))
+		return Target(db=self,id=id,name=self.get_target_name(id=id))
 
 	def get_target_name(self,
 		*,
@@ -999,18 +1004,12 @@ class Database:
 
 		return None
 
-	# def get_feature(self,
-	# 	*,
-	# 	id: int
-	# ) -> Feature:
-
-	# 	table = 'feature'
-	# 	entry = self.select_all_where(table=table, key='name', value=name)
-
-	# 	if entry:
-	# 		return entry[0]
-
-	# 	return None
+	def get_feature(self, 
+		*,
+		id=int
+	) -> Feature:
+		entry = self.select_all_where(table='feature', key='id', value=id)
+		return Feature(*entry)
 
 	### COMPOUND QUERY
 

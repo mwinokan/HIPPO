@@ -42,6 +42,11 @@ class CompoundSet:
 
 	### METHODS
 
+	def get_by_tag(self,tag):
+		values = self.db.select_where(query='tag_compound', table='tag', key='name', value=tag, multiple=True)
+		ids = [v for v, in values if v]
+		return self[ids]
+
 	### DUNDERS
 
 	def __getitem__(self, key) -> Compound:
@@ -53,6 +58,9 @@ class CompoundSet:
 
 			case str():
 				return self.db.get_compound(table=self.table, name=key)
+
+			case list():
+				return CompoundSubset(self.db, self.table, key)
 
 			case slice():
 
@@ -93,8 +101,6 @@ class CompoundSubset(CompoundSet):
 		indices = indices or []
 
 		self._indices = indices
-
-		print(indices)
 
 	def __getitem__(self, key) -> Compound:
 		raise NotImplementedError

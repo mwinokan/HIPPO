@@ -1,7 +1,46 @@
 
+# from .db import Database
 from collections.abc import MutableSet
 
-class TagSet(MutableSet):
+class TagSet:
+
+	# class to access entries in database tables containing tags
+
+	def __init__(self, 
+		db, 
+		table: str = 'tag',
+	) -> None:
+		
+		self._db = db
+		self._table = table
+
+	### FACTORIES
+
+	### PROPERTIES
+
+	@property
+	def db(self):
+		return self._db
+	
+	@property
+	def table(self) -> str:
+		return self._table
+
+	@property
+	def unique(self):
+		values = self.db.select(table=self.table, query='DISTINCT tag_name', multiple=True)
+		return set(v for v, in values)
+
+	### METHODS
+
+	### DUNDERS
+
+	def __getitem__(self, key):
+		raise NotImplementedError
+
+
+
+class TagSubset(MutableSet):
 
 	def __init__(self, 
 		parent, # Compound or Pose

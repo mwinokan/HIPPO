@@ -3,6 +3,7 @@ import pandas as pd
 
 from .cset import CompoundSet
 from .pset import PoseSet
+from .tags import TagSet
 
 from .db import Database
 from pathlib import Path
@@ -39,6 +40,7 @@ class HIPPO:
 
 		self._compounds = CompoundSet(self.db, 'compound')
 		self._poses = PoseSet(self.db, 'pose')
+		self._tags = TagSet(self.db, 'tag')
 
 		logger.success(f"Initialised animal {self}")
 		
@@ -69,8 +71,12 @@ class HIPPO:
 	@property
 	def poses(self):
 		return self._poses
+
+	@property
+	def tags(self):
+		return self._tags
 	
-	### PUBLIC METHODS
+	### MAIN METHODS
 
 	def add_hits(self, target_name, metadata_csv, aligned_directory, skip=None, debug=False):
 
@@ -151,10 +157,11 @@ class HIPPO:
 				compound = self.compounds[inchikey]
 
 				if not compound:
-
-					print(smiles)
-					print(inchikey)
-					print(observation_shortname)
+					logger.error('Compound exists in database but could not be found by inchikey')
+					logger.var('smiles',smiles)
+					logger.var('inchikey',inchikey)
+					logger.var('observation_shortname',observation_shortname)
+					raise Exception
 			
 			else:
 				count_compound_registered += 1
@@ -168,8 +175,6 @@ class HIPPO:
 			for tag in curated_tag_cols:
 				if meta_row[tag].values[0]:
 					tags.append(tag)
-
-			print(tags)
 
 			metadata = {}
 			for tag in generated_tag_cols:
@@ -192,6 +197,32 @@ class HIPPO:
 		logger.var('#poses registered', count_poses_registered)
 
 		return meta_df
+
+	# def calculate_fingerprints(self, poses):
+
+	# 	# group by reference ID??? Use an SQL select query to construct a PoseSubset with the groups
+
+	# 	...
+
+
+
+	### PLOTTING
+
+	def plot_tag_statistics(self, *args, **kwargs):
+		from .plotting import plot_tag_statistics
+		return plot_tag_statistics(self, *args, **kwargs)
+
+	def plot_compound_property(self, prop, **kwargs): 
+		from .plotting import plot_compound_property
+		return plot_compound_property(self, prop, **kwargs)
+
+	def plot_pose_property(self, prop, **kwargs): 
+		from .plotting import plot_pose_property
+		return plot_pose_property(self, prop, **kwargs)
+
+	def plot_interaction_punchcard(self, poses, subtitle, opacity=1.0, **kwargs):
+		from .plotting import plot_interaction_punchcard
+		return plot_interaction_punchcard(self, poses=poses, subtitle=subtitle, opacity=opacity, **kwargs)
 
 	### DUNDERS
 

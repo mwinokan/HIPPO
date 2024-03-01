@@ -4,7 +4,7 @@ import mcol
 from rdkit import Chem
 
 from .pose import Pose
-from .tags import TagSet
+from .tags import TagSubset
 
 
 class Compound:
@@ -86,12 +86,29 @@ class Compound:
 	def table(self):
 		return self._table
 
+	@property
+	def dict(self):
+
+		serialisable_fields = ['id','name','smiles']
+
+		data = {}
+		for key in serialisable_fields:
+			data[key] = getattr(self, key)
+
+		if base := self.base:
+			data['base'] = base.name
+
+		if metadata := self.metadata:
+			for key in metadata:
+				data[key] = metadata[key]
+
+		return data
 	
 	### METHODS
 
 	def get_tags(self) -> set:
 		tags = self.db.select_where(query='tag_name', table='tag', key='compound', value=self.id, multiple=True)
-		return TagSet(self, {t[0] for t in tags})
+		return TagSubset(self, {t[0] for t in tags})
 
 	def get_quotes(self, min_amount=None, supplier=None, max_lead_time=None, none='error', pick_cheapest=False, df=False) -> list[dict]:
 
