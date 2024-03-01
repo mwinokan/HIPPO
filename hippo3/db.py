@@ -10,6 +10,10 @@ from .compound import Compound
 from .pose import Pose
 from .reaction import Reaction
 from .quote import Quote
+from .metadata import MetaData
+from .target import Target
+
+from .tools import inchikey_from_smiles
 
 from pathlib import Path
 
@@ -18,7 +22,7 @@ logger = logging.getLogger('HIPPO')
 
 class Database:
 
-	def __init__(self, path: Path):
+	def __init__(self, path: Path) -> None:
 
 		assert isinstance(path, Path)
 		
@@ -39,28 +43,13 @@ class Database:
 			self.create_blank_db()
 
 		else:
-			# exists
+			# existing database
 			self.connect()
 		
-	### FACTORIES
-
-	@classmethod
-	def from_file(cls, path):
-
-		logger.debug('hippo3.Database.from_file()')
-
-		# load DB from file
-
-		self = cls.__new__(cls)
-
-		self.__init__()
-		
-		return self
-
 	### PROPERTIES
 
 	@property
-	def path(self):
+	def path(self) -> Path:
 		return self._path
 
 	@property
@@ -77,11 +66,11 @@ class Database:
 
 	### PUBLIC METHODS / API CALLS
 
-	def close(self):
+	def close(self) -> None:
 		logger.debug('hippo3.Database.close()')
 		if self.connection:
 			self.connection.close()
-		mout.success(f'Closed connection to @ {mcol.file}{self.path}')
+		mout.success(f'Closed connection to {mcol.file}{self.path}')
 
 	### GENERAL SQL
 
@@ -142,7 +131,9 @@ class Database:
 		self.create_table_pose()
 		self.create_table_tag()
 		self.create_table_quote()
+		self.create_table_target()
 		self.create_table_pattern_bfp()
+		self.create_table_feature()
 		# self.create_table_morgan_bfp()
 
 	def create_table_compound(self):
@@ -156,6 +147,7 @@ class Database:
 			compound_mol MOL,
 			compound_pattern_bfp bits(2048),
 			compound_morgan_bfp bits(1024),
+			compound_metadata TEXT,
 			FOREIGN KEY (compound_base) REFERENCES compound(compound_id),
 			CONSTRAINT UC_compound_name UNIQUE (compound_name)
 			CONSTRAINT UC_compound_smiles UNIQUE (compound_smiles)
@@ -217,16 +209,22 @@ class Database:
 			pose_name TEXT,
 			pose_longname TEXT,
 			pose_smiles TEXT,
-			pose_compound INTEGER,
+			pose_reference INTEGER,
 			pose_path TEXT,
-			pose_target TEXT,
+			pose_compound INTEGER,
+			pose_target INTEGER,
 			pose_mol BLOB,
 			pose_fingerprint BLOB,
+			pose_metadata TEXT,
 			FOREIGN KEY (pose_compound) REFERENCES compound(compound_id),
 			CONSTRAINT UC_pose_longname UNIQUE (pose_longname)
 			CONSTRAINT UC_pose_path UNIQUE (pose_path)
 		);
 		"""
+
+		### snippet to convert python metadata dictionary with JSON
+		# json.dumps(variables).encode('utf-8')
+		# json.loads(s.decode('utf-8'))
 
 		self.execute(sql)
 
@@ -239,8 +237,7 @@ class Database:
 			tag_pose INTEGER,
 			FOREIGN KEY (tag_compound) REFERENCES compound(compound_id),
 			FOREIGN KEY (tag_pose) REFERENCES pose(pose_id),
-			CONSTRAINT UC_tag_compound UNIQUE (tag_name, tag_compound)
-			CONSTRAINT UC_tag_pose UNIQUE (tag_name, tag_pose)
+			CONSTRAINT UC_tag UNIQUE (tag_name, tag_compound, tag_pose)
 		);
 		"""
 
@@ -251,6 +248,7 @@ class Database:
 
 		sql = """CREATE TABLE quote(
 			quote_id INTEGER PRIMARY KEY,
+			quote_smiles TEXT,
 			quote_amount REAL,
 			quote_supplier TEXT,
 			quote_catalogue TEXT,
@@ -258,6 +256,7 @@ class Database:
 			quote_lead_time INTEGER,
 			quote_price REAL,
 			quote_currency TEXT,
+			quote_purity REAL,
 			quote_date TEXT,
 			quote_compound INTEGER,
 			FOREIGN KEY (quote_compound) REFERENCES compound(compound_id),
@@ -270,6 +269,35 @@ class Database:
 		# if logging.root.level >= logging.DEBUG:
 		# 	self.execute(f'PRAGMA table_info(quote);')
 		# 	pprint(self.cursor.fetchall())
+
+	def create_table_target(self):
+		logger.debug('HIPPO.Database.create_table_target()')
+		sql = """CREATE TABLE target(
+			target_id INTEGER PRIMARY KEY,
+			target_name TEXT,
+			target_metadata TEXT,
+			CONSTRAINT UC_target UNIQUE (target_name)
+		);
+		"""
+
+		self.execute(sql)
+
+	def create_table_feature(self):
+		logger.debug('HIPPO.Database.create_table_feature()')
+		sql = """CREATE TABLE feature(
+			feature_id INTEGER PRIMARY KEY,
+			feature_type TEXT,
+			feature_target INTEGER,
+			feature_chain_name TEXT,
+			feature_residue_name TEXT,
+			feature_residue_number INTEGER,
+			feature_atom_name TEXT,
+			feature_atom_number INTEGER,
+			CONSTRAINT UC_feature UNIQUE (feature_type, feature_target, feature_chain_name, feature_residue_number, feature_atom_name)
+		);
+		"""
+
+		self.execute(sql)
 
 	def create_table_pattern_bfp(self):
 		logger.debug('HIPPO.Database.create_table_pattern_bfp()')
@@ -289,18 +317,23 @@ class Database:
 
 	def insert_compound(self, 
 		*,
-		name: str, 
+		# name: str, 
 		smiles: str, 
-		base: Compound | None = None, 
+		base: Compound | int | None = None, 
 		tags: None | list = None, 
-		# inspirations=None,
+		warn_duplicate=True,
 	) -> int:
 
 		# process the base
-		assert isinstance(base, Compound) or base is None, f'incompatible base={base}'
+		assert isinstance(base, int) or isinstance(base, Compound) or base is None, f'incompatible base={base}'
 
-		if base:
+		if base and not isinstance(base,int):
 			base = base.id
+
+		# generate the inchikey name
+		name = inchikey_from_smiles(smiles)
+
+		# logger.debug(f'{smiles} --> {name}')
 
 		sql = """
 		INSERT INTO compound(compound_name, compound_smiles, compound_base, compound_mol, compound_pattern_bfp, compound_morgan_bfp)
@@ -316,9 +349,11 @@ class Database:
 			elif 'UNIQUE constraint failed: compound.compound_smiles' in str(e):
 				logger.warning(f"Skipping compound with existing smiles \"{smiles}\"")
 			elif 'UNIQUE constraint failed: compound.compound_pattern_bfp' in str(e):
-				logger.warning(f"Skipping compound with existing pattern binary fingerprint \"{smiles}\"")
+				if warn_duplicate:
+					logger.warning(f"Skipping compound with existing pattern binary fingerprint \"{smiles}\"")
 			elif 'UNIQUE constraint failed: compound.compound_morgan_bfp' in str(e):
-				logger.warning(f"Skipping compound with existing morgan binary fingerprint \"{smiles}\"")
+				if warn_duplicate:
+					logger.warning(f"Skipping compound with existing morgan binary fingerprint \"{smiles}\"")
 			else:
 				logger.exception(e)
 			return None
@@ -349,7 +384,6 @@ class Database:
 		# 	logger.error('Could not insert compound morgan bfp')
 
 		return compound_id
-
 
 	def insert_compound_pattern_bfp(self, compound_id):
 
@@ -391,19 +425,27 @@ class Database:
 
 	def insert_pose(self,
 		*,
-		compound: Compound,
+		compound: Compound | int,
 		name: str,
-		# smiles: str,
-		target: str,
+		target: int | str,
 		path: str | None = None,
+		reference: int | None = None,
 		tags: None | list = None,
+		metadata: None | dict = None,
 	):
+
+		if isinstance(compound, int):
+			compound = self.get_compound(id=compound)
 
 		assert isinstance(compound, Compound), f'incompatible {compound}'
 		assert name, f'incompatible name={name}'
-		# assert smiles
+		assert isinstance(reference, int) or reference is None, f'incompatible name={name}'
 
-		longname = f'{target}_{compound.name}_{name}'
+		if isinstance(target, str):
+			target = self.get_target_id(name=target)
+		target_name = self.get_target_name(id=target)
+		
+		longname = f'{compound.name} {target_name} {name}'
 
 		if path:
 
@@ -417,12 +459,12 @@ class Database:
 				return None
 
 		sql = """
-		INSERT INTO pose(pose_name, pose_longname, pose_smiles, pose_compound, pose_target, pose_path)
-		VALUES(?1, ?2, ?3, ?4, ?5, ?6)
+		INSERT INTO pose(pose_name, pose_longname, pose_smiles, pose_compound, pose_target, pose_path, pose_reference)
+		VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7)
 		"""
 
 		try:
-			self.execute(sql, (name, longname, compound.smiles, compound.id, target, path))
+			self.execute(sql, (name, longname, compound.smiles, compound.id, target, path, reference))
 
 		except sqlite3.IntegrityError as e:
 			if 'UNIQUE constraint failed: pose.pose_longname' in str(e):
@@ -442,6 +484,9 @@ class Database:
 			if tags:
 				for tag in tags:
 					self.insert_tag(name=tag, pose=pose_id)
+
+			if metadata:
+				self.insert_metadata(table='pose', id=pose_id, payload=metadata)
 
 			return pose_id
 
@@ -578,14 +623,19 @@ class Database:
 		amount: float,
 		price: float,
 		currency: str,
+		purity: float,
 		lead_time: int,
-	):
+		smiles: str | None = None,
+	) -> int | None:
 
 		assert isinstance(compound, Compound), f'incompatible {compound=}'
 		assert currency in ['GBP', 'EUR', 'USD'], f'incompatible {currency=}'
+
+		smiles = smiles or ""
 		
 		sql = """
-		INSERT INTO quote(
+		INSERT or REPLACE INTO quote(
+			quote_smiles,
 			quote_amount,
 			quote_supplier,
 			quote_catalogue,
@@ -593,14 +643,20 @@ class Database:
 			quote_lead_time,
 			quote_price,
 			quote_currency,
+			quote_purity,
 			quote_compound,
 			quote_date
 		)
-		VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, date());
+		VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, date());
 		"""
 
 		try:
-			self.execute(sql, (amount, supplier, catalogue, entry, lead_time, price, currency, compound.id))
+			self.execute(sql, (smiles, amount, supplier, catalogue, entry, lead_time, price, currency, purity, compound.id))
+
+		except sqlite3.InterfaceError as e:
+			logger.error(e)
+			logger.debug((smiles, amount, supplier, catalogue, entry, lead_time, price, currency, purity, compound.id))
+			raise
 
 		except Exception as e:
 			logger.exception(e)
@@ -609,7 +665,97 @@ class Database:
 		quote_id = self.cursor.lastrowid
 		return quote_id
 
+	def insert_target(self,
+		*,
+		name: str
+	) -> int:
+
+		sql = """
+		INSERT INTO target(target_name)
+		VALUES(?1)
+		"""
+
+		try:
+			self.execute(sql, (name, ))
+
+		except sqlite3.IntegrityError as e:
+			logger.warning(f"Skipping existing target with {name=}")
+			return None
+
+		except Exception as e:
+			logger.exception(e)
+			
+		target_id = self.cursor.lastrowid
+		return target_id
+
+	def insert_feature(self,
+		*,
+		type: str,
+		target: int,
+		chain_name: str,
+		residue_name: str,
+		residue_number: int,
+		atom_name: str,
+		atom_number: int,
+	) -> int:
+
+		assert len(chain_name) == 1
+		assert len(residue_name) <= 4
+		assert len(atom_name) <= 4
+
+		if isinstance(target, str):
+			target = self.get_target_id(name=target)
+		assert isinstance(target, int)
+
+		sql = """
+		INSERT INTO feature(feature_type, feature_target, feature_chain_name, feature_residue_name, feature_residue_number, feature_atom_name, feature_atom_number)
+		VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7)
+		"""
+
+		try:
+			self.execute(sql, (type, target, chain_name, residue_name, residue_number, atom_name, atom_number))
+
+		# except sqlite3.IntegrityError as e:
+		# 	logger.warning(f"Target with {name=} already exists")
+
+		except Exception as e:
+			logger.exception(e)
+
+		finally:
+			
+			target_id = self.cursor.lastrowid
+			return target_id
+
+		return None
+
+	def insert_metadata(self,
+		table: str,
+		id: int,
+		payload: dict,
+	) -> None:
+
+		payload = json.dumps(payload)
+
+		self.update(table=table, id=id, key=f'{table}_metadata', value=payload)
+
 	### SELECTION
+
+	def select(self, query, table, multiple=False):
+
+		sql = f'SELECT {query} FROM {table}'
+
+		try:
+			self.execute(sql)
+		except sqlite3.OperationalError as e:
+			logger.var('sql',sql)
+			raise
+
+		if multiple:
+			result = self.cursor.fetchall()
+		else:
+			result = self.cursor.fetchone()
+
+		return result
 
 	def select_where(self, query, table, key, value, multiple=False, none='error'):
 		if isinstance(value, str):
@@ -640,6 +786,27 @@ class Database:
 	def select_all_where(self, table, key, value, multiple=False):
 		return self.select_where(query='*', table=table, key=key, value=value, multiple=multiple)
 
+	### DELETION
+
+	def delete_where(self, table, key, value):
+
+		if isinstance(value, str):
+			value = f"'{value}'"
+
+		sql = f'DELETE FROM {table} WHERE {table}_{key}={value}'
+
+		try:
+			self.execute(sql)
+
+		except sqlite3.OperationalError as e:
+			logger.var('sql',sql)
+			raise
+
+		return result
+
+
+	### UPDATE
+
 	def update(self, table, id, key, value):
 
 		# sql = f"""
@@ -667,6 +834,7 @@ class Database:
 	### GETTERS
 
 	def get_compound(self,
+		*,
 		table: str = 'compound',
 		id: int | None = None,
 		name: str | None = None,
@@ -680,12 +848,13 @@ class Database:
 			logger.error(f'Invalid {id=}')
 			return None
 
-		query = 'compound_id, compound_name, compound_smiles, compound_base, mol_to_binary_mol(compound_mol)'
+		query = 'compound_id, compound_name, compound_smiles, compound_base'
 		entry = self.select_where(query=query, table=table, key='id', value=id)
-		compound = Compound(self, *entry)
+		compound = Compound(self, *entry, metadata=None, mol=None)
 		return compound
 
 	def get_compound_id(self, 
+		*,
 		table: str = 'compound',
 		name: str | None = None, 
 		smiles: str | None = None, 
@@ -708,6 +877,7 @@ class Database:
 		return None
 
 	def get_pose(self,
+		*,
 		table: str = 'pose',
 		id: int | None = None,
 		longname: str | None = None,
@@ -721,12 +891,13 @@ class Database:
 			logger.error(f'Invalid {id=}')
 			return None
 
-		query = 'pose_id, pose_name, pose_longname, pose_smiles, pose_compound, pose_target, pose_path, pose_mol, pose_fingerprint'
+		query = 'pose_id, pose_name, pose_longname, pose_smiles, pose_reference, pose_path, pose_compound, pose_target, pose_mol, pose_fingerprint'
 		entry = self.select_where(query=query, table=table, key='id', value=id)
 		pose = Pose(self, *entry)
 		return pose
 
 	def get_pose_id(self, 
+		*,
 		table: str = 'pose',
 		longname: str | None = None, 
 	) -> int:
@@ -739,6 +910,7 @@ class Database:
 		return None
 
 	def get_reaction(self,
+		*,
 		table: str = 'reaction',
 		id: int | None = None,
 		none: str | None = None,
@@ -754,12 +926,13 @@ class Database:
 		return reaction
 
 	def get_quote(self,
+		*,
 		table: str = 'quote',
 		id: int | None = None,
 		none: str | None = None,
 	) -> list[dict]:
 		
-		query = 'quote_compound, quote_supplier, quote_catalogue, quote_entry, quote_amount, quote_price, quote_currency, quote_lead_time, quote_date'
+		query = 'quote_compound, quote_supplier, quote_catalogue, quote_entry, quote_amount, quote_price, quote_currency, quote_lead_time, quote_purity, quote_date, quote_smiles '
 		entry = self.select_where(query=query, table=table, key='id', value=id, none=none)
 
 		return Quote(
@@ -771,8 +944,73 @@ class Database:
 			price=entry[5],
 			currency=entry[6],
 			lead_time=entry[7],
-			date=entry[8],
+			purity=entry[8],
+			date=entry[9],
+			smiles=entry[10],
 		)
+
+	def get_metadata(self, 
+		*,
+		table: str, 
+		id: int
+	) -> dict:
+
+		payload, = self.select_where(query=f'{table}_metadata', table=table, key=f'id', value=id)
+
+		if payload:
+			payload = json.loads(payload)
+			
+		else:
+			payload = dict()
+
+		metadata = MetaData(payload)
+
+		metadata._db = self
+		metadata._id = id
+		metadata._table = table
+
+		return metadata
+
+	def get_target(self, 
+		*,
+		id=int
+	) -> Target:
+		return Target(id=id,name=self.get_target_name(id=id))
+
+	def get_target_name(self,
+		*,
+		id:int,
+	) -> str:
+
+		table = 'target'
+		payload, = self.select_where(query=f'{table}_name', table=table, key=f'id', value=id)
+		return payload
+
+	def get_target_id(self, 
+		*,
+		name: str, 
+	) -> int:
+			
+		table = 'target'
+		entry = self.select_id_where(table=table, key='name', value=name)
+
+		if entry:
+			return entry[0]
+
+		return None
+
+	# def get_feature(self,
+	# 	*,
+	# 	id: int
+	# ) -> Feature:
+
+	# 	table = 'feature'
+	# 	entry = self.select_all_where(table=table, key='name', value=name)
+
+	# 	if entry:
+	# 		return entry[0]
+
+	# 	return None
 
 	### COMPOUND QUERY
 
@@ -847,7 +1085,7 @@ class Database:
 		return compounds
 
 	def query_exact(self, query):
-		return self.query_similarity(query, 1.0, return_similarity=False)
+		return self.query_similarity(query, 0.989, return_similarity=False)
 
 	### COUNTING
 

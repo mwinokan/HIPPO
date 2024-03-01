@@ -4,6 +4,7 @@ import mcol
 from rdkit import Chem
 
 from .pose import Pose
+from .tags import TagSet
 
 
 class Compound:
@@ -14,13 +15,18 @@ class Compound:
 			name: str,
 			smiles: str,
 			base: int,
-			mol: Chem.Mol,
-		):
+			mol: Chem.Mol | bytes | None = None,
+			metadata: dict | None = None,
+	):
 		
 		self._id = id
 		self._name = name
 		self._smiles = smiles
 		self._base = base
+		self._table = 'compound'
+		self._tags = None
+
+		self._metadata = metadata
 		
 		if isinstance(mol, bytes):
 			mol = Chem.Mol(mol)
@@ -47,7 +53,16 @@ class Compound:
 	
 	@property
 	def mol(self):
+		if self._mol is None:
+			mol, = self.db.select_where(query='mol_to_binary_mol(compound_mol)', table='compound', key='id', value=self.id, multiple=False)
+			self._mol = Chem.Mol(mol)
 		return self._mol
+
+	@property
+	def metadata(self):
+		if self._metadata is None:
+			self._metadata = self.db.get_metadata(table='compound', id=self.id)
+		return self._metadata
 
 	@property
 	def db(self):
@@ -55,7 +70,9 @@ class Compound:
 
 	@property
 	def tags(self):
-		return self.get_tags()
+		if not self._tags:
+			self._tags = self.get_tags()
+		return self._tags
 
 	@property
 	def poses(self):
@@ -65,14 +82,18 @@ class Compound:
 	def base(self):
 		return self._base
 
+	@property
+	def table(self):
+		return self._table
+
 	
 	### METHODS
 
 	def get_tags(self) -> set:
 		tags = self.db.select_where(query='tag_name', table='tag', key='compound', value=self.id, multiple=True)
-		return {t[0] for t in tags}
+		return TagSet(self, {t[0] for t in tags})
 
-	def get_quotes(self, min_amount=None, supplier=None, max_lead_time=None, none='error', pick_cheapest=False) -> list[dict]:
+	def get_quotes(self, min_amount=None, supplier=None, max_lead_time=None, none='error', pick_cheapest=False, df=False) -> list[dict]:
 
 		quote_ids = self.db.select_where(query='quote_id', table='quote', key='compound', value=self.id, multiple=True, none=none)
 
@@ -92,6 +113,10 @@ class Compound:
 
 		if pick_cheapest:
 			return sorted(quotes, key=lambda x: x.price)[0]
+
+		if df:
+			from pandas import DataFrame
+			return DataFrame([q.asdict() for q in quotes]).drop(columns='compound')
 		
 		return quotes
 

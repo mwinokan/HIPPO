@@ -7,8 +7,12 @@ from .pset import PoseSet
 from .db import Database
 from pathlib import Path
 
+from tqdm import tqdm
+
+from .tools import inchikey_from_smiles, sanitise_smiles
+
 from mlog import setup_logger
-logger = setup_logger('HIPPO', debug=True)
+logger = setup_logger('HIPPO')
 
 class HIPPO:
 		
@@ -68,67 +72,126 @@ class HIPPO:
 	
 	### PUBLIC METHODS
 
-	def add_hits(self, metadata_path, pdb_path, pdb_pattern='**/*-x????_??_bound.pdb', tags=None, overwrite=False):
-				
-		### checks
-		
-		if not overwrite and 'hits' in [s.name for s in self.compound_sets]:
-			logger.error(f'CompoundSet "hits" already exists')
-			return
+	def add_hits(self, target_name, metadata_csv, aligned_directory, skip=None, debug=False):
 
-		if not isinstance(metadata_path, Path):
-			metadata_path = Path(metadata_path)
+		""" Pass in a generator to the aligned directory from a Fragalysis download"""
 
-		if not isinstance(pdb_path, Path):
-			pdb_path = Path(pdb_path)
+		import molparse as mp
+		from rdkit.Chem import PandasTools
+		from .tools import remove_other_ligands
 
-		tags = tags or ['hits']
+		# create the target
+		target_id = self.db.insert_target(name=target_name)
 
-		### metadata
+		if not target_id:
+			target_id = self.db.get_target_id(name=target_name)
 
-		logger.var('metadata_path',str(metadata_path),dict(color='file'))
+		skip = skip or []
 
-		try:
-			metadata_df = pd.read_csv(metadata_path)
-		except FileNotFoundError as e:
-			logger.exception(e)
-			raise
+		logger.var('aligned_directory',aligned_directory)
 
-		# logger.header('metadata columns:')
-		# pprint(list(metadata_df.columns))
+		count_directories_tried = 0
+		count_compound_registered = 0
+		count_poses_registered = 0
 
-		logger.success(f'Parsed metadata CSV')
+		meta_df = pd.read_csv(metadata_csv)
+		generated_tag_cols = ['ConformerSites', 'CanonSites', 'CrystalformSites', 'Quatassemblies', 'Crystalforms']
+		curated_tag_cols = [c for c in meta_df.columns if c not in ['Code', 'Long code', 'Compound code', 'Smiles']+generated_tag_cols]
 
-		### pdbs
+		for path in tqdm(aligned_directory.iterdir()):
 
-		logger.var('pdb_path',str(pdb_path),dict(color='file'))
-		logger.var('pdb_pattern',str(pdb_pattern),dict(color='file'))
+			if not path.is_dir():
+				continue
 
-		pdbs = list(pdb_path.glob(pdb_pattern))
+			if path.name in skip:
+				continue
 
-		pdbs = sorted(pdbs)
+			count_directories_tried += 1
 
-		if len(pdbs) < 1:
-			logger.error(f'Did not find any PDBs',fatal=True,code='HIPPO.add_hits.0')
-		
-		# from .io import compounds_from_bound_pdbs
+			sdfs = list(path.glob('*x?????.sdf'))
+			pdbs = list(path.glob('*x?????.pdb'))
 
-		comp_set = CompoundSet.from_bound_pdbs(name='hits', 
-			pdbs=pdbs, 
-			metadata_df=metadata_df,
-			pdb_pattern=pdb_pattern,
-			tags=tags,
-			animal=self,
-		)
+			assert len(sdfs) == 1, (path, sdfs)
+			assert len(pdbs) == 1, (path, pdbs)
+			
+			# load the SDF
+			df = PandasTools.LoadSDF(sdfs[0])
 
-		# if 'hits' in self.compound_sets:
-		# 	self._compound_sets['hits'] = comp_set
-		# else:
-		# 	self._compound_sets.append(comp_set)
-		
-		# self._hit_compounds = self._compound_sets['hits']
+			# extract fields
+			observation_shortname = path.name.replace('.sdf','')
+			observation_longname = df.ID[0]
+			mol = df.ROMol[0]
+			lig_res_number = int(observation_longname.split('-')[1].split('_')[2])
 
-		# logger.success(f'Loaded {comp_set.num_compounds} compounds as "{comp_set.name}" ({self.hits.num_poses} poses)')
+			# create the single ligand bound pdb
+
+			sys = mp.parse(pdbs[0], verbosity=debug)
+
+			sys = remove_other_ligands(sys, lig_res_number)
+
+			pose_path = str(pdbs[0].resolve()).replace('.pdb','_hippo.pdb')
+			smiles = mp.rdkit.mol_to_smiles(mol)
+
+			smiles = sanitise_smiles(smiles, verbosity=debug)
+
+			mp.write(pose_path, sys, shift_name=True, verbosity=debug)
+
+			# create the molecule / pose
+
+			compound_id = self.db.insert_compound(
+				# name=crystal_name, 
+				smiles=smiles, 
+				tags=['hits'],
+				warn_duplicate=debug,
+			)
+
+			if not compound_id:
+
+				inchikey = inchikey_from_smiles(smiles)
+				compound = self.compounds[inchikey]
+
+				if not compound:
+
+					print(smiles)
+					print(inchikey)
+					print(observation_shortname)
+			
+			else:
+				count_compound_registered += 1
+				compound = self.compounds[compound_id]
+
+			# metadata
+
+			meta_row = meta_df[meta_df['Code']==observation_shortname]
+
+			tags = ['hits']
+			for tag in curated_tag_cols:
+				if meta_row[tag].values[0]:
+					tags.append(tag)
+
+			print(tags)
+
+			metadata = {}
+			for tag in generated_tag_cols:
+				metadata[tag] = meta_row[tag].values[0]
+
+			pose_id = self.db.insert_pose(
+				compound=compound,
+				name=observation_shortname,
+				target=target_id,
+				path=pose_path,
+				tags=tags,
+				metadata=metadata,
+			)
+
+			if pose_id:
+				count_poses_registered += 1
+
+		logger.var('#directories parsed', count_directories_tried)
+		logger.var('#compounds registered', count_compound_registered)
+		logger.var('#poses registered', count_poses_registered)
+
+		return meta_df
 
 	### DUNDERS
 

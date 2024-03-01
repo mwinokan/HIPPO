@@ -4,6 +4,8 @@ import molparse as mp
 
 from rdkit import Chem
 
+from .tags import TagSet
+
 import logging
 logger = logging.getLogger('HIPPO')
 
@@ -15,11 +17,13 @@ class Pose:
 		name: str,
 		longname: str,
 		smiles: str,
+		reference: int, # another pose
+		path: str,
 		compound: int,
 		target: str,
-		path: str,
-		mol: str,
+		mol: Chem.Mol | bytes | None,
 		fingerprint: str,
+		metadata: dict | None = None,
 	):
 
 		self._db = db
@@ -31,6 +35,10 @@ class Pose:
 		self._target = target
 		self._path = path
 		self._fingerprint = fingerprint
+		self._metadata = metadata
+		self._tags = None
+		self._table = 'pose'
+		self._reference = reference
 
 		if isinstance(mol, bytes):
 			self._mol = Chem.Mol(mol)
@@ -63,6 +71,8 @@ class Pose:
 
 	@property
 	def target(self):
+		if isinstance(self._target, int):
+			self._target = self.db.get_target(id=self._target)
 		return self._target
 
 	@property
@@ -78,8 +88,13 @@ class Pose:
 		return self._path
 
 	@property
-	def mol(self):
+	def reference(self):
+		if isinstance(self._reference, int):
+			self._reference = self.db.get_pose(id=self._reference)
+		return self._reference
 
+	@property
+	def mol(self):
 		if not self._mol and self.path:
 			logger.reading(self.path)
 			sys = mp.parse(self.path, verbosity=False)
@@ -88,8 +103,6 @@ class Pose:
 				logger.warning('Multiple ligands in PDB')
 			lig_res = lig_residues[0]
 			self.mol = lig_res.rdkit_mol
-			return self.mol
-
 		return self._mol
 
 	@mol.setter
@@ -100,17 +113,29 @@ class Pose:
 		self.db.update(table='pose', id=self.id, key='pose_mol', value=m.ToBinary())
 
 	@property
+	def metadata(self):
+		if self._metadata is None:
+			self._metadata = self.db.get_metadata(table='pose', id=self.id)
+		return self._metadata
+
+	@property
 	def fingerprint(self):
 		return self._fingerprint
 
 	@property
 	def tags(self):
-		return self.get_tags()
+		if not self._tags:
+			self._tags = self.get_tags()
+		return self._tags
 
 	@property
 	def inspirations(self):
 		return self.get_inspirations()
 
+	@property
+	def table(self):
+		return self._table
+	
 
 	### METHODS
 
@@ -119,7 +144,7 @@ class Pose:
 
 	def get_tags(self):
 		tags = self.db.select_where(query='tag_name', table='tag', key='pose', value=self.id, multiple=True)
-		return {t[0] for t in tags}
+		return TagSet(self, {t[0] for t in tags})
 	
 	def get_inspirations(self):
 		inspirations = self.db.select_where(query='inspiration_original', table='inspiration', key='derivative', value=self.id, multiple=True, none='quiet')

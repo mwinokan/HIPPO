@@ -5,7 +5,7 @@ from .compound import Compound
 from .recipe import Recipe
 
 from mlog import setup_logger
-logger = setup_logger('HIPPO', debug=True)
+logger = setup_logger('HIPPO')
 
 class Reaction:
 
@@ -37,6 +37,8 @@ class Reaction:
 
 	@property
 	def product(self):
+		if isinstance(self._product, int):
+			self._product = self.db.get_compound(id=self._product)
 		return self._product
 
 	@property
@@ -95,9 +97,11 @@ class Reaction:
 
 	def get_recipe(self, amount):
 
-		ingredients, reactions = self.get_ingredients(amount=amount, return_reactions=True)
+		product = self.product.as_ingredient(amount=amount)
 
-		recipe = Recipe(ingredients, reactions)
+		reactants, reactions = self.get_ingredients(amount=amount, return_reactions=True)
+
+		recipe = Recipe(product=product, reactants=reactants, reactions=reactions)
 		
 		return recipe
 
