@@ -4,6 +4,8 @@
 from .compound import Compound
 from .db import Database
 
+from .recipe import Recipe
+
 import mcol
 
 import os
@@ -40,6 +42,11 @@ class CompoundSet:
 		result = self.db.select(table=self.table, query='compound_name', multiple=True)
 		return [q for q, in result]
 
+	@property
+	def ids(self):
+		result = self.db.select(table=self.table, query='compound_id', multiple=True)
+		return [q for q, in result]
+
 	### METHODS
 
 	def get_by_tag(self,tag):
@@ -54,12 +61,24 @@ class CompoundSet:
 		match key:
 
 			case int():
-				return self.db.get_compound(table=self.table, id=key)
+
+				if key == 0:
+					return self.__getitem__(key=1)
+
+				if key < 0:
+					key = len(self) + 1 + key
+					return self.__getitem__(key=key)
+
+				else:
+					return self.db.get_compound(table=self.table, id=key)
 
 			case str():
 				return self.db.get_compound(table=self.table, name=key)
 
 			case list():
+				return CompoundSubset(self.db, self.table, key)
+
+			case tuple():
 				return CompoundSubset(self.db, self.table, key)
 
 			case slice():
@@ -105,9 +124,64 @@ class CompoundSubset(CompoundSet):
 	def __getitem__(self, key) -> Compound:
 		raise NotImplementedError
 
+	### PROPERTIES
+
 	@property
 	def indices(self):
 		return self._indices
+
+	@property
+	def ids(self):
+		return self.indices
+
+	### METHODS
+
+	def draw(self):
+		from molparse.rdkit import draw_grid
+
+		data = [(str(c), c.mol) for c in self]
+
+		mols = [d[1] for d in data]
+		labels = [d[0] for d in data]
+
+		return draw_grid(mols, labels=labels)
+
+	def get_recipe(self, amount=1):
+
+		n_comps = len(self)
+
+		if not hasattr(amount, '__iter__'):
+			amount = [amount] * n_comps
+
+		products = []
+		reactants = []
+		reactions = []
+
+		for comp, a in zip(self, amount):
+
+			reax = comp.reactions
+
+			assert len(reax) == 1
+
+			recipe = reax[0].get_recipe(a)
+
+			products.append(comp.as_ingredient(amount=a))
+
+			for reactant in recipe.reactants:
+				matches = [r for r in reactants if r.id == reactant.id]
+				if matches:
+					matches[0].amount += reactant.amount
+				else:
+					reactants.append(reactant) 
+
+			for reaction in recipe.reactions:
+				matches = [r for r in reactions if r.id == reaction.id]
+				if not matches:
+					reactions.append(reaction) 
+
+		return Recipe(products=products, reactants=reactants, reactions=reactions)
+
+	### DUNDERS
 
 	def __repr__(self) -> str:
 		return f'{mcol.bold}{mcol.underline}subset(C x {len(self)}){mcol.unbold}{mcol.ununderline}'

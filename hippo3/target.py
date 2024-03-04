@@ -54,8 +54,6 @@ class Target:
 
 		features = protein.get_protein_features()
 
-		print(len(features))
-
 		for f in features:
 			self.db.insert_feature(
 				family=f.family,

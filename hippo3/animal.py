@@ -4,6 +4,7 @@ import pandas as pd
 from .cset import CompoundSet
 from .pset import PoseSet
 from .tags import TagSet
+from .rset import ReactionSet
 
 from .db import Database
 from pathlib import Path
@@ -41,6 +42,7 @@ class HIPPO:
 		self._compounds = CompoundSet(self.db, 'compound')
 		self._poses = PoseSet(self.db, 'pose')
 		self._tags = TagSet(self.db, 'tag')
+		self._reactions = ReactionSet(self.db, 'reaction')
 
 		logger.success(f"Initialised animal {self}")
 		
@@ -71,6 +73,10 @@ class HIPPO:
 	@property
 	def poses(self):
 		return self._poses
+
+	@property
+	def reactions(self):
+		return self._reactions
 
 	@property
 	def tags(self):

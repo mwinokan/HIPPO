@@ -147,15 +147,15 @@ class Database:
 			compound_base INTEGER,
 			compound_mol MOL,
 			compound_pattern_bfp bits(2048),
-			compound_morgan_bfp bits(1024),
+			compound_morgan_bfp bits(2048),
 			compound_metadata TEXT,
 			FOREIGN KEY (compound_base) REFERENCES compound(compound_id),
 			CONSTRAINT UC_compound_name UNIQUE (compound_name)
 			CONSTRAINT UC_compound_smiles UNIQUE (compound_smiles)
-			CONSTRAINT UC_compound_pattern_bfp UNIQUE (compound_pattern_bfp)
-			CONSTRAINT UC_compound_morgan_bfp UNIQUE (compound_morgan_bfp)
 		);
 		"""
+			# CONSTRAINT UC_compound_morgan_bfp UNIQUE (compound_morgan_bfp)
+			# CONSTRAINT UC_compound_pattern_bfp UNIQUE (compound_pattern_bfp)
 
 		self.execute(sql)
 
@@ -309,7 +309,7 @@ class Database:
 	def create_table_morgan_bfp(self):
 		logger.debug('HIPPO.Database.create_table_morgan_bfp()')
  
-		sql = "CREATE VIRTUAL TABLE compound_morgan_bfp USING rdtree(compound_id, fp bits(1024))"
+		sql = "CREATE VIRTUAL TABLE compound_morgan_bfp USING rdtree(compound_id, fp bits(2048))"
  
 		self.execute(sql)
 
@@ -337,7 +337,7 @@ class Database:
 
 		sql = """
 		INSERT INTO compound(compound_name, compound_smiles, compound_base, compound_mol, compound_pattern_bfp, compound_morgan_bfp)
-		VALUES(?1, ?2, ?3, mol_from_smiles(?2), mol_pattern_bfp(mol_from_smiles(?2), 2048), mol_morgan_bfp(mol_from_smiles(?2), 2, 1024))
+		VALUES(?1, ?2, ?3, mol_from_smiles(?2), mol_pattern_bfp(mol_from_smiles(?2), 2048), mol_morgan_bfp(mol_from_smiles(?2), 2, 2048))
 		"""
 
 		try:
@@ -345,9 +345,11 @@ class Database:
 
 		except sqlite3.IntegrityError as e:
 			if 'UNIQUE constraint failed: compound.compound_name' in str(e):
-				logger.warning(f"Skipping compound with existing name \"{name}\"")
+				if warn_duplicate:
+					logger.warning(f"Skipping compound with existing name \"{name}\"")
 			elif 'UNIQUE constraint failed: compound.compound_smiles' in str(e):
-				logger.warning(f"Skipping compound with existing smiles \"{smiles}\"")
+				if warn_duplicate:
+					logger.warning(f"Skipping compound with existing smiles \"{smiles}\"")
 			elif 'UNIQUE constraint failed: compound.compound_pattern_bfp' in str(e):
 				if warn_duplicate:
 					logger.warning(f"Skipping compound with existing pattern binary fingerprint \"{smiles}\"")
@@ -356,6 +358,9 @@ class Database:
 					logger.warning(f"Skipping compound with existing morgan binary fingerprint \"{smiles}\"")
 			else:
 				logger.exception(e)
+
+			# if tags:
+				# logger.error('Unused tag data')
 			return None
 
 		except Exception as e:
@@ -562,6 +567,9 @@ class Database:
 		product_yield: float = 1.0,
 	) -> int:
 
+		if isinstance(product, int):
+			product = self.get_compound(id=product)
+
 		assert isinstance(product, Compound), f'incompatible {product=}'
 		assert isinstance(type, str), f'incompatible {type=}'
 
@@ -589,6 +597,12 @@ class Database:
 		reaction: Reaction,
 		amount: float,
 	) -> int:
+
+		if isinstance(reaction, int):
+			reaction = self.get_reaction(id=reaction)
+
+		if isinstance(compound, int):
+			compound = self.get_compound(id=compound)
 
 		assert isinstance(compound, Compound), f'incompatible {compound=}'
 		assert isinstance(reaction, Reaction), f'incompatible {reaction=}'
@@ -801,13 +815,13 @@ class Database:
 		sql = f'DELETE FROM {table} WHERE {table}_{key}={value}'
 
 		try:
-			self.execute(sql)
+			result = self.execute(sql)
 
 		except sqlite3.OperationalError as e:
 			logger.var('sql',sql)
 			raise
 
-		return result
+		return None
 
 
 	### UPDATE
@@ -1093,6 +1107,29 @@ class Database:
 		sql = f"""SELECT COUNT(1) FROM {table}; """
 		self.execute(sql)
 		return self.cursor.fetchone()[0]
+
+	### PRUNING
+
+	def prune_reactions(self, compound, reactions):
+
+		pruned = []
+		del_list = []
+
+		for i,reaction in enumerate(reactions):
+
+			matches = [r for r in pruned if r == reaction]
+
+			if not matches:
+				pruned.append(reaction)
+
+			else:
+				del_list.append(reaction)
+
+		for reaction in del_list:
+			logger.warning(f'Deleted duplicate {reaction=}')
+			self.delete_where('reaction', 'id', reaction.id)
+
+		return pruned
 
 	### PRINTING
 

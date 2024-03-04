@@ -6,6 +6,9 @@ from rdkit import Chem
 from .pose import Pose
 from .tags import TagSubset
 
+import logging
+logger = logging.getLogger('HIPPO')
+
 
 class Compound:
 
@@ -87,6 +90,10 @@ class Compound:
 		return self._table
 
 	@property
+	def reactions(self):
+		return self.get_reactions(none=False)
+	
+	@property
 	def dict(self):
 
 		serialisable_fields = ['id','name','smiles']
@@ -107,8 +114,11 @@ class Compound:
 	### METHODS
 
 	def get_tags(self) -> set:
-		tags = self.db.select_where(query='tag_name', table='tag', key='compound', value=self.id, multiple=True)
-		return TagSubset(self, {t[0] for t in tags})
+		tags = self.db.select_where(query='tag_name', table='tag', key='compound', value=self.id, multiple=True, none='quiet')
+		if tags:
+			return TagSubset(self, {t[0] for t in tags})
+		else:
+			return None
 
 	def get_quotes(self, min_amount=None, supplier=None, max_lead_time=None, none='error', pick_cheapest=False, df=False) -> list[dict]:
 
@@ -146,6 +156,9 @@ class Compound:
 		else:
 			return []
 
+		if len(reactions) > 1:
+			reactions = self.db.prune_reactions(compound=self, reactions=reactions)
+
 		return reactions
 
 	def get_poses(self, 
@@ -167,10 +180,11 @@ class Compound:
 			pick_cheapest=True, 
 			min_amount=amount, 
 			max_lead_time=max_lead_time, 
-			supplier=supplier
+			supplier=supplier,
+			none='quiet',
 		)
 		
-		return Ingredient(self, amount, quote)
+		return Ingredient(self, amount, quote, max_lead_time, supplier)
 
 	### DUNDERS
 
@@ -180,28 +194,53 @@ class Compound:
 	def __repr__(self):
 		return f'{mcol.bold}{mcol.underline}{self} "{self.name}"{mcol.unbold}{mcol.ununderline}'
 
+	def __eq__(self, other):
+		return self.id == other.id
+
 class Ingredient(Compound):
 
 	"""An ingredient is a Compound with a fixed quanitity and an attached quote"""
 
-	def __init__(self, inherit, amount, quote):
+	def __init__(self, inherit, amount, quote, max_lead_time=None, supplier=None):
 		self._id = inherit.id
 		self._name = inherit.name
 		self._smiles = inherit.smiles
 		self._base = inherit.base			
 		self._mol = inherit.mol
 		self._db = inherit.db
-
-		self._required_amount = amount
+		
+		self._max_lead_time = max_lead_time
+		self._supplier = supplier
+		self._amount = amount
 		self._quote = quote
 
 	@property
-	def required_amount(self):
-		return self._required_amount
+	def amount(self):
+		return self._amount
+
+	@amount.setter
+	def amount(self, a):
+
+		quote = self.get_quotes(
+			pick_cheapest=True, 
+			min_amount=a, 
+			max_lead_time=self._max_lead_time, 
+			supplier=self._supplier,
+			none='quiet',
+		)
+		
+		self._amount = a
 
 	@property
 	def quote(self):
 		return self._quote
 
 	def __repr__(self):
-		return f'{self.required_amount:.2f}mg of {mcol.bold}{mcol.underline}{self} "{self.name}"{mcol.unbold}{mcol.ununderline}'
+		return f'{self.amount:.2f}mg of {mcol.bold}{mcol.underline}{self} "{self.name}"{mcol.unbold}{mcol.ununderline}'
+
+	def __eq__(self, other):
+
+		if self.id != other.id:
+			return False
+
+		return self.amount == other.amount

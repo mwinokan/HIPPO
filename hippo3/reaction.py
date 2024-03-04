@@ -49,6 +49,24 @@ class Reaction:
 	def db(self):
 		return self._db
 
+	@property
+	def reactants(self):
+		return [v[0] for v in self.get_reactant_amount_pairs()]
+
+	@property
+	def reaction_str(self):
+		s = ' + '.join([str(r) for r in self.reactants])
+		s = f'{s} -> {str(self.product)}'
+		return s
+
+	@property
+	def reactant_ids(self):
+		return set(v[0].id for v in self.get_reactant_amount_pairs())
+
+	@property
+	def product_id(self):
+		return self.product.id
+	
 	### METHODS
 
 	def get_reactant_amount_pairs(self) -> list[Compound]:
@@ -63,6 +81,8 @@ class Reaction:
 		return reactants
 
 	def get_ingredients(self, amount, return_reactions=False):
+
+		"""recursively assemble a list of ingredients and reactions required to make the compound"""
 
 		ingredients = []
 		reax = []
@@ -80,13 +100,15 @@ class Reaction:
 			if reactions:
 				assert len(reactions) == 1
 				reaction = reactions[0]
+				_ingredients, _reactions = reaction.get_ingredients(reactant_amount, return_reactions=True)
+
+				ingredients += _ingredients
+				reax += _reactions
+
 				reax.append(reaction)
-				ingredients += reaction.get_ingredients(reactant_amount)
 
 			else:
-				
 				ingredient = reactant.as_ingredient(reactant_amount)
-
 				ingredients.append(ingredient)
 
 		if return_reactions:
@@ -95,13 +117,15 @@ class Reaction:
 			
 		return ingredients
 
-	def get_recipe(self, amount):
+	def get_recipe(self, 
+		amount: float = 1, # in mg
+	):
 
-		product = self.product.as_ingredient(amount=amount)
+		products = [self.product.as_ingredient(amount=amount)]
 
 		reactants, reactions = self.get_ingredients(amount=amount, return_reactions=True)
 
-		recipe = Recipe(product=product, reactants=reactants, reactions=reactions)
+		recipe = Recipe(products=products, reactants=reactants, reactions=reactions)
 		
 		return recipe
 
@@ -121,9 +145,40 @@ class Reaction:
 
 		return self.get_recipe(amount)
 
+	def draw(self):
+
+		from molparse.rdkit import draw_grid
+
+		reactants = self.reactants
+
+		product = self.product
+
+		mols = [r.mol for r in reactants]
+		mols.append(product.mol)
+
+		labels = [f'+ {r}' if i>0 else f'{r}' for i,r in enumerate(reactants)]
+		labels.append(f'-> {product}')
+
+		return draw_grid(mols, labels=labels, highlightAtomLists=None)
+
 	### DUNDERS
 
-	def __repr__(self):
-		# return f'Reaction(#{self.id})'
-		return f'{mcol.bold}{mcol.underline}R{self.id}{mcol.unbold}{mcol.ununderline}'
+	def __str__(self):
+		return f'R{self.id}'
 
+	def __repr__(self):
+		return f'{mcol.bold}{mcol.underline}{self}: {self.reaction_str} via {self.type}{mcol.unbold}{mcol.ununderline}'
+
+	def __eq__(self, other):
+
+		if self.type != other.type:
+			return False
+
+		if self.product != other.product:
+			return False
+
+		if self.reactant_ids != other.reactant_ids:
+			return False
+
+		return True
+		
