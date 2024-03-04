@@ -15,11 +15,14 @@ class Recipe:
 
 	# list of Ingredient objects
 	reactants: list = field(default_factory=list)
+
+	# list of Ingredient objects
+	intermediates: list = field(default_factory=list)
 	
 	# list of Reaction objects
 	reactions: list = field(default_factory=list)
 
-	def draw(self, color_mapper = None):
+	def draw(self, color_mapper = None, node_size=300):
 
 		"""draw graph of the reaction network"""
 
@@ -27,6 +30,7 @@ class Recipe:
 
 		color_mapper = color_mapper or {} 
 		colors = {}
+		sizes = {}
 
 		graph = nx.DiGraph()
 
@@ -34,6 +38,7 @@ class Recipe:
 			for reactant in reaction.reactants:
 				key = str(reactant)
 				graph.add_node(key)
+				sizes[key] = self.get_ingredient(id=reactant.id).amount
 				if key in color_mapper:
 					colors[key] = color_mapper[key]
 				else:
@@ -42,6 +47,7 @@ class Recipe:
 		for product in self.products:
 			key = str(product)
 			graph.add_node(key)
+			sizes[key] = product.amount
 			if key in color_mapper:
 				colors[key] = color_mapper[key]
 			else:
@@ -51,14 +57,16 @@ class Recipe:
 			for reactant in reaction.reactants:
 				graph.add_edge(str(reactant), str(reaction.product))
 
-		logger.var('#nodes', len(graph))
-		logger.var('#colors', len(colors))
+		# rescale sizes
+		s_min = min(sizes.values())
+		sizes = [s/s_min*node_size for s in sizes.values()]
 
+		# pos = nx.spring_layout(graph, iterations=200, k=30)
 		pos = nx.spring_layout(graph)
 
 		import matplotlib as plt
 		# return nx.draw(graph, pos, with_labels=True, font_weight='bold')
-		return nx.draw(graph, pos, with_labels=True, font_weight='bold', node_color=list(colors.values()))
+		return nx.draw(graph, pos=pos, with_labels=True, font_weight='bold', node_color=list(colors.values()), node_size=sizes)
 
 	def summary(self):
 		
@@ -68,6 +76,10 @@ class Recipe:
 		for product in self.products:
 			logger.var(str(product), product.amount, dict(unit='mg'))
 
+		logger.var('\n#intermediates', len(self.intermediates))
+		for intermediate in self.intermediates:
+			logger.var(str(intermediate), intermediate.amount, dict(unit='mg'))
+
 		logger.var('\n#reactants', len(self.reactants))
 		for reactant in self.reactants:
 			logger.var(str(reactant), reactant.amount, dict(unit='mg'))
@@ -75,3 +87,6 @@ class Recipe:
 		logger.var('\n#reactions', len(self.reactions))
 		for reaction in self.reactions:
 			logger.var(str(reaction), reaction.reaction_str, dict(unit=reaction.type))
+
+	def get_ingredient(self, id):
+		return [r for r in self.reactants + self.products + self.intermediates if r.id == id][0]

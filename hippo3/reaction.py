@@ -80,11 +80,12 @@ class Reaction:
 
 		return reactants
 
-	def get_ingredients(self, amount, return_reactions=False):
+	def get_ingredients(self, amount, return_reactions=False, return_intermediates=False):
 
 		"""recursively assemble a list of ingredients and reactions required to make the compound"""
 
 		ingredients = []
+		intermediates = []
 		reax = []
 
 		pairs = self.get_reactant_amount_pairs()
@@ -100,10 +101,13 @@ class Reaction:
 			if reactions:
 				assert len(reactions) == 1
 				reaction = reactions[0]
-				_ingredients, _reactions = reaction.get_ingredients(reactant_amount, return_reactions=True)
+				_ingredients, _reactions, _intermediates = reaction.get_ingredients(reactant_amount, return_reactions=True, return_intermediates=True)
 
 				ingredients += _ingredients
 				reax += _reactions
+				intermediates += _intermediates
+
+				intermediates.append(reaction.product.as_ingredient(reactant_amount))
 
 				reax.append(reaction)
 
@@ -111,11 +115,22 @@ class Reaction:
 				ingredient = reactant.as_ingredient(reactant_amount)
 				ingredients.append(ingredient)
 
+		output = [ingredients]
+
 		if return_reactions:
 			reax.append(self)
-			return ingredients, reax
-			
-		return ingredients
+			output.append(reax)
+
+		if return_intermediates:
+			output.append(intermediates)
+
+		match len(output):
+			case 1:
+				return output[0]
+			case 2:
+				return output[0], output[1]
+			case 3:
+				return output[0], output[1], output[2]
 
 	def get_recipe(self, 
 		amount: float = 1, # in mg
@@ -123,9 +138,9 @@ class Reaction:
 
 		products = [self.product.as_ingredient(amount=amount)]
 
-		reactants, reactions = self.get_ingredients(amount=amount, return_reactions=True)
+		reactants, reactions, intermediates = self.get_ingredients(amount=amount, return_reactions=True, return_intermediates=True)
 
-		recipe = Recipe(products=products, reactants=reactants, reactions=reactions)
+		recipe = Recipe(products=products, reactants=reactants, reactions=reactions, intermediates=intermediates)
 		
 		return recipe
 
@@ -181,4 +196,3 @@ class Reaction:
 			return False
 
 		return True
-		

@@ -156,6 +156,7 @@ class CompoundSubset(CompoundSet):
 		products = []
 		reactants = []
 		reactions = []
+		intermediates = []
 
 		for comp, a in zip(self, amount):
 
@@ -179,7 +180,12 @@ class CompoundSubset(CompoundSet):
 				if not matches:
 					reactions.append(reaction) 
 
-		return Recipe(products=products, reactants=reactants, reactions=reactions)
+			for intermediate in recipe.intermediates:
+				matches = [r for r in intermediates if r.id == intermediate.id]
+				if not matches:
+					intermediates.append(intermediate) 
+
+		return Recipe(products=products, reactants=reactants, reactions=reactions, intermediates=intermediates)
 
 	### DUNDERS
 
