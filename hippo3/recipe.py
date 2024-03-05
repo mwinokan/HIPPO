@@ -22,7 +22,7 @@ class Recipe:
 	# list of Reaction objects
 	reactions: list = field(default_factory=list)
 
-	def draw(self, color_mapper = None, node_size=300):
+	def draw(self, color_mapper = None, node_size=300, graph_only=False):
 
 		"""draw graph of the reaction network"""
 
@@ -64,9 +64,52 @@ class Recipe:
 		# pos = nx.spring_layout(graph, iterations=200, k=30)
 		pos = nx.spring_layout(graph)
 
-		import matplotlib as plt
-		# return nx.draw(graph, pos, with_labels=True, font_weight='bold')
-		return nx.draw(graph, pos=pos, with_labels=True, font_weight='bold', node_color=list(colors.values()), node_size=sizes)
+		if graph_only:
+			return graph
+		else:
+			import matplotlib as plt
+			# return nx.draw(graph, pos, with_labels=True, font_weight='bold')
+			return nx.draw(graph, pos=pos, with_labels=True, font_weight='bold', node_color=list(colors.values()), node_size=sizes)
+
+	def sankey(self):
+
+		graph = self.draw(graph_only=True)
+
+		import plotly.graph_objects as go
+
+		nodes = {}
+
+		for edge in graph.edges:
+
+			c = edge[0]
+			if c not in nodes:
+				nodes[c] = len(nodes)
+
+			c = edge[1]
+			if c not in nodes:
+				nodes[c] = len(nodes)
+
+		source = [nodes[a] for a,b in graph.edges]
+		target = [nodes[b] for a,b in graph.edges]
+		value = [1 for l in graph.edges]
+		
+		labels = list(nodes.keys())
+
+		fig = go.Figure(data=[go.Sankey(
+				node = dict(
+				# pad = 15,
+				# thickness = 20,
+				# line = dict(color = "black", width = 0.5),
+				label = labels,
+				# color = "blue"
+			),
+				link = dict(
+				source = source,
+				target = target,
+				value = value,
+		))])
+
+		return fig
 
 	def summary(self):
 		
