@@ -1,0 +1,52 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+[project]
+name = "MolParse"
+version = "0.0.13"
+authors = [
+    { name = "Max Winokan", email = "max@winokan.com" },
+]
+description = "Package for parsing, writing, and modifying molecular structure files"
+readme = "README.md"
+requires-python = ">=3.9"
+requires = []
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "mpytools >= 0.0.9",
+    "numpy",
+    "matplotlib",
+    "plotly",
+    "ase",
+    "rdkit",
+    "py3Dmol",
+    "IPython",
+    "kaleido",
+]
+[project.urls]
+"Homepage" = "https://github.com/mwinokan/MolParse"
+"Bug Tracker" = "https://github.com/mwinokan/MolParse/issues"
+[tool.hatch.build]
+include = [
+    "molparse/*.py",
+    "molparse/dl_poly/*.py",
+    "molparse/dna/*.py",
+    "molparse/ndfes/*.py",
+    "molparse/hijack/*.py",
+    "molparse/monte/*.py",
+    "molparse/mutate/*.py",
+    "molparse/rdkit/*.py",
+    "molparse/signal/*.py",
+    "molparse/sites/*.py",
+    "molparse/styles/*.py",
+    "molparse/tunnel/*.py",
+    "molparse/units/*.py",
+    "molparse/ref/*.pdb",
+    "tests/*.py",
+    "molxvg",
+    "moltree",
+]
