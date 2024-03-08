@@ -5,6 +5,9 @@ import pandas as pd
 import mout
 import plotly.graph_objects as go
 
+import logging
+logger = logging.getLogger('HIPPO')
+
 '''
 
 	ALL GRAPHS DEFINED HERE SHOULD:
@@ -133,13 +136,15 @@ def plot_interaction_histogram(animal, poses, feature_metadata, subtitle=None,):
 	return fig
 
 @hippo_graph
-def plot_interaction_punchcard(animal, poses, subtitle=None, opacity=1.0):
+def plot_interaction_punchcard(animal, poses, subtitle=None, opacity=1.0, group='pose_id'):
 
 	import plotly
 
 	plot_data = []
 
 	categoryarray = {}
+
+	logger.debug(f'{poses=}')
 
 	for pose in poses:
 
@@ -164,7 +169,9 @@ def plot_interaction_punchcard(animal, poses, subtitle=None, opacity=1.0):
 			data['chain_name'] = f.chain_name
 			data['atom_names'] = f.atom_names
 			
-			data['pose'] = pose.name
+			data['pose_name'] = pose.name
+			data['pose_longname'] = pose.longname
+			data['pose_id'] = str(pose)
 
 			data['chain_res_name_number_str'] = f.chain_res_name_number_str
 
@@ -175,7 +182,7 @@ def plot_interaction_punchcard(animal, poses, subtitle=None, opacity=1.0):
 
 	plot_df = pd.DataFrame(plot_data)
 
-	plot_df = plot_df.sort_values('pose')
+	plot_df = plot_df.sort_values(group)
 
 	title = 'Interaction Punch-Card'
 
@@ -184,7 +191,7 @@ def plot_interaction_punchcard(animal, poses, subtitle=None, opacity=1.0):
 	else:
 		title = f'<b>{animal.name}</b>: {title}'
 
-	fig = px.scatter(plot_df, x='chain_res_name_number_str', y='family',marginal_x='histogram',marginal_y='histogram', hover_data=plot_df.columns, color='pose', title=title)
+	fig = px.scatter(plot_df, x='chain_res_name_number_str', y='family',marginal_x='histogram',marginal_y='histogram', hover_data=plot_df.columns, color=group, title=title)
 	
 	fig.update_layout(title=title,title_automargin=False, title_yref='container')
 
@@ -453,6 +460,8 @@ def plot_compound_property(animal, prop, style='bar', null=None):
 				# get attr
 				if hasattr(comp,p):
 					v = getattr(comp,p)
+				elif p in comp.metadata:
+					v = comp.metadata[p]
 				else:
 					v = null
 
@@ -518,6 +527,8 @@ def plot_pose_property(animal, prop, poses=None, style='bar', null=None):
 				# get attr
 				if hasattr(pose,p):
 					v = getattr(pose,p)
+				elif p in pose.metadata:
+					v = pose.metadata[p]
 				else:
 					v = null
 

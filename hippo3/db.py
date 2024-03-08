@@ -317,11 +317,13 @@ class Database:
 
 	def insert_compound(self, 
 		*,
-		# name: str, 
 		smiles: str, 
 		base: Compound | int | None = None, 
 		tags: None | list = None, 
 		warn_duplicate=True,
+		commit=True,
+		metadata=None,
+		inchikey: str = None, 
 	) -> int:
 
 		# process the base
@@ -330,8 +332,13 @@ class Database:
 		if base and not isinstance(base,int):
 			base = base.id
 
+		# logger.debug(f'{base=}')
+
 		# generate the inchikey name
-		name = inchikey_from_smiles(smiles)
+		if inchikey:
+			name = inchikey
+		else:
+			name = inchikey_from_smiles(smiles)
 
 		# logger.debug(f'{smiles} --> {name}')
 
@@ -365,18 +372,20 @@ class Database:
 
 		except Exception as e:
 			logger.exception(e)
-			
+
 		compound_id = self.cursor.lastrowid
+		if commit:
+			self.commit()
 
 		### register the tags
 
 		if tags:
 			for tag in tags:
-				self.insert_tag(name=tag, compound=compound_id)
+				self.insert_tag(name=tag, compound=compound_id, commit=commit)
 
 		### register the binary fingerprints
 
-		result = self.insert_compound_pattern_bfp(compound_id)
+		result = self.insert_compound_pattern_bfp(compound_id, commit=commit)
 
 		if not result:
 			logger.error('Could not insert compound pattern bfp')
@@ -388,9 +397,12 @@ class Database:
 		# if not result:
 		# 	logger.error('Could not insert compound morgan bfp')
 
+		if metadata:
+			self.insert_metadata(table='compound', id=compound_id, payload=metadata, commit=commit)
+
 		return compound_id
 
-	def insert_compound_pattern_bfp(self, compound_id):
+	def insert_compound_pattern_bfp(self, compound_id, commit=True):
 
 		sql = """
 		INSERT INTO compound_pattern_bfp(compound_id, fp)
@@ -406,6 +418,8 @@ class Database:
 			logger.exception(e)
 
 		bfp_id = self.cursor.lastrowid
+		if commit:
+			self.commit()
 
 		return bfp_id
 
@@ -425,6 +439,7 @@ class Database:
 			logger.exception(e)
 
 		mfp_id = self.cursor.lastrowid
+		self.commit()
 
 		return mfp_id
 
@@ -437,20 +452,30 @@ class Database:
 		reference: int | None = None,
 		tags: None | list = None,
 		metadata: None | dict = None,
+		commit: bool = True,
+		longname: str = None,
+		warn_duplicate: bool = True,
 	):
 
 		if isinstance(compound, int):
 			compound = self.get_compound(id=compound)
 
+		if isinstance(reference, int):
+			reference = self.get_pose(id=reference)
+
 		assert isinstance(compound, Compound), f'incompatible {compound}'
 		assert name, f'incompatible name={name}'
-		assert isinstance(reference, int) or reference is None, f'incompatible name={name}'
+		assert isinstance(reference, Pose) or reference is None, f'incompatible pose={name}'
+
+		if reference:
+			reference = reference.id
 
 		if isinstance(target, str):
 			target = self.get_target_id(name=target)
 		target_name = self.get_target_name(id=target)
 		
-		longname = f'{compound.name} {target_name} {name}'
+		if not longname:
+			longname = f'{compound.name} {target_name} {name}'
 
 		if path:
 
@@ -473,35 +498,38 @@ class Database:
 
 		except sqlite3.IntegrityError as e:
 			if 'UNIQUE constraint failed: pose.pose_longname' in str(e):
-				logger.warning(f"Skipping pose with existing longname \"{longname}\"")
+				if warn_duplicate:
+					logger.warning(f"Skipping pose with existing longname \"{longname}\"")
 			elif 'UNIQUE constraint failed: pose.pose_path' in str(e):
-				logger.warning(f"Skipping pose with existing path \"{longname}\"")
+				if warn_duplicate:
+					logger.warning(f"Skipping pose with existing path \"{longname}\"")
 			else:
 				logger.exception(e)
+			return None
 
 		except Exception as e:
 			logger.exception(e)
-
-		finally:
+			raise
 			
-			pose_id = self.cursor.lastrowid
+		pose_id = self.cursor.lastrowid
+		if commit:
+			self.commit()
 
-			if tags:
-				for tag in tags:
-					self.insert_tag(name=tag, pose=pose_id)
+		if tags:
+			for tag in tags:
+				self.insert_tag(name=tag, pose=pose_id, commit=commit)
 
-			if metadata:
-				self.insert_metadata(table='pose', id=pose_id, payload=metadata)
+		if metadata:
+			self.insert_metadata(table='pose', id=pose_id, payload=metadata, commit=commit)
 
-			return pose_id
-
-		return None
+		return pose_id
 
 	def insert_tag(self, 
 		*,
 		name, 
 		compound: int = None, 
-		pose: int = None
+		pose: int = None,
+		commit: bool = True,
 	):
 
 		assert compound or pose
@@ -527,6 +555,8 @@ class Database:
 
 		finally:
 			tag_id = self.cursor.lastrowid
+			if commit:
+				self.commit()
 			return tag_id
 
 		return None
@@ -535,6 +565,7 @@ class Database:
 		*,
 		original: Pose, 
 		derivative: Pose,
+		warn_duplicate: bool = True,
 	) -> int:
 
 		assert isinstance(original, Pose), f'incompatible {original=}'
@@ -549,16 +580,16 @@ class Database:
 			self.execute(sql, (original.id, derivative.id))
 
 		except sqlite3.IntegrityError as e:
-			logger.warning(f"Skipping existing inspiration: {original} {derivative}")
+			if warn_duplicate:
+				logger.warning(f"Skipping existing inspiration: {original} {derivative}")
+			return None
 
 		except Exception as e:
 			logger.exception(e)
 
-		finally:
-			inspiration_id = self.cursor.lastrowid
-			return inspiration_id
-
-		return None
+		inspiration_id = self.cursor.lastrowid
+		self.commit()
+		return inspiration_id
 
 	def insert_reaction(self,
 		*,
@@ -587,6 +618,7 @@ class Database:
 		finally:
 			
 			reaction_id = self.cursor.lastrowid
+			self.commit()
 			return reaction_id
 
 		return None
@@ -595,7 +627,7 @@ class Database:
 		*,
 		compound: Compound,
 		reaction: Reaction,
-		amount: float,
+		amount: float = 1.0,
 	) -> int:
 
 		if isinstance(reaction, int):
@@ -624,6 +656,7 @@ class Database:
 		finally:
 			
 			reactant_id = self.cursor.lastrowid
+			self.commit()
 			return reactant_id
 
 		return None
@@ -677,6 +710,7 @@ class Database:
 			return None
 			
 		quote_id = self.cursor.lastrowid
+		self.commit()
 		return quote_id
 
 	def insert_target(self,
@@ -700,6 +734,7 @@ class Database:
 			logger.exception(e)
 			
 		target_id = self.cursor.lastrowid
+		self.commit()
 		return target_id
 
 	def insert_feature(self,
@@ -740,19 +775,22 @@ class Database:
 		finally:
 			
 			target_id = self.cursor.lastrowid
+			self.commit()
 			return target_id
 
 		return None
 
 	def insert_metadata(self,
+		*,
 		table: str,
 		id: int,
 		payload: dict,
+		commit: bool = True,
 	) -> None:
 
 		payload = json.dumps(payload)
 
-		self.update(table=table, id=id, key=f'{table}_metadata', value=payload)
+		self.update(table=table, id=id, key=f'{table}_metadata', value=payload, commit=commit)
 
 	### SELECTION
 
@@ -774,6 +812,7 @@ class Database:
 		return result
 
 	def select_where(self, query, table, key, value, multiple=False, none='error', sort=None):
+
 		if isinstance(value, str):
 			value = f"'{value}'"
 
@@ -816,6 +855,7 @@ class Database:
 
 		try:
 			result = self.execute(sql)
+			self.commit()
 
 		except sqlite3.OperationalError as e:
 			logger.var('sql',sql)
@@ -826,7 +866,13 @@ class Database:
 
 	### UPDATE
 
-	def update(self, table, id, key, value):
+	def update(self, *, 
+		table: str, 
+		id: int, 
+		key: str, 
+		value, 
+		commit: bool = True,
+	):
 
 		# sql = f"""
 		# UPDATE ?1
@@ -848,6 +894,8 @@ class Database:
 			raise
 
 		id = self.cursor.lastrowid
+		if commit:
+			self.commit()
 		return id
 
 	### GETTERS
@@ -899,12 +947,13 @@ class Database:
 		*,
 		table: str = 'pose',
 		id: int | None = None,
+		name: str = None,
 		longname: str | None = None,
-		smiles: str | None = None,
+		# smiles: str | None = None,
 	) -> Pose:
 		
 		if id is None:
-			id = self.get_pose_id(longname=longname)
+			id = self.get_pose_id(longname=longname, name=name)
 
 		if not id:
 			logger.error(f'Invalid {id=}')
@@ -919,10 +968,17 @@ class Database:
 		*,
 		table: str = 'pose',
 		longname: str | None = None, 
+		name: str | None = None, 
 	) -> int:
-			
-		entry = self.select_id_where(table=table, key='longname', value=longname)
 
+		if name:
+			entry = self.select_id_where(table=table, key='name', value=name)
+
+		elif longname:
+			entry = self.select_id_where(table=table, key='longname', value=longname)
+		else:
+			raise NotImplementedError
+			
 		if entry:
 			return entry[0]
 

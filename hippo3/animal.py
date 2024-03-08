@@ -5,6 +5,10 @@ from .cset import CompoundSet
 from .pset import PoseSet
 from .tags import TagSet
 from .rset import ReactionSet
+from .compound import Compound
+from .reaction import Reaction
+from .target import Target
+from .pose import Pose
 
 from .db import Database
 from pathlib import Path
@@ -82,9 +86,9 @@ class HIPPO:
 	def tags(self):
 		return self._tags
 	
-	### MAIN METHODS
+	### BULK INSERTION
 
-	def add_hits(self, target_name, metadata_csv, aligned_directory, skip=None, debug=False):
+	def add_hits(self, target_name, metadata_csv, aligned_directory, skip=None, debug=False, test=False):
 
 		""" Pass in a generator to the aligned directory from a Fragalysis download"""
 
@@ -125,9 +129,12 @@ class HIPPO:
 
 			assert len(sdfs) == 1, (path, sdfs)
 			assert len(pdbs) == 1, (path, pdbs)
+
+			# logger.var('sdfs[0]',sdfs[0])
+			# logger.var('PandasTools', PandasTools.__file__)
 			
 			# load the SDF
-			df = PandasTools.LoadSDF(sdfs[0])
+			df = PandasTools.LoadSDF(str(sdfs[0]), molColName='ROMol', idName='ID', strictParsing=True)
 
 			# extract fields
 			observation_shortname = path.name.replace('.sdf','')
@@ -198,19 +205,129 @@ class HIPPO:
 			if pose_id:
 				count_poses_registered += 1
 
+			if test:
+				break
+
 		logger.var('#directories parsed', count_directories_tried)
 		logger.var('#compounds registered', count_compound_registered)
 		logger.var('#poses registered', count_poses_registered)
 
 		return meta_df
 
-	# def calculate_fingerprints(self, poses):
+	### SINGLE INSERTION
 
-	# 	# group by reference ID??? Use an SQL select query to construct a PoseSubset with the groups
+	def register_compound(self, 
+		*,
+		smiles: str, 
+		base: Compound | int | None = None, 
+		tags: None | list = None, 
+		metadata: None | dict = None,
+		return_compound: bool = True,
+	) -> Compound:
 
-	# 	...
+		"""Use a smiles string to add a compound to the database. If it already exists return the compound"""
 
+		smiles = sanitise_smiles(smiles)
+		inchikey = inchikey_from_smiles(smiles)
 
+		compound_id = self.db.insert_compound(
+			smiles=smiles, base=base, inchikey=inchikey, tags=tags, 
+			metadata=metadata, warn_duplicate=False, commit=True)
+
+		if return_compound or metadata:
+			if not compound_id:
+				compound = self.compounds[inchikey]
+			else:
+				compound = self.compounds[compound_id]
+
+			if metadata:
+				compound.metadata.update(metadata)
+
+			return compound
+
+		else:
+			if not compound_id:
+				compound_id = self.db.get_compound_id(name=inchikey)
+			return compound_id
+
+	def register_reaction(self,
+		*,
+		type: str,
+		product: Compound,
+		reactants: list[Compound | int],
+	) -> Reaction:
+
+		### CHECK FOR DUPLICATES
+		
+		reactant_ids = set(v if isinstance(v, int) else v.id for v in reactants)
+		
+		for reaction in product.reactions:
+
+			if reaction.type != type:
+				continue
+
+			if reaction.product != product:
+				continue
+
+			if reaction.reactant_ids != reactant_ids:
+				continue
+
+			return reaction
+
+		reaction_id = self.db.insert_reaction(type=type, product=product)
+
+		for reactant in reactants:
+			self.db.insert_reactant(compound=reactant, reaction=reaction_id)
+
+		return self.reactions[reaction_id]
+
+	def register_target(self,
+		*,
+		name: str,
+	) -> Target:
+		
+		target_id = self.db.insert_target(name=name)
+
+		if not target_id:
+			target_id = self.db.get_target_id(name=name)
+
+		return self.db.get_target(id=target_id)
+
+	def register_pose(self,
+		*,
+		compound: Compound | int,
+		name: str,
+		target: str,
+		path: str | None = None,
+		reference: int | None = None,
+		tags: None | list = None,
+		metadata: None | dict = None,
+		inspirations: None | list = None,
+		return_pose: bool = True,
+	) -> Pose:
+
+		longname = f'{compound.name} {target} {name}'
+		
+		pose_id = self.db.insert_pose(
+			compound=compound, longname=longname, name=name, target=target, path=path, 
+			tags=tags, metadata=metadata, reference=reference, warn_duplicate=False)
+
+		if return_pose:
+			if not pose_id:
+				pose = self.poses[longname]
+				pose.metadata.update(metadata)
+			else:
+				pose = self.poses[pose_id]
+		else:
+			if not pose_id:
+				pose_id = self.db.get_pose_id(longname=longname)
+			pose = pose_id
+
+		inspirations = inspirations or []
+		for inspiration in inspirations:
+			self.db.insert_inspiration(original=inspiration, derivative=pose, warn_duplicate=False)
+
+		return pose
 
 	### PLOTTING
 

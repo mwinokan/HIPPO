@@ -33,6 +33,11 @@ class PoseSet:
 	def table(self) -> str:
 		return self._table
 
+	@property
+	def names(self):
+		result = self.db.select(table=self.table, query='pose_name', multiple=True)
+		return [q for q, in result]
+
 	### METHODS
 
 	def get_by_tag(self,tag):
@@ -47,12 +52,26 @@ class PoseSet:
 		match key:
 
 			case int():
-				return self.db.get_pose(id=key)
+				if key == 0:
+					return self.__getitem__(key=1)
+
+				if key < 0:
+					key = len(self) + 1 + key
+					return self.__getitem__(key=key)
+
+				else:
+					return self.db.get_pose(table=self.table, id=key)
 
 			case str():
-				return self.db.get_pose(longname=key)
+				if len(key.split(' ')) > 1:
+					return self.db.get_pose(longname=key)
+				else:
+					return self.db.get_pose(name=key)
 
 			case list():
+				return PoseSubset(self.db, self.table, key)
+
+			case tuple():
 				return PoseSubset(self.db, self.table, key)
 
 			case slice():
@@ -66,7 +85,7 @@ class PoseSet:
 				return self[indices]
 
 			case _:
-				logger.error(f'Unsupported type for CompoundSet.__getitem__(): {type(key)}')
+				logger.error(f'Unsupported type for PoseSet.__getitem__(): {type(key)}')
 
 		return None
 
@@ -88,7 +107,6 @@ class PoseSubset(PoseSet):
 		table: str = 'pose',
 		indices: list = None,
 	):
-
 		self._db = db
 		self._table = table
 
@@ -96,12 +114,17 @@ class PoseSubset(PoseSet):
 
 		self._indices = indices
 
-	def __getitem__(self, key) -> Pose:
-		raise NotImplementedError
+	### PROPERTIES
 
 	@property
 	def indices(self):
 		return self._indices
+
+	@property
+	def names(self):
+		return [self.db.select_where(table=self.table, query='pose_name', key='id', value=i, multiple=False)[0] for i in self.indices]
+
+	### DUNDERS
 
 	def __repr__(self) -> str:
 		return f'{mcol.bold}{mcol.underline}subset(P x {len(self)}){mcol.unbold}{mcol.ununderline}'
@@ -110,4 +133,12 @@ class PoseSubset(PoseSet):
 		return len(self.indices)
 
 	def __iter__(self):
-		return iter(self.db.get_compound(table=self.table, id=i) for i in self.indices)
+		return iter(self.db.get_pose(table=self.table, id=i) for i in self.indices)
+
+	def __getitem__(self, key) -> Pose:
+		try:
+			index = self.indices[key]
+		except IndexError:
+			logger.exception(f'list index out of range: {key=} for {self}')
+			raise
+		return self.db.get_pose(table=self.table, id=index)

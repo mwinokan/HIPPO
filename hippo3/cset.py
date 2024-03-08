@@ -46,7 +46,7 @@ class CompoundSet:
 	def ids(self):
 		result = self.db.select(table=self.table, query='compound_id', multiple=True)
 		return [q for q, in result]
-
+	
 	### METHODS
 
 	def get_by_tag(self,tag):
@@ -121,9 +121,6 @@ class CompoundSubset(CompoundSet):
 
 		self._indices = indices
 
-	def __getitem__(self, key) -> Compound:
-		raise NotImplementedError
-
 	### PROPERTIES
 
 	@property
@@ -133,6 +130,10 @@ class CompoundSubset(CompoundSet):
 	@property
 	def ids(self):
 		return self.indices
+
+	@property
+	def names(self):
+		return [self.db.select_where(table=self.table, query='compound_name', key='id', value=i, multiple=False)[0] for i in self.indices]
 
 	### METHODS
 
@@ -197,3 +198,11 @@ class CompoundSubset(CompoundSet):
 
 	def __iter__(self):
 		return iter(self.db.get_compound(table=self.table, id=i) for i in self.indices)
+
+	def __getitem__(self, key) -> Compound:
+		try:
+			index = self.indices[key]
+		except IndexError:
+			logger.exception(f'list index out of range: {key=} for {self}')
+			raise
+		return self.db.get_pose(table=self.table, id=index)

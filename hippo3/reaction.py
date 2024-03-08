@@ -51,7 +51,8 @@ class Reaction:
 
 	@property
 	def reactants(self):
-		return [v[0] for v in self.get_reactant_amount_pairs()]
+		from .cset import CompoundSubset
+		return CompoundSubset(self.db, indices=self.reactant_ids)
 
 	@property
 	def reaction_str(self):
@@ -61,7 +62,7 @@ class Reaction:
 
 	@property
 	def reactant_ids(self):
-		return set(v[0].id for v in self.get_reactant_amount_pairs())
+		return set(v for v in self.get_reactant_ids())
 
 	@property
 	def product_id(self):
@@ -79,6 +80,15 @@ class Reaction:
 			return []
 
 		return reactants
+
+	def get_reactant_ids(self) -> list[Compound]:
+
+		compound_ids = self.db.select_where(query='reactant_compound', table='reactant', key='reaction', value=self.id, multiple=True)
+
+		if compound_ids:
+			return [id for id, in compound_ids]
+		else:
+			return []
 
 	def get_ingredients(self, amount, return_reactions=False, return_intermediates=False):
 

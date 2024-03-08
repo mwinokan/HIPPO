@@ -60,6 +60,7 @@ class Pose:
 			fingerprint = pickle.loads(fingerprint)		
 		self._fingerprint = fingerprint
 
+		# print(f'{self}{metadata=}')
 		self._metadata = metadata
 		self._tags = None
 		self._table = 'pose'
@@ -122,16 +123,30 @@ class Pose:
 	def mol(self):
 		if not self._mol and self.path:
 
-			assert self.path.endswith('.pdb')
+			if self.path.endswith('.pdb'):
 
-			# logger.reading(self.path)
-			sys = mp.parse(self.path, verbosity=False)
-			self._protein_system = sys.protein_system
-			lig_residues = sys['rLIG']
-			if len(lig_residues) > 1:
-				logger.warning('Multiple ligands in PDB')
-			lig_res = lig_residues[0]
-			self.mol = lig_res.rdkit_mol
+				# logger.reading(self.path)
+				sys = mp.parse(self.path, verbosity=False)
+				
+				self.protein_system = sys.protein_system
+				
+				lig_residues = sys['rLIG']
+				if len(lig_residues) > 1:
+					logger.warning('Multiple ligands in PDB')
+				lig_res = lig_residues[0]
+				
+				self.mol = lig_res.rdkit_mol
+
+			elif self.path.endswith('.mol'):
+
+				# logger.reading(self.path)
+				mol = mp.parse(self.path, verbosity=False)
+				self.mol = mol
+
+			else:
+
+				raise NotImplementedError
+
 		return self._mol
 
 	@mol.setter
@@ -141,8 +156,15 @@ class Pose:
 
 	@property
 	def protein_system(self):
+		if self._protein_system is None and self.path.endswith('.pdb'):
+			# logger.debug(f'getting pose protein system {self}')
+			self.protein_system = mp.parse(self.path, verbosity=False).protein_system
 		return self._protein_system
-	
+
+	@protein_system.setter
+	def protein_system(self, a):
+		# logger.debug(f'setting {self} protein_system')
+		self._protein_system = a
 
 	@property
 	def metadata(self):
@@ -214,63 +236,82 @@ class Pose:
 	def get_inspirations(self):
 		inspirations = self.db.select_where(query='inspiration_original', table='inspiration', key='derivative', value=self.id, multiple=True, none='quiet')
 		
+		from .pset import PoseSubset
+
 		if inspirations:
-			inspirations = [self.db.get_pose(id=id[0]) for id in inspirations]
+			inspirations = [id for id, in inspirations]
+			inspirations = PoseSubset(self.db, indices=inspirations)
 
 		return inspirations
 
 	def calculate_fingerprint(self):
 
 		if self.path.endswith('.pdb'):
-
-			import molparse as mp
-
-			comp_features = self.features
 			
+			import molparse as mp
 			protein_system = self.protein_system
 			if not self.protein_system:
 				# logger.reading(self.path)
 				protein_system = mp.parse(self.path, verbosity=False).protein_system
 
-			comp_features_by_family = {}
-			for family in FEATURE_FAMILIES:
-				comp_features_by_family[family] = [f for f in comp_features if f.family == family]
+		elif self.path.endswith('.mol') and self.reference:
 
-			protein_features = self.target.features
-			if not protein_features:
-				protein_features = self.target.calculate_features(protein_system)
-
-			fingerprint = {}
-
-			for prot_feature in protein_features:
-
-				prot_family = prot_feature.family
-
-				prot_residue = protein_system.get_chain(prot_feature.chain_name).residues[f'n{prot_feature.residue_number}']
-
-				if not prot_residue:
-					continue
-
-				prot_atoms = [prot_residue.get_atom(a).np_pos for a in prot_feature.atom_names.split(' ')]
-				
-				prot_coord = np.array(np.sum(prot_atoms,axis=0)/len(prot_atoms))
-
-				complementary_family = COMPLEMENTARY_FEATURES[prot_family]
-
-				complementary_comp_features = comp_features_by_family[complementary_family]
-
-				cutoff = FEATURE_PAIR_CUTOFFS[f'{prot_family} {complementary_family}']
-
-				valid_features = [f for f in complementary_comp_features if np.linalg.norm(f - prot_coord) <= cutoff]
-
-				fingerprint[prot_feature.id] = len(valid_features)
-
-			self.fingerprint = fingerprint
+			logger.debug('fingerprint from .mol and reference pose')
+			protein_system = self.reference.protein_system
 
 		else:
 
 			logger.debug('calculate_fingerprint()')
 			raise NotImplementedError
+
+		assert protein_system
+
+		comp_features = self.features
+
+		comp_features_by_family = {}
+		for family in FEATURE_FAMILIES:
+			comp_features_by_family[family] = [f for f in comp_features if f.family == family]
+
+		protein_features = self.target.features
+		if not protein_features:
+			protein_features = self.target.calculate_features(protein_system)
+
+		fingerprint = {}
+
+		for prot_feature in protein_features:
+
+			prot_family = prot_feature.family
+
+			prot_residue = protein_system.get_chain(prot_feature.chain_name).residues[f'n{prot_feature.residue_number}']
+
+			if not prot_residue:
+				continue
+
+			prot_atoms = [prot_residue.get_atom(a).np_pos for a in prot_feature.atom_names.split(' ')]
+			
+			prot_coord = np.array(np.sum(prot_atoms,axis=0)/len(prot_atoms))
+
+			complementary_family = COMPLEMENTARY_FEATURES[prot_family]
+
+			complementary_comp_features = comp_features_by_family[complementary_family]
+
+			cutoff = FEATURE_PAIR_CUTOFFS[f'{prot_family} {complementary_family}']
+
+			valid_features = [f for f in complementary_comp_features if np.linalg.norm(f - prot_coord) <= cutoff]
+
+			fingerprint[prot_feature.id] = len(valid_features)
+
+		self.fingerprint = fingerprint
+
+	def draw(self):
+		
+		assert self.inspirations
+
+		from molparse.rdkit import draw_mols
+
+		mols = [self.mol] + [i.mol for i in self.inspirations]
+
+		return draw_mols(mols)
 
 	### DUNDERS
 

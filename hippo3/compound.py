@@ -83,7 +83,14 @@ class Compound:
 
 	@property
 	def base(self):
+		if isinstance(self._base, int):
+			self._base = self.db.get_compound(id=self._base)
 		return self._base
+
+	@base.setter
+	def base(self, b):
+		self._base = b
+		self.db.update(table='compound', id=self.id, key='compound_base', value=b)
 
 	@property
 	def table(self):
@@ -115,10 +122,11 @@ class Compound:
 
 	def get_tags(self) -> set:
 		tags = self.db.select_where(query='tag_name', table='tag', key='compound', value=self.id, multiple=True, none='quiet')
-		if tags:
-			return TagSubset(self, {t[0] for t in tags})
-		else:
-			return None
+		return TagSubset(self, {t[0] for t in tags})
+		# if tags:
+		# 	return TagSubset(self, {t[0] for t in tags})
+		# else:
+		# 	return None
 
 	def get_quotes(self, min_amount=None, supplier=None, max_lead_time=None, none='error', pick_cheapest=False, df=False) -> list[dict]:
 
@@ -185,6 +193,23 @@ class Compound:
 		)
 		
 		return Ingredient(self, amount, quote, max_lead_time, supplier)
+
+	def draw(self):
+
+		''' draw:
+
+		* compound
+		* base
+		* inspirations (move to Pose.draw())
+
+		'''
+
+		# print(self.inspirations)
+		print(self.base)
+
+		if self.base:
+			from molparse.rdkit import draw_mcs
+			return draw_mcs({self.base.smiles:str(self), self.smiles:f'{self.base} (base)'})
 
 	### DUNDERS
 

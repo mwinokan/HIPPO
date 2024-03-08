@@ -27,3 +27,6 @@ class MetaData(UserDict):
 		self.data.__delitem__(key)
 		self._update_db()
 
+	def update(self, data):
+		self.data.update(data)
+		self._update_db()
