@@ -2,14 +2,14 @@
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 [project]
-name = "MolParse"
-version = "0.0.13"
+name = "hippo-db"
+version = "0.3.0"
 authors = [
     { name = "Max Winokan", email = "max@winokan.com" },
 ]
-description = "Package for parsing, writing, and modifying molecular structure files"
+description = "Hit Interaction Profiling and Procurement Optimisation"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 requires = []
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -17,36 +17,13 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "mpytools >= 0.0.9",
-    "numpy",
-    "matplotlib",
-    "plotly",
-    "ase",
-    "rdkit",
-    "py3Dmol",
-    "IPython",
-    "kaleido",
+    "molparse >= 0.0.13",
+    "chemicalite",
 ]
 [project.urls]
-"Homepage" = "https://github.com/mwinokan/MolParse"
-"Bug Tracker" = "https://github.com/mwinokan/MolParse/issues"
+"Homepage" = "https://github.com/mwinokan/HIPPO"
+"Bug Tracker" = "https://github.com/mwinokan/HIPPO/issues"
 [tool.hatch.build]
 include = [
-    "molparse/*.py",
-    "molparse/dl_poly/*.py",
-    "molparse/dna/*.py",
-    "molparse/ndfes/*.py",
-    "molparse/hijack/*.py",
-    "molparse/monte/*.py",
-    "molparse/mutate/*.py",
-    "molparse/rdkit/*.py",
-    "molparse/signal/*.py",
-    "molparse/sites/*.py",
-    "molparse/styles/*.py",
-    "molparse/tunnel/*.py",
-    "molparse/units/*.py",
-    "molparse/ref/*.pdb",
-    "tests/*.py",
-    "molxvg",
-    "moltree",
+    "hippo3/*.py",
 ]
