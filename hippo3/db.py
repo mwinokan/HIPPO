@@ -103,9 +103,8 @@ class Database:
 			logger.exception(e)
 			raise
 		
-		finally:
-			self._connection = conn
-			self._cursor = conn.cursor()
+		self._connection = conn
+		self._cursor = conn.cursor()
 
 	def execute(self, sql, payload=None):
 		try:
@@ -553,19 +552,17 @@ class Database:
 		except Exception as e:
 			logger.exception(e)		
 
-		finally:
-			tag_id = self.cursor.lastrowid
-			if commit:
-				self.commit()
-			return tag_id
-
-		return None
+		tag_id = self.cursor.lastrowid
+		if commit:
+			self.commit()
+		return tag_id
 
 	def insert_inspiration(self, 
 		*,
 		original: Pose, 
 		derivative: Pose,
 		warn_duplicate: bool = True,
+		commit: bool = True,
 	) -> int:
 
 		assert isinstance(original, Pose), f'incompatible {original=}'
@@ -588,7 +585,9 @@ class Database:
 			logger.exception(e)
 
 		inspiration_id = self.cursor.lastrowid
-		self.commit()
+
+		if commit:
+			self.commit()
 		return inspiration_id
 
 	def insert_reaction(self,
@@ -596,6 +595,7 @@ class Database:
 		type: str,
 		product: Compound,
 		product_yield: float = 1.0,
+		commit: bool = True,
 	) -> int:
 
 		if isinstance(product, int):
@@ -614,20 +614,18 @@ class Database:
 
 		except Exception as e:
 			logger.exception(e)
-
-		finally:
 			
-			reaction_id = self.cursor.lastrowid
+		reaction_id = self.cursor.lastrowid
+		if commit:
 			self.commit()
-			return reaction_id
-
-		return None
+		return reaction_id
 
 	def insert_reactant(self,
 		*,
 		compound: Compound,
 		reaction: Reaction,
 		amount: float = 1.0,
+		commit: bool = True,
 	) -> int:
 
 		if isinstance(reaction, int):
@@ -652,14 +650,11 @@ class Database:
 
 		except Exception as e:
 			logger.exception(e)
-
-		finally:
 			
-			reactant_id = self.cursor.lastrowid
+		reactant_id = self.cursor.lastrowid
+		if commit:
 			self.commit()
-			return reactant_id
-
-		return None
+		return reactant_id
 
 	def insert_quote(self,
 		*,
@@ -771,14 +766,10 @@ class Database:
 
 		except Exception as e:
 			logger.exception(e)
-
-		finally:
 			
-			target_id = self.cursor.lastrowid
-			self.commit()
-			return target_id
-
-		return None
+		target_id = self.cursor.lastrowid
+		self.commit()
+		return target_id
 
 	def insert_metadata(self,
 		*,

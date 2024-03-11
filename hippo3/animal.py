@@ -223,6 +223,7 @@ class HIPPO:
 		tags: None | list = None, 
 		metadata: None | dict = None,
 		return_compound: bool = True,
+		commit: bool = True,
 	) -> Compound:
 
 		"""Use a smiles string to add a compound to the database. If it already exists return the compound"""
@@ -232,7 +233,7 @@ class HIPPO:
 
 		compound_id = self.db.insert_compound(
 			smiles=smiles, base=base, inchikey=inchikey, tags=tags, 
-			metadata=metadata, warn_duplicate=False, commit=True)
+			metadata=metadata, warn_duplicate=False, commit=commit)
 
 		if return_compound or metadata:
 			if not compound_id:
@@ -255,6 +256,7 @@ class HIPPO:
 		type: str,
 		product: Compound,
 		reactants: list[Compound | int],
+		commit: bool = True,
 	) -> Reaction:
 
 		### CHECK FOR DUPLICATES
@@ -274,10 +276,10 @@ class HIPPO:
 
 			return reaction
 
-		reaction_id = self.db.insert_reaction(type=type, product=product)
+		reaction_id = self.db.insert_reaction(type=type, product=product, commit=commit)
 
 		for reactant in reactants:
-			self.db.insert_reactant(compound=reactant, reaction=reaction_id)
+			self.db.insert_reactant(compound=reactant, reaction=reaction_id, commit=commit)
 
 		return self.reactions[reaction_id]
 
@@ -304,18 +306,19 @@ class HIPPO:
 		metadata: None | dict = None,
 		inspirations: None | list = None,
 		return_pose: bool = True,
+		commit: bool = True,
 	) -> Pose:
 
 		longname = f'{compound.name} {target} {name}'
 		
 		pose_id = self.db.insert_pose(
 			compound=compound, longname=longname, name=name, target=target, path=path, 
-			tags=tags, metadata=metadata, reference=reference, warn_duplicate=False)
+			tags=tags, metadata=metadata, reference=reference, warn_duplicate=False, commit=commit)
 
 		if return_pose:
 			if not pose_id:
 				pose = self.poses[longname]
-				pose.metadata.update(metadata)
+				pose.metadata.update(metadata, commit=commit)
 			else:
 				pose = self.poses[pose_id]
 		else:
@@ -325,7 +328,7 @@ class HIPPO:
 
 		inspirations = inspirations or []
 		for inspiration in inspirations:
-			self.db.insert_inspiration(original=inspiration, derivative=pose, warn_duplicate=False)
+			self.db.insert_inspiration(original=inspiration, derivative=pose, warn_duplicate=False, commit=commit)
 
 		return pose
 
