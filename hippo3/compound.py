@@ -89,8 +89,7 @@ class Compound:
 
 	@base.setter
 	def base(self, b):
-		self._base = b
-		self.db.update(table='compound', id=self.id, key='compound_base', value=b)
+		self.set_base(b)
 
 	@property
 	def table(self):
@@ -122,7 +121,7 @@ class Compound:
 
 	def get_tags(self) -> set:
 		tags = self.db.select_where(query='tag_name', table='tag', key='compound', value=self.id, multiple=True, none='quiet')
-		return TagSubset(self, {t[0] for t in tags})
+		return TagSubset(self, {t[0] for t in tags}, commit=False)
 		# if tags:
 		# 	return TagSubset(self, {t[0] for t in tags})
 		# else:
@@ -181,6 +180,10 @@ class Compound:
 			poses = [q for q in poses if q['target'] == target]
 
 		return poses
+
+	def set_base(self, base, commit=True):
+		self._base = base
+		self.db.update(table='compound', id=self.id, key='compound_base', value=base, commit=commit)
 
 	def as_ingredient(self, amount, max_lead_time=None, supplier=None):
 		

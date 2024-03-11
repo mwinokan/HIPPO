@@ -45,7 +45,8 @@ class TagSubset(MutableSet):
 	def __init__(self, 
 		parent, # Compound or Pose
 		tags=(), 
-		immutable=False
+		immutable=False,
+		commit=True,
 	):
 		
 		self._elements = []
@@ -53,7 +54,7 @@ class TagSubset(MutableSet):
 		self._parent = parent
 
 		for tag in tags:
-			self.add(tag)
+			self.add(tag, commit=commit)
 		
 	### FACTORIES
 
@@ -87,9 +88,9 @@ class TagSubset(MutableSet):
 		sql = f'DELETE FROM tag WHERE tag_name="{tag}" AND tag_{self.parent.table}={self.parent.id}'
 		self.db.execute(sql)
 
-	def _add_tag_to_db(self, tag):
+	def _add_tag_to_db(self, tag, commit=True):
 		payload = { 'name':tag, self.parent.table:self.parent.id }
-		self.db.insert_tag(**payload)
+		self.db.insert_tag(**payload, commit=commit)
 			
 
 	### METHODS
@@ -110,11 +111,11 @@ class TagSubset(MutableSet):
 		else:
 			raise ValueError(f'{tag} not in {self}')
 
-	def add(self, tag):
+	def add(self, tag, commit=True):
 		assert not self.immutable
 		if tag not in self._elements:
 			self._elements.append(tag)
-			self._add_tag_to_db(tag)
+			self._add_tag_to_db(tag, commit=commit)
 
 	### DUNDERS
 
