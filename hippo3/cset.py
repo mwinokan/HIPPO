@@ -117,9 +117,9 @@ class CompoundSubset(CompoundSet):
 		self._db = db
 		self._table = table
 
-		indices = indices or []
+		self._indices = indices or []
 
-		self._indices = indices
+		self._indices = list(set(self.indices))
 
 	### PROPERTIES
 
@@ -136,6 +136,12 @@ class CompoundSubset(CompoundSet):
 		return [self.db.select_where(table=self.table, query='compound_name', key='id', value=i, multiple=False)[0] for i in self.indices]
 
 	### METHODS
+
+	def get_by_tag(self,tag):
+		values = self.db.select_where(query='tag_compound', table='tag', key='name', value=tag, multiple=True)
+		ids = [v for v, in values if v]
+		ids = [v for v in ids if v in self.indices]
+		return CompoundSubset(self.db, self.table, ids)
 
 	def draw(self):
 		from molparse.rdkit import draw_grid
