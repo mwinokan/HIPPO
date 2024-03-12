@@ -449,13 +449,14 @@ class Database:
 		compound: Compound | int,
 		name: str,
 		target: int | str,
-		path: str | None = None,
+		path: str,
 		reference: int | None = None,
 		tags: None | list = None,
 		metadata: None | dict = None,
 		commit: bool = True,
 		longname: str = None,
 		warn_duplicate: bool = True,
+		resolve_path: bool = True,
 	):
 
 		if isinstance(compound, int):
@@ -478,8 +479,7 @@ class Database:
 		if not longname:
 			longname = f'{compound.name} {target_name} {name}'
 
-		if path:
-
+		if resolve_path:
 			try:
 				path = Path(path)
 				path = path.resolve(strict=True)
@@ -1155,6 +1155,11 @@ class Database:
 	def count(self, table):
 
 		sql = f"""SELECT COUNT(1) FROM {table}; """
+		self.execute(sql)
+		return self.cursor.fetchone()[0]
+
+	def count_where(self, table, key, value):
+		sql = f"""SELECT COUNT(1) FROM {table} WHERE {table}_{key} is {value}; """
 		self.execute(sql)
 		return self.cursor.fetchone()[0]
 

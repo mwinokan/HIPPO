@@ -82,6 +82,10 @@ class Compound:
 		return self.get_poses()
 
 	@property
+	def num_poses(self):
+		return self.db.count_where(table='pose', key='compound', value=self.id)
+
+	@property
 	def base(self):
 		if isinstance(self._base, int):
 			self._base = self.db.get_compound(id=self._base)
