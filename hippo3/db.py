@@ -1108,6 +1108,8 @@ class Database:
 
 	def query_similarity(self, query, threshold, return_similarity=False, none='error'):
 
+		from .cset import CompoundSubset
+
 		# smiles
 		if isinstance(query, str):
 
@@ -1133,16 +1135,15 @@ class Database:
 			logger.error(f'No compounds with similarity >= {threshold} to {query}')
 			return None
 
-		compounds = []
-
 		if return_similarity:
-			for id, similarity in result:
-				compounds.append((self.get_compound(id=id), similarity))
-		else:
-			for id, in result:
-				compounds.append(self.get_compound(id=id))
+			ids, similarities = zip(*result)
+			cset = CompoundSubset(self, 'compound', ids)
+			return cset, similarities
 
-		return compounds
+		ids = [r for r, in result]
+		cset = CompoundSubset(self, 'compound', ids)
+
+		return cset
 
 	def query_exact(self, query):
 		return self.query_similarity(query, 0.989, return_similarity=False)
