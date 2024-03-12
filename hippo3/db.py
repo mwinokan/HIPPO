@@ -117,7 +117,9 @@ class Database:
 			raise
 
 	def commit(self):
+		# logger.debug('db.commit...')
 		self.connection.commit()
+		# raise Exception
 
 	### CREATE TABLES
 
