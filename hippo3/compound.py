@@ -196,20 +196,11 @@ class Compound:
 
 	def draw(self):
 
-		''' draw:
-
-		* compound
-		* base
-		* inspirations (move to Pose.draw())
-
-		'''
-
-		# print(self.inspirations)
-		print(self.base)
-
 		if self.base:
 			from molparse.rdkit import draw_mcs
-			return draw_mcs({self.base.smiles:str(self), self.smiles:f'{self.base} (base)'})
+			return draw_mcs({self.base.smiles:f'{self.base} (base)', self.smiles:str(self)})
+		else:
+			display(self.mol)
 
 	### DUNDERS
 
