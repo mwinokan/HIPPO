@@ -209,7 +209,7 @@ class Database:
 		sql = """CREATE TABLE pose(
 			pose_id INTEGER PRIMARY KEY,
 			pose_name TEXT,
-			pose_longname TEXT,
+			-- pose_longname TEXT,
 			pose_smiles TEXT,
 			pose_reference INTEGER,
 			pose_path TEXT,
@@ -219,7 +219,7 @@ class Database:
 			pose_fingerprint BLOB,
 			pose_metadata TEXT,
 			FOREIGN KEY (pose_compound) REFERENCES compound(compound_id),
-			CONSTRAINT UC_pose_longname UNIQUE (pose_longname)
+			-- CONSTRAINT UC_pose_longname UNIQUE (pose_longname)
 			CONSTRAINT UC_pose_path UNIQUE (pose_path)
 		);
 		"""
@@ -447,9 +447,9 @@ class Database:
 	def insert_pose(self,
 		*,
 		compound: Compound | int,
-		name: str,
 		target: int | str,
 		path: str,
+		name: str | None = None,
 		reference: int | None = None,
 		tags: None | list = None,
 		metadata: None | dict = None,
@@ -466,7 +466,6 @@ class Database:
 			reference = self.get_pose(id=reference)
 
 		assert isinstance(compound, Compound), f'incompatible {compound}'
-		assert name, f'incompatible name={name}'
 		assert isinstance(reference, Pose) or reference is None, f'incompatible pose={name}'
 
 		if reference:
@@ -476,9 +475,6 @@ class Database:
 			target = self.get_target_id(name=target)
 		target_name = self.get_target_name(id=target)
 		
-		if not longname:
-			longname = f'{compound.name} {target_name} {name}'
-
 		if resolve_path:
 			try:
 				path = Path(path)
@@ -490,20 +486,17 @@ class Database:
 				return None
 
 		sql = """
-		INSERT INTO pose(pose_name, pose_longname, pose_smiles, pose_compound, pose_target, pose_path, pose_reference)
-		VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7)
+		INSERT INTO pose(pose_name, pose_smiles, pose_compound, pose_target, pose_path, pose_reference)
+		VALUES(?1, ?2, ?3, ?4, ?5, ?6)
 		"""
 
 		try:
-			self.execute(sql, (name, longname, compound.smiles, compound.id, target, path, reference))
+			self.execute(sql, (name, compound.smiles, compound.id, target, path, reference))
 
 		except sqlite3.IntegrityError as e:
-			if 'UNIQUE constraint failed: pose.pose_longname' in str(e):
+			if 'UNIQUE constraint failed: pose.pose_path' in str(e):
 				if warn_duplicate:
-					logger.warning(f"Skipping pose with existing longname \"{longname}\"")
-			elif 'UNIQUE constraint failed: pose.pose_path' in str(e):
-				if warn_duplicate:
-					logger.warning(f"Skipping pose with existing path \"{longname}\"")
+					logger.warning(f"Skipping pose with existing path \"{path}\"")
 			else:
 				logger.exception(e)
 			return None
@@ -544,12 +537,13 @@ class Database:
 			self.execute(sql, (name, compound, pose))
 
 		except sqlite3.IntegrityError as e:
-			if 'UNIQUE constraint failed: compound.compound_name' in str(e):
-				logger.warning(f"Skipping compound with existing name \"{name}\"")
-			elif 'UNIQUE constraint failed: compound.compound_smiles' in str(e):
-				logger.warning(f"Skipping compound with existing smiles \"{smiles}\"")
-			else:
-				logger.exception(e)
+			# if 'UNIQUE constraint failed: compound.compound_name' in str(e):
+			# 	logger.warning(f"Skipping compound with existing name \"{name}\"")
+			# elif 'UNIQUE constraint failed: compound.compound_smiles' in str(e):
+			# 	logger.warning(f"Skipping compound with existing smiles \"{smiles}\"")
+			# else:
+			logger.error(e)
+			# logger.exception(e)
 
 		except Exception as e:
 			logger.exception(e)		
@@ -561,14 +555,16 @@ class Database:
 
 	def insert_inspiration(self, 
 		*,
-		original: Pose, 
-		derivative: Pose,
+		original: Pose | int, 
+		derivative: Pose | int,
 		warn_duplicate: bool = True,
 		commit: bool = True,
 	) -> int:
 
-		assert isinstance(original, Pose), f'incompatible {original=}'
-		assert isinstance(derivative, Pose), f'incompatible {derivative=}'
+		if isinstance(original, Pose):
+			original = original.id
+		if isinstance(derivative, Pose):
+			derivative = derivative.id
 
 		sql = """
 		INSERT INTO inspiration(inspiration_original, inspiration_derivative)
@@ -576,7 +572,7 @@ class Database:
 		"""
 
 		try:
-			self.execute(sql, (original.id, derivative.id))
+			self.execute(sql, (original, derivative))
 
 		except sqlite3.IntegrityError as e:
 			if warn_duplicate:
@@ -941,18 +937,18 @@ class Database:
 		table: str = 'pose',
 		id: int | None = None,
 		name: str = None,
-		longname: str | None = None,
+		# longname: str | None = None,
 		# smiles: str | None = None,
 	) -> Pose:
 		
 		if id is None:
-			id = self.get_pose_id(longname=longname, name=name)
+			id = self.get_pose_id(name=name)
 
 		if not id:
 			logger.error(f'Invalid {id=}')
 			return None
 
-		query = 'pose_id, pose_name, pose_longname, pose_smiles, pose_reference, pose_path, pose_compound, pose_target, pose_mol, pose_fingerprint'
+		query = 'pose_id, pose_name, pose_smiles, pose_reference, pose_path, pose_compound, pose_target, pose_mol, pose_fingerprint'
 		entry = self.select_where(query=query, table=table, key='id', value=id)
 		pose = Pose(self, *entry)
 		return pose

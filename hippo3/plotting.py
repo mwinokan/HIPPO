@@ -4,6 +4,7 @@ import plotly.express as px
 import pandas as pd
 import mout
 import plotly.graph_objects as go
+from tqdm import tqdm
 
 import logging
 logger = logging.getLogger('HIPPO')
@@ -170,7 +171,6 @@ def plot_interaction_punchcard(animal, poses, subtitle=None, opacity=1.0, group=
 			data['atom_names'] = f.atom_names
 			
 			data['pose_name'] = pose.name
-			data['pose_longname'] = pose.longname
 			data['pose_id'] = str(pose)
 
 			data['chain_res_name_number_str'] = f.chain_res_name_number_str
@@ -432,7 +432,7 @@ def plot_numbers(animal, subtitle=None):
 	return fig
 
 @hippo_graph
-def plot_compound_property(animal, prop, style='bar', null=None):
+def plot_compound_property(animal, prop, compounds=None, style='bar', null=None):
 
 	"""
 	Get an arbitrary property from all the compounds in animal.compounds
@@ -447,7 +447,13 @@ def plot_compound_property(animal, prop, style='bar', null=None):
 
 	plot_data = []
 
-	for comp in animal.compounds:
+	if not compounds:
+		compounds = animal.compounds
+
+	if len(compounds) > 1000:
+		compounds = tqdm(compounds)
+
+	for comp in compounds:
 
 		data = comp.dict
 

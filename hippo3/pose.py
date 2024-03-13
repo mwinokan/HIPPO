@@ -34,7 +34,6 @@ class Pose:
 		db,
 		id: int,
 		name: str,
-		longname: str,
 		smiles: str,
 		reference: int, # another pose
 		path: str,
@@ -48,7 +47,6 @@ class Pose:
 		self._db = db
 		self._id = id
 		self._name = name
-		self._longname = longname
 		self._smiles = smiles
 		self._compound_id = compound
 		self._target = target
@@ -86,10 +84,6 @@ class Pose:
 	@property
 	def name(self):
 		return self._name
-
-	@property
-	def longname(self):
-		return self._longname
 
 	@property
 	def smiles(self):
@@ -209,7 +203,7 @@ class Pose:
 	@property
 	def dict(self):
 
-		serialisable_fields = ['id','name','longname','smiles','path','reference']
+		serialisable_fields = ['id','name','smiles','path','reference']
 
 		data = {}
 		for key in serialisable_fields:
@@ -319,4 +313,4 @@ class Pose:
 		return f'P{self.id}'
 
 	def __repr__(self):
-		return f'{mcol.bold}{mcol.underline}{self.compound}->{self} "{self.longname}"{mcol.unbold}{mcol.ununderline}'
+		return f'{mcol.bold}{mcol.underline}{self.compound}->{self}{mcol.unbold}{mcol.ununderline}'

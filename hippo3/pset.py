@@ -63,10 +63,7 @@ class PoseSet:
 					return self.db.get_pose(table=self.table, id=key)
 
 			case str():
-				if len(key.split(' ')) > 1:
-					return self.db.get_pose(longname=key)
-				else:
-					return self.db.get_pose(name=key)
+				return self.db.get_pose(name=key)
 
 			case list():
 				return PoseSubset(self.db, self.table, key)

@@ -244,7 +244,10 @@ class HIPPO:
 			if metadata:
 				compound.metadata.update(metadata)
 
-			return compound
+			if return_compound:
+				return compound
+			else:
+				return compound.id
 
 		else:
 			if not compound_id:
@@ -298,61 +301,41 @@ class HIPPO:
 	def register_pose(self,
 		*,
 		compound: Compound | int,
-		name: str,
 		target: str,
-		path: str | None = None,
+		path: str,
+		name: str | None = None,
 		reference: int | None = None,
 		tags: None | list = None,
 		metadata: None | dict = None,
 		inspirations: None | list = None,
 		return_pose: bool = True,
 		commit: bool = True,
+		overwrite_metadata: bool = True,
 	) -> Pose:
-
-		# see if a pose with that path exists
-		path = str(Path(path).resolve(strict=True))
-		matches = self.db.select_where(table='pose', query='pose_id, pose_longname', key='path', value=path, none='quiet')
-		if matches:
-			pose_id, longname = matches
-			# logger.debug(f'existing pose {pose_id=}')
-			# logger.debug(f'existing pose {longname=}')
-
-		else:
-			n = compound.num_poses
-			assert n < 26
-			name = chr(ord('a') + n)
-			# logger.debug(f'new pose {name=}')
-
-			longname = f'{compound.name} {target} {name}'
 		
-			pose_id = self.db.insert_pose(
-				compound=compound, longname=longname, name=name, target=target, path=path, 
-				tags=tags, metadata=metadata, reference=reference, warn_duplicate=True, commit=commit)
+		pose_id = self.db.insert_pose(
+			compound=compound, name=name, target=target, path=path, 
+			tags=tags, metadata=metadata, reference=reference, warn_duplicate=True, commit=commit)
+		
+		if not pose_id:
+			pose_id, = self.db.select_where(table='pose', query='pose_id', key='path', value=path, none='quiet')
+
+		if not pose_id:
+			logger.var('compound', compound)
+			logger.var('name', name)
+			logger.var('target', target)
+			logger.var('path', path)
+			logger.var('reference', reference)
+			logger.var('tags', tags)
+			logger.debug(f'{metadata=}')
+			logger.debug(f'{inspirations=}')
+
+			raise Exception
 
 		if return_pose:
-		
-			if not pose_id:
-				pose = self.poses[longname]
-		
-				if not pose:
-					logger.var('compound', compound)
-					logger.var('name', name)
-					logger.var('target', target)
-					logger.var('path', path)
-					logger.var('reference', reference)
-					logger.var('tags', tags)
-					logger.debug(f'{metadata=}')
-					logger.debug(f'{inspirations=}')
-
-					raise Exception
-
-				pose.metadata.update(metadata, commit=commit)
-			else:
-				pose = self.poses[pose_id]
+			pose = self.poses[pose_id]
 		
 		else:
-			if not pose_id:
-				pose_id = self.db.get_pose_id(longname=longname)
 			pose = pose_id
 
 		inspirations = inspirations or []
