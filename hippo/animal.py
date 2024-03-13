@@ -21,6 +21,19 @@ from mlog import setup_logger
 logger = setup_logger('HIPPO')
 
 class HIPPO:
+
+	"""The HIPPO 'animal' class. Instantiating a HIPPO object will create or link a HIPPO database.
+
+	::
+		
+		from hippo import HIPPO
+		animal = HIPPO(project_name, db_path)
+
+	* *project_name* give this hippo a name
+	* *db_path* path where the database will be stored
+
+
+	"""
 		
 	def __init__(self, 
 		name: str,  
@@ -55,52 +68,70 @@ class HIPPO:
 	### PROPERTIES
 
 	@property
-	def name(self):
+	def name(self) -> str:
+		"""Returns the project name"""
 		return self._name
 
-	# @property
-	# def target_name(self):
-	# 	return self._target_name
-
 	@property
-	def db_path(self):
+	def db_path(self) -> str:
+		"""Returns the database path"""
 		return self._db_path
 
 	@property
 	def db(self):
+		"""Returns the Database object"""
 		return self._db
 
 	@property
 	def compounds(self):
+		"""Returns a :doc:`CompoundSet <compounds>` object, which interfaces to the compound table in the database"""
 		return self._compounds
 
 	@property
 	def poses(self):
+		"""Returns a :doc:`PoseSet <poses>` object, which interfaces to the pose table in the database"""
 		return self._poses
 
 	@property
 	def reactions(self):
+		"""Returns a :doc:`ReactionSet <reactions>` object, which interfaces to the reaction table in the database"""
 		return self._reactions
 
 	@property
 	def tags(self):
+		"""Returns a :doc:`TagSet <metadata>` object, which interfaces to the tag table in the database"""
 		return self._tags
 	
 	### BULK INSERTION
 
-	def add_hits(self, target_name, metadata_csv, aligned_directory, skip=None, debug=False, test=False):
+	def add_hits(self, 
+		target_name: str, 
+		metadata_csv: str | Path, 
+		aligned_directory: str | Path, 
+		skip: list | None = None, 
+		debug: bool = False, 
+	) -> pd.DataFrame:
 
-		""" Pass in a generator to the aligned directory from a Fragalysis download"""
+		"""Load in crystallographic hits downloaded from Fragalysis.
+
+		* *target_name* Name of this protein target
+		* *metadata_csv* Path to the metadata.csv from the Fragalysis download
+		* *aligned_directory* Path to the aligned_files directory from the Fragalysis download
+		* *skip* optional list of observation names to skip
+
+		Returns: a DataFrame of metadata
+
+		"""
 
 		import molparse as mp
 		from rdkit.Chem import PandasTools
 		from .tools import remove_other_ligands
 
-		# create the target
-		target_id = self.db.insert_target(name=target_name)
+		if not isinstance(aligned_directory, Path):
+			aligned_directory = Path(aligned_directory)
 
-		if not target_id:
-			target_id = self.db.get_target_id(name=target_name)
+		# create the target
+		target = self.register_target(name=target_name)
 
 		skip = skip or []
 
@@ -112,7 +143,7 @@ class HIPPO:
 
 		meta_df = pd.read_csv(metadata_csv)
 		generated_tag_cols = ['ConformerSites', 'CanonSites', 'CrystalformSites', 'Quatassemblies', 'Crystalforms']
-		curated_tag_cols = [c for c in meta_df.columns if c not in ['Code', 'Long code', 'Compound code', 'Smiles']+generated_tag_cols]
+		curated_tag_cols = [c for c in meta_df.columns if c not in ['Code', 'Long code', 'Compound code', 'Smiles', 'Downloaded']+generated_tag_cols]
 
 		for path in tqdm(aligned_directory.iterdir()):
 
@@ -142,21 +173,22 @@ class HIPPO:
 			mol = df.ROMol[0]
 			lig_res_number = int(observation_longname.split('-')[1].split('_')[2])
 
-			# create the single ligand bound pdb
-
-			sys = mp.parse(pdbs[0], verbosity=debug)
-
-			sys = remove_other_ligands(sys, lig_res_number)
-
-			pose_path = str(pdbs[0].resolve()).replace('.pdb','_hippo.pdb')
+			# smiles			
 			smiles = mp.rdkit.mol_to_smiles(mol)
-
 			smiles = sanitise_smiles(smiles, verbosity=debug)
 
-			mp.write(pose_path, sys, shift_name=True, verbosity=debug)
+			# parse PDB
+			sys = mp.parse(pdbs[0], verbosity=debug)
 
+			if len(sys.residues['LIG']) > 1:
+				# create the single ligand bound pdb
+				sys = remove_other_ligands(sys, lig_res_number)
+				pose_path = str(pdbs[0].resolve()).replace('.pdb', '_hippo.pdb')
+				mp.write(pose_path, sys, shift_name=True, verbosity=debug)
+			else:
+				pose_path = str(pdbs[0].resolve())
+			
 			# create the molecule / pose
-
 			compound_id = self.db.insert_compound(
 				# name=crystal_name, 
 				smiles=smiles, 
@@ -196,7 +228,7 @@ class HIPPO:
 			pose_id = self.db.insert_pose(
 				compound=compound,
 				name=observation_shortname,
-				target=target_id,
+				target=target.id,
 				path=pose_path,
 				tags=tags,
 				metadata=metadata,
@@ -204,9 +236,6 @@ class HIPPO:
 
 			if pose_id:
 				count_poses_registered += 1
-
-			if test:
-				break
 
 		logger.var('#directories parsed', count_directories_tried)
 		logger.var('#compounds registered', count_compound_registered)
@@ -347,22 +376,27 @@ class HIPPO:
 	### PLOTTING
 
 	def plot_tag_statistics(self, *args, **kwargs):
+		"""Plot an overview of the number of compounds and poses for each tag"""
 		from .plotting import plot_tag_statistics
 		return plot_tag_statistics(self, *args, **kwargs)
 
 	def plot_compound_property(self, prop, **kwargs): 
+		"""Plot an arbitrary compound property across the whole dataset"""
 		from .plotting import plot_compound_property
 		return plot_compound_property(self, prop, **kwargs)
 
 	def plot_pose_property(self, prop, **kwargs): 
+		"""Plot an arbitrary pose property across the whole dataset"""
 		from .plotting import plot_pose_property
 		return plot_pose_property(self, prop, **kwargs)
 
 	def plot_interaction_punchcard(self, poses, subtitle, opacity=1.0, **kwargs):
+		"""Plot an interaction punchcard for a set of poses"""
 		from .plotting import plot_interaction_punchcard
 		return plot_interaction_punchcard(self, poses=poses, subtitle=subtitle, opacity=opacity, **kwargs)
 
 	### DUNDERS
 
-	def __repr__(self):
+	def __repr__(self) -> str:
+		"""Returns a command line representation"""
 		return f'HIPPO("{self.name}")'

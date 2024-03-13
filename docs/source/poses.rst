@@ -1,8 +1,8 @@
 Poses
 =====
 
-.. autoclass:: hippo3.pose.Pose
+.. autoclass:: hippo.pose.Pose
     :members:
 
-.. autoclass:: hippo3.pset.PoseSet
+.. autoclass:: hippo.pset.PoseSet
     :members:

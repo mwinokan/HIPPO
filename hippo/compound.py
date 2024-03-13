@@ -4,6 +4,7 @@ import mcol
 from rdkit import Chem
 
 from .pose import Pose
+# from .pset import PoseSubset
 from .tags import TagSubset
 
 import logging
@@ -26,8 +27,8 @@ class Compound:
 		self._name = name
 		self._smiles = smiles
 		self._base = base
-		self._table = 'compound'
 		self._tags = None
+		self._table = 'compound'
 
 		self._metadata = metadata
 		
@@ -43,68 +44,77 @@ class Compound:
 	### PROPERTIES
 
 	@property
-	def id(self):
+	def id(self) -> int:
+		"""Returns the compound's database ID"""
 		return self._id
 	
 	@property
-	def name(self):
+	def name(self) -> str:
+		"""Returns the compound's name (InChiKey)"""
 		return self._name
 	
 	@property
-	def smiles(self):
+	def smiles(self) -> str:
+		"""Returns the compound's (flattened) smiles"""
 		return self._smiles
 	
 	@property
-	def mol(self):
+	def mol(self) -> Chem.Mol:
+		"""Returns the compound's RDKit Molecule"""
 		if self._mol is None:
 			mol, = self.db.select_where(query='mol_to_binary_mol(compound_mol)', table='compound', key='id', value=self.id, multiple=False)
 			self._mol = Chem.Mol(mol)
 		return self._mol
 
 	@property
-	def metadata(self):
+	def metadata(self) -> dict:
+		"""Returns the compound's metadata dict"""
 		if self._metadata is None:
 			self._metadata = self.db.get_metadata(table='compound', id=self.id)
 		return self._metadata
 
 	@property
 	def db(self):
+		"""Returns a pointer to the parent database"""
 		return self._db
 
 	@property
-	def tags(self):
+	def tags(self) -> TagSubset:
+		"""Returns the compound's tags"""
 		if not self._tags:
 			self._tags = self.get_tags()
 		return self._tags
 
 	@property
 	def poses(self):
+		"""Returns the compound's poses"""
 		return self.get_poses()
 
 	@property
-	def num_poses(self):
+	def num_poses(self) -> int:
+		"""Returns the number of associated poses"""
 		return self.db.count_where(table='pose', key='compound', value=self.id)
 
 	@property
 	def base(self):
+		"""Returns the base compound for this elaboration"""
 		if isinstance(self._base, int):
 			self._base = self.db.get_compound(id=self._base)
 		return self._base
 
 	@base.setter
 	def base(self, b):
+		"""Set the base compound for this elaboration"""
 		self.set_base(b)
 
 	@property
-	def table(self):
-		return self._table
+	def reactions(self):
+		"""Returns the reactions resulting in this compound"""
+		return self.get_reactions(none=False)
 
 	@property
-	def reactions(self):
-		return self.get_reactions(none=False)
-	
-	@property
-	def dict(self):
+	def dict(self) -> dict:
+		"""Returns a dictionary of this compound"""
 
 		serialisable_fields = ['id','name','smiles']
 
@@ -120,18 +130,20 @@ class Compound:
 				data[key] = metadata[key]
 
 		return data
+
+	@property
+	def table(self):
+		return self._table
+	
 	
 	### METHODS
 
 	def get_tags(self) -> set:
 		tags = self.db.select_where(query='tag_name', table='tag', key='compound', value=self.id, multiple=True, none='quiet')
 		return TagSubset(self, {t[0] for t in tags}, commit=False)
-		# if tags:
-		# 	return TagSubset(self, {t[0] for t in tags})
-		# else:
-		# 	return None
 
 	def get_quotes(self, min_amount=None, supplier=None, max_lead_time=None, none='error', pick_cheapest=False, df=False) -> list[dict]:
+		"""Get all quotes associated to this compound"""
 
 		quote_ids = self.db.select_where(query='quote_id', table='quote', key='compound', value=self.id, multiple=True, none=none)
 
@@ -178,18 +190,18 @@ class Compound:
 
 		pose_ids = self.db.select_where(query='pose_id', table='pose', key='compound', value=self.id, multiple=True)
 
-		poses = [self.db.get_pose(id=q[0]) for q in pose_ids]
+		# poses = [self.db.get_pose(id=q[0]) for q in pose_ids]
 
-		if target:
-			poses = [q for q in poses if q['target'] == target]
+		from .pset import PoseSubset
 
-		return poses
+		return PoseSubset(self.db, [q[0] for q in pose_ids])
 
 	def set_base(self, base, commit=True):
 		self._base = base
 		self.db.update(table='compound', id=self.id, key='compound_base', value=base, commit=commit)
 
 	def as_ingredient(self, amount, max_lead_time=None, supplier=None):
+		"""Convert this compound into an Ingredient object"""
 		
 		quote = self.get_quotes(
 			pick_cheapest=True, 
@@ -202,6 +214,7 @@ class Compound:
 		return Ingredient(self, amount, quote, max_lead_time, supplier)
 
 	def draw(self):
+		"""Display this compound (and its base if it has one)"""
 
 		if self.base:
 			from molparse.rdkit import draw_mcs

@@ -46,4 +46,4 @@ exclude_patterns = ['build']
 # default_role = 'math'
 # pygments_style = 'sphinx'
 autoclass_content = 'both'
-modindex_common_prefix = ['hippo3.']
+modindex_common_prefix = ['hippo.']

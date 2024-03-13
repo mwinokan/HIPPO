@@ -2,6 +2,6 @@
 HIPPO "animal" object
 =====================
 
-.. autoclass:: hippo3.animal.HIPPO
+.. autoclass:: hippo.animal.HIPPO
     :members:
     

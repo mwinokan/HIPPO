@@ -29,7 +29,8 @@ def df_row_to_dict(df_row):
 
 def remove_other_ligands(sys, residue_number):
 	ligand_residues = [r.number for r in sys['rLIG'] if r.number != residue_number]
-	sys.remove_residues_by_index(ligand_residues, fix_indices=False)
+	if ligand_residues:
+		sys.remove_residues(numbers=ligand_residues, verbosity=0)
 	return sys
 
 def inchikey_from_smiles(smiles):

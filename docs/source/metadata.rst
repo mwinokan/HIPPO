@@ -1,17 +1,17 @@
 Metadata
 ========
 
-.. autoclass:: hippo3.metadata.MetaData
+.. autoclass:: hippo.metadata.MetaData
     :members:
 
-.. autoclass:: hippo3.feature.Feature
+.. autoclass:: hippo.feature.Feature
     :members:
 
-.. autoclass:: hippo3.tags.TagSet
+.. autoclass:: hippo.tags.TagSet
     :members:
 
-.. autoclass:: hippo3.tags.TagSubset
+.. autoclass:: hippo.tags.TagSubset
     :members:
 
-.. autoclass:: hippo3.target.Target
+.. autoclass:: hippo.target.Target
     :members:

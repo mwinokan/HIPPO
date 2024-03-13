@@ -2,8 +2,8 @@
 Quoting
 =======
 
-.. autoclass:: hippo3.pycule.Quoter
+.. autoclass:: hippo.pycule.Quoter
     :members:
 
-.. autoclass:: hippo3.quote.Quote
+.. autoclass:: hippo.quote.Quote
     :members:

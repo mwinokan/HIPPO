@@ -1,11 +1,11 @@
 Reactions
 =========
 
-.. autoclass:: hippo3.reaction.Reaction
+.. autoclass:: hippo.reaction.Reaction
     :members:
 
-.. autoclass:: hippo3.recipe.Recipe
+.. autoclass:: hippo.recipe.Recipe
     :members:
 
-.. autoclass:: hippo3.rset.ReactionSet
+.. autoclass:: hippo.rset.ReactionSet
     :members:

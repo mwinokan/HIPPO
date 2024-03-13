@@ -52,6 +52,7 @@ class Pose:
 		self._target = target
 		self._path = path
 		self._protein_system = None
+		self._table = 'pose'
 
 		if fingerprint:
 			# logger.debug('unpickling fingerprint')
@@ -61,7 +62,6 @@ class Pose:
 		# print(f'{self}{metadata=}')
 		self._metadata = metadata
 		self._tags = None
-		self._table = 'pose'
 		self._reference = reference
 
 		if isinstance(mol, bytes):
@@ -75,46 +75,56 @@ class Pose:
 
 	@property
 	def db(self):
+		"""Returns a pointer to the parent database"""
 		return self._db
 
 	@property
-	def id(self):
+	def id(self) -> int:
+		"""Returns the pose's database ID"""
 		return self._id
 
 	@property
-	def name(self):
+	def name(self) -> str:
+		"""Returns the pose's name"""
 		return self._name
 
 	@property
 	def smiles(self):
+		"""Returns the pose's smiles"""
 		return self._smiles
 
 	@property
 	def target(self):
+		"""Returns the pose's associated target"""
 		if isinstance(self._target, int):
 			self._target = self.db.get_target(id=self._target)
 		return self._target
 
 	@property
-	def compound_id(self):
+	def compound_id(self) -> int:
+		"""Returns the pose's associated compound ID"""
 		return self._compound_id
 
 	@property
 	def compound(self):
+		"""Returns the pose's associated compound"""
 		return self.get_compound()
 
 	@property
 	def path(self):
+		"""Returns the pose's path"""
 		return self._path
 
 	@property
 	def reference(self):
+		"""Returns the pose's protein reference (another pose)"""
 		if isinstance(self._reference, int):
 			self._reference = self.db.get_pose(id=self._reference)
 		return self._reference
 
 	@property
 	def mol(self):
+		"""Returns a pose's rdkit.Chem.Mol"""
 		if not self._mol and self.path:
 
 			if self.path.endswith('.pdb'):
@@ -129,7 +139,11 @@ class Pose:
 					logger.warning('Multiple ligands in PDB')
 				lig_res = lig_residues[0]
 				
-				self.mol = lig_res.rdkit_mol
+				if not (mol := lig_res.rdkit_mol):
+					logger.warning(f'{self} has {mol=}')
+					return None
+
+				self.mol = mol
 
 			elif self.path.endswith('.mol'):
 
@@ -145,11 +159,13 @@ class Pose:
 
 	@mol.setter
 	def mol(self, m):
+		"""Set the pose's rdkit.Chem.Mol"""
 		self._mol = m
 		self.db.update(table='pose', id=self.id, key='pose_mol', value=m.ToBinary())
 
 	@property
 	def protein_system(self):
+		"""Returns the pose's protein molparse.System"""
 		if self._protein_system is None and self.path.endswith('.pdb'):
 			# logger.debug(f'getting pose protein system {self}')
 			self.protein_system = mp.parse(self.path, verbosity=False).protein_system
@@ -157,21 +173,24 @@ class Pose:
 
 	@protein_system.setter
 	def protein_system(self, a):
-		# logger.debug(f'setting {self} protein_system')
+		"""Sets the pose's protein molparse.System"""
 		self._protein_system = a
 
 	@property
 	def metadata(self):
+		"""Returns the pose's metadata"""
 		if self._metadata is None:
 			self._metadata = self.db.get_metadata(table='pose', id=self.id)
 		return self._metadata
 
 	@property
 	def fingerprint(self):
+		"""Returns the pose's fingerprint"""
 		return self._fingerprint
 
 	@fingerprint.setter
 	def fingerprint(self, fp):
+		"""Set the pose's fingerprint"""
 
 		# remove features that don't exist in this fingerprint?
 
@@ -180,28 +199,28 @@ class Pose:
 		# store in the database
 		fp = pickle.dumps(fp)
 		# logger.debug('pickling fingerprint')
-		self.db.update(table=self.table, id=self.id, key=f'{self.table}_fingerprint', value=fp)
+		self.db.update(table='pose', id=self.id, key=f'pose_fingerprint', value=fp)
 
 	@property
 	def tags(self):
+		"""Returns the pose's tags"""
 		if not self._tags:
 			self._tags = self.get_tags()
 		return self._tags
 
 	@property
 	def inspirations(self):
+		"""Returns the pose's inspirations"""
 		return self.get_inspirations()
 
 	@property
-	def table(self):
-		return self._table
-
-	@property
 	def features(self):
+		"""Returns the pose's features"""
 		return mp.rdkit.features_from_mol(self.mol)
 	
 	@property
 	def dict(self):
+		"""Serialised dictionary representing the pose"""
 
 		serialisable_fields = ['id','name','smiles','path','reference']
 
@@ -217,6 +236,11 @@ class Pose:
 				data[key] = metadata[key]
 
 		return data
+
+	@property
+	def table(self):
+		return self._table
+
 
 	### METHODS
 
@@ -259,6 +283,9 @@ class Pose:
 			raise NotImplementedError
 
 		assert protein_system
+
+		if not self.mol:
+			return
 
 		comp_features = self.features
 

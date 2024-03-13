@@ -2,14 +2,14 @@
 Compounds
 =========
 
-.. autoclass:: hippo3.compound.Compound
+.. autoclass:: hippo.compound.Compound
     :members:
 
-.. autoclass:: hippo3.compound.Ingredient
+.. autoclass:: hippo.compound.Ingredient
     :members:
 
-.. autoclass:: hippo3.cset.CompoundSet
+.. autoclass:: hippo.cset.CompoundSet
     :members:
 
-.. autoclass:: hippo3.cset.CompoundSubset
+.. autoclass:: hippo.cset.CompoundSubset
     :members:

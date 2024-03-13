@@ -1,5 +1,5 @@
 Database
 =========
 
-.. autoclass:: hippo3.db.Database
+.. autoclass:: hippo.db.Database
     :members:
