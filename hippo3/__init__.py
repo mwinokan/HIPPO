@@ -1,5 +1,5 @@
 
-__version__ = '0.3.3c'
+__version__ = '0.3.5'
 
 from .animal import HIPPO
 from .compound import Compound
