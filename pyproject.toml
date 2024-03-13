@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 [project]
 name = "hippo-db"
-version = "0.3.5"
+version = "0.3.6"
 authors = [
     { name = "Max Winokan", email = "max@winokan.com" },
 ]
@@ -24,5 +24,5 @@ dependencies = [
 "Bug Tracker" = "https://github.com/mwinokan/HIPPO/issues"
 [tool.hatch.build]
 include = [
-    "hippo3/*.py",
+    "hippo/*.py",
 ]
