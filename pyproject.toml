@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 [project]
 name = "hippo-db"
-version = "0.3.4b"
+version = "0.3.5"
 authors = [
     { name = "Max Winokan", email = "max@winokan.com" },
 ]
@@ -20,7 +20,7 @@ dependencies = [
     "molparse >= 0.0.13",
 ]
 [project.urls]
-"Homepage" = "https://github.com/mwinokan/HIPPO"
+"Homepage" = "https://hippo.winokan.com"
 "Bug Tracker" = "https://github.com/mwinokan/HIPPO/issues"
 [tool.hatch.build]
 include = [
