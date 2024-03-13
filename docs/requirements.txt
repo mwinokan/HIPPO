@@ -7,4 +7,5 @@ mpytools>=0.0.9
 molparse
 pandas
 tqdm
+pycule
 
