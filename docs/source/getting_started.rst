@@ -15,7 +15,7 @@ Loading crystallographic hits from Fragalysis
 =============================================
 
 1. Go `Fragalysis (v2)
-<https://http://fragalysis.xchem.diamond.ac.uk>`_. and download a dataset 
+<https://fragalysis.xchem.diamond.ac.uk>`_. and download a dataset 
 
 2. Load the crystallographic data
 

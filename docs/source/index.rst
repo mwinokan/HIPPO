@@ -17,7 +17,13 @@ HIPPO is still in alpha-development, but it can be obtained from PyPI:
 
 ::
    
-   pip install --upgrade hippo-db
+   $ pip install --upgrade hippo-db
+
+You will also need chemicalite:
+
+::
+
+   $ conda install -c conda-forge chemicalite
 
 Core concepts
 =============
@@ -48,7 +54,7 @@ A :class:`.Reaction` is a simplified representation of a synthetic pathway to cr
 
    Structure-based searching <queries>
 
-   Inserting virtual hits <insert_elaborations>
+   Adding data <insert_elaborations>
    
    Inserting synthetic pathways <insert_reactions>
 
