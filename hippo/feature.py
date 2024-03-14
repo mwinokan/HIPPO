@@ -7,6 +7,7 @@ from .target import Target
 
 @dataclass
 class Feature:
+	"""Pharmocophoric feature in a protein"""
 
 	id: int
 	family: Target
@@ -24,4 +25,5 @@ class Feature:
 
 	@property
 	def chain_res_name_number_str(self):
+		"""Return a string representation of the feature"""
 		return f'{self.chain_name} {self.residue_name} {self.residue_number}'

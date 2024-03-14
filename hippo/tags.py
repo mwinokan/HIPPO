@@ -3,8 +3,7 @@
 from collections.abc import MutableSet
 
 class TagSet:
-
-	# class to access entries in database tables containing tags
+	"""Object representing the 'tag' table in the :class:`.Database`."""
 
 	def __init__(self, 
 		db, 
@@ -20,6 +19,7 @@ class TagSet:
 
 	@property
 	def db(self):
+		"""Returns the associated :class:`.database`"""
 		return self._db
 	
 	@property
@@ -27,7 +27,8 @@ class TagSet:
 		return self._table
 
 	@property
-	def unique(self):
+	def unique(self) -> set:
+		"""Returns a set of tag names contained in the table"""
 		values = self.db.select(table=self.table, query='DISTINCT tag_name', multiple=True)
 		return set(v for v, in values)
 
@@ -41,6 +42,7 @@ class TagSet:
 
 
 class TagSubset(MutableSet):
+	"""Object representing a subset of the 'tag' table in the :class:`.Database` belonging to a certain :class:`.Compound` or :class:`.Pose`."""
 
 	def __init__(self, 
 		parent, # Compound or Pose
@@ -61,11 +63,13 @@ class TagSubset(MutableSet):
 	### PROPERTIES
 
 	@property
-	def tags(self):
+	def tags(self) -> list:
+		"""Returns the elements in this set"""
 		return self._elements
 
 	@property
 	def immutable(self):
+		"""Returns whether this set is immutable"""
 		return self._immutable
 	
 	@immutable.setter
@@ -74,10 +78,12 @@ class TagSubset(MutableSet):
 
 	@property
 	def parent(self):
+		"""Returns this set of tags parent :class:`.Compound` or :class:`.Pose`."""
 		return self._parent
 
 	@property
 	def db(self):
+		"""Returns the associated :class:`.database`"""
 		return self.parent.db
 	
 
@@ -96,13 +102,16 @@ class TagSubset(MutableSet):
 	### METHODS
 
 	def pop(self):
+		"""Pop the last element"""
 		assert not self.immutable
 		return self._elements.pop()
 
 	def discard(self, tag):
+		"""Discard an element"""
 		return self.discard(tag)
 
 	def remove(self, tag):
+		"""Remove an element"""
 		assert not self.immutable
 		if tag in self:
 			i = self._elements.index(tag)
@@ -112,6 +121,7 @@ class TagSubset(MutableSet):
 			raise ValueError(f'{tag} not in {self}')
 
 	def add(self, tag, commit=True):
+		"""Add an element"""
 		assert not self.immutable
 		if tag not in self._elements:
 			self._elements.append(tag)

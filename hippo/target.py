@@ -2,6 +2,7 @@
 import mcol
 
 class Target:
+	"""Object representing a protein target"""
 
 	def __init__(self, db, id, name):
 
@@ -15,14 +16,17 @@ class Target:
 
 	@property
 	def id(self):
+		"""Returns the target's ID"""
 		return self._id
 
 	@property
 	def name(self):
+		"""Returns the target's name"""
 		return self._name
 
 	@property
 	def feature_ids(self):
+		"""Returns the target's feature ID's"""
 		feature_ids = self.db.select_where(
 			query='feature_id', 
 			table='feature', 
@@ -40,6 +44,7 @@ class Target:
 
 	@property
 	def features(self):
+		"""Returns the target's features"""
 		if feature_ids := self.feature_ids:
 			return [self.db.get_feature(id=i) for i in feature_ids]
 		return None
@@ -51,6 +56,7 @@ class Target:
 		return f'{mcol.bold}{mcol.underline}{self} "{self.name}"{mcol.unbold}{mcol.ununderline}'
 
 	def calculate_features(self, protein):
+		"""Calculate features from a protein system"""
 
 		features = protein.get_protein_features()
 

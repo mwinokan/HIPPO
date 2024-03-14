@@ -6,3 +6,6 @@ Poses
 
 .. autoclass:: hippo.pset.PoseSet
     :members:
+
+.. autoclass:: hippo.pset.PoseSubset
+    :members:

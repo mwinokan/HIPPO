@@ -4,6 +4,8 @@ from typing import Mapping
 
 class MetaData(UserDict):
 
+	"""Metadata dictionary linked to a compound or pose in the database"""
+
 	def __init__(self, 
 		__dict: Mapping[str, str]
 	) -> None:

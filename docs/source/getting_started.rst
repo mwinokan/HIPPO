@@ -3,7 +3,7 @@
 Getting started with HIPPO
 ==========================
 
-To create a HIPPO database or interface with an existing one, create a :doc:`HIPPO animal object<animal>`:
+To create a HIPPO database or interface with an existing one, create a :class:`.HIPPO` 'animal' object:
 
 ::
 
@@ -36,7 +36,7 @@ Navigating compounds and poses
 Getting compounds/poses
 -----------------------
 
-Compounds can be accessed via the compounds property which wraps a :doc:`CompoundSet <compounds>`:
+Compounds can be accessed via the compounds property which wraps a :class:`.CompoundSet`:
 
 ::
 
@@ -65,7 +65,7 @@ Additionally you can get compounds by their tag:
 
 See also the :doc:`tools for structure-based searching<queries>`
 
-Equivalent methods exist for animal.poses (returns a :doc:`PoseSet <poses>`), animal.reactions (returns a :doc:`ReactionSet <reactions>`), and animal.tags returns a :doc:`TagSet <metadata>`).
+Equivalent methods exist for animal.poses (returns a :class:`PoseSet`), animal.reactions (returns a :class:`.ReactionSet`), and animal.tags returns a :class:`TagSet`).
 
 Inspecting a compound and its poses
 -----------------------------------
@@ -133,4 +133,4 @@ Interaction fingerprints can be visualised with a 'punchcard':
 
 ::
 
-	animal.plot_interaction_punchcard(poses=animal.poses.get_by_tag('hits'), subtitle='hits')
+	animal.plot_interaction_punchcard(poses=animal.poses.get_by_tag('hits'), subtitle='hits', group='pose_name')

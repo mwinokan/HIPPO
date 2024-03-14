@@ -14,6 +14,7 @@ import logging
 logger = logging.getLogger('HIPPO')
 
 class Quoter:
+	"""Class to scrape catalogue data"""
 
 	def __init__(self,
 		supplier: str, 
@@ -21,12 +22,13 @@ class Quoter:
 		password: str = None,
 		token: str = None,
 	):
+		"""Currently 'Enamine' and 'MCule' are supported. Once initialised"""
 
 		if supplier == 'Enamine':
 
 			self.supplier = 'Enamine'
 			self.catalogues = ENAMINE_CATALOGUES
-			self.get_quote = self.get_enamine_quote
+			self._get_quote = self.get_enamine_quote
 
 			assert username
 			assert password
@@ -36,7 +38,7 @@ class Quoter:
 		elif supplier == 'MCule':
 
 			self.supplier = 'MCule'
-			self.get_quote = self.get_mcule_quote
+			self._get_quote = self.get_mcule_quote
 			
 			assert token
 
@@ -45,6 +47,11 @@ class Quoter:
 		else:
 			logger.error(f'Unsupported supplier: "{supplier}"')
 			raise NotImplementedError
+
+
+	def get_quote(self, compound):
+		"""Get quotes for a compound"""
+		return self._get_quote(compound)
 
 	### ENAMINE
 

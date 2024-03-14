@@ -8,12 +8,12 @@ API Reference
    :caption: Contents:
 
    animal
-   db
    compounds
    poses
    reactions
    quoting
    metadata
+   db
 
 
 

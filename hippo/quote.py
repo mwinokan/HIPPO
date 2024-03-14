@@ -7,6 +7,7 @@ logger = logging.getLogger('HIPPO')
 
 @dataclass
 class Quote:
+	"""Dataclass representing a quote in the database"""
 
 	compound: int
 	smiles: str

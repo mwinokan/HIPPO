@@ -23,6 +23,8 @@ logger = logging.getLogger('HIPPO')
 
 class Database:
 
+	"""Wrapper to connect to the HIPPO sqlite database."""
+
 	def __init__(self, path: Path) -> None:
 
 		assert isinstance(path, Path)
@@ -51,16 +53,19 @@ class Database:
 
 	@property
 	def path(self) -> Path:
+		"""Returns the path to the database file"""
 		return self._path
 
 	@property
 	def connection(self):
+		"""Returns a sqlite3.connection"""
 		if not self._connection:
 			self.connect()
 		return self._connection
 	
 	@property
 	def cursor(self):
+		"""Returns a sqlite3.cursor"""
 		if not self._cursor:
 			self._cursor = self.connection.cursor()
 		return self._cursor
@@ -68,6 +73,7 @@ class Database:
 	### PUBLIC METHODS / API CALLS
 
 	def close(self) -> None:
+		"""Close the connection"""
 		logger.debug('hippo3.Database.close()')
 		if self.connection:
 			self.connection.close()
@@ -76,6 +82,7 @@ class Database:
 	### GENERAL SQL
 
 	def connect(self):
+		"""Connect to the database"""
 		logger.debug('hippo3.Database.connect()')
 
 		conn = None
@@ -107,6 +114,7 @@ class Database:
 		self._cursor = conn.cursor()
 
 	def execute(self, sql, payload=None):
+		"""Execute arbitrary SQL"""
 		try:
 			if payload:
 				return self.cursor.execute(sql, payload)
@@ -117,6 +125,7 @@ class Database:
 			raise
 
 	def commit(self):
+		"""Commit the changes"""
 		# logger.debug('db.commit...')
 		self.connection.commit()
 		# raise Exception
@@ -124,6 +133,7 @@ class Database:
 	### CREATE TABLES
 
 	def create_blank_db(self):
+		"""Create a blank database"""
 
 		logger.out('Creating blank database...')
 		self.create_table_compound()
@@ -139,6 +149,7 @@ class Database:
 		# self.create_table_morgan_bfp()
 
 	def create_table_compound(self):
+		"""Create the compound table"""
 		logger.debug('HIPPO.Database.create_table_compound()')
 
 		sql = """CREATE TABLE compound(
@@ -161,6 +172,7 @@ class Database:
 		self.execute(sql)
 
 	def create_table_inspiration(self):
+		"""Create the inspiration table"""
 		logger.debug('HIPPO.Database.create_table_inspiration()')
 
 		sql = """CREATE TABLE inspiration(
@@ -175,6 +187,7 @@ class Database:
 		self.execute(sql)
 
 	def create_table_reaction(self):
+		"""Create the reaction table"""
 		logger.debug('HIPPO.Database.create_table_reaction()')
 
 		sql = """CREATE TABLE reaction(
@@ -189,6 +202,7 @@ class Database:
 		self.execute(sql)
 
 	def create_table_reactant(self):
+		"""Create the reactant table"""
 		logger.debug('HIPPO.Database.create_table_reactant()')
 
 		sql = """CREATE TABLE reactant(
@@ -204,6 +218,7 @@ class Database:
 		self.execute(sql)
 
 	def create_table_pose(self):
+		"""Create the pose table"""
 		logger.debug('HIPPO.Database.create_table_pose()')
 
 		sql = """CREATE TABLE pose(
@@ -231,6 +246,7 @@ class Database:
 		self.execute(sql)
 
 	def create_table_tag(self):
+		"""Create the tag table"""
 		logger.debug('HIPPO.Database.create_table_tag()')
 
 		sql = """CREATE TABLE tag(
@@ -246,6 +262,7 @@ class Database:
 		self.execute(sql)
 
 	def create_table_quote(self):
+		"""Create the quote table"""
 		logger.debug('HIPPO.Database.create_table_quote()')
 
 		sql = """CREATE TABLE quote(
@@ -273,6 +290,7 @@ class Database:
 		# 	pprint(self.cursor.fetchall())
 
 	def create_table_target(self):
+		"""Create the target table"""
 		logger.debug('HIPPO.Database.create_table_target()')
 		sql = """CREATE TABLE target(
 			target_id INTEGER PRIMARY KEY,
@@ -285,6 +303,7 @@ class Database:
 		self.execute(sql)
 
 	def create_table_feature(self):
+		"""Create the feature table"""
 		logger.debug('HIPPO.Database.create_table_feature()')
 		sql = """CREATE TABLE feature(
 			feature_id INTEGER PRIMARY KEY,
@@ -301,6 +320,7 @@ class Database:
 		self.execute(sql)
 
 	def create_table_pattern_bfp(self):
+		"""Create the pattern_bfp table"""
 		logger.debug('HIPPO.Database.create_table_pattern_bfp()')
 
 		sql = "CREATE VIRTUAL TABLE compound_pattern_bfp USING rdtree(compound_id, fp bits(2048))"
@@ -308,6 +328,7 @@ class Database:
 		self.execute(sql)
 
 	def create_table_morgan_bfp(self):
+		"""Create the morgan_bfp table"""
 		logger.debug('HIPPO.Database.create_table_morgan_bfp()')
  
 		sql = "CREATE VIRTUAL TABLE compound_morgan_bfp USING rdtree(compound_id, fp bits(2048))"
@@ -326,6 +347,7 @@ class Database:
 		metadata=None,
 		inchikey: str = None, 
 	) -> int:
+		"""Insert a compound"""
 
 		# process the base
 		assert isinstance(base, int) or isinstance(base, Compound) or base is None, f'incompatible base={base}'
@@ -404,6 +426,7 @@ class Database:
 		return compound_id
 
 	def insert_compound_pattern_bfp(self, compound_id, commit=True):
+		"""Insert a compound_pattern_bfp"""
 
 		sql = """
 		INSERT INTO compound_pattern_bfp(compound_id, fp)
@@ -425,6 +448,8 @@ class Database:
 		return bfp_id
 
 	def insert_compound_morgan_bfp(self, compound_id):
+		"""Insert a compound_morgan_bfp"""
+
 
 		sql = """
 		INSERT INTO compound_morgan_bfp(compound_id, fp)
@@ -458,6 +483,7 @@ class Database:
 		warn_duplicate: bool = True,
 		resolve_path: bool = True,
 	):
+		"""Insert a pose"""
 
 		if isinstance(compound, int):
 			compound = self.get_compound(id=compound)
@@ -525,6 +551,7 @@ class Database:
 		pose: int = None,
 		commit: bool = True,
 	):
+		"""Insert a tag"""
 
 		assert compound or pose
 
@@ -560,6 +587,7 @@ class Database:
 		warn_duplicate: bool = True,
 		commit: bool = True,
 	) -> int:
+		"""Insert an inspiration"""
 
 		if isinstance(original, Pose):
 			original = original.id
@@ -595,6 +623,7 @@ class Database:
 		product_yield: float = 1.0,
 		commit: bool = True,
 	) -> int:
+		"""Insert a reaction"""
 
 		if isinstance(product, int):
 			product = self.get_compound(id=product)
@@ -625,6 +654,7 @@ class Database:
 		amount: float = 1.0,
 		commit: bool = True,
 	) -> int:
+		"""Insert a reactant"""
 
 		if isinstance(reaction, int):
 			reaction = self.get_reaction(id=reaction)
@@ -667,6 +697,7 @@ class Database:
 		lead_time: int,
 		smiles: str | None = None,
 	) -> int | None:
+		"""Insert a quote"""
 
 		assert isinstance(compound, Compound), f'incompatible {compound=}'
 		assert currency in ['GBP', 'EUR', 'USD'], f'incompatible {currency=}'
@@ -710,6 +741,7 @@ class Database:
 		*,
 		name: str
 	) -> int:
+		"""Insert a target"""
 
 		sql = """
 		INSERT INTO target(target_name)
@@ -739,6 +771,7 @@ class Database:
 		residue_number: int,
 		atom_names: list,
 	) -> int:
+		"""Insert a feature"""
 
 		assert len(chain_name) == 1
 		assert len(residue_name) <= 4
@@ -776,6 +809,7 @@ class Database:
 		payload: dict,
 		commit: bool = True,
 	) -> None:
+		"""Insert metadata"""
 
 		payload = json.dumps(payload)
 
@@ -784,6 +818,7 @@ class Database:
 	### SELECTION
 
 	def select(self, query, table, multiple=False):
+		"""Select entries"""
 
 		sql = f'SELECT {query} FROM {table}'
 
@@ -801,6 +836,7 @@ class Database:
 		return result
 
 	def select_where(self, query, table, key, value, multiple=False, none='error', sort=None):
+		"""Select entries where key==value"""
 
 		if isinstance(value, str):
 			value = f"'{value}'"
@@ -828,14 +864,17 @@ class Database:
 		return result
 
 	def select_id_where(self, table, key, value, multiple=False):
+		"""Select ID's where key==value"""
 		return self.select_where(query=f'{table}_id', table=table, key=key, value=value, multiple=multiple)
 
 	def select_all_where(self, table, key, value, multiple=False):
+		"""Select * where key==value"""
 		return self.select_where(query='*', table=table, key=key, value=value, multiple=multiple)
 
 	### DELETION
 
 	def delete_where(self, table, key, value):
+		"""Delete where key==value"""
 
 		if isinstance(value, str):
 			value = f"'{value}'"
@@ -862,6 +901,7 @@ class Database:
 		value, 
 		commit: bool = True,
 	):
+		"""Update a database entry where key==value"""
 
 		# sql = f"""
 		# UPDATE ?1
@@ -896,6 +936,7 @@ class Database:
 		name: str | None = None,
 		smiles: str | None = None,
 	) -> Compound:
+		"""Get a compound"""
 		
 		if id is None:
 			id = self.get_compound_id(name=name, smiles=smiles)
@@ -917,6 +958,7 @@ class Database:
 		similar: str | Compound | int | None = None, 
 		threshold: float = 1.0,
 	) -> int:
+		"""Get a compound ID"""
 
 		if name:
 			entry = self.select_id_where(table=table, key='name', value=name)
@@ -940,6 +982,7 @@ class Database:
 		# longname: str | None = None,
 		# smiles: str | None = None,
 	) -> Pose:
+		"""Get a pose"""
 		
 		if id is None:
 			id = self.get_pose_id(name=name)
@@ -959,6 +1002,7 @@ class Database:
 		longname: str | None = None, 
 		name: str | None = None, 
 	) -> int:
+		"""Get a pose ID"""
 
 		if name:
 			entry = self.select_id_where(table=table, key='name', value=name)
@@ -979,6 +1023,7 @@ class Database:
 		id: int | None = None,
 		none: str | None = None,
 	) -> Reaction:
+		"""Get a reaction"""
 		
 		if not id:
 			logger.error(f'Invalid {id=}')
@@ -995,6 +1040,7 @@ class Database:
 		id: int | None = None,
 		none: str | None = None,
 	) -> list[dict]:
+		"""Get a quote"""
 		
 		query = 'quote_compound, quote_supplier, quote_catalogue, quote_entry, quote_amount, quote_price, quote_currency, quote_lead_time, quote_purity, quote_date, quote_smiles '
 		entry = self.select_where(query=query, table=table, key='id', value=id, none=none)
@@ -1018,6 +1064,7 @@ class Database:
 		table: str, 
 		id: int
 	) -> dict:
+		"""Get metadata"""
 
 		payload, = self.select_where(query=f'{table}_metadata', table=table, key=f'id', value=id)
 
@@ -1039,12 +1086,14 @@ class Database:
 		*,
 		id=int
 	) -> Target:
+		"""Get target"""
 		return Target(db=self,id=id,name=self.get_target_name(id=id))
 
 	def get_target_name(self,
 		*,
 		id:int,
 	) -> str:
+		"""Get target name"""
 
 		table = 'target'
 		payload, = self.select_where(query=f'{table}_name', table=table, key=f'id', value=id)
@@ -1054,6 +1103,7 @@ class Database:
 		*,
 		name: str, 
 	) -> int:
+		"""Get target ID"""
 			
 		table = 'target'
 		entry = self.select_id_where(table=table, key='name', value=name)
@@ -1067,12 +1117,14 @@ class Database:
 		*,
 		id=int
 	) -> Feature:
+		"""Get feature"""
 		entry = self.select_all_where(table='feature', key='id', value=id)
 		return Feature(*entry)
 
 	### COMPOUND QUERY
 
 	def query_substructure(self, query, fast=True, none='error'):
+		"""Search compounds by substructure"""
 
 		# smiles
 		if isinstance(query, str):
@@ -1105,6 +1157,7 @@ class Database:
 		return compounds
 
 	def query_similarity(self, query, threshold, return_similarity=False, none='error'):
+		"""Search compounds by similarity"""
 
 		from .cset import CompoundSubset
 
@@ -1144,17 +1197,20 @@ class Database:
 		return cset
 
 	def query_exact(self, query):
+		"""Search for exact match compounds"""
 		return self.query_similarity(query, 0.989, return_similarity=False)
 
 	### COUNTING
 
 	def count(self, table):
+		"""Count all entries in a table"""
 
 		sql = f"""SELECT COUNT(1) FROM {table}; """
 		self.execute(sql)
 		return self.cursor.fetchone()[0]
 
 	def count_where(self, table, key, value):
+		"""Count all entries in a table where key==value"""
 		sql = f"""SELECT COUNT(1) FROM {table} WHERE {table}_{key} is {value}; """
 		self.execute(sql)
 		return self.cursor.fetchone()[0]
@@ -1162,6 +1218,7 @@ class Database:
 	### PRUNING
 
 	def prune_reactions(self, compound, reactions):
+		"""Remove duplicate reactions for a given compound"""
 
 		pruned = []
 		del_list = []
@@ -1185,10 +1242,12 @@ class Database:
 	### PRINTING
 
 	def list_tables(self):
+		"""List all tables in the database"""
 		self.execute("SELECT name FROM sqlite_master WHERE type='table';")
 		pprint(self.cursor.fetchall())
 
 	def print_table(self, name):
+		"""Print a table's entries"""
 		self.execute(f"SELECT * FROM {name}")
 		pprint(self.cursor.fetchall())
 

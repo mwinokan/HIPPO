@@ -30,6 +30,11 @@ FEATURE_PAIR_CUTOFFS = {
 
 class Pose:
 
+	"""A :class:`.Pose` is a particular conformer of a :class:`.Compound` within a protein environment. A pose will have its own (stereochemical) smiles string, and must have a path to a coordinate file. Poses can have *inspirations* that can be used to trace fragment-derived scaffolds in merges and expansions.
+
+	:class:`.Pose` objects should not be created directly. Instead use :meth:`.HIPPO.register_pose` or :meth:`.HIPPO.poses`
+	"""
+
 	def __init__(self, 
 		db,
 		id: int,
@@ -263,6 +268,7 @@ class Pose:
 		return inspirations
 
 	def calculate_fingerprint(self):
+		"""Calculate the pose's interaction fingerprint"""
 
 		if self.path.endswith('.pdb'):
 			
@@ -299,7 +305,12 @@ class Pose:
 
 		fingerprint = {}
 
+		chains = protein_system.chain_names
+
 		for prot_feature in protein_features:
+
+			if prot_feature.chain_name not in chains:
+				continue
 
 			prot_family = prot_feature.family
 
@@ -325,6 +336,7 @@ class Pose:
 		self.fingerprint = fingerprint
 
 	def draw(self):
+		"""Render this pose (and its inspirations)"""
 		
 		assert self.inspirations
 

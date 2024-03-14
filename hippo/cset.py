@@ -14,8 +14,7 @@ import logging
 logger = logging.getLogger('HIPPO')
 
 class CompoundSet:
-
-	# class to access entries in database tables containing compounds
+	"""Object representing the 'compound' table in the :class:`.Database`."""
 
 	def __init__(self, 
 		db: Database, 
@@ -31,6 +30,7 @@ class CompoundSet:
 
 	@property
 	def db(self) -> Database:
+		"""Returns the associated :class:`.database`"""
 		return self._db
 	
 	@property
@@ -38,18 +38,21 @@ class CompoundSet:
 		return self._table
 
 	@property
-	def names(self):
+	def names(self) -> list:
+		"""Returns the names of child compounds"""
 		result = self.db.select(table=self.table, query='compound_name', multiple=True)
 		return [q for q, in result]
 
 	@property
 	def ids(self):
+		"""Returns the IDs of child compounds"""
 		result = self.db.select(table=self.table, query='compound_id', multiple=True)
 		return [q for q, in result]
 	
 	### METHODS
 
 	def get_by_tag(self,tag):
+		"""Get all child compounds with a certain tag"""
 		values = self.db.select_where(query='tag_compound', table='tag', key='name', value=tag, multiple=True)
 		ids = [v for v, in values if v]
 		return self[ids]
@@ -107,6 +110,7 @@ class CompoundSet:
 
 
 class CompoundSubset(CompoundSet):
+	"""Object representing a subset of the 'compound' table in the :class:`.Database`."""
 
 	def __init__(self,
 		db: Database,
@@ -125,25 +129,30 @@ class CompoundSubset(CompoundSet):
 
 	@property
 	def indices(self):
+		"""Returns the ids of compounds in this set"""
 		return self._indices
 
 	@property
 	def ids(self):
+		"""Returns the ids of compounds in this set"""
 		return self.indices
 
 	@property
 	def names(self):
+		"""Returns the names of compounds in this set"""
 		return [self.db.select_where(table=self.table, query='compound_name', key='id', value=i, multiple=False)[0] for i in self.indices]
 
 	### METHODS
 
 	def get_by_tag(self,tag):
+		"""Get all child compounds with a certain tag"""
 		values = self.db.select_where(query='tag_compound', table='tag', key='name', value=tag, multiple=True)
 		ids = [v for v, in values if v]
 		ids = [v for v in ids if v in self.indices]
 		return CompoundSubset(self.db, self.table, ids)
 
 	def draw(self):
+		"""Draw a grid of all contained molecules"""
 		from molparse.rdkit import draw_grid
 
 		data = [(str(c), c.mol) for c in self]
@@ -153,9 +162,15 @@ class CompoundSubset(CompoundSet):
 
 		return draw_grid(mols, labels=labels)
 
-	def get_recipe(self, amount=1):
+	def get_recipe(self, 
+		amount: float = 1, 
+		simplify_network: bool = True,
+	):
+		"""Generate the :class:`.Recipe` to make these compounds."""
 
 		n_comps = len(self)
+
+		assert simplify_network
 
 		if not hasattr(amount, '__iter__'):
 			amount = [amount] * n_comps

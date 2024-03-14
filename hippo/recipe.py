@@ -8,7 +8,7 @@ logger = logging.getLogger('HIPPO')
 
 @dataclass
 class Recipe:
-	""" A Recipe stores data corresponding to a specific synthetic recipe involving one or more reactions."""
+	""" A Recipe stores data corresponding to a specific synthetic recipe involving several products, reactants, intermediates, and reactions."""
 
 	# list of Ingredient options
 	products: list = field(default_factory=list)
@@ -72,6 +72,7 @@ class Recipe:
 			return nx.draw(graph, pos=pos, with_labels=True, font_weight='bold', node_color=list(colors.values()), node_size=sizes)
 
 	def sankey(self):
+		"""draw a plotly Sankey diagram"""
 
 		graph = self.draw(graph_only=True)
 
@@ -112,6 +113,7 @@ class Recipe:
 		return fig
 
 	def summary(self):
+		"""Print a summary of this recipe"""
 		
 		logger.header('Recipe')
 
@@ -132,4 +134,5 @@ class Recipe:
 			logger.var(str(reaction), reaction.reaction_str, dict(unit=reaction.type))
 
 	def get_ingredient(self, id):
+		"""Get an ingredient by its compound ID"""
 		return [r for r in self.reactants + self.products + self.intermediates if r.id == id][0]

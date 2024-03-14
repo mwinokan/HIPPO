@@ -12,6 +12,7 @@ import logging
 logger = logging.getLogger('HIPPO')
 
 class PoseSet:
+	"""Object representing the 'pose' table in the :class:`.Database`."""
 
 	def __init__(self,
 		db: Database,
@@ -27,6 +28,7 @@ class PoseSet:
 	
 	@property
 	def db(self) -> Database:
+		"""Returns the associated :class:`.Database`"""
 		return self._db
 	
 	@property
@@ -35,12 +37,20 @@ class PoseSet:
 
 	@property
 	def names(self):
+		"""Returns the names of child poses"""
 		result = self.db.select(table=self.table, query='pose_name', multiple=True)
+		return [q for q, in result]
+
+	@property
+	def ids(self):
+		"""Returns the IDs of child poses"""
+		result = self.db.select(table=self.table, query='pose_id', multiple=True)
 		return [q for q, in result]
 
 	### METHODS
 
 	def get_by_tag(self,tag):
+		"""Get all child poses with a certain tag"""
 		values = self.db.select_where(query='tag_pose', table='tag', key='name', value=tag, multiple=True)
 		ids = [v for v, in values if v]
 		return self[ids]
@@ -98,6 +108,7 @@ class PoseSet:
 
 
 class PoseSubset(PoseSet):
+	"""Object representing a subset of the 'pose' table in the :class:`.Database`."""
 
 	def __init__(self,
 		db: Database,
@@ -115,10 +126,17 @@ class PoseSubset(PoseSet):
 
 	@property
 	def indices(self):
+		"""Returns the ids of poses in this set"""
+		return self._indices
+
+	@property
+	def ids(self):
+		"""Returns the ids of poses in this set"""
 		return self._indices
 
 	@property
 	def names(self):
+		"""Returns the names of poses in this set"""
 		return [self.db.select_where(table=self.table, query='pose_name', key='id', value=i, multiple=False)[0] for i in self.indices]
 
 	### DUNDERS

@@ -9,6 +9,11 @@ logger = setup_logger('HIPPO')
 
 class Reaction:
 
+	"""A :class:`.Reaction` is a simplified representation of a synthetic pathway to create a product :class:`.Compound`. Reactants (also :class:`.Compound` objects) as well as a reaction type are required.
+
+	:class:`.Reaction` objects should not be created directly. Instead use :meth:`.HIPPO.register_reaction` or :meth:`.HIPPO.reactions`
+	"""
+
 	def __init__(self,
 		db,
 		id: int,
@@ -28,49 +33,59 @@ class Reaction:
 	### PROPERTIES
 
 	@property
-	def id(self):
+	def id(self) -> int:
+		"""Returns the reaction ID"""
 		return self._id
 
 	@property
-	def type(self):
+	def type(self) -> str:
+		"""Returns the reaction tyoe"""
 		return self._type
 
 	@property
 	def product(self):
+		"""Returns the reaction's product :class:`.Compound`"""
 		if isinstance(self._product, int):
 			self._product = self.db.get_compound(id=self._product)
 		return self._product
 
 	@property
-	def product_yield(self):
+	def product_yield(self) -> float:
+		"""Returns the reaction's product yield (fraction)"""
 		return self._product_yield
 
 	@property
 	def db(self):
+		"""Returns a pointer to the parent database"""
 		return self._db
 
 	@property
 	def reactants(self):
+		"""Returns a :class:`.CompoundSubset` of the reactants"""
 		from .cset import CompoundSubset
 		return CompoundSubset(self.db, indices=self.reactant_ids)
 
 	@property
-	def reaction_str(self):
+	def reaction_str(self) -> str:
+		"""Returns a string representing the reaction"""
 		s = ' + '.join([str(r) for r in self.reactants])
 		s = f'{s} -> {str(self.product)}'
 		return s
 
 	@property
-	def reactant_ids(self):
+	def reactant_ids(self) -> set:
+		"""Returns a set of reactant ID's"""
 		return set(v for v in self.get_reactant_ids())
 
 	@property
-	def product_id(self):
+	def product_id(self) -> int:
+		"""Returns the product ID"""
 		return self.product.id
 	
 	### METHODS
 
 	def get_reactant_amount_pairs(self) -> list[Compound]:
+		"""Returns pairs of reactants and their amounts"""
 
 		compound_ids = self.db.select_where(query='reactant_compound, reactant_amount', table='reactant', key='reaction', value=self.id, multiple=True)
 
@@ -91,7 +106,6 @@ class Reaction:
 			return []
 
 	def get_ingredients(self, amount, return_reactions=False, return_intermediates=False):
-
 		"""recursively assemble a list of ingredients and reactions required to make the compound"""
 
 		ingredients = []
@@ -145,6 +159,7 @@ class Reaction:
 	def get_recipe(self, 
 		amount: float = 1, # in mg
 	):
+		"""Get a :class:`.Recipe` describing how to make the product"""
 
 		products = [self.product.as_ingredient(amount=amount)]
 
@@ -155,6 +170,7 @@ class Reaction:
 		return recipe
 
 	def summary(self, amount=1):
+		"""Print a summary of this reaction's information"""
 
 		print(f'{self}.id={self.id}')
 		print(f'{self}.type={self.type}')
@@ -171,6 +187,7 @@ class Reaction:
 		return self.get_recipe(amount)
 
 	def draw(self):
+		"""Draw the molecules involved in this reaction"""
 
 		from molparse.rdkit import draw_grid
 

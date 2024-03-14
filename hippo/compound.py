@@ -13,6 +13,11 @@ logger = logging.getLogger('HIPPO')
 
 class Compound:
 
+	"""A :class:`.Compound` represents a ligand/small molecule with stereochemistry removed and no atomic coordinates. I.e. it represents the chemical structure. It's name is always an InChiKey. If a compound is an elaboration it can have a :meth:`.Compound.base` property which is another :class:`.Compound`. :class:`.Compound` objects are target-agnostic and can be linked to any number of catalogue entries (:class:`.Quote`) or synthetic pathways (:class:`.Reaction`).
+
+	:class:`.Compound` objects should not be created directly. Instead use :meth:`.HIPPO.register_compound` or :meth:`.HIPPO.compounds`
+	"""
+
 	def __init__(self,
 			db,
 			id: int,
@@ -235,7 +240,9 @@ class Compound:
 
 class Ingredient(Compound):
 
-	"""An ingredient is a Compound with a fixed quanitity and an attached quote"""
+	"""An ingredient is a :class:`.Compound` with a fixed quanitity and an attached quote.
+
+	Create one from a :meth:`.Compound.as_ingredient`"""
 
 	def __init__(self, inherit, amount, quote, max_lead_time=None, supplier=None):
 		self._id = inherit.id
@@ -251,11 +258,13 @@ class Ingredient(Compound):
 		self._quote = quote
 
 	@property
-	def amount(self):
+	def amount(self) -> float:
+		"""Returns the amount"""
 		return self._amount
 
 	@amount.setter
 	def amount(self, a):
+		"""Set the amount"""
 
 		quote = self.get_quotes(
 			pick_cheapest=True, 
@@ -269,6 +278,7 @@ class Ingredient(Compound):
 
 	@property
 	def quote(self):
+		"""Returns the associated :class:`Quote`"""
 		return self._quote
 
 	def __repr__(self):

@@ -11,6 +11,7 @@ logger = logging.getLogger('HIPPO')
 from .reaction import Reaction
 
 class ReactionSet:
+	"""Object representing the 'reaction' table in the :class:`.Database`."""
 
 	def __init__(self, 
 		db: Database, 
@@ -24,6 +25,7 @@ class ReactionSet:
 
 	@property
 	def db(self):
+		"""Returns the associated :class:`.Database`"""
 		return self._db
 
 	@property
