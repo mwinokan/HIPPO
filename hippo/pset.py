@@ -76,10 +76,10 @@ class PoseSet:
 				return self.db.get_pose(name=key)
 
 			case list():
-				return PoseSubset(self.db, self.table, key)
+				return PoseSubset(self.db, key)
 
 			case tuple():
-				return PoseSubset(self.db, self.table, key)
+				return PoseSubset(self.db, key)
 
 			case slice():
 
