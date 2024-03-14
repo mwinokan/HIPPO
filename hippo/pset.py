@@ -47,6 +47,12 @@ class PoseSet:
 		result = self.db.select(table=self.table, query='pose_id', multiple=True)
 		return [q for q, in result]
 
+	@property
+	def tags(self):
+		"""Returns the set of unique tags present in this pose set"""
+		values = self.db.select_where(table='tag', query='DISTINCT tag_name', key='tag_pose IS NOT NULL', multiple=True)
+		return set(v for v, in values)
+
 	### METHODS
 
 	def get_by_tag(self,tag):
@@ -54,6 +60,23 @@ class PoseSet:
 		values = self.db.select_where(query='tag_pose', table='tag', key='name', value=tag, multiple=True)
 		ids = [v for v, in values if v]
 		return self[ids]
+
+	def get_by_metadata(self, key: str, value: str | None = None):
+		"""Get all child podrd with by their metadata. If no value is passed, then simply containing the key in the metadata dictionary is sufficient"""
+		results = self.db.select(query='pose_id, pose_metadata', table='pose', multiple=True)
+		if value is None:
+			ids = [i for i,d in results if d and f'"{key}":' in d]
+		else:
+			if isinstance(value, str):
+				value = f'"{value}"'
+			ids = [i for i,d in results if d and f'"{key}": {value}' in d]
+		return self[ids]		
+
+	def summary(self):
+		"""Print a summary of this pose set"""
+		logger.header('PoseSet()')
+		logger.var('#poses', len(self))
+		logger.var('tags', self.tags)
 
 	### DUNDERS
 
@@ -139,6 +162,52 @@ class PoseSubset(PoseSet):
 	def names(self):
 		"""Returns the names of poses in this set"""
 		return [self.db.select_where(table=self.table, query='pose_name', key='id', value=i, multiple=False)[0] for i in self.indices]
+
+	@property
+	def tags(self):
+		"""Returns the set of unique tags present in this pose set"""
+		values = self.db.select_where(table='tag', query='DISTINCT tag_name', key=f'tag_pose in {tuple(self.ids)}', multiple=True)
+		return set(v for v, in values)
+
+	@property
+	def compounds(self):
+		"""Get the compounds associated to this set of poses"""
+		from .cset import CompoundSubset
+		ids = self.db.select_where(table='pose', query='DISTINCT pose_compound', key=f'pose_id in {tuple(self.ids)}', multiple=True)
+		ids = [v for v, in ids]
+		return CompoundSubset(self.db, ids)
+
+	@property
+	def num_compounds(self):
+		"""Count the compounds associated to this set of poses"""
+		return len(self.compounds)
+
+	### METHODS
+
+	def get_by_tag(self,tag):
+		"""Get all child poses with a certain tag"""
+		values = self.db.select_where(query='tag_pose', table='tag', key='name', value=tag, multiple=True)
+		ids = [v for v, in values if v and v in self.ids]
+		return PoseSubset(self.db, ids)
+
+	def get_by_metadata(self, key: str, value: str | None = None):
+		"""Get all child poses with by their metadata. If no value is passed, then simply containing the key in the metadata dictionary is sufficient"""
+		results = self.db.select(query='pose_id, pose_metadata', table='pose', multiple=True)
+		if value is None:
+			ids = [i for i,d in results if d and f'"{key}":' in d and i in self.ids]
+		else:
+			if isinstance(value, str):
+				value = f'"{value}"'
+			ids = [i for i,d in results if d and f'"{key}": {value}' in d and i in self.ids]
+		return PoseSubset(self.db, ids)		
+
+	def summary(self):
+		"""Print a summary of this pose set"""
+		logger.header('PoseSubset()')
+		logger.var('#poses', len(self))
+		logger.var('#compounds', self.num_compounds)
+		logger.var('tags', self.tags)
+
 
 	### DUNDERS
 

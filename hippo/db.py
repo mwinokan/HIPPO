@@ -835,16 +835,21 @@ class Database:
 
 		return result
 
-	def select_where(self, query, table, key, value, multiple=False, none='error', sort=None):
+	def select_where(self, query, table, key, value=None, multiple=False, none='error', sort=None):
 		"""Select entries where key==value"""
+
+		if value is not None:
+			where_str = f'{table}_{key}={value}'
+		else:
+			where_str = key
 
 		if isinstance(value, str):
 			value = f"'{value}'"
 
 		if sort:
-			sql = f'SELECT {query} FROM {table} WHERE {table}_{key}={value} ORDER BY {sort}'
+			sql = f'SELECT {query} FROM {table} WHERE {where_str} ORDER BY {sort}'
 		else:
-			sql = f'SELECT {query} FROM {table} WHERE {table}_{key}={value}'
+			sql = f'SELECT {query} FROM {table} WHERE {where_str}'
 
 		try:
 			self.execute(sql)
@@ -1188,11 +1193,11 @@ class Database:
 
 		if return_similarity:
 			ids, similarities = zip(*result)
-			cset = CompoundSubset(self, 'compound', ids)
+			cset = CompoundSubset(self, ids)
 			return cset, similarities
 
 		ids = [r for r, in result]
-		cset = CompoundSubset(self, 'compound', ids)
+		cset = CompoundSubset(self, ids)
 
 		return cset
 
@@ -1209,9 +1214,14 @@ class Database:
 		self.execute(sql)
 		return self.cursor.fetchone()[0]
 
-	def count_where(self, table, key, value):
+	def count_where(self, table, key, value=None):
 		"""Count all entries in a table where key==value"""
-		sql = f"""SELECT COUNT(1) FROM {table} WHERE {table}_{key} is {value}; """
+		if value is not None:
+			where_str = f'{table}_{key} is {value}'
+		else:
+			where_str = key
+
+		sql = f"""SELECT COUNT(1) FROM {table} WHERE {where_str};"""
 		self.execute(sql)
 		return self.cursor.fetchone()[0]
 

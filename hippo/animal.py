@@ -102,6 +102,26 @@ class HIPPO:
 		"""Returns a :doc:`TagSet <metadata>` object, which interfaces to the tag table in the database"""
 		return self._tags
 	
+	@property
+	def num_compounds(self):
+		"""Returns the number of compounds"""
+		return len(self.compounds)
+
+	@property
+	def num_poses(self):
+		"""Returns the number of poses"""
+		return len(self.poses)
+
+	@property
+	def num_reactions(self):
+		"""Returns the number of reactions"""
+		return len(self.reactions)
+
+	@property
+	def num_tags(self):
+		"""Returns the number of tags"""
+		return len(self.tags.unique)
+
 	### BULK INSERTION
 
 	def add_hits(self, 
@@ -394,6 +414,18 @@ class HIPPO:
 		"""Plot an interaction punchcard for a set of poses"""
 		from .plotting import plot_interaction_punchcard
 		return plot_interaction_punchcard(self, poses=poses, subtitle=subtitle, opacity=opacity, **kwargs)
+
+	### OTHER
+
+	def summary(self):
+		"""Print a summary of this HIPPO"""
+		logger.header(self)
+		logger.var('db_path', self.db_path)
+		logger.var('#compounds', self.num_compounds)
+		logger.var('#poses', self.num_poses)
+		logger.var('#reactions', self.num_reactions)
+		logger.var('#tags', self.num_tags)
+		logger.var('tags', self.tags.unique)
 
 	### DUNDERS
 

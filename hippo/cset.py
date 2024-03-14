@@ -49,6 +49,12 @@ class CompoundSet:
 		result = self.db.select(table=self.table, query='compound_id', multiple=True)
 		return [q for q, in result]
 	
+	@property
+	def tags(self):
+		"""Returns the set of unique tags present in this compound set"""
+		values = self.db.select_where(table='tag', query='DISTINCT tag_name', key='tag_compound IS NOT NULL', multiple=True)
+		return set(v for v, in values)
+
 	### METHODS
 
 	def get_by_tag(self,tag):
@@ -56,6 +62,24 @@ class CompoundSet:
 		values = self.db.select_where(query='tag_compound', table='tag', key='name', value=tag, multiple=True)
 		ids = [v for v, in values if v]
 		return self[ids]
+
+	def get_by_metadata(self, key: str, value: str | None = None):
+		"""Get all child compounds with by their metadata. If no value is passed, then simply containing the key in the metadata dictionary is sufficient"""
+		results = self.db.select(query='compound_id, compound_metadata', table='compound', multiple=True)
+		if value is None:
+			ids = [i for i,d in results if d and f'"{key}":' in d]
+		else:
+			if isinstance(value, str):
+				value = f'"{value}"'
+			ids = [i for i,d in results if d and f'"{key}": {value}' in d]
+		return self[ids]		
+
+	def summary(self):
+		"""Print a summary of this compound set"""
+		logger.header('CompoundSet()')
+		logger.var('#compounds', len(self))
+		# logger.var('#poses', self.num_poses)
+		logger.var('tags', self.tags)
 
 	### DUNDERS
 
@@ -79,10 +103,10 @@ class CompoundSet:
 				return self.db.get_compound(table=self.table, name=key)
 
 			case list():
-				return CompoundSubset(self.db, self.table, key)
+				return CompoundSubset(self.db, key)
 
 			case tuple():
-				return CompoundSubset(self.db, self.table, key)
+				return CompoundSubset(self.db, key)
 
 			case slice():
 
@@ -92,7 +116,7 @@ class CompoundSet:
 
 				indices = [i for i in range(start, stop, step)]
 
-				return CompoundSubset(self.db, self.table, indices)
+				return CompoundSubset(self.db, indices)
 
 			case _:
 				logger.error(f'Unsupported type for CompoundSet.__getitem__(): {key=} {type(key)}')
@@ -114,8 +138,9 @@ class CompoundSubset(CompoundSet):
 
 	def __init__(self,
 		db: Database,
-		table: str = 'compound',
 		indices: list = None,
+		*,
+		table: str = 'compound',
 	):
 
 		self._db = db
@@ -142,14 +167,44 @@ class CompoundSubset(CompoundSet):
 		"""Returns the names of compounds in this set"""
 		return [self.db.select_where(table=self.table, query='compound_name', key='id', value=i, multiple=False)[0] for i in self.indices]
 
+	@property
+	def tags(self):
+		"""Returns the set of unique tags present in this compound set"""
+		values = self.db.select_where(table='tag', query='DISTINCT tag_name', key=f'tag_compound in {tuple(self.ids)}', multiple=True)
+		return set(v for v, in values)
+
+	@property
+	def num_poses(self):
+		"""Count the poses associated to this set of compounds"""
+		from .pset import PoseSubset
+		return self.db.count_where(table='pose', key=f'pose_compound in {tuple(self.ids)}')
+
+	@property
+	def poses(self):
+		"""Get the poses associated to this set of compounds"""
+		from .pset import PoseSubset
+		ids = self.db.select_where(query='pose_id', table='pose', key=f'pose_compound in {tuple(self.ids)}', multiple=True)
+		ids = [v for v, in ids]
+		return PoseSubset(self.db, ids)
+
 	### METHODS
 
 	def get_by_tag(self,tag):
 		"""Get all child compounds with a certain tag"""
 		values = self.db.select_where(query='tag_compound', table='tag', key='name', value=tag, multiple=True)
-		ids = [v for v, in values if v]
-		ids = [v for v in ids if v in self.indices]
-		return CompoundSubset(self.db, self.table, ids)
+		ids = [v for v, in values if v and v in self.ids]
+		return CompoundSubset(self.db, ids)
+
+	def get_by_metadata(self, key: str, value: str | None = None):
+		"""Get all child compounds with by their metadata. If no value is passed, then simply containing the key in the metadata dictionary is sufficient"""
+		results = self.db.select(query='compound_id, compound_metadata', table='compound', multiple=True)
+		if value is None:
+			ids = [i for i,d in results if d and f'"{key}":' in d and i in self.ids]
+		else:
+			if isinstance(value, str):
+				value = f'"{value}"'
+			ids = [i for i,d in results if d and f'"{key}": {value}' in d and i in self.ids]
+		return CompoundSubset(self.db, ids)		
 
 	def draw(self):
 		"""Draw a grid of all contained molecules"""
@@ -208,6 +263,13 @@ class CompoundSubset(CompoundSet):
 					intermediates.append(intermediate) 
 
 		return Recipe(products=products, reactants=reactants, reactions=reactions, intermediates=intermediates)
+
+	def summary(self):
+		"""Print a summary of this compound set"""
+		logger.header('CompoundSubset()')
+		logger.var('#compounds', len(self))
+		logger.var('#poses', self.num_poses)
+		logger.var('tags', self.tags)
 
 	### DUNDERS
 

@@ -6,6 +6,7 @@ from rdkit import Chem
 from .pose import Pose
 # from .pset import PoseSubset
 from .tags import TagSubset
+# from .rset import ReactionSet
 
 import logging
 logger = logging.getLogger('HIPPO')
@@ -101,6 +102,16 @@ class Compound:
 		return self.db.count_where(table='pose', key='compound', value=self.id)
 
 	@property
+	def num_reactions(self) -> int:
+		"""Returns the number of associated reactions (product)"""
+		return self.db.count_where(table='reaction', key='product', value=self.id)
+
+	@property
+	def num_reactant(self) -> int:
+		"""Returns the number of associated reactions (reactant)"""
+		return self.db.count_where(table='reactant', key='compound', value=self.id)
+
+	@property
 	def base(self):
 		"""Returns the base compound for this elaboration"""
 		if isinstance(self._base, int):
@@ -115,7 +126,7 @@ class Compound:
 	@property
 	def reactions(self):
 		"""Returns the reactions resulting in this compound"""
-		return self.get_reactions(none=False)
+		return self.get_reactions(none=False, prune_duplicate=False)
 
 	@property
 	def dict(self) -> dict:
@@ -175,16 +186,20 @@ class Compound:
 		
 		return quotes
 
-	def get_reactions(self, none='error') -> list:
+	def get_reactions(self, none='error', as_reactant=False, prune_duplicate=True) -> list:
+		"""Get the associated reactions as product, unless as_reactant is True."""
 
-		reaction_ids = self.db.select_where(query='reaction_id', table='reaction', key='product', value=self.id, multiple=True, none=none)
+		if as_reactant:
+			reaction_ids = self.db.select_where(query='reactant_reaction', table='reactant', key='compound', value=self.id, multiple=True, none=none)
+		else:
+			reaction_ids = self.db.select_where(query='reaction_id', table='reaction', key='product', value=self.id, multiple=True, none=none)
 
 		if reaction_ids:
 			reactions = [self.db.get_reaction(id=q[0]) for q in reaction_ids]
 		else:
 			return []
 
-		if len(reactions) > 1:
+		if not as_reactant and prune_duplicate and len(reactions) > 1:
 			reactions = self.db.prune_reactions(compound=self, reactions=reactions)
 
 		return reactions
@@ -226,6 +241,17 @@ class Compound:
 			return draw_mcs({self.base.smiles:f'{self.base} (base)', self.smiles:str(self)})
 		else:
 			display(self.mol)
+
+	def summary(self):
+		"""Print a summary of this compound"""
+		logger.header(repr(self))
+		logger.var('smiles', self.smiles)
+		logger.var('base', self.base)
+		logger.var('#poses', self.num_poses)
+		logger.var('#reactions (product)', self.num_reactions)
+		logger.var('#reactions (reactant)', self.num_reactant)
+		logger.var('tags', self.tags)
+		logger.var('metadata', str(self.metadata))
 
 	### DUNDERS
 
