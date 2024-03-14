@@ -112,8 +112,9 @@ class PoseSubset(PoseSet):
 
 	def __init__(self,
 		db: Database,
-		table: str = 'pose',
 		indices: list = None,
+		*,
+		table: str = 'pose',
 	):
 		self._db = db
 		self._table = table
