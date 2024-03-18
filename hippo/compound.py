@@ -25,6 +25,7 @@ class Compound:
 			name: str,
 			smiles: str,
 			base: int,
+			alias: str,
 			mol: Chem.Mol | bytes | None = None,
 			metadata: dict | None = None,
 	):
@@ -33,6 +34,7 @@ class Compound:
 		self._name = name
 		self._smiles = smiles
 		self._base = base
+		self._alias = alias
 		self._tags = None
 		self._table = 'compound'
 
@@ -63,6 +65,11 @@ class Compound:
 	def smiles(self) -> str:
 		"""Returns the compound's (flattened) smiles"""
 		return self._smiles
+
+	@property
+	def alias(self) -> str:
+		"""Returns the compound's alias"""
+		return self._alias
 	
 	@property
 	def mol(self) -> Chem.Mol:
@@ -132,7 +139,7 @@ class Compound:
 	def dict(self) -> dict:
 		"""Returns a dictionary of this compound"""
 
-		serialisable_fields = ['id','name','smiles']
+		serialisable_fields = ['id','name','smiles','alias']
 
 		data = {}
 		for key in serialisable_fields:

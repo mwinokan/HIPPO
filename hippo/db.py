@@ -155,6 +155,7 @@ class Database:
 		sql = """CREATE TABLE compound(
 			compound_id INTEGER PRIMARY KEY,
 			compound_name TEXT,
+			compound_alias TEXT,
 			compound_smiles TEXT,
 			compound_base INTEGER,
 			compound_mol MOL,
@@ -341,6 +342,7 @@ class Database:
 		*,
 		smiles: str, 
 		base: Compound | int | None = None, 
+		alias: str | None = None,
 		tags: None | list = None, 
 		warn_duplicate=True,
 		commit=True,
@@ -366,12 +368,12 @@ class Database:
 		# logger.debug(f'{smiles} --> {name}')
 
 		sql = """
-		INSERT INTO compound(compound_name, compound_smiles, compound_base, compound_mol, compound_pattern_bfp, compound_morgan_bfp)
-		VALUES(?1, ?2, ?3, mol_from_smiles(?2), mol_pattern_bfp(mol_from_smiles(?2), 2048), mol_morgan_bfp(mol_from_smiles(?2), 2, 2048))
+		INSERT INTO compound(compound_name, compound_smiles, compound_base, compound_mol, compound_pattern_bfp, compound_morgan_bfp, compound_alias)
+		VALUES(?1, ?2, ?3, mol_from_smiles(?2), mol_pattern_bfp(mol_from_smiles(?2), 2048), mol_morgan_bfp(mol_from_smiles(?2), 2, 2048), ?4)
 		"""
 
 		try:
-			self.execute(sql, (name, smiles, base))
+			self.execute(sql, (name, smiles, base, alias))
 
 		except sqlite3.IntegrityError as e:
 			if 'UNIQUE constraint failed: compound.compound_name' in str(e):
@@ -838,13 +840,13 @@ class Database:
 	def select_where(self, query, table, key, value=None, multiple=False, none='error', sort=None):
 		"""Select entries where key==value"""
 
+		if isinstance(value, str):
+			value = f"'{value}'"
+
 		if value is not None:
 			where_str = f'{table}_{key}={value}'
 		else:
 			where_str = key
-
-		if isinstance(value, str):
-			value = f"'{value}'"
 
 		if sort:
 			sql = f'SELECT {query} FROM {table} WHERE {where_str} ORDER BY {sort}'
@@ -950,7 +952,7 @@ class Database:
 			logger.error(f'Invalid {id=}')
 			return None
 
-		query = 'compound_id, compound_name, compound_smiles, compound_base'
+		query = 'compound_id, compound_name, compound_smiles, compound_base, compound_alias'
 		entry = self.select_where(query=query, table=table, key='id', value=id)
 		compound = Compound(self, *entry, metadata=None, mol=None)
 		return compound

@@ -160,6 +160,9 @@ class Pose:
 
 				raise NotImplementedError
 
+			if not mol:
+				logger.error(f'Could not parse {self}.path={self.path}')
+
 		return self._mol
 
 	@mol.setter
@@ -226,21 +229,7 @@ class Pose:
 	@property
 	def dict(self):
 		"""Serialised dictionary representing the pose"""
-
-		serialisable_fields = ['id','name','smiles','path','reference']
-
-		data = {}
-		for key in serialisable_fields:
-			data[key] = getattr(self, key)
-
-		data['compound'] = self.compound.name
-		data['target'] = self.target.name
-
-		if metadata := self.metadata:
-			for key in metadata:
-				data[key] = metadata[key]
-
-		return data
+		return self.get_dict()
 
 	@property
 	def table(self):
@@ -266,6 +255,49 @@ class Pose:
 			inspirations = PoseSubset(self.db, indices=inspirations)
 
 		return inspirations
+
+	def get_dict(self, 
+		mol: bool = False, 
+		inspirations: bool | str = True, 
+		reference: bool | str = True,
+		metadata: bool = True,
+	) -> dict:
+
+		"""Returns a dictionary representing this Pose. Arguments:
+
+		mol (bool): [True, False]
+		inspirations (bool): [True, False, 'fragalysis']
+		reference (bool): [True, False, 'name']
+
+		"""
+
+		serialisable_fields = ['id','name','smiles','path']
+
+		data = {}
+		for key in serialisable_fields:
+			data[key] = getattr(self, key)
+
+		if mol:
+			data['mol'] = self.mol
+
+		data['compound'] = self.compound.name
+		data['target'] = self.target.name
+		
+		if inspirations == 'fragalysis':
+			data['inspirations'] = ','.join([p.name for p in self.inspirations])
+		elif inspirations:
+			data['inspirations'] = self.inspirations
+
+		if reference == 'name':
+			data['reference'] = self.reference.name
+		elif reference:
+			data['reference'] = self.reference
+
+		if metadata and (metadict := self.metadata):
+			for key in metadict:
+				data[key] = metadict[key]
+
+		return data
 
 	def calculate_fingerprint(self):
 		"""Calculate the pose's interaction fingerprint"""
@@ -353,3 +385,10 @@ class Pose:
 
 	def __repr__(self):
 		return f'{mcol.bold}{mcol.underline}{self.compound}->{self}{mcol.unbold}{mcol.ununderline}'
+
+	def __eq__(self, other):
+
+		if isinstance(other, int):
+			return self.id == other
+
+		return self.id == other.id

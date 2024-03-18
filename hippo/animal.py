@@ -261,7 +261,124 @@ class HIPPO:
 		logger.var('#compounds registered', count_compound_registered)
 		logger.var('#poses registered', count_poses_registered)
 
-		return meta_df
+	def add_compounds(self, 
+		target: str,
+		sdf_path: str | Path, 
+		*,
+		reference: int | Pose | None = None,
+		tags: None | list = None,
+		output_directory: str | Path | None = None,
+		mol_col='ROMol',
+		name_col='ID',
+		inspiration_col = 'ref_mols',
+		skip_first=False,
+		convert_floats=True,
+	):
+
+		"""Add virtual hits from an SDF into the database.
+
+		All columns except those specified via arguments mol_col and name_col are added to the Pose metadata.
+		"""
+
+		if not isinstance(sdf_path, Path):
+			sdf_path = Path(sdf_path)
+
+		logger.debug(f'{sdf_path=}')
+
+		tags = tags or []
+
+		from rdkit.Chem import PandasTools, MolToMolFile, MolFromMolFile
+		from molparse.rdkit import mol_to_smiles, mol_to_pdb_block
+		from numpy import isnan
+
+		df = PandasTools.LoadSDF(sdf_path)
+
+		df_columns = list(df.columns)
+
+		target = self.register_target(target).name
+
+		assert mol_col in df_columns
+		assert name_col in df_columns
+		assert inspiration_col in df_columns
+
+		df_columns.pop(df_columns.index(mol_col))
+		df_columns.pop(df_columns.index(name_col))
+		df_columns.pop(df_columns.index(inspiration_col))
+
+		if not output_directory:
+			import os
+			output_directory = str(sdf_path.name).removesuffix('.sdf')
+			logger.writing(f'Creating output directory {output_directory}')
+			os.system(f'mkdir -p {output_directory}')
+
+		output_directory = Path(output_directory)
+
+		for i,row in tqdm(df.iterrows()):
+
+			name = row[name_col].strip()
+
+			if name == 'ver_1.2':
+				logger.warning('Skipping Fragalysis header molecule')
+				continue
+			
+			mol = row[mol_col]
+
+			if not name:
+				name = f'pose_{i}'
+
+			mol_path = output_directory / f'{name}.mol'
+
+			MolToMolFile(mol, mol_path)
+
+			smiles = mol_to_smiles(mol)
+
+			comp = self.register_compound(smiles=smiles, tags=tags)
+
+			# inspirations
+
+			inspirations = []
+
+			insp_str = row[inspiration_col]
+
+			insp_str = insp_str.removeprefix('[')
+			insp_str = insp_str.removesuffix(']')
+			insp_str = insp_str.replace("'", "")
+
+			for insp in insp_str.split(','):
+				insp = insp.strip()
+
+				pose = self.poses[insp]
+				if pose:
+					inspirations.append(pose)
+
+			# metadata
+			metadata = {}
+
+			for col in df_columns:
+				value = row[col]
+				if isinstance(value, float) and isnan(value):
+					continue
+
+				if convert_floats:
+					try:
+						value = float(value)
+					except ValueError:
+						pass
+
+				metadata[col] = value
+
+			pose = self.register_pose(
+				name=name, 
+				compound=comp, 
+				target=target, 
+				path=mol_path, 
+				metadata=metadata, 
+				inspirations=inspirations, 
+				tags=tags, 
+				reference=reference
+			)
+
+		return df_columns
 
 	### SINGLE INSERTION
 
@@ -336,7 +453,6 @@ class HIPPO:
 		return self.reactions[reaction_id]
 
 	def register_target(self,
-		*,
 		name: str,
 	) -> Target:
 		
@@ -361,13 +477,20 @@ class HIPPO:
 		commit: bool = True,
 		overwrite_metadata: bool = True,
 	) -> Pose:
+
+		if isinstance(compound, int):
+			compound_id = compound
+		else:
+			compound_id = compound.id
 		
 		pose_id = self.db.insert_pose(
 			compound=compound, name=name, target=target, path=path, 
 			tags=tags, metadata=metadata, reference=reference, warn_duplicate=True, commit=commit)
 		
 		if not pose_id:
-			pose_id, = self.db.select_where(table='pose', query='pose_id', key='path', value=path, none='quiet')
+			if isinstance(path, Path):
+				path = path.resolve()
+			pose_id, = self.db.select_where(table='pose', query='pose_id', key='path', value=str(path))
 
 		if not pose_id:
 			logger.var('compound', compound)
@@ -381,11 +504,17 @@ class HIPPO:
 
 			raise Exception
 
-		if return_pose:
+		if return_pose or (metadata and not overwrite_metadata):
 			pose = self.poses[pose_id]
+
+			if metadata:
+				pose.metadata.update(metadata)
 		
 		else:
 			pose = pose_id
+
+		if overwrite_metadata:
+			self.db.insert_metadata(table='pose', id=compound_id, payload=metadata, commit=commit)
 
 		inspirations = inspirations or []
 		for inspiration in inspirations:

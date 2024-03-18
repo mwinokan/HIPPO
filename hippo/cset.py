@@ -102,11 +102,21 @@ class CompoundSet:
 			case str():
 				return self.db.get_compound(table=self.table, name=key)
 
-			case list():
-				return CompoundSubset(self.db, key)
+			case key if isinstance(key, list) or isinstance(key, tuple):
 
-			case tuple():
-				return CompoundSubset(self.db, key)
+				indices = []
+				for i in key:
+					if isinstance(i,int):
+						index = i
+					elif isinstance(i,str):
+						index = self.db.get_compound_id(name=i)
+					else:
+						raise NotImplementedError
+
+					assert index
+					indices.append(index)
+
+				return CompoundSubset(self.db, indices)
 
 			case slice():
 

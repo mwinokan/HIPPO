@@ -70,7 +70,7 @@ class PoseSet:
 			if isinstance(value, str):
 				value = f'"{value}"'
 			ids = [i for i,d in results if d and f'"{key}": {value}' in d]
-		return self[ids]		
+		return self[ids]			
 
 	def summary(self):
 		"""Print a summary of this pose set"""
@@ -98,11 +98,21 @@ class PoseSet:
 			case str():
 				return self.db.get_pose(name=key)
 
-			case list():
-				return PoseSubset(self.db, key)
+			case key if isinstance(key, list) or isinstance(key, tuple) or isinstance(key, set):
 
-			case tuple():
-				return PoseSubset(self.db, key)
+				indices = []
+				for i in key:
+					if isinstance(i,int):
+						index = i
+					elif isinstance(i,str):
+						index = self.db.get_pose_id(name=i)
+					else:
+						raise NotImplementedError
+
+					assert index
+					indices.append(index)
+
+				return PoseSubset(self.db, indices)
 
 			case slice():
 
@@ -144,6 +154,9 @@ class PoseSubset(PoseSet):
 
 		indices = indices or []
 
+		if not isinstance(indices, list):
+			indices = list(indices)
+
 		self._indices = indices
 
 	### PROPERTIES
@@ -164,6 +177,11 @@ class PoseSubset(PoseSet):
 		return [self.db.select_where(table=self.table, query='pose_name', key='id', value=i, multiple=False)[0] for i in self.indices]
 
 	@property
+	def smiles(self):
+		"""Returns the smiles of poses in this set"""
+		return [self.db.select_where(table=self.table, query='pose_smiles', key='id', value=i, multiple=False)[0] for i in self.indices]
+
+	@property
 	def tags(self):
 		"""Returns the set of unique tags present in this pose set"""
 		values = self.db.select_where(table='tag', query='DISTINCT tag_name', key=f'tag_pose in {tuple(self.ids)}', multiple=True)
@@ -181,6 +199,11 @@ class PoseSubset(PoseSet):
 	def num_compounds(self):
 		"""Count the compounds associated to this set of poses"""
 		return len(self.compounds)
+
+	@property
+	def df(self):
+		"""Get a DataFrame of the poses in this set"""
+		return self.get_df(mol=True)
 
 	### METHODS
 
@@ -201,6 +224,44 @@ class PoseSubset(PoseSet):
 			ids = [i for i,d in results if d and f'"{key}": {value}' in d and i in self.ids]
 		return PoseSubset(self.db, ids)		
 
+	def get_by_inspiration(self, inspiration: int | Pose, inverse=False):
+		"""Get all child poses with with this inspiration."""
+
+		ids = set()
+
+		for pose in self:
+			if not inverse:
+				for pose_inspiration in pose.inspirations:
+					if pose_inspiration == inspiration:
+						ids.add(pose.id)
+						break
+
+			elif inverse:
+				for pose_inspiration in pose.inspirations:
+					if pose_inspiration == inspiration:
+						break
+				else:
+					ids.add(pose.id)
+
+		return PoseSubset(self.db, ids)
+
+	def get_df(self, skip_no_mol=True, **kwargs):
+		"""Get a DataFrame of the poses in this set"""
+		
+		from pandas import DataFrame
+
+		data = []
+
+		for pose in self:
+			d = pose.get_dict(**kwargs)
+
+			if not d['mol']:
+				logger.warning(f'Skipping pose with no mol: {d["id"]} {d["name"]}')
+				continue
+			data.append(d)
+
+		return DataFrame(data)
+
 	def summary(self):
 		"""Print a summary of this pose set"""
 		logger.header('PoseSubset()')
@@ -208,6 +269,102 @@ class PoseSubset(PoseSet):
 		logger.var('#compounds', self.num_compounds)
 		logger.var('tags', self.tags)
 
+	def write_sdf(self, out_path, name_col='name'):
+
+		"""Write an SDF"""
+
+		df = self.get_df(mol=True)
+		
+		df.rename(inplace=True, columns={name_col:'_Name', 'mol':'ROMol'})
+
+		logger.writing(out_path)
+			
+		from rdkit.Chem import PandasTools
+		PandasTools.WriteSDF(df, out_path, "ROMol", "_Name", list(df.columns))
+
+
+	def to_fragalysis(self, 
+		out_path,
+
+		*,
+		method,
+		ref_url,
+		submitter_name,
+		submitter_email,
+		submitter_institution,
+		metadata: bool = True,
+	):
+
+		"""Prepare an SDF for upload to the RHS of Fragalysis"""
+
+		from .fragalysis import generate_header
+		from rdkit.Chem import SDWriter, PandasTools
+
+		name_col = '_Name'
+		mol_col = 'ROMol'
+
+		# get the dataframe of poses
+
+		pose_df = self.get_df(mol=True, inspirations='fragalysis', reference='name', metadata=metadata)
+		pose_df = pose_df.drop(columns=['id', 'path', 'compound', 'target', 'ref_pdb', 'original SMILES'], errors='ignore')
+
+		pose_df.rename(inplace=True, columns=
+			{'name':name_col, 
+			 'mol':mol_col, 
+			 'inspirations':'ref_mols',
+			 'reference':'ref_pdb',
+			 'smiles':'original SMILES',
+			})
+
+		# create the header molecule
+		
+		df_cols = set(pose_df.columns)
+
+		header = generate_header(
+			self[1],
+			method=method,
+			ref_url=ref_url,
+			submitter_name=submitter_name,
+			submitter_email=submitter_email,
+			submitter_institution=submitter_institution,
+			extras={'smiles':'smiles', 'ref_mols':'fragment inspirations'},
+			metadata=metadata,
+		)
+
+		# return header
+
+		header_cols = set(header.GetPropNames())
+
+		# print(df_cols - header_cols)
+		# print(header_cols - df_cols)
+		# print(df_cols)
+
+		# empty properties
+		pose_df['generation_date'] = [None] * len(pose_df)
+		pose_df['submitter_name'] = [None] * len(pose_df)
+		pose_df['method'] = [None] * len(pose_df)
+		pose_df['submitter_email'] = [None] * len(pose_df)
+		pose_df['ref_url'] = [None] * len(pose_df)
+
+		fields = []
+
+		logger.writing(out_path)
+
+		with open(out_path, 'w') as sdfh:
+			with SDWriter(sdfh) as w:
+				w.write(header)
+			PandasTools.WriteSDF(pose_df, sdfh, mol_col, name_col, set(pose_df.columns))
+
+		return pose_df
+
+	def draw(self):
+		"""Render this pose set with Py3Dmol"""
+		
+		from molparse.rdkit import draw_mols
+
+		mols = [p.mol for p in self]
+
+		return draw_mols(mols)
 
 	### DUNDERS
 
