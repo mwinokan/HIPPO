@@ -205,7 +205,7 @@ class PoseSet(PoseTable):
 		"""Get a DataFrame of the poses in this set"""
 		return self.get_df(mol=True)
 
-	### METHODS
+	### FILTERING
 
 	def get_by_tag(self,tag):
 		"""Get all child poses with a certain tag"""
@@ -262,12 +262,11 @@ class PoseSet(PoseTable):
 
 		return DataFrame(data)
 
-	def summary(self):
-		"""Print a summary of this pose set"""
-		logger.header('PoseSet()')
-		logger.var('#poses', len(self))
-		logger.var('#compounds', self.num_compounds)
-		logger.var('tags', self.tags)
+	### TAGGING
+
+	
+
+	### EXPORTING
 
 	def write_sdf(self, out_path, name_col='name'):
 
@@ -281,7 +280,6 @@ class PoseSet(PoseTable):
 			
 		from rdkit.Chem import PandasTools
 		PandasTools.WriteSDF(df, out_path, "ROMol", "_Name", list(df.columns))
-
 
 	def to_fragalysis(self, 
 		out_path,
@@ -321,7 +319,7 @@ class PoseSet(PoseTable):
 		df_cols = set(pose_df.columns)
 
 		header = generate_header(
-			self[1],
+			self[0],
 			method=method,
 			ref_url=ref_url,
 			submitter_name=submitter_name,
@@ -365,6 +363,15 @@ class PoseSet(PoseTable):
 		mols = [p.mol for p in self]
 
 		return draw_mols(mols)
+
+	### OTHER
+
+	def summary(self):
+		"""Print a summary of this pose set"""
+		logger.header('PoseSet()')
+		logger.var('#poses', len(self))
+		logger.var('#compounds', self.num_compounds)
+		logger.var('tags', self.tags)
 
 	### DUNDERS
 

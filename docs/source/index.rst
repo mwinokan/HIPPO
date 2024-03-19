@@ -58,6 +58,8 @@ A :class:`.Reaction` is a simplified representation of a synthetic pathway to cr
    
    Inserting synthetic pathways <insert_reactions>
 
+   Preparing files for Fragalysis upload <fragalysis>
+
    Quoting with Pycule <pycule_tutorial>
 
    API Reference <api_reference>

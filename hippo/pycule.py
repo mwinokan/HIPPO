@@ -53,9 +53,13 @@ class Quoter:
 		"""Get quotes for a compound"""
 		return self._get_quote(compound)
 
+	def __call__(self, compound):
+		"""Get quotes for a compound"""
+		return self.get_quote(compound)
+
 	### ENAMINE
 
-	def get_enamine_quote(self, compound):
+	def get_enamine_quote(self, compound, currency="USD"):
 
 		try:
 		
@@ -68,7 +72,7 @@ class Quoter:
 				logger.header(f'Searching in {self.supplier} {catalogue}...')
 
 				try:
-					result = self.wrapper.exactsearch(compound.smiles, catalogue)
+					result = self.wrapper.exactsearch(smiles=compound.smiles, currency=currency, catalogue=catalogue)
 				except requests.ConnectionError as e:
 					logger.error(f'ConnectionError: {e}')
 					return None

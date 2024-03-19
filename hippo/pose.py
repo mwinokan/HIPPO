@@ -185,6 +185,36 @@ class Pose:
 		self._protein_system = a
 
 	@property
+	def complex_system(self):
+
+		if self.has_complex_pdb_path:
+			return mp.parse(self.path, verbosity=False)
+
+		elif self.reference:
+
+			# construct from .mol and reference
+
+			system = self.reference.protein_system.copy()
+
+			system.name = f'{self.target.name}_{self.reference.name}_{self.compound.name}'
+
+			from molparse.rdkit import mol_to_AtomGroup
+			ligand = mol_to_AtomGroup(self.mol)
+
+			for atom in ligand.atoms:
+				system.add_atom(atom)
+
+			return system
+
+		else:
+
+			raise NotImplementedError
+
+	@property
+	def has_complex_pdb_path(self):
+		return self.path.endswith('.pdb')
+
+	@property
 	def metadata(self):
 		"""Returns the pose's metadata"""
 		if self._metadata is None:
@@ -377,6 +407,8 @@ class Pose:
 		mols = [self.mol] + [i.mol for i in self.inspirations]
 
 		return draw_mols(mols)
+
+
 
 	### DUNDERS
 
