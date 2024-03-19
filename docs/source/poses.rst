@@ -4,8 +4,8 @@ Poses
 .. autoclass:: hippo.pose.Pose
     :members:
 
-.. autoclass:: hippo.pset.PoseSet
+.. autoclass:: hippo.pset.PoseTable
     :members:
 
-.. autoclass:: hippo.pset.PoseSubset
+.. autoclass:: hippo.pset.PoseSet
     :members:

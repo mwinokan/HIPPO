@@ -61,9 +61,9 @@ class Reaction:
 
 	@property
 	def reactants(self):
-		"""Returns a :class:`.CompoundSubset` of the reactants"""
-		from .cset import CompoundSubset
-		return CompoundSubset(self.db, indices=self.reactant_ids)
+		"""Returns a :class:`.CompoundSet` of the reactants"""
+		from .cset import CompoundSet
+		return CompoundSet(self.db, indices=self.reactant_ids)
 
 	@property
 	def reaction_str(self) -> str:

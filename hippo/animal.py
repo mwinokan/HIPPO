@@ -1,8 +1,8 @@
 
 import pandas as pd
 
-from .cset import CompoundSet
-from .pset import PoseSet
+from .cset import CompoundTable
+from .pset import PoseTable
 from .tags import TagSet
 from .rset import ReactionSet
 from .compound import Compound
@@ -56,8 +56,8 @@ class HIPPO:
 		self._db_path = db_path
 		self._db = Database(self.db_path)
 
-		self._compounds = CompoundSet(self.db, 'compound')
-		self._poses = PoseSet(self.db, 'pose')
+		self._compounds = CompoundTable(self.db, 'compound')
+		self._poses = PoseTable(self.db, 'pose')
 		self._tags = TagSet(self.db, 'tag')
 		self._reactions = ReactionSet(self.db, 'reaction')
 
@@ -84,12 +84,12 @@ class HIPPO:
 
 	@property
 	def compounds(self):
-		"""Returns a :doc:`CompoundSet <compounds>` object, which interfaces to the compound table in the database"""
+		"""Returns a :doc:`CompoundTable <compounds>` object, which interfaces to the compound table in the database"""
 		return self._compounds
 
 	@property
 	def poses(self):
-		"""Returns a :doc:`PoseSet <poses>` object, which interfaces to the pose table in the database"""
+		"""Returns a :doc:`PoseTable <poses>` object, which interfaces to the pose table in the database"""
 		return self._poses
 
 	@property

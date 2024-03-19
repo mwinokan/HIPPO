@@ -36,13 +36,13 @@ Navigating compounds and poses
 Getting compounds/poses
 -----------------------
 
-Compounds can be accessed via the compounds property which wraps a :class:`.CompoundSet`:
+Compounds can be accessed via the compounds property which wraps a :class:`.CompoundTable`:
 
 ::
 
 	all_compounds = animal.compounds
 
-CompoundSets can be indexed using their database id (positive integer) or InChiKey (str):
+CompoundTables can be indexed using their database id (positive integer) or InChiKey (str):
 
 ::
 
@@ -65,7 +65,7 @@ Additionally you can get compounds by their tag:
 
 See also the :doc:`tools for structure-based searching<queries>`
 
-Equivalent methods exist for animal.poses (returns a :class:`PoseSet`), animal.reactions (returns a :class:`.ReactionSet`), and animal.tags returns a :class:`TagSet`).
+Equivalent methods exist for animal.poses (returns a :class:`PoseTable`), animal.reactions (returns a :class:`.ReactionSet`), and animal.tags returns a :class:`TagSet`).
 
 Inspecting a compound and its poses
 -----------------------------------

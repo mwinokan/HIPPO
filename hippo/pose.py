@@ -248,11 +248,11 @@ class Pose:
 	def get_inspirations(self):
 		inspirations = self.db.select_where(query='inspiration_original', table='inspiration', key='derivative', value=self.id, multiple=True, none='quiet')
 		
-		from .pset import PoseSubset
+		from .pset import PoseSet
 
 		if inspirations:
 			inspirations = [id for id, in inspirations]
-			inspirations = PoseSubset(self.db, indices=inspirations)
+			inspirations = PoseSet(self.db, indices=inspirations)
 
 		return inspirations
 

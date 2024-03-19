@@ -8,8 +8,8 @@ Compounds
 .. autoclass:: hippo.compound.Ingredient
     :members:
 
-.. autoclass:: hippo.cset.CompoundSet
+.. autoclass:: hippo.cset.CompoundTable
     :members:
 
-.. autoclass:: hippo.cset.CompoundSubset
+.. autoclass:: hippo.cset.CompoundSet
     :members:

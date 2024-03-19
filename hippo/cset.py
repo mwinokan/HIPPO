@@ -13,7 +13,7 @@ import os
 import logging
 logger = logging.getLogger('HIPPO')
 
-class CompoundSet:
+class CompoundTable:
 	"""Object representing the 'compound' table in the :class:`.Database`."""
 
 	def __init__(self, 
@@ -76,7 +76,7 @@ class CompoundSet:
 
 	def summary(self):
 		"""Print a summary of this compound set"""
-		logger.header('CompoundSet()')
+		logger.header('CompoundTable()')
 		logger.var('#compounds', len(self))
 		# logger.var('#poses', self.num_poses)
 		logger.var('tags', self.tags)
@@ -116,7 +116,7 @@ class CompoundSet:
 					assert index
 					indices.append(index)
 
-				return CompoundSubset(self.db, indices)
+				return CompoundSet(self.db, indices)
 
 			case slice():
 
@@ -126,10 +126,10 @@ class CompoundSet:
 
 				indices = [i for i in range(start, stop, step)]
 
-				return CompoundSubset(self.db, indices)
+				return CompoundSet(self.db, indices)
 
 			case _:
-				logger.error(f'Unsupported type for CompoundSet.__getitem__(): {key=} {type(key)}')
+				logger.error(f'Unsupported type for CompoundTable.__getitem__(): {key=} {type(key)}')
 
 		return None
 
@@ -143,7 +143,7 @@ class CompoundSet:
 		return iter(self[i+1] for i in range(len(self)))
 
 
-class CompoundSubset(CompoundSet):
+class CompoundSet(CompoundTable):
 	"""Object representing a subset of the 'compound' table in the :class:`.Database`."""
 
 	def __init__(self,
@@ -186,16 +186,16 @@ class CompoundSubset(CompoundSet):
 	@property
 	def num_poses(self):
 		"""Count the poses associated to this set of compounds"""
-		from .pset import PoseSubset
+		from .pset import PoseSet
 		return self.db.count_where(table='pose', key=f'pose_compound in {tuple(self.ids)}')
 
 	@property
 	def poses(self):
 		"""Get the poses associated to this set of compounds"""
-		from .pset import PoseSubset
+		from .pset import PoseSet
 		ids = self.db.select_where(query='pose_id', table='pose', key=f'pose_compound in {tuple(self.ids)}', multiple=True)
 		ids = [v for v, in ids]
-		return PoseSubset(self.db, ids)
+		return PoseSet(self.db, ids)
 
 	### METHODS
 
@@ -203,7 +203,7 @@ class CompoundSubset(CompoundSet):
 		"""Get all child compounds with a certain tag"""
 		values = self.db.select_where(query='tag_compound', table='tag', key='name', value=tag, multiple=True)
 		ids = [v for v, in values if v and v in self.ids]
-		return CompoundSubset(self.db, ids)
+		return CompoundSet(self.db, ids)
 
 	def get_by_metadata(self, key: str, value: str | None = None):
 		"""Get all child compounds with by their metadata. If no value is passed, then simply containing the key in the metadata dictionary is sufficient"""
@@ -214,7 +214,7 @@ class CompoundSubset(CompoundSet):
 			if isinstance(value, str):
 				value = f'"{value}"'
 			ids = [i for i,d in results if d and f'"{key}": {value}' in d and i in self.ids]
-		return CompoundSubset(self.db, ids)		
+		return CompoundSet(self.db, ids)		
 
 	def draw(self):
 		"""Draw a grid of all contained molecules"""
@@ -276,7 +276,7 @@ class CompoundSubset(CompoundSet):
 
 	def summary(self):
 		"""Print a summary of this compound set"""
-		logger.header('CompoundSubset()')
+		logger.header('CompoundSet()')
 		logger.var('#compounds', len(self))
 		logger.var('#poses', self.num_poses)
 		logger.var('tags', self.tags)

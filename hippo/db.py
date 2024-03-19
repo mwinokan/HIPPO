@@ -1166,7 +1166,7 @@ class Database:
 	def query_similarity(self, query, threshold, return_similarity=False, none='error'):
 		"""Search compounds by similarity"""
 
-		from .cset import CompoundSubset
+		from .cset import CompoundSet
 
 		# smiles
 		if isinstance(query, str):
@@ -1195,11 +1195,11 @@ class Database:
 
 		if return_similarity:
 			ids, similarities = zip(*result)
-			cset = CompoundSubset(self, ids)
+			cset = CompoundSet(self, ids)
 			return cset, similarities
 
 		ids = [r for r, in result]
-		cset = CompoundSubset(self, ids)
+		cset = CompoundSet(self, ids)
 
 		return cset
 

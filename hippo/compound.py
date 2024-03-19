@@ -4,7 +4,7 @@ import mcol
 from rdkit import Chem
 
 from .pose import Pose
-# from .pset import PoseSubset
+# from .pset import PoseSet
 from .tags import TagSubset
 # from .rset import ReactionSet
 
@@ -219,9 +219,9 @@ class Compound:
 
 		# poses = [self.db.get_pose(id=q[0]) for q in pose_ids]
 
-		from .pset import PoseSubset
+		from .pset import PoseSet
 
-		return PoseSubset(self.db, [q[0] for q in pose_ids])
+		return PoseSet(self.db, [q[0] for q in pose_ids])
 
 	def set_base(self, base, commit=True):
 		self._base = base

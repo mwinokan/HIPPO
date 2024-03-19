@@ -11,7 +11,7 @@ import os
 import logging
 logger = logging.getLogger('HIPPO')
 
-class PoseSet:
+class PoseTable:
 	"""Object representing the 'pose' table in the :class:`.Database`."""
 
 	def __init__(self,
@@ -74,7 +74,7 @@ class PoseSet:
 
 	def summary(self):
 		"""Print a summary of this pose set"""
-		logger.header('PoseSet()')
+		logger.header('PoseTable()')
 		logger.var('#poses', len(self))
 		logger.var('tags', self.tags)
 
@@ -112,7 +112,7 @@ class PoseSet:
 					assert index
 					indices.append(index)
 
-				return PoseSubset(self.db, indices)
+				return PoseSet(self.db, indices)
 
 			case slice():
 
@@ -125,12 +125,12 @@ class PoseSet:
 				return self[indices]
 
 			case _:
-				logger.error(f'Unsupported type for PoseSet.__getitem__(): {type(key)}')
+				logger.error(f'Unsupported type for PoseTable.__getitem__(): {type(key)}')
 
 		return None
 
 	def __repr__(self) -> str:
-		# return f'PoseSet(table="{self.table}")'
+		# return f'PoseTable(table="{self.table}")'
 		return f'{mcol.bold}{mcol.underline}set(P x {len(self)}){mcol.unbold}{mcol.ununderline}'
 
 	def __len__(self) -> int:
@@ -140,7 +140,7 @@ class PoseSet:
 		return iter(self[i+1] for i in range(len(self)))
 
 
-class PoseSubset(PoseSet):
+class PoseSet(PoseTable):
 	"""Object representing a subset of the 'pose' table in the :class:`.Database`."""
 
 	def __init__(self,
@@ -190,10 +190,10 @@ class PoseSubset(PoseSet):
 	@property
 	def compounds(self):
 		"""Get the compounds associated to this set of poses"""
-		from .cset import CompoundSubset
+		from .cset import CompoundSet
 		ids = self.db.select_where(table='pose', query='DISTINCT pose_compound', key=f'pose_id in {tuple(self.ids)}', multiple=True)
 		ids = [v for v, in ids]
-		return CompoundSubset(self.db, ids)
+		return CompoundSet(self.db, ids)
 
 	@property
 	def num_compounds(self):
@@ -211,7 +211,7 @@ class PoseSubset(PoseSet):
 		"""Get all child poses with a certain tag"""
 		values = self.db.select_where(query='tag_pose', table='tag', key='name', value=tag, multiple=True)
 		ids = [v for v, in values if v and v in self.ids]
-		return PoseSubset(self.db, ids)
+		return PoseSet(self.db, ids)
 
 	def get_by_metadata(self, key: str, value: str | None = None):
 		"""Get all child poses with by their metadata. If no value is passed, then simply containing the key in the metadata dictionary is sufficient"""
@@ -222,7 +222,7 @@ class PoseSubset(PoseSet):
 			if isinstance(value, str):
 				value = f'"{value}"'
 			ids = [i for i,d in results if d and f'"{key}": {value}' in d and i in self.ids]
-		return PoseSubset(self.db, ids)		
+		return PoseSet(self.db, ids)		
 
 	def get_by_inspiration(self, inspiration: int | Pose, inverse=False):
 		"""Get all child poses with with this inspiration."""
@@ -243,7 +243,7 @@ class PoseSubset(PoseSet):
 				else:
 					ids.add(pose.id)
 
-		return PoseSubset(self.db, ids)
+		return PoseSet(self.db, ids)
 
 	def get_df(self, skip_no_mol=True, **kwargs):
 		"""Get a DataFrame of the poses in this set"""
@@ -264,7 +264,7 @@ class PoseSubset(PoseSet):
 
 	def summary(self):
 		"""Print a summary of this pose set"""
-		logger.header('PoseSubset()')
+		logger.header('PoseSet()')
 		logger.var('#poses', len(self))
 		logger.var('#compounds', self.num_compounds)
 		logger.var('tags', self.tags)
