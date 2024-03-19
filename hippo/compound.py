@@ -5,7 +5,7 @@ from rdkit import Chem
 
 from .pose import Pose
 # from .pset import PoseSet
-from .tags import TagSubset
+from .tags import TagSet
 # from .rset import ReactionSet
 
 import logging
@@ -92,7 +92,7 @@ class Compound:
 		return self._db
 
 	@property
-	def tags(self) -> TagSubset:
+	def tags(self) -> TagSet:
 		"""Returns the compound's tags"""
 		if not self._tags:
 			self._tags = self.get_tags()
@@ -163,7 +163,7 @@ class Compound:
 
 	def get_tags(self) -> set:
 		tags = self.db.select_where(query='tag_name', table='tag', key='compound', value=self.id, multiple=True, none='quiet')
-		return TagSubset(self, {t[0] for t in tags}, commit=False)
+		return TagSet(self, {t[0] for t in tags}, commit=False)
 
 	def get_quotes(self, min_amount=None, supplier=None, max_lead_time=None, none='error', pick_cheapest=False, df=False) -> list[dict]:
 		"""Get all quotes associated to this compound"""

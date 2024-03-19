@@ -6,7 +6,7 @@ from rdkit import Chem
 
 import numpy as np
 
-from .tags import TagSubset
+from .tags import TagSet
 
 import pickle
 
@@ -243,7 +243,7 @@ class Pose:
 
 	def get_tags(self):
 		tags = self.db.select_where(query='tag_name', table='tag', key='pose', value=self.id, multiple=True)
-		return TagSubset(self, {t[0] for t in tags})
+		return TagSet(self, {t[0] for t in tags})
 	
 	def get_inspirations(self):
 		inspirations = self.db.select_where(query='inspiration_original', table='inspiration', key='derivative', value=self.id, multiple=True, none='quiet')

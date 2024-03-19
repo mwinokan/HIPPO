@@ -7,10 +7,10 @@ Metadata
 .. autoclass:: hippo.feature.Feature
     :members:
 
-.. autoclass:: hippo.tags.TagSet
+.. autoclass:: hippo.tags.TagTable
     :members:
 
-.. autoclass:: hippo.tags.TagSubset
+.. autoclass:: hippo.tags.TagSet
     :members:
 
 .. autoclass:: hippo.target.Target

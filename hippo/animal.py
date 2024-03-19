@@ -3,7 +3,7 @@ import pandas as pd
 
 from .cset import CompoundTable
 from .pset import PoseTable
-from .tags import TagSet
+from .tags import TagTable
 from .rset import ReactionSet
 from .compound import Compound
 from .reaction import Reaction
@@ -58,7 +58,7 @@ class HIPPO:
 
 		self._compounds = CompoundTable(self.db, 'compound')
 		self._poses = PoseTable(self.db, 'pose')
-		self._tags = TagSet(self.db, 'tag')
+		self._tags = TagTable(self.db, 'tag')
 		self._reactions = ReactionSet(self.db, 'reaction')
 
 		logger.success(f"Initialised animal {self}")
@@ -99,7 +99,7 @@ class HIPPO:
 
 	@property
 	def tags(self):
-		"""Returns a :doc:`TagSet <metadata>` object, which interfaces to the tag table in the database"""
+		"""Returns a :doc:`TagTable <metadata>` object, which interfaces to the tag table in the database"""
 		return self._tags
 	
 	@property

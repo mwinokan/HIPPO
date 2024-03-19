@@ -2,7 +2,7 @@
 # from .db import Database
 from collections.abc import MutableSet
 
-class TagSet:
+class TagTable:
 	"""Object representing the 'tag' table in the :class:`.Database`."""
 
 	def __init__(self, 
@@ -41,7 +41,7 @@ class TagSet:
 
 
 
-class TagSubset(MutableSet):
+class TagSet(MutableSet):
 	"""Object representing a subset of the 'tag' table in the :class:`.Database` belonging to a certain :class:`.Compound` or :class:`.Pose`."""
 
 	def __init__(self, 
@@ -146,4 +146,4 @@ class TagSubset(MutableSet):
 
 	def __add__(self, other):
 		raise NotImplementedError
-		# return TagSet(self.tags+other)
+		# return TagTable(self.tags+other)

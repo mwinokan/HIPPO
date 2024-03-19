@@ -65,7 +65,7 @@ Additionally you can get compounds by their tag:
 
 See also the :doc:`tools for structure-based searching<queries>`
 
-Equivalent methods exist for animal.poses (returns a :class:`PoseTable`), animal.reactions (returns a :class:`.ReactionSet`), and animal.tags returns a :class:`TagSet`).
+Equivalent methods exist for animal.poses (returns a :class:`PoseTable`), animal.reactions (returns a :class:`.ReactionSet`), and animal.tags returns a :class:`TagTable`).
 
 Inspecting a compound and its poses
 -----------------------------------
