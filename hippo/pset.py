@@ -55,10 +55,11 @@ class PoseTable:
 
 	### METHODS
 
-	def get_by_tag(self,tag):
+	def get_by_tag(self, tag):
 		"""Get all child poses with a certain tag"""
 		values = self.db.select_where(query='tag_pose', table='tag', key='name', value=tag, multiple=True)
 		ids = [v for v, in values if v]
+		# print(values)
 		return self[ids]
 
 	def get_by_metadata(self, key: str, value: str | None = None):
@@ -207,10 +208,14 @@ class PoseSet(PoseTable):
 
 	### FILTERING
 
-	def get_by_tag(self,tag):
+	def get_by_tag(self, tag, inverse=False):
 		"""Get all child poses with a certain tag"""
 		values = self.db.select_where(query='tag_pose', table='tag', key='name', value=tag, multiple=True)
-		ids = [v for v, in values if v and v in self.ids]
+		if inverse:
+			matches = [v for v, in values if v]
+			ids = [i for i in self.ids if i not in matches]
+		else:
+			ids = [v for v, in values if v and v in self.ids]
 		return PoseSet(self.db, ids)
 
 	def get_by_metadata(self, key: str, value: str | None = None):
@@ -363,6 +368,17 @@ class PoseSet(PoseTable):
 		mols = [p.mol for p in self]
 
 		return draw_mols(mols)
+
+	def grid(self):
+		"""Draw a grid of all contained molecules"""
+		from molparse.rdkit import draw_grid
+
+		data = [(p.name, p.compound.mol) for p in self]
+
+		mols = [d[1] for d in data]
+		labels = [d[0] for d in data]
+
+		return draw_grid(mols, labels=labels)
 
 	### OTHER
 
