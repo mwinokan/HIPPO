@@ -192,6 +192,9 @@ class HIPPO:
 			observation_longname = df.ID[0]
 			mol = df.ROMol[0]
 			lig_res_number = int(observation_longname.split('-')[1].split('_')[2])
+			lig_chain = observation_longname.split('-')[1].split('_')[1]
+			
+			# logger.var('observation_longname',observation_longname)
 
 			# smiles			
 			smiles = mp.rdkit.mol_to_smiles(mol)
@@ -200,9 +203,11 @@ class HIPPO:
 			# parse PDB
 			sys = mp.parse(pdbs[0], verbosity=debug)
 
-			if len(sys.residues['LIG']) > 1:
+			if len(sys.residues['LIG']) > 1 or any(r.contains_alternative_sites for r in sys.residues['LIG']):
 				# create the single ligand bound pdb
-				sys = remove_other_ligands(sys, lig_res_number)
+				# logger.debug(str(pdbs[0].resolve()))
+				sys = remove_other_ligands(sys, lig_res_number, lig_chain)
+				sys.prune_alternative_sites('A', verbosity=0)
 				pose_path = str(pdbs[0].resolve()).replace('.pdb', '_hippo.pdb')
 				mp.write(pose_path, sys, shift_name=True, verbosity=debug)
 			else:
