@@ -141,11 +141,18 @@ class Pose:
 				
 				lig_residues = sys['rLIG']
 				if len(lig_residues) > 1:
-					logger.warning('Multiple ligands in PDB')
+					logger.warning(f'Multiple ligands in PDB {self}')
+
 				lig_res = lig_residues[0]
 				
 				if not (mol := lig_res.rdkit_mol):
-					logger.warning(f'{self} has {mol=}')
+					logger.error(f'[{self}] Error computing RDKit Mol from PDB={self.path}')
+					
+					print(lig_res.pdb_block)
+
+					lig_res.plot3d()
+
+					raise Exception
 					return None
 
 				self.mol = mol
@@ -272,7 +279,7 @@ class Pose:
 		return self.db.get_compound(id=self._compound_id)
 
 	def get_tags(self):
-		tags = self.db.select_where(query='tag_name', table='tag', key='pose', value=self.id, multiple=True)
+		tags = self.db.select_where(query='tag_name', table='tag', key='pose', value=self.id, multiple=True, none='quiet')
 		return TagSet(self, {t[0] for t in tags})
 	
 	def get_inspirations(self):
@@ -312,6 +319,8 @@ class Pose:
 
 		data['compound'] = self.compound.name
 		data['target'] = self.target.name
+
+		data['tags'] = self.tags
 		
 		if inspirations == 'fragalysis':
 			data['inspirations'] = ','.join([p.name for p in self.inspirations])
@@ -361,9 +370,9 @@ class Pose:
 		for family in FEATURE_FAMILIES:
 			comp_features_by_family[family] = [f for f in comp_features if f.family == family]
 
-		protein_features = self.target.features
-		if not protein_features:
-			protein_features = self.target.calculate_features(protein_system)
+		# protein_features = self.target.features
+		# if not protein_features:
+		protein_features = self.target.calculate_features(protein_system)
 
 		fingerprint = {}
 
@@ -379,6 +388,13 @@ class Pose:
 			prot_residue = protein_system.get_chain(prot_feature.chain_name).residues[f'n{prot_feature.residue_number}']
 
 			if not prot_residue:
+				continue
+
+			# if prot_feature.residue_number == 77:
+			# 	logger.debug(repr(prot_feature))
+
+			if prot_residue.name != prot_feature.residue_name:
+				logger.warning(f'Feature {repr(prot_feature)}')
 				continue
 
 			prot_atoms = [prot_residue.get_atom(a).np_pos for a in prot_feature.atom_names.split(' ')]
@@ -408,7 +424,20 @@ class Pose:
 
 		return draw_mols(mols)
 
-
+	def summary(self):
+		"""Print a summary of this pose"""
+		if self.name:
+			logger.header(f'{str(self)}: {self.name}')
+		else:
+			logger.header(str(self))
+		logger.var('smiles', self.smiles)
+		logger.var('compound', repr(self.compound))
+		logger.var('path', self.path)
+		logger.var('target', repr(self.target))
+		logger.var('reference', self.reference)
+		logger.var('tags', self.tags)
+		logger.var('inspirations', self.inspirations)
+		logger.var('metadata', str(self.metadata))
 
 	### DUNDERS
 
