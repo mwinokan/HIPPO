@@ -27,3 +27,8 @@ class Feature:
 	def chain_res_name_number_str(self):
 		"""Return a string representation of the feature"""
 		return f'{self.chain_name} {self.residue_name} {self.residue_number}'
+
+	@property
+	def res_name_number_str(self):
+		"""Return a string representation of the feature"""
+		return f'{self.residue_name} {self.residue_number}'
