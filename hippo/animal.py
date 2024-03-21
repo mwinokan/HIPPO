@@ -241,7 +241,7 @@ class HIPPO:
 				if meta_row[tag].values[0]:
 					tags.append(tag)
 
-			metadata = {}
+			metadata = {'observation_longname':observation_longname}
 			for tag in generated_tag_cols:
 				metadata[tag] = meta_row[tag].values[0]
 
