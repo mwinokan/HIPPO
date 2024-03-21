@@ -7,12 +7,13 @@ class MetaData(UserDict):
 	"""Metadata dictionary linked to a compound or pose in the database"""
 
 	def __init__(self, 
-		__dict: Mapping[str, str]
+		__dict: Mapping[str, str] | None
 	) -> None:
 
 		super().__init__()
-		for key, value in __dict.items():
-			super().__setitem__(key, value)
+		if __dict:
+			for key, value in __dict.items():
+				super().__setitem__(key, value)
 
 		self._db = None
 		self._table: str = None
