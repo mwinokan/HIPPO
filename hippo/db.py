@@ -315,7 +315,7 @@ class Database:
 			feature_residue_name TEXT,
 			feature_residue_number INTEGER,
 			feature_atom_names TEXT,
-			CONSTRAINT UC_feature UNIQUE (feature_family, feature_target, feature_chain_name, feature_residue_number, feature_atom_names)
+			CONSTRAINT UC_feature UNIQUE (feature_family, feature_target, feature_chain_name, feature_residue_number, feature_residue_name, feature_atom_names)
 		);
 		"""
 
