@@ -27,10 +27,21 @@ def df_row_to_dict(df_row):
 
 	return data
 
-def remove_other_ligands(sys, residue_number):
+def remove_other_ligands(sys, residue_number, chain):
+	
 	ligand_residues = [r.number for r in sys['rLIG'] if r.number != residue_number]
-	if ligand_residues:
-		sys.remove_residues(numbers=ligand_residues, verbosity=0)
+	
+	# if ligand_residues:
+	for c in sys.chains:
+		if c.name != chain:
+			c.remove_residues(names=['LIG'], verbosity=0)
+		elif ligand_residues:
+			c.remove_residues(numbers=ligand_residues, verbosity=0)
+
+	# print([r.name_number_str for r in sys['rLIG']])
+
+	assert len([r.name_number_str for r in sys['rLIG']]) == 1, f"{sys.name} {[r.name_number_str for r in sys['rLIG']]}"
+
 	return sys
 
 def inchikey_from_smiles(smiles):

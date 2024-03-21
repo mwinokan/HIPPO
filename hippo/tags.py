@@ -94,6 +94,10 @@ class TagSet(MutableSet):
 		sql = f'DELETE FROM tag WHERE tag_name="{tag}" AND tag_{self.parent.table}={self.parent.id}'
 		self.db.execute(sql)
 
+	def _clear_tags_from_db(self, tag):
+		sql = f'DELETE FROM tag WHERE tag_{self.parent.table}={self.parent.id}'
+		self.db.execute(sql)
+
 	def _add_tag_to_db(self, tag, commit=True):
 		payload = { 'name':tag, self.parent.table:self.parent.id }
 		self.db.insert_tag(**payload, commit=commit)
@@ -109,6 +113,11 @@ class TagSet(MutableSet):
 	def discard(self, tag):
 		"""Discard an element"""
 		return self.discard(tag)
+
+	def clear(self):
+		"""Clear all tags"""
+		self._elements = []
+		self._clear_tags_from_db(self)
 
 	def remove(self, tag):
 		"""Remove an element"""
