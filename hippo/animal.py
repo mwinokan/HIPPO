@@ -380,6 +380,90 @@ class HIPPO:
 
 		return df_columns
 
+	def add_syndirella_elabs(self,
+		df_path: str | Path,
+		*,
+		inspiration_map: dict | None = None,
+
+	):
+
+		logger.warning('Assuming this is a three-step reaction')
+
+		df = pd.read_pickle(df_path)
+
+		for i,row in tqdm(df.iterrows()):
+
+			# skip pose-less entries
+
+			if not row.path_to_mol:
+				continue
+
+			if i > 100:
+				break
+
+			# loop over each reaction step
+			for j in range(3):
+
+				j += 1
+
+				reactants = []
+
+				reactant_previous_product = row[f'{j}_r_previous_product']
+
+				# reactant 1
+				if reactant_previous_product == 1:
+					reactant1_id = product.id
+					reactants.append(reactant1_id)
+				elif smiles := row[f'{j}_r1_smiles']:
+					reactant1_id = self.register_compound(smiles=smiles, commit=False, return_compound=False)
+					reactants.append(reactant1_id)
+			
+				# reactant 2
+				if reactant_previous_product == 2:
+					reactant2_id = product.id
+					reactants.append(reactant2_id)
+				elif smiles := row[f'{j}_r2_smiles']:
+					reactant2_id = self.register_compound(smiles=smiles, commit=False, return_compound=False)
+					reactants.append(reactant2_id)
+			
+				# product
+				if smiles := row[f'{j}_product_smiles']:
+					if j != 3:
+						tags = ['intermediate']
+					elif row['3_num_atom_diff'] == 0:
+						tags = ['base']
+					else:
+						tags = ['elab']
+					product = self.register_compound(smiles=smiles, tags=tags, commit=False, return_compound=True)
+			
+				# register the reaction
+				self.register_reaction(reactants=reactants, product=product, type=row[f'{j}_reaction'], commit=False)
+
+			# pose metadata
+			metadata = {
+				'ddG':row['∆∆G'],
+				'RMSD':row['comRMSD'],
+			}
+
+			# inspirations
+			inspirations = []
+			
+			# register the pose
+			self.register_pose(
+				compound=product, 
+				target='A71EV2A', 
+				path=row.path_to_mol, 
+				inspirations=inspirations, 
+				metadata=metadata, 
+				tags=tags, 
+				commit=False, 
+				return_pose=False,
+				overwrite_metadata=True,
+			)
+
+		self.db.commit()
+		logger.success('Committed changes')
+
 	### SINGLE INSERTION
 
 	def register_compound(self, 

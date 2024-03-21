@@ -501,6 +501,8 @@ class Database:
 
 		if isinstance(target, str):
 			target = self.get_target_id(name=target)
+			if not target:
+				raise ValueError(f'No such {target=}')
 		target_name = self.get_target_name(id=target)
 		
 		if resolve_path:
@@ -595,6 +597,9 @@ class Database:
 			original = original.id
 		if isinstance(derivative, Pose):
 			derivative = derivative.id
+
+		assert isinstance(original, int), 'Must pass an integer ID or Pose object (original)'
+		assert isinstance(derivative, int), 'Must pass an integer ID or Pose object (derivative)'
 
 		sql = """
 		INSERT INTO inspiration(inspiration_original, inspiration_derivative)
@@ -1103,7 +1108,7 @@ class Database:
 		"""Get target name"""
 
 		table = 'target'
-		payload, = self.select_where(query=f'{table}_name', table=table, key=f'id', value=id)
+		payload, = self.select_where(query=f'{table}_name', table=table, key='id', value=id)
 		return payload
 
 	def get_target_id(self, 
