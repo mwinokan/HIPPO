@@ -256,7 +256,8 @@ class Database:
 			tag_pose INTEGER,
 			FOREIGN KEY (tag_compound) REFERENCES compound(compound_id),
 			FOREIGN KEY (tag_pose) REFERENCES pose(pose_id),
-			CONSTRAINT UC_tag UNIQUE (tag_name, tag_compound, tag_pose)
+			CONSTRAINT UC_tag_compound UNIQUE (tag_name, tag_compound)
+			CONSTRAINT UC_tag_pose UNIQUE (tag_name, tag_pose)
 		);
 		"""
 
