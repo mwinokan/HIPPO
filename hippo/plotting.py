@@ -225,6 +225,82 @@ def plot_interaction_punchcard(animal, poses, subtitle=None, opacity=1.0, group=
 	return add_punchcard_logo(fig)
 
 @hippo_graph
+def plot_residue_interactions(animal, poses, residue_number, subtitle=None, chain=None):
+
+	assert not chain
+
+	logger.debug(poses)
+	logger.debug(residue_number)
+
+	plot_data = []
+
+	categoryarray = {}
+
+	for pose in poses:
+
+		fingerprint = pose.fingerprint
+
+		if not fingerprint:
+			continue
+
+		# loop over each interaction in the pose
+		for key, value in fingerprint.items():
+			if not value:
+				continue
+
+			f = animal.db.get_feature(id=key)
+
+			if chain and f.chain_name != chain:
+				continue
+
+			if residue_number != f.residue_number:
+				continue
+
+			data = dict(str=key,count=value)
+
+			data['id'] = f.id
+			data['family'] = f.family
+			data['residue_name'] = f.residue_name
+			data['residue_number'] = f.residue_number
+			data['chain_name'] = f.chain_name
+			data['atom_names'] = f.atom_names
+			
+			data['pose_name'] = pose.name
+			data['pose_id'] = str(pose)
+			
+			data['residue_name_number'] = f'{f.residue_name} {f.residue_number}'
+
+			if data['pose_name'] not in categoryarray:
+				categoryarray[data['pose_name']] = [data['pose_name'], data['count']]
+			else:
+				categoryarray[data['pose_name']][1] += data['count']
+
+			for _ in range(value):
+				plot_data.append(data)
+
+	fig = px.histogram(plot_data, x='pose_name', color='family')
+	
+	categoryarray = sorted([v for v in categoryarray.values()], key=lambda x: (-x[1], x[0]))
+	categoryarray = [v[0] for v in categoryarray]
+
+	fig.update_xaxes(categoryorder='array', categoryarray=categoryarray)
+
+	if not subtitle:
+		subtitle = f'#Poses={len(poses)}'
+
+	title = f"Interactions w/ {data['residue_name_number']}"
+
+	title = f'<b>{animal.name}</b>: {title}<br><sup><i>{subtitle}</i></sup>'
+
+	fig.update_layout(title=title,title_automargin=False, title_yref='container')
+
+	fig.update_xaxes(title='Pose')
+	fig.update_yaxes(title='#Interactions')
+
+	return fig
+
+
+@hippo_graph
 # def plot_building_blocks(animal, subtitle=None, cset='elabs', color='name_is_smiles'):
 def plot_reactant_amounts(animal, subtitle=None, color='has_price_picker', named_only=False, most_common=None):
 
