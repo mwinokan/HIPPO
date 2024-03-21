@@ -139,7 +139,7 @@ def plot_interaction_histogram(animal, poses, feature_metadata, subtitle=None,):
 	return fig
 
 @hippo_graph
-def plot_interaction_punchcard(animal, poses, subtitle=None, opacity=1.0, group='pose_id'):
+def plot_interaction_punchcard(animal, poses, subtitle=None, opacity=1.0, group='pose_id', ignore_chains=False):
 
 	import plotly
 
@@ -148,6 +148,11 @@ def plot_interaction_punchcard(animal, poses, subtitle=None, opacity=1.0, group=
 	categoryarray = {}
 
 	logger.debug(f'{poses=}')
+
+	if ignore_chains:
+		x = 'chain_res_name_number_str'
+	else:
+		x = 'res_name_number_str'
 
 	for pose in poses:
 
@@ -175,10 +180,11 @@ def plot_interaction_punchcard(animal, poses, subtitle=None, opacity=1.0, group=
 			data['pose_name'] = pose.name
 			data['pose_id'] = str(pose)
 
-			data['chain_res_name_number_str'] = f.chain_res_name_number_str
+			# data['chain_res_name_number_str'] = f.chain_res_name_number_str
+			data[x] = getattr(f, x)
 
-			if data['chain_res_name_number_str'] not in categoryarray:
-				categoryarray[data['chain_res_name_number_str']] = (data['chain_res_name_number_str'], f.chain_name, f.residue_number)
+			if data[x] not in categoryarray:
+				categoryarray[data[x]] = (data[x], f.chain_name, f.residue_number)
 
 			plot_data.append(data)
 
@@ -193,7 +199,7 @@ def plot_interaction_punchcard(animal, poses, subtitle=None, opacity=1.0, group=
 	else:
 		title = f'<b>{animal.name}</b>: {title}'
 
-	fig = px.scatter(plot_df, x='chain_res_name_number_str', y='family',marginal_x='histogram',marginal_y='histogram', hover_data=plot_df.columns, color=group, title=title)
+	fig = px.scatter(plot_df, x=x, y='family',marginal_x='histogram',marginal_y='histogram', hover_data=plot_df.columns, color=group, title=title)
 	
 	fig.update_layout(title=title,title_automargin=False, title_yref='container')
 
