@@ -794,8 +794,8 @@ class Database:
 		try:
 			self.execute(sql, (family, target, chain_name, residue_name, residue_number, atom_names))
 
-		# except sqlite3.IntegrityError as e:
-		# 	logger.warning(f"Target with {name=} already exists")
+		except sqlite3.IntegrityError as e:
+			return None
 
 		except Exception as e:
 			logger.exception(e)
