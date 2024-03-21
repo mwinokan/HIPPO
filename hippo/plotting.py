@@ -62,19 +62,21 @@ def hippo_graph(func):
 	return wrapper
 
 @hippo_graph
-def plot_tag_statistics(animal, color='type', subtitle=None, log_y=False):
+def plot_tag_statistics(animal, color='type', subtitle=None, log_y=False, compounds=True, poses=True):
 
 	plot_data = []
 
 	for tag in animal.tags.unique:
 
-		num_compounds = len(animal.compounds.get_by_tag(tag=tag))
-		data = dict(tag=tag, number=num_compounds, type='compounds')
-		plot_data.append(data)
+		if compounds:
+			num_compounds = len(animal.compounds.get_by_tag(tag=tag))
+			data = dict(tag=tag, number=num_compounds, type='compounds')
+			plot_data.append(data)
 
-		num_poses = len(animal.poses.get_by_tag(tag=tag))
-		data = dict(tag=tag, number=num_poses, type='poses')
-		plot_data.append(data)
+		if poses:
+			num_poses = len(animal.poses.get_by_tag(tag=tag))
+			data = dict(tag=tag, number=num_poses, type='poses')
+			plot_data.append(data)
 		
 	fig = px.bar(plot_data, x='tag', y='number', color=color, log_y=log_y)
 

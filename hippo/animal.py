@@ -633,6 +633,11 @@ class HIPPO:
 		from .plotting import plot_interaction_punchcard
 		return plot_interaction_punchcard(self, poses=poses, subtitle=subtitle, opacity=opacity, **kwargs)
 
+	def plot_residue_interactions(self, poses, residue_number, **kwargs):
+		"""Plot an interaction punchcard for a set of poses"""
+		from .plotting import plot_residue_interactions
+		return plot_residue_interactions(self, poses=poses, residue_number=residue_number, **kwargs)
+
 	### OTHER
 
 	def summary(self):
