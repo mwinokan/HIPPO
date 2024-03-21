@@ -569,13 +569,7 @@ class Database:
 			self.execute(sql, (name, compound, pose))
 
 		except sqlite3.IntegrityError as e:
-			# if 'UNIQUE constraint failed: compound.compound_name' in str(e):
-			# 	logger.warning(f"Skipping compound with existing name \"{name}\"")
-			# elif 'UNIQUE constraint failed: compound.compound_smiles' in str(e):
-			# 	logger.warning(f"Skipping compound with existing smiles \"{smiles}\"")
-			# else:
-			logger.error(e)
-			# logger.exception(e)
+			return None
 
 		except Exception as e:
 			logger.exception(e)		
