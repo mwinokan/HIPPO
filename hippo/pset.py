@@ -71,7 +71,13 @@ class PoseTable:
 			if isinstance(value, str):
 				value = f'"{value}"'
 			ids = [i for i,d in results if d and f'"{key}": {value}' in d]
-		return self[ids]			
+		return self[ids]	
+
+	def draw(self, max_draw=100):
+		if len(self) <= max_draw:
+			self[:].draw()
+		else:
+			logger.warning(f"Too many poses: {len(self)} > {max_draw=}. Increase max_draw or use animal.poses[:].draw()")		
 
 	def summary(self):
 		"""Print a summary of this pose set"""
