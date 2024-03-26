@@ -217,7 +217,10 @@ class Compound:
 		target: str = None
 	) -> list[Pose]:
 
-		pose_ids = self.db.select_where(query='pose_id', table='pose', key='compound', value=self.id, multiple=True)
+		pose_ids = self.db.select_where(query='pose_id', table='pose', key='compound', value=self.id, multiple=True, none=False)
+
+		if not pose_ids:
+			return None
 
 		# poses = [self.db.get_pose(id=q[0]) for q in pose_ids]
 
