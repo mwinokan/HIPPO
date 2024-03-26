@@ -203,6 +203,11 @@ class PoseSet(PoseTable):
 		return CompoundSet(self.db, ids)
 
 	@property
+	def mols(self):
+		"""Get the rdkit Molecules contained in this set"""
+		return [p.mol for p in self]
+
+	@property
 	def num_compounds(self):
 		"""Count the compounds associated to this set of poses"""
 		return len(self.compounds)
