@@ -181,6 +181,8 @@ class CompoundSet(CompoundTable):
 	def tags(self):
 		"""Returns the set of unique tags present in this compound set"""
 		values = self.db.select_where(table='tag', query='DISTINCT tag_name', key=f'tag_compound in {tuple(self.ids)}', multiple=True)
+		if not values:
+			return set()
 		return set(v for v, in values)
 
 	@property
