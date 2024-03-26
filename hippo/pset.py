@@ -299,7 +299,6 @@ class PoseSet(PoseTable):
 
 	def to_fragalysis(self, 
 		out_path,
-
 		*,
 		method,
 		ref_url,

@@ -265,6 +265,77 @@ class Compound:
 		logger.var('tags', self.tags)
 		logger.var('metadata', str(self.metadata))
 
+	def place(self,
+		*,
+		target: str | int | Target | None = None,
+		inspirations: list[Pose] | None = None,
+		reference: Pose | None = None,
+		max_ddG: float = 0.0,
+		max_RMSD: float = 2.0,
+		output_dir: str = 'wictor_place',
+		tags = None,
+		metadata = None,
+		overwrite = False,
+	) -> Pose:
+		"""Generate a new pose for this compound using Fragmenstein."""
+		
+		from fragmenstein import Monster, Wictor
+		from pathlib import Path
+
+		tags = tags or []
+		metadata = metadata or {}
+
+		# get required data
+		smiles = self.smiles
+
+		inspirations = inspirations or self.poses[0].inspirations
+		target = target or self.poses[0].target.name
+		reference = reference or self.poses[0].reference
+
+		inspiration_mols = [c.mol for c in inspirations]
+		protein_pdb_block = reference.protein_system.pdb_block_with_alt_sites
+				
+		# create the victor
+		victor = Wictor(hits=inspiration_mols, pdb_block=protein_pdb_block)
+		victor.work_path = output_dir
+		victor.enable_stdout(logging.CRITICAL)
+
+		# do the placement
+		victor.place(smiles, long_name=self.name)
+
+		# metadata
+		metadata['ddG'] = victor.energy_score['bound']['total_score'] - victor.energy_score['unbound']['total_score']
+		metadata['RMSD'] = victor.mrmsd.mrmsd
+
+		# print(victor.energy_score)
+
+		if metadata['ddG'] > max_ddG:
+			return None
+
+		if metadata['RMSD'] > max_RMSD:
+			return None
+
+		# register the pose
+		pose = self._animal.register_pose(
+			compound=self,
+			target=target,
+			path=Path(victor.work_path) / self.name / f'{self.name}.minimised.mol',
+			inspirations = inspirations,
+			reference=reference,
+			tags=tags,
+			metadata=metadata,	
+		)
+
+		if overwrite:
+			ids = [p.id for p in self.poses if p.id != pose.id]
+			for i in ids:
+				self.db.delete_where(table='pose', key="id", value=i)
+			logger.success(f'Successfully posed {self} (and deleted old poses)')
+		else:
+			logger.success(f'Successfully posed {self}')
+
+		return pose
+
 	### DUNDERS
 
 	def __str__(self):
