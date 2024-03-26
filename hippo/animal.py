@@ -276,8 +276,10 @@ class HIPPO:
 		mol_col='ROMol',
 		name_col='ID',
 		inspiration_col = 'ref_mols',
+		inspiration_map: None | dict = None,
 		skip_first=False,
 		convert_floats=True,
+		stop_after: int | None = None,
 	):
 
 		"""Add virtual hits from an SDF into the database.
@@ -352,9 +354,22 @@ class HIPPO:
 			for insp in insp_str.split(','):
 				insp = insp.strip()
 
-				pose = self.poses[insp]
-				if pose:
-					inspirations.append(pose)
+				if inspiration_map:
+					if isinstance(inspiration_map, dict) and insp in inspiration_map:
+						pose = inspiration_map[insp]
+						if pose:
+							inspirations.append(pose)
+					elif hasattr(inspiration_map, '__call__'):
+						pose = inspiration_map(insp)
+						if pose:
+							inspirations.append(pose)
+				else:
+					pose = self.poses[insp]
+					if pose:
+						inspirations.append(pose)
+					else:
+						logger.error(f'Could not find inspiration pose {insp}')
+						continue
 
 			# metadata
 			metadata = {}
@@ -383,7 +398,10 @@ class HIPPO:
 				reference=reference
 			)
 
-		return df_columns
+			if stop_after and i+1 >= stop_after:
+				break
+
+		logger.success(f'Loaded compounds from {sdf_path}')
 
 	def add_syndirella_elabs(self,
 		df_path: str | Path,
