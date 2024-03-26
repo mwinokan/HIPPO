@@ -54,7 +54,7 @@ class HIPPO:
 		logger.var('db_path', db_path, dict(color='file'))
 
 		self._db_path = db_path
-		self._db = Database(self.db_path)
+		self._db = Database(self.db_path, animal=self)
 
 		self._compounds = CompoundTable(self.db, 'compound')
 		self._poses = PoseTable(self.db, 'pose')

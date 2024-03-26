@@ -25,7 +25,7 @@ class Database:
 
 	"""Wrapper to connect to the HIPPO sqlite database."""
 
-	def __init__(self, path: Path) -> None:
+	def __init__(self, path: Path, animal) -> None:
 
 		assert isinstance(path, Path)
 		
@@ -34,6 +34,7 @@ class Database:
 		self._path = path
 		self._connection = None
 		self._cursor = None
+		self._animal = animal
 
 		logger.debug(f'Database.path = {self.path}')
 
