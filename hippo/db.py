@@ -955,7 +955,7 @@ class Database:
 
 		query = 'compound_id, compound_name, compound_smiles, compound_base, compound_alias'
 		entry = self.select_where(query=query, table=table, key='id', value=id)
-		compound = Compound(self, *entry, metadata=None, mol=None)
+		compound = Compound(self._animal, self, *entry, metadata=None, mol=None)
 		return compound
 
 	def get_compound_id(self, 

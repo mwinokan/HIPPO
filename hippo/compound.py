@@ -20,6 +20,7 @@ class Compound:
 	"""
 
 	def __init__(self,
+			animal,
 			db,
 			id: int,
 			name: str,
@@ -33,6 +34,7 @@ class Compound:
 		self._id = id
 		self._name = name
 		self._smiles = smiles
+		self._animal = animal
 		self._base = base
 		self._alias = alias
 		self._tags = None
