@@ -97,3 +97,21 @@ def sanitise_smiles(s, verbosity=False):
 			mout.warning(f'SMILES was changed: {annotated_smiles_str} --> {smiles}')
 
 	return smiles
+
+def pose_gap(a, b):
+
+	from numpy.linalg import norm
+	from molparse.rdkit import mol_to_AtomGroup
+
+	min_dist = None
+
+	a = mol_to_AtomGroup(a.mol)
+	b = mol_to_AtomGroup(b.mol)
+
+	for atom1 in a.atoms:
+		for atom2 in b.atoms:
+			dist = norm(atom1.np_pos - atom2.np_pos)
+			if min_dist is None or dist < min_dist:
+				min_dist = dist
+
+	return min_dist
