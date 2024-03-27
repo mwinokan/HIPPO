@@ -300,6 +300,7 @@ class Pose:
 		inspirations: bool | str = True, 
 		reference: bool | str = True,
 		metadata: bool = True,
+		duplicate_name: str | bool = False,
 	) -> dict:
 
 		"""Returns a dictionary representing this Pose. Arguments:
@@ -315,6 +316,10 @@ class Pose:
 		data = {}
 		for key in serialisable_fields:
 			data[key] = getattr(self, key)
+
+		if duplicate_name:
+			assert isinstance(duplicate_name, str)
+			data[duplicate_name] = data['name']
 
 		if mol:
 			data['mol'] = self.mol

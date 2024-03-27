@@ -371,7 +371,7 @@ class PoseSet(PoseTable):
 
 		# get the dataframe of poses
 
-		pose_df = self.get_df(mol=True, inspirations='fragalysis', reference='name', metadata=metadata)
+		pose_df = self.get_df(mol=True, inspirations='fragalysis', duplicate_name='original ID', reference='name', metadata=metadata)
 		pose_df = pose_df.drop(columns=['id', 'path', 'compound', 'target', 'ref_pdb', 'original SMILES'], errors='ignore')
 
 		pose_df.rename(inplace=True, columns=
@@ -393,7 +393,7 @@ class PoseSet(PoseTable):
 			submitter_name=submitter_name,
 			submitter_email=submitter_email,
 			submitter_institution=submitter_institution,
-			extras={'smiles':'smiles', 'ref_mols':'fragment inspirations'},
+			extras={'smiles':'smiles', 'ref_mols':'fragment inspirations', 'original ID':'original ID'},
 			metadata=metadata,
 		)
 
