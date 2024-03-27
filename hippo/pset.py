@@ -358,7 +358,7 @@ class PoseSet(PoseTable):
 		submitter_email,
 		submitter_institution,
 		metadata: bool = True,
-		sort_by: str | None,
+		sort_by: str | None = None,
 	):
 
 		"""Prepare an SDF for upload to the RHS of Fragalysis"""
