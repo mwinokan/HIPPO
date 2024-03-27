@@ -282,16 +282,18 @@ class Pose:
 		tags = self.db.select_where(query='tag_name', table='tag', key='pose', value=self.id, multiple=True, none='quiet')
 		return TagSet(self, {t[0] for t in tags})
 	
-	def get_inspirations(self):
+	def get_inspiration_ids(self):
 		inspirations = self.db.select_where(query='inspiration_original', table='inspiration', key='derivative', value=self.id, multiple=True, none='quiet')
-		
+		if not inspirations:
+			return None
+		return set([v for v, in inspirations])
+
+	def get_inspirations(self):	
+		if not (inspirations := self.get_inspiration_ids()):
+			return None
+
 		from .pset import PoseSet
-
-		if inspirations:
-			inspirations = [id for id, in inspirations]
-			inspirations = PoseSet(self.db, indices=inspirations)
-
-		return inspirations
+		return PoseSet(self.db, indices=inspirations)
 
 	def get_dict(self, 
 		mol: bool = False, 

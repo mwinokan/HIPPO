@@ -866,7 +866,7 @@ class Database:
 			result = self.cursor.fetchone()
 
 		if not result and none == 'error':
-			logger.error(f'No entry in {table} with {table}_{key}={value}')
+			logger.error(f'No entry in {table} with {where_str}')
 			return None
 
 		return result

@@ -280,6 +280,8 @@ class HIPPO:
 		skip_first=False,
 		convert_floats=True,
 		stop_after: int | None = None,
+		skip_equal_dict: dict | None = None,
+		skip_not_equal_dict: dict | None = None,
 	):
 
 		"""Add virtual hits from an SDF into the database.
@@ -297,16 +299,20 @@ class HIPPO:
 		from rdkit.Chem import PandasTools, MolToMolFile, MolFromMolFile
 		from molparse.rdkit import mol_to_smiles, mol_to_pdb_block
 		from numpy import isnan
+		from pandas import read_pickle
 
-		df = PandasTools.LoadSDF(sdf_path)
+		if sdf_path.name.endswith('.sdf'):
+			df = PandasTools.LoadSDF(sdf_path)
+		else:
+			df = read_pickle(sdf_path)
 
 		df_columns = list(df.columns)
 
 		target = self.register_target(target).name
 
-		assert mol_col in df_columns
-		assert name_col in df_columns
-		assert inspiration_col in df_columns
+		assert mol_col in df_columns, f'{mol_col=} not in {df_columns}'
+		assert name_col in df_columns, f'{name_col=} not in {df_columns}'
+		assert inspiration_col in df_columns, f'{inspiration_col=} not in {df_columns}'
 
 		df_columns.pop(df_columns.index(mol_col))
 		df_columns.pop(df_columns.index(name_col))
@@ -326,6 +332,12 @@ class HIPPO:
 
 			if name == 'ver_1.2':
 				logger.warning('Skipping Fragalysis header molecule')
+				continue
+
+			if skip_equal_dict and any(row[k] == v for k,v in skip_equal_dict.items()):
+				continue
+
+			if skip_not_equal_dict and any(row[k] != v for k,v in skip_not_equal_dict.items()):
 				continue
 			
 			mol = row[mol_col]
@@ -347,11 +359,16 @@ class HIPPO:
 
 			insp_str = row[inspiration_col]
 
-			insp_str = insp_str.removeprefix('[')
-			insp_str = insp_str.removesuffix(']')
-			insp_str = insp_str.replace("'", "")
+			if isinstance(insp_str, str):
+				insp_str = insp_str.removeprefix('[')
+				insp_str = insp_str.removesuffix(']')
+				insp_str = insp_str.replace("'", "")
+				generator = insp_str.split(',')
 
-			for insp in insp_str.split(','):
+			else:
+				generator = insp_str
+
+			for insp in generator:
 				insp = insp.strip()
 
 				if inspiration_map:
@@ -376,16 +393,32 @@ class HIPPO:
 
 			for col in df_columns:
 				value = row[col]
+
+				if not isinstance(col, str):
+					if i == 0:
+						logger.warning(f'Skipping metadata from column={col}.')
+					continue
+
 				if isinstance(value, float) and isnan(value):
 					continue
 
 				if convert_floats:
 					try:
 						value = float(value)
+					except TypeError:
+					# 	logger.warning(f'Could not convert column={col}.')
+						pass
 					except ValueError:
 						pass
 
+				if not (isinstance(value, str) or isinstance(value, float)):
+					if i == 0:
+						logger.warning(f'Skipping metadata from column={col}.')
+					continue
+
 				metadata[col] = value
+
+			# print(metadata)
 
 			pose = self.register_pose(
 				name=name, 

@@ -7,6 +7,7 @@ from .pose import Pose
 # from .pset import PoseSet
 from .tags import TagSet
 # from .rset import ReactionSet
+from .target import Target
 
 import logging
 logger = logging.getLogger('HIPPO')
