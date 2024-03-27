@@ -211,9 +211,9 @@ class Quoter:
 		price = pack['price']
 		currency = pack['currencyName']
 
-		if pack['status'] not in ['Normal', 'Ice pack']:
+		if pack['status'] not in ['Normal', 'Ice pack', '']:
 			print(pack)
-			raise Exception(f"{pack['status']=}")
+			logger.warning(f"{pack['status']=}")
 
 		if not price:
 			logger.warning(f'Skipping price-less Enamine pack ({entry})')
