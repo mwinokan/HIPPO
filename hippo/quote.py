@@ -29,8 +29,14 @@ class Quote:
 			logger.warning(self)
 
 	def __repr__(self):
+
+		if self.purity:
+			purity = f'@ {self.purity:.0%}'
+		else:
+			purity = ''
+
 		if self.catalogue:
-			return f'{mcol.bold}{mcol.underline}{self.supplier}:{self.catalogue}:{self.entry} {self.amount:>8}mg @ {self.purity:.0%} = {self.price:>8} {self.currency} ({self.lead_time} days) {self.smiles}{mcol.unbold}{mcol.ununderline}'
+			return f'{mcol.bold}{mcol.underline}{self.supplier}:{self.catalogue}:{self.entry} {self.amount:>8}mg {purity} = {self.price:>8} {self.currency} ({self.lead_time} days) {self.smiles}{mcol.unbold}{mcol.ununderline}'
 		else:
 			return f'{mcol.bold}{mcol.underline}{self.supplier}:{self.entry} {self.amount:>8}mg @ {self.purity:.0%} = {self.price:>8} {self.currency} ({self.lead_time} days) {self.smiles}{mcol.unbold}{mcol.ununderline}'
 		
