@@ -486,6 +486,77 @@ class PoseSet(PoseTable):
 
 		return '; '.join(commands)
 
+	### OUTPUT
+
+	def interactive(self, method=None, print_name=True, **kwargs):
+		"""Creates a ipywidget to interactively navigate this PoseSet."""
+
+		from ipywidgets import interactive, BoundedIntText, Checkbox, interactive_output, HBox, GridBox, Layout, VBox
+		from IPython.display import display
+		from pprint import pprint
+
+		if method:
+			def widget(i):
+				pose = self[i]
+				if print_name:
+					print(repr(pose))
+				value = getattr(pose, method)(**kwargs)
+				if value:
+					display(value)
+
+			return interactive(widget, i=
+				BoundedIntText(
+					value=0,
+					min=0,
+					max=len(self)-1,
+					step=1,
+					description='Pose:',
+					disabled=False
+				))
+
+		else:
+
+			a = BoundedIntText(
+					value=0,
+					min=0,
+					max=len(self)-1,
+					step=1,
+					description='Pose:',
+					disabled=False,
+				)
+
+			b = Checkbox(description='Name', value=True)
+			c = Checkbox(description='Summary', value=False)
+			d = Checkbox(description='2D', value=False)
+			e = Checkbox(description='3D', value=True)
+			f = Checkbox(description='Metadata', value=False)
+
+			ui = GridBox([b, c, d, e, f], layout=Layout(grid_template_columns="repeat(5, 100px)"))
+			ui = VBox([a, ui])
+			
+			def widget(i, name=True, summary=True, grid=True, draw=True, metadata=True):
+				pose = self[i]
+				if name:
+					print(repr(pose))
+
+				if summary: pose.summary(metadata=False)
+				if grid: pose.grid()
+				if draw: pose.draw()
+				if metadata:
+					logger.title('Metadata:')
+					pprint(pose.metadata)
+
+			out = interactive_output(widget, {'i': a, 'name': b, 'summary': c, 'grid':d, 'draw':e, 'metadata':f})
+
+			display(ui, out)
+
+	def summary(self):
+		"""Print a summary of this pose set"""
+		logger.header('PoseSet()')
+		logger.var('#poses', len(self))
+		logger.var('#compounds', self.num_compounds)
+		logger.var('tags', self.tags)
+
 	def draw(self):
 		"""Render this pose set with Py3Dmol"""
 		
@@ -505,15 +576,6 @@ class PoseSet(PoseTable):
 		labels = [d[0] for d in data]
 
 		return draw_grid(mols, labels=labels)
-
-	### OTHER
-
-	def summary(self):
-		"""Print a summary of this pose set"""
-		logger.header('PoseSet()')
-		logger.var('#poses', len(self))
-		logger.var('#compounds', self.num_compounds)
-		logger.var('tags', self.tags)
 
 	### DUNDERS
 

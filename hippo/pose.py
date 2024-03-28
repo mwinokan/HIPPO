@@ -423,15 +423,28 @@ class Pose:
 	def draw(self):
 		"""Render this pose (and its inspirations)"""
 		
-		assert self.inspirations
-
 		from molparse.rdkit import draw_mols
-
-		mols = [self.mol] + [i.mol for i in self.inspirations]
-
+		
+		mols = [self.mol]
+		if self.inspirations:
+			mols += [i.mol for i in self.inspirations]
+		
 		return draw_mols(mols)
 
-	def summary(self):
+	def grid(self):
+		"""Draw a grid of this pose with its inspirations"""
+		from molparse.rdkit import draw_grid
+		from IPython.display import display
+
+		mols = [self.compound.mol]
+		labels = [self.plain_repr()]
+		if self.inspirations:
+			mols += [i.compound.mol for i in self.inspirations]
+			labels += [i.plain_repr() for i in self.inspirations]
+
+		display(draw_grid(mols, labels=labels))
+
+	def summary(self, metadata:bool = True):
 		"""Print a summary of this pose"""
 		if self.name:
 			logger.header(f'{str(self)}: {self.name}')
@@ -444,7 +457,23 @@ class Pose:
 		logger.var('reference', self.reference)
 		logger.var('tags', self.tags)
 		logger.var('inspirations', self.inspirations)
-		logger.var('metadata', str(self.metadata))
+		if metadata:
+			logger.var('metadata', str(self.metadata))
+
+	def showcase(self):
+		self.summary(metadata=False)
+		self.grid()
+		self.draw()
+		from pprint import pprint
+		logger.title('Metadata:')
+		pprint(self.metadata)
+
+	def plain_repr(self):
+		"""Unformatted __repr__"""
+		if self.name:
+			return f'{self.compound}->{self}: {self.name}'
+		else:
+			return f'{self.compound}->{self}'
 
 	### DUNDERS
 
@@ -452,7 +481,7 @@ class Pose:
 		return f'P{self.id}'
 
 	def __repr__(self):
-		return f'{mcol.bold}{mcol.underline}{self.compound}->{self}{mcol.unbold}{mcol.ununderline}'
+		return f'{mcol.bold}{mcol.underline}{self.plain_repr()}{mcol.unbold}{mcol.ununderline}'
 
 	def __eq__(self, other):
 
