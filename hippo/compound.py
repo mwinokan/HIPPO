@@ -255,7 +255,7 @@ class Compound:
 		else:
 			display(self.mol)
 
-	def summary(self):
+	def summary(self, metadata: bool = True):
 		"""Print a summary of this compound"""
 		logger.header(repr(self))
 		logger.var('smiles', self.smiles)
@@ -264,7 +264,8 @@ class Compound:
 		logger.var('#reactions (product)', self.num_reactions)
 		logger.var('#reactions (reactant)', self.num_reactant)
 		logger.var('tags', self.tags)
-		logger.var('metadata', str(self.metadata))
+		if metadata:
+			logger.var('metadata', str(self.metadata))
 
 	def place(self,
 		*,
