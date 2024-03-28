@@ -96,6 +96,10 @@ class Pose:
 	@property
 	def smiles(self):
 		"""Returns the pose's smiles"""
+		if not self._smiles:
+			from molparse.rdkit import mol_to_smiles
+			self._smiles = mol_to_smiles(self.mol)
+			self.db.update(table='pose', id=self.id, key='pose_smiles', value=self._smiles)
 		return self._smiles
 
 	@property

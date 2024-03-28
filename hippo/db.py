@@ -523,7 +523,7 @@ class Database:
 		"""
 
 		try:
-			self.execute(sql, (name, compound.smiles, compound.id, target, path, reference))
+			self.execute(sql, (name, None, compound.id, target, path, reference))
 
 		except sqlite3.IntegrityError as e:
 			if 'UNIQUE constraint failed: pose.pose_path' in str(e):
