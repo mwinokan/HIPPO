@@ -300,4 +300,4 @@ class CompoundSet(CompoundTable):
 		except IndexError:
 			logger.exception(f'list index out of range: {key=} for {self}')
 			raise
-		return self.db.get_pose(table=self.table, id=index)
+		return self.db.get_compound(table=self.table, id=index)
