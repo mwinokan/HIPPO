@@ -2,10 +2,10 @@
 
 import os
 import sys
+sys.path.insert(0, os.path.abspath("../"))
+
 import unittest
 from hippo import HIPPO
-
-sys.path.insert(0, os.path.abspath("../"))
 
 class TestA71EV2A(unittest.TestCase):
 

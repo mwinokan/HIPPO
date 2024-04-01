@@ -3,6 +3,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+tests/A71EV2A
+
 # C extensions
 *.so
 
