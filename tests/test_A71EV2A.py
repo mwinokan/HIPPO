@@ -1,8 +1,11 @@
 #!/usr/bin/env python
 
 import os
+import sys
 import unittest
 from hippo import HIPPO
+
+sys.path.insert(0, os.path.abspath("../"))
 
 class TestA71EV2A(unittest.TestCase):
 
