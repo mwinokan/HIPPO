@@ -27,7 +27,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install rdkit==2023.9.1 molparse>=0.0.13 tqdm jupyterlab pycule chardet pandas
-        conda install -c conda-forge chemicalite
+        conda install -c conda-forge -y chemicalite
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     # - name: Lint with flake8
     #   run: |
