@@ -396,6 +396,8 @@ class HIPPO:
 
 		df = pd.read_pickle(df_path)
 
+		base_id = None
+
 		for i,row in tqdm(df.iterrows()):
 
 			# skip pose-less entries
@@ -403,8 +405,8 @@ class HIPPO:
 			if not row.path_to_mol:
 				continue
 
-			if i > 100:
-				break
+			# if i > 100:
+			# 	break
 
 			# loop over each reaction step
 			for j in range(3):
@@ -437,10 +439,20 @@ class HIPPO:
 						tags = ['intermediate']
 					elif row['3_num_atom_diff'] == 0:
 						tags = ['base']
+
 					else:
 						tags = ['elab']
-					product = self.register_compound(smiles=smiles, tags=tags, commit=False, return_compound=True)
-			
+
+					if j == 3:
+						base = base_id
+					else:
+						base = None
+
+					product = self.register_compound(smiles=smiles, tags=tags, commit=False, return_compound=True, base=base)
+					
+					if j == 3 and i == 0:
+						base_id = product.id
+
 				# register the reaction
 				self.register_reaction(reactants=reactants, product=product, type=row[f'{j}_reaction'], commit=False)
 
@@ -452,6 +464,14 @@ class HIPPO:
 
 			# inspirations
 			inspirations = []
+			for inspiration in row.regarded:
+				if inspiration_map:
+					inspiration = inspiration_map[inspiration]
+				else:
+					# this is really expensive
+					inspiration = self.poses[inspiration]
+				if inspiration:
+					inspirations.append(inspiration)
 			
 			# register the pose
 			self.register_pose(
