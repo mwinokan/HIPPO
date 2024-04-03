@@ -34,7 +34,7 @@ def generate_header(
 
 	if metadata:
 		for k,v in pose.metadata.items():
-			header.SetProp(k, str(v))
+			header.SetProp(k, str(k))
 
 	for k,v in extras.items():
 		header.SetProp(k, str(v))

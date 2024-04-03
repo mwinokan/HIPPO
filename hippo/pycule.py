@@ -61,6 +61,8 @@ class Quoter:
 
 	def get_enamine_quote(self, compound, currency="USD"):
 
+		assert compound._table == 'compound'
+
 		try:
 		
 			smiles = compound.smiles
@@ -77,12 +79,22 @@ class Quoter:
 					logger.error(f'ConnectionError: {e}')
 					return None
 
+				# try again but with a similarity search
+				if result['response']['result']['code'] != 0:
+					try:
+						result = self.wrapper.similaritysearch(smiles, similarity_value=1.0, catalogue=catalogue)
+					except requests.ConnectionError as e:
+						logger.error(f'ConnectionError: {e}')
+						return None
+
 				if result['response']['result']['code'] != 0:
 					continue
 
 				data = result['response']['data']
 
-				assert len(data) == 1
+				if len(data) < 1:
+					print(result['response'])
+					raise NotImplementedError
 
 				data = data[0]
 
@@ -98,19 +110,17 @@ class Quoter:
 				return None
 			
 			### get the information
-
-			for catalogue in self.catalogues:
 				
-				logger.header(f'Searching by ID in {self.supplier} {catalogue}...')
+			logger.header(f'Searching by ID in {self.supplier} {catalogue}...')
 
-				result = self.wrapper.compoundidsearch(name, catalogue=catalogue)
+			result = self.wrapper.compoundidsearch(name, catalogue=catalogue)
 
-				if result['response']['result']['code'] == 0:
-					try:
-						logger.success(f'Found in {catalogue}')
-						return self.parse_enamine_response(result, compound, catalogue), result
-					except NoDataInReponse:
-						pass
+			if result['response']['result']['code'] == 0:
+				try:
+					logger.success(f'Found in {catalogue}')
+					return self.parse_enamine_response(result, compound, catalogue), result
+				except NoDataInReponse:
+					pass
 
 			else:
 
@@ -139,11 +149,11 @@ class Quoter:
 
 		for i,data in enumerate(result['response']['data']):
 
-			
 			if i == 0:
 
 				# update compound metadata
 				metadata = dict()
+				metadata['enamine_id'] = data['Id']
 				metadata['alias'] = data['name']
 				metadata['cas'] = data['cas']
 				metadata['mfcd'] = data['mfcd']
@@ -159,13 +169,35 @@ class Quoter:
 				* lastUpdate
 				"""
 			
-			lead_time = self.parse_enamine_delivery_string(data['deliveryDays'])
+			lead_time = self.parse_enamine_delivery_string(delivery := data['deliveryDays'])
 			entry = data['Id']
 			smiles = data['smile']
-			purity = data['purity'] / 100
+
+			if purity := data['purity']:
+				purity /= 100
 			
-			for pack in data['packs']:
-				self.parse_enamine_pack(compound, entry, purity, catalogue, pack, lead_time, smiles)
+			# if not (packs := data['packs']):
+
+			if not (packs := data['packs']) and 'synthesis' in delivery:
+				
+				logger.warning('Hardcoded REAL quote')
+
+				compound.db.insert_quote(
+					compound=compound,
+					supplier='Enamine',
+					catalogue=catalogue,
+					entry=entry,
+					amount=20,
+					price=330,
+					currency='USD',
+					purity=None,
+					lead_time=15,
+					smiles=smiles,
+				)
+
+			else:
+				for pack in packs:
+					self.parse_enamine_pack(compound, entry, purity, catalogue, pack, lead_time, smiles)
 
 	def pick_enamine_data(self, comp_id,data):
 		
@@ -211,9 +243,9 @@ class Quoter:
 		price = pack['price']
 		currency = pack['currencyName']
 
-		if pack['status'] not in ['Normal', 'Ice pack']:
+		if pack['status'] not in ['Normal', 'Ice pack', '']:
 			print(pack)
-			raise Exception(f"{pack['status']=}")
+			logger.warning(f"{pack['status']=}")
 
 		if not price:
 			logger.warning(f'Skipping price-less Enamine pack ({entry})')

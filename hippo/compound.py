@@ -7,6 +7,7 @@ from .pose import Pose
 # from .pset import PoseSet
 from .tags import TagSet
 # from .rset import ReactionSet
+from .target import Target
 
 import logging
 logger = logging.getLogger('HIPPO')
@@ -20,6 +21,7 @@ class Compound:
 	"""
 
 	def __init__(self,
+			animal,
 			db,
 			id: int,
 			name: str,
@@ -33,6 +35,7 @@ class Compound:
 		self._id = id
 		self._name = name
 		self._smiles = smiles
+		self._animal = animal
 		self._base = base
 		self._alias = alias
 		self._tags = None
@@ -165,7 +168,7 @@ class Compound:
 		tags = self.db.select_where(query='tag_name', table='tag', key='compound', value=self.id, multiple=True, none='quiet')
 		return TagSet(self, {t[0] for t in tags}, commit=False)
 
-	def get_quotes(self, min_amount=None, supplier=None, max_lead_time=None, none='error', pick_cheapest=False, df=False) -> list[dict]:
+	def get_quotes(self, min_amount=None, supplier=None, max_lead_time=None, none='quiet', pick_cheapest=False, df=False) -> list[dict]:
 		"""Get all quotes associated to this compound"""
 
 		quote_ids = self.db.select_where(query='quote_id', table='quote', key='compound', value=self.id, multiple=True, none=none)
@@ -215,7 +218,10 @@ class Compound:
 		target: str = None
 	) -> list[Pose]:
 
-		pose_ids = self.db.select_where(query='pose_id', table='pose', key='compound', value=self.id, multiple=True)
+		pose_ids = self.db.select_where(query='pose_id', table='pose', key='compound', value=self.id, multiple=True, none=False)
+
+		if not pose_ids:
+			return None
 
 		# poses = [self.db.get_pose(id=q[0]) for q in pose_ids]
 
@@ -249,7 +255,7 @@ class Compound:
 		else:
 			display(self.mol)
 
-	def summary(self):
+	def summary(self, metadata: bool = True):
 		"""Print a summary of this compound"""
 		logger.header(repr(self))
 		logger.var('smiles', self.smiles)
@@ -258,7 +264,79 @@ class Compound:
 		logger.var('#reactions (product)', self.num_reactions)
 		logger.var('#reactions (reactant)', self.num_reactant)
 		logger.var('tags', self.tags)
-		logger.var('metadata', str(self.metadata))
+		if metadata:
+			logger.var('metadata', str(self.metadata))
+
+	def place(self,
+		*,
+		target: str | int | Target | None = None,
+		inspirations: list[Pose] | None = None,
+		reference: Pose | None = None,
+		max_ddG: float = 0.0,
+		max_RMSD: float = 2.0,
+		output_dir: str = 'wictor_place',
+		tags = None,
+		metadata = None,
+		overwrite = False,
+	) -> Pose:
+		"""Generate a new pose for this compound using Fragmenstein."""
+		
+		from fragmenstein import Monster, Wictor
+		from pathlib import Path
+
+		tags = tags or []
+		metadata = metadata or {}
+
+		# get required data
+		smiles = self.smiles
+
+		inspirations = inspirations or self.poses[0].inspirations
+		target = target or self.poses[0].target.name
+		reference = reference or self.poses[0].reference
+
+		inspiration_mols = [c.mol for c in inspirations]
+		protein_pdb_block = reference.protein_system.pdb_block_with_alt_sites
+				
+		# create the victor
+		victor = Wictor(hits=inspiration_mols, pdb_block=protein_pdb_block)
+		victor.work_path = output_dir
+		victor.enable_stdout(logging.CRITICAL)
+
+		# do the placement
+		victor.place(smiles, long_name=self.name)
+
+		# metadata
+		metadata['ddG'] = victor.energy_score['bound']['total_score'] - victor.energy_score['unbound']['total_score']
+		metadata['RMSD'] = victor.mrmsd.mrmsd
+
+		# print(victor.energy_score)
+
+		if metadata['ddG'] > max_ddG:
+			return None
+
+		if metadata['RMSD'] > max_RMSD:
+			return None
+
+		# register the pose
+		pose = self._animal.register_pose(
+			compound=self,
+			target=target,
+			path=Path(victor.work_path) / self.name / f'{self.name}.minimised.mol',
+			inspirations = inspirations,
+			reference=reference,
+			tags=tags,
+			metadata=metadata,	
+		)
+
+		if overwrite:
+			ids = [p.id for p in self.poses if p.id != pose.id]
+			for i in ids:
+				self.db.delete_where(table='pose', key="id", value=i)
+			logger.success(f'Successfully posed {self} (and deleted old poses)')
+		else:
+			logger.success(f'Successfully posed {self}')
+
+		return pose
 
 	### DUNDERS
 

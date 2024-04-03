@@ -71,7 +71,13 @@ class PoseTable:
 			if isinstance(value, str):
 				value = f'"{value}"'
 			ids = [i for i,d in results if d and f'"{key}": {value}' in d]
-		return self[ids]			
+		return self[ids]	
+
+	def draw(self, max_draw=100):
+		if len(self) <= max_draw:
+			self[:].draw()
+		else:
+			logger.warning(f"Too many poses: {len(self)} > {max_draw=}. Increase max_draw or use animal.poses[:].draw()")		
 
 	def summary(self):
 		"""Print a summary of this pose set"""
@@ -158,6 +164,8 @@ class PoseSet(PoseTable):
 		if not isinstance(indices, list):
 			indices = list(indices)
 
+		assert all(isinstance(i, int) for i in indices)
+
 		self._indices = indices
 
 	### PROPERTIES
@@ -197,6 +205,11 @@ class PoseSet(PoseTable):
 		return CompoundSet(self.db, ids)
 
 	@property
+	def mols(self):
+		"""Get the rdkit Molecules contained in this set"""
+		return [p.mol for p in self]
+
+	@property
 	def num_compounds(self):
 		"""Count the compounds associated to this set of poses"""
 		return len(self.compounds)
@@ -205,6 +218,26 @@ class PoseSet(PoseTable):
 	def df(self):
 		"""Get a DataFrame of the poses in this set"""
 		return self.get_df(mol=True)
+
+	@property
+	def reference_ids(self):
+		values = self.db.select_where(table='pose', query='DISTINCT pose_reference', key=f'pose_reference IS NOT NULL and pose_id in {tuple(self.ids)}', value=None, multiple=True)
+		return set(v for v, in values)
+
+	# @property
+	# def inspirations(self):
+	# 	return self._inspirations
+
+	@property
+	def inspiration_sets(self):
+		sets = []
+		for id in self.ids:
+			insp_ids = self.db.select_where(query='inspiration_original', table='inspiration', key='derivative', value=id, multiple=True, sort='inspiration_original')
+			insp_ids = set(v for v, in insp_ids)
+			# print(insp_ids)
+			if insp_ids not in sets:
+				sets.append(insp_ids)
+		return sets
 
 	### FILTERING
 
@@ -267,9 +300,39 @@ class PoseSet(PoseTable):
 
 		return DataFrame(data)
 
+	def get_by_reference(self, ref_id):
+		"""Get poses with a certain reference id"""
+		values = self.db.select_where(table='pose', query='pose_id', key='reference', value=ref_id, multiple=True)
+		if not values:
+			return None
+		return PoseSet(self.db, [v for v, in values])
+
 	### TAGGING
 
 	
+	### SPLITTING
+
+	def split_by_reference(self):
+		sets = {}
+		for ref_id in self.reference_ids:
+			sets[ref_id] = self.get_by_reference(ref_id)
+		return sets
+
+	def split_by_inspirations(self):
+		
+		sets = {}
+
+		for pose in self:
+
+			insp_ids = tuple(pose.get_inspiration_ids())
+
+			if insp_ids not in sets:
+				sets[insp_ids] = PoseSet(self.db, [pose.id])
+			else:
+				sets[insp_ids]._indices.append(pose.id)
+
+		return sets
+
 
 	### EXPORTING
 
@@ -288,7 +351,6 @@ class PoseSet(PoseTable):
 
 	def to_fragalysis(self, 
 		out_path,
-
 		*,
 		method,
 		ref_url,
@@ -296,6 +358,7 @@ class PoseSet(PoseTable):
 		submitter_email,
 		submitter_institution,
 		metadata: bool = True,
+		sort_by: str | None = None,
 	):
 
 		"""Prepare an SDF for upload to the RHS of Fragalysis"""
@@ -308,7 +371,7 @@ class PoseSet(PoseTable):
 
 		# get the dataframe of poses
 
-		pose_df = self.get_df(mol=True, inspirations='fragalysis', reference='name', metadata=metadata)
+		pose_df = self.get_df(mol=True, inspirations='fragalysis', duplicate_name='original ID', reference='name', metadata=metadata)
 		pose_df = pose_df.drop(columns=['id', 'path', 'compound', 'target', 'ref_pdb', 'original SMILES'], errors='ignore')
 
 		pose_df.rename(inplace=True, columns=
@@ -330,7 +393,7 @@ class PoseSet(PoseTable):
 			submitter_name=submitter_name,
 			submitter_email=submitter_email,
 			submitter_institution=submitter_institution,
-			extras={'smiles':'smiles', 'ref_mols':'fragment inspirations'},
+			extras={'smiles':'smiles', 'ref_mols':'fragment inspirations', 'original ID':'original ID'},
 			metadata=metadata,
 		)
 
@@ -338,16 +401,15 @@ class PoseSet(PoseTable):
 
 		header_cols = set(header.GetPropNames())
 
-		# print(df_cols - header_cols)
-		# print(header_cols - df_cols)
-		# print(df_cols)
-
 		# empty properties
 		pose_df['generation_date'] = [None] * len(pose_df)
 		pose_df['submitter_name'] = [None] * len(pose_df)
 		pose_df['method'] = [None] * len(pose_df)
 		pose_df['submitter_email'] = [None] * len(pose_df)
 		pose_df['ref_url'] = [None] * len(pose_df)
+
+		if sort_by:
+			pose_df = pose_df.sort_values(by=sort_by)
 
 		fields = []
 
@@ -359,6 +421,141 @@ class PoseSet(PoseTable):
 			PandasTools.WriteSDF(pose_df, sdfh, mol_col, name_col, set(pose_df.columns))
 
 		return pose_df
+
+	def to_pymol(self, prefix=None):
+		"""Group the poses by reference protein and inspirations and output relevant PDBs and SDFs."""
+
+		commands = []
+
+		prefix = prefix or ''
+		if prefix:
+			prefix = f'{prefix}_'
+
+		from pathlib import Path
+
+		for i,(ref_id, poses) in enumerate(self.split_by_reference().items()):
+
+			ref_pose = self.db.get_pose(id=ref_id)
+			ref_name = ref_pose.name or ref_id
+		
+			# create the subdirectory
+			ref_dir = Path(f'{prefix}ref_{ref_name}')
+			logger.writing(ref_dir)
+			ref_dir.mkdir(parents=True, exist_ok=True)
+			
+			# write the reference protein
+			ref_pdb = ref_dir / f'ref_{ref_name}.pdb'
+			ref_pose.protein_system.write(ref_pdb, verbosity=0)
+
+			# color the reference:
+			commands.append(f'load {ref_pdb.resolve()}')
+			commands.append('hide')
+			commands.append('show lines')
+			commands.append('show surface')
+			commands.append('util.cbaw')
+			commands.append('set surface_color, white')
+			commands.append('set transparency,  0.4')
+
+			for j,(insp_ids, poses) in enumerate(poses.split_by_inspirations().items()):
+
+				inspirations = PoseSet(self.db, insp_ids)
+				insp_names = "-".join(inspirations.names)
+
+				# create the subdirectory
+				insp_dir = ref_dir / insp_names
+				insp_dir.mkdir(parents=True, exist_ok=True)
+
+				# write the inspirations
+				insp_sdf = insp_dir / f'{insp_names}_frags.sdf'
+				inspirations.write_sdf(insp_sdf)
+
+				commands.append(f"load {insp_sdf.resolve()}")
+				commands.append(f"set all_states, on, {insp_sdf.name.removesuffix('.sdf')}")
+				commands.append(f"util.rainbow \"{insp_sdf.name.removesuffix('.sdf')}\"")
+
+				# write the poses
+				pose_sdf = insp_dir / f'{insp_names}_derivatives.sdf'
+				poses.write_sdf(pose_sdf)
+				
+				commands.append(f"load {pose_sdf.resolve()}")
+				commands.append(f'util.cbaw "{pose_sdf.name.removesuffix(".sdf")}"')
+
+				if j > 0:
+					commands.append(f"disable \"{insp_sdf.name.removesuffix('.sdf')}\"")
+					commands.append(f'disable "{pose_sdf.name.removesuffix(".sdf")}"')
+
+		return '; '.join(commands)
+
+	### OUTPUT
+
+	def interactive(self, method=None, print_name=True, **kwargs):
+		"""Creates a ipywidget to interactively navigate this PoseSet."""
+
+		from ipywidgets import interactive, BoundedIntText, Checkbox, interactive_output, HBox, GridBox, Layout, VBox
+		from IPython.display import display
+		from pprint import pprint
+
+		if method:
+			def widget(i):
+				pose = self[i]
+				if print_name:
+					print(repr(pose))
+				value = getattr(pose, method)(**kwargs)
+				if value:
+					display(value)
+
+			return interactive(widget, i=
+				BoundedIntText(
+					value=0,
+					min=0,
+					max=len(self)-1,
+					step=1,
+					description='Pose:',
+					disabled=False
+				))
+
+		else:
+
+			a = BoundedIntText(
+					value=0,
+					min=0,
+					max=len(self)-1,
+					step=1,
+					description='Pose:',
+					disabled=False,
+				)
+
+			b = Checkbox(description='Name', value=True)
+			c = Checkbox(description='Summary', value=False)
+			d = Checkbox(description='2D', value=False)
+			e = Checkbox(description='3D', value=True)
+			f = Checkbox(description='Metadata', value=False)
+
+			ui = GridBox([b, c, d, e, f], layout=Layout(grid_template_columns="repeat(5, 100px)"))
+			ui = VBox([a, ui])
+			
+			def widget(i, name=True, summary=True, grid=True, draw=True, metadata=True):
+				pose = self[i]
+				if name:
+					print(repr(pose))
+
+				if summary: pose.summary(metadata=False)
+				if grid: pose.grid()
+				if draw: pose.draw()
+				if metadata:
+					logger.title('Metadata:')
+					pprint(pose.metadata)
+
+			out = interactive_output(widget, {'i': a, 'name': b, 'summary': c, 'grid':d, 'draw':e, 'metadata':f})
+
+			display(ui, out)
+
+	def summary(self):
+		"""Print a summary of this pose set"""
+		logger.header('PoseSet()')
+		logger.var('#poses', len(self))
+		logger.var('#compounds', self.num_compounds)
+		logger.var('tags', self.tags)
 
 	def draw(self):
 		"""Render this pose set with Py3Dmol"""
@@ -379,15 +576,6 @@ class PoseSet(PoseTable):
 		labels = [d[0] for d in data]
 
 		return draw_grid(mols, labels=labels)
-
-	### OTHER
-
-	def summary(self):
-		"""Print a summary of this pose set"""
-		logger.header('PoseSet()')
-		logger.var('#poses', len(self))
-		logger.var('#compounds', self.num_compounds)
-		logger.var('tags', self.tags)
 
 	### DUNDERS
 

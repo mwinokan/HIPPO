@@ -181,6 +181,8 @@ class CompoundSet(CompoundTable):
 	def tags(self):
 		"""Returns the set of unique tags present in this compound set"""
 		values = self.db.select_where(table='tag', query='DISTINCT tag_name', key=f'tag_compound in {tuple(self.ids)}', multiple=True)
+		if not values:
+			return set()
 		return set(v for v, in values)
 
 	@property
@@ -298,4 +300,4 @@ class CompoundSet(CompoundTable):
 		except IndexError:
 			logger.exception(f'list index out of range: {key=} for {self}')
 			raise
-		return self.db.get_pose(table=self.table, id=index)
+		return self.db.get_compound(table=self.table, id=index)

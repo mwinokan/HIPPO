@@ -96,6 +96,10 @@ class Pose:
 	@property
 	def smiles(self):
 		"""Returns the pose's smiles"""
+		if not self._smiles:
+			from molparse.rdkit import mol_to_smiles
+			self._smiles = mol_to_smiles(self.mol)
+			self.db.update(table='pose', id=self.id, key='pose_smiles', value=self._smiles)
 		return self._smiles
 
 	@property
@@ -154,6 +158,11 @@ class Pose:
 
 					raise Exception
 					return None
+
+				# clean up bond orders
+				from rdkit.Chem.AllChem import MolFromSmiles, AssignBondOrdersFromTemplate
+				template = MolFromSmiles(self.compound.smiles)
+				mol = AssignBondOrdersFromTemplate(template, mol)
 
 				self.mol = mol
 
@@ -282,22 +291,25 @@ class Pose:
 		tags = self.db.select_where(query='tag_name', table='tag', key='pose', value=self.id, multiple=True, none='quiet')
 		return TagSet(self, {t[0] for t in tags})
 	
-	def get_inspirations(self):
+	def get_inspiration_ids(self):
 		inspirations = self.db.select_where(query='inspiration_original', table='inspiration', key='derivative', value=self.id, multiple=True, none='quiet')
-		
+		if not inspirations:
+			return None
+		return set([v for v, in inspirations])
+
+	def get_inspirations(self):	
+		if not (inspirations := self.get_inspiration_ids()):
+			return None
+
 		from .pset import PoseSet
-
-		if inspirations:
-			inspirations = [id for id, in inspirations]
-			inspirations = PoseSet(self.db, indices=inspirations)
-
-		return inspirations
+		return PoseSet(self.db, indices=inspirations)
 
 	def get_dict(self, 
 		mol: bool = False, 
 		inspirations: bool | str = True, 
 		reference: bool | str = True,
 		metadata: bool = True,
+		duplicate_name: str | bool = False,
 	) -> dict:
 
 		"""Returns a dictionary representing this Pose. Arguments:
@@ -313,6 +325,10 @@ class Pose:
 		data = {}
 		for key in serialisable_fields:
 			data[key] = getattr(self, key)
+
+		if duplicate_name:
+			assert isinstance(duplicate_name, str)
+			data[duplicate_name] = data['name']
 
 		if mol:
 			data['mol'] = self.mol
@@ -416,15 +432,28 @@ class Pose:
 	def draw(self):
 		"""Render this pose (and its inspirations)"""
 		
-		assert self.inspirations
-
 		from molparse.rdkit import draw_mols
-
-		mols = [self.mol] + [i.mol for i in self.inspirations]
-
+		
+		mols = [self.mol]
+		if self.inspirations:
+			mols += [i.mol for i in self.inspirations]
+		
 		return draw_mols(mols)
 
-	def summary(self):
+	def grid(self):
+		"""Draw a grid of this pose with its inspirations"""
+		from molparse.rdkit import draw_grid
+		from IPython.display import display
+
+		mols = [self.compound.mol]
+		labels = [self.plain_repr()]
+		if self.inspirations:
+			mols += [i.compound.mol for i in self.inspirations]
+			labels += [i.plain_repr() for i in self.inspirations]
+
+		display(draw_grid(mols, labels=labels))
+
+	def summary(self, metadata:bool = True):
 		"""Print a summary of this pose"""
 		if self.name:
 			logger.header(f'{str(self)}: {self.name}')
@@ -437,7 +466,23 @@ class Pose:
 		logger.var('reference', self.reference)
 		logger.var('tags', self.tags)
 		logger.var('inspirations', self.inspirations)
-		logger.var('metadata', str(self.metadata))
+		if metadata:
+			logger.var('metadata', str(self.metadata))
+
+	def showcase(self):
+		self.summary(metadata=False)
+		self.grid()
+		self.draw()
+		from pprint import pprint
+		logger.title('Metadata:')
+		pprint(self.metadata)
+
+	def plain_repr(self):
+		"""Unformatted __repr__"""
+		if self.name:
+			return f'{self.compound}->{self}: {self.name}'
+		else:
+			return f'{self.compound}->{self}'
 
 	### DUNDERS
 
@@ -445,7 +490,7 @@ class Pose:
 		return f'P{self.id}'
 
 	def __repr__(self):
-		return f'{mcol.bold}{mcol.underline}{self.compound}->{self}{mcol.unbold}{mcol.ununderline}'
+		return f'{mcol.bold}{mcol.underline}{self.plain_repr()}{mcol.unbold}{mcol.ununderline}'
 
 	def __eq__(self, other):
 

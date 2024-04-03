@@ -25,7 +25,7 @@ class Database:
 
 	"""Wrapper to connect to the HIPPO sqlite database."""
 
-	def __init__(self, path: Path) -> None:
+	def __init__(self, path: Path, animal) -> None:
 
 		assert isinstance(path, Path)
 		
@@ -34,6 +34,7 @@ class Database:
 		self._path = path
 		self._connection = None
 		self._cursor = None
+		self._animal = animal
 
 		logger.debug(f'Database.path = {self.path}')
 
@@ -522,7 +523,7 @@ class Database:
 		"""
 
 		try:
-			self.execute(sql, (name, compound.smiles, compound.id, target, path, reference))
+			self.execute(sql, (name, None, compound.id, target, path, reference))
 
 		except sqlite3.IntegrityError as e:
 			if 'UNIQUE constraint failed: pose.pose_path' in str(e):
@@ -865,7 +866,7 @@ class Database:
 			result = self.cursor.fetchone()
 
 		if not result and none == 'error':
-			logger.error(f'No entry in {table} with {table}_{key}={value}')
+			logger.error(f'No entry in {table} with {where_str}')
 			return None
 
 		return result
@@ -954,7 +955,7 @@ class Database:
 
 		query = 'compound_id, compound_name, compound_smiles, compound_base, compound_alias'
 		entry = self.select_where(query=query, table=table, key='id', value=id)
-		compound = Compound(self, *entry, metadata=None, mol=None)
+		compound = Compound(self._animal, self, *entry, metadata=None, mol=None)
 		return compound
 
 	def get_compound_id(self, 
