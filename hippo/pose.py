@@ -159,6 +159,11 @@ class Pose:
 					raise Exception
 					return None
 
+				# clean up bond orders
+				from rdkit.Chem.AllChem import MolFromSmiles, AssignBondOrdersFromTemplate
+				template = MolFromSmiles(self.compound.smiles)
+				mol = AssignBondOrdersFromTemplate(template, mol)
+
 				self.mol = mol
 
 			elif self.path.endswith('.mol'):
