@@ -440,12 +440,18 @@ class HIPPO:
 		df_path: str | Path,
 		*,
 		inspiration_map: dict | None = None,
-
+		base_only: bool = False,
 	):
 
 		logger.warning('Assuming this is a three-step reaction')
-
+		
 		df = pd.read_pickle(df_path)
+
+		if '3_num_atom_diff' not in df.columns:
+			logger.error(df_path)
+			# return df.head()
+			print(df.columns)
+			raise NotImplementedError
 
 		base_id = None
 
@@ -455,6 +461,10 @@ class HIPPO:
 
 			if not row.path_to_mol:
 				continue
+
+
+			if base_only and row['3_num_atom_diff'] > 0:
+				break
 
 			# if i > 100:
 			# 	break
