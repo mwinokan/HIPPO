@@ -15,7 +15,7 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-from .tools import inchikey_from_smiles, sanitise_smiles
+from .tools import inchikey_from_smiles, sanitise_smiles, SanitisationError
 
 from mlog import setup_logger
 logger = setup_logger('HIPPO')
@@ -353,6 +353,10 @@ class HIPPO:
 
 			comp = self.register_compound(smiles=smiles, tags=tags)
 
+			if not comp:
+				logger.error(f'Could not register compound {i=}')
+				continue
+
 			# inspirations
 
 			inspirations = []
@@ -564,7 +568,13 @@ class HIPPO:
 
 		"""Use a smiles string to add a compound to the database. If it already exists return the compound"""
 
-		smiles = sanitise_smiles(smiles)
+		assert smiles
+		try:
+			smiles = sanitise_smiles(smiles, sanitisation_failed='error')
+		except SanitisationError:
+			logger.error(f'Could not sanitise {smiles=}')
+			return None
+
 		inchikey = inchikey_from_smiles(smiles)
 
 		compound_id = self.db.insert_compound(

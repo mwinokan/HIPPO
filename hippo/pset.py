@@ -307,6 +307,20 @@ class PoseSet(PoseTable):
 			return None
 		return PoseSet(self.db, [v for v, in values])
 
+	def filter(self, function, inverse=False):
+		"""Filter this poseset by selecting members where function(pose) is truthy"""
+		
+		ids = set()
+		for pose in self:
+			value = function(pose)
+			# logger.debug(f'{pose=} {value=}')
+			if value and not inverse:
+				ids.add(pose.id)
+			elif not value and inverse:
+				ids.add(pose.id)
+
+		return PoseSet(self.db, ids)
+
 	### TAGGING
 
 	
@@ -359,12 +373,15 @@ class PoseSet(PoseTable):
 		submitter_institution,
 		metadata: bool = True,
 		sort_by: str | None = None,
+		sort_reverse: bool = False,
+		generate_pdbs: bool = False,
 	):
 
 		"""Prepare an SDF for upload to the RHS of Fragalysis"""
 
 		from .fragalysis import generate_header
 		from rdkit.Chem import SDWriter, PandasTools
+		assert out_path.endswith('.sdf')
 
 		name_col = '_Name'
 		mol_col = 'ROMol'
@@ -382,6 +399,37 @@ class PoseSet(PoseTable):
 			 'smiles':'original SMILES',
 			})
 
+		if generate_pdbs:
+			
+			from pathlib import Path
+			from zipfile import ZipFile
+
+			# output subdirectory
+			out_key = Path(out_path).name.removesuffix('.sdf')
+			pdb_dir = Path(out_key)
+			pdb_dir.mkdir(exist_ok=True)
+
+			# create the zip archive
+			with ZipFile(f'{out_key}_pdbs.zip', 'w') as z:
+				
+				# loop over poses
+				for (i,row),pose in zip(pose_df.iterrows(), self):
+
+					# filenames
+					pdb_name = f"{out_key}_{row._Name}.pdb"
+					pdb_path = pdb_dir / pdb_name
+					pose_df.iloc[i]['ref_pdb'] = pdb_name
+
+					# generate the PL-complex
+					sys = pose.complex_system
+					
+					# write the PDB
+					logger.writing(pdb_path)
+					sys.write(pdb_path, verbosity=0)
+					z.write(pdb_path)
+			
+			logger.writing(f'{out_key}_pdbs.zip')
+
 		# create the header molecule
 		
 		df_cols = set(pose_df.columns)
@@ -397,8 +445,6 @@ class PoseSet(PoseTable):
 			metadata=metadata,
 		)
 
-		# return header
-
 		header_cols = set(header.GetPropNames())
 
 		# empty properties
@@ -409,7 +455,7 @@ class PoseSet(PoseTable):
 		pose_df['ref_url'] = [None] * len(pose_df)
 
 		if sort_by:
-			pose_df = pose_df.sort_values(by=sort_by)
+			pose_df = pose_df.sort_values(by=sort_by, ascending=not sort_reverse)
 
 		fields = []
 
@@ -521,7 +567,7 @@ class PoseSet(PoseTable):
 					min=0,
 					max=len(self)-1,
 					step=1,
-					description='Pose:',
+					description=f'Pose (/{len(self)}):',
 					disabled=False,
 				)
 

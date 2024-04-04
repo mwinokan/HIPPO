@@ -113,14 +113,16 @@ class Quoter:
 				
 			logger.header(f'Searching by ID in {self.supplier} {catalogue}...')
 
-			result = self.wrapper.compoundidsearch(name, catalogue=catalogue)
+			for catalogue in self.catalogues:
+				
+				result = self.wrapper.compoundidsearch(name, catalogue=catalogue)
 
-			if result['response']['result']['code'] == 0:
-				try:
-					logger.success(f'Found in {catalogue}')
-					return self.parse_enamine_response(result, compound, catalogue), result
-				except NoDataInReponse:
-					pass
+				if result['response']['result']['code'] == 0:
+					try:
+						logger.success(f'Found in {catalogue}')
+						return self.parse_enamine_response(result, compound, catalogue), result
+					except NoDataInReponse:
+						pass
 
 			else:
 

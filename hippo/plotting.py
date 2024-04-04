@@ -586,7 +586,11 @@ def plot_compound_property(animal, prop, compounds=None, style='bar', null=None)
 	return fig
 
 @hippo_graph
+<<<<<<< HEAD
 def plot_pose_property(animal, prop, poses=None, style='scatter', null=None):
+=======
+def plot_pose_property(animal, prop, poses=None, style='bar', null=None, color=None):
+>>>>>>> f72f49d0fc24efb18be9d6a3f194cf322d4d32d0
 
 	"""
 	Get an arbitrary property from all the poses in animal.poses
@@ -632,17 +636,28 @@ def plot_pose_property(animal, prop, poses=None, style='scatter', null=None):
 
 		title = f'Pose {prop[0]}'
 
-		fig = px.histogram(plot_data, x=prop[0], hover_data=hover_data)
+		fig = px.histogram(plot_data, x=prop[0], hover_data=hover_data, color=color)
 		
 		fig.update_layout(xaxis_title=prop[0], yaxis_title='Quantity')
 
 	elif len(prop) == 2:
+		
+		if style == 'histogram':
+
+			x = [d[prop[0]] for d in plot_data]
+			y = [d[prop[1]] for d in plot_data]
+
+			fig = go.Figure(go.Histogram2d(x=x, y=y))
+
+		else:
+			
+			if style == 'bar':
+				style='scatter'
+			
+			func = eval(f'px.{style}')
+			fig = func(plot_data, x=prop[0], y=prop[1], color=color, hover_data=hover_data)
 
 		title = f'Pose {prop[0]} vs {prop[1]}'
-		
-		func = eval(f'px.{style}')
-		fig = func(plot_data, x=prop[0], y=prop[1], hover_data=hover_data)
-
 		fig.update_layout(xaxis_title=prop[0], yaxis_title=prop[1])
 
 	else:

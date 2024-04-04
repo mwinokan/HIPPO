@@ -100,8 +100,13 @@ class Pose:
 		"""Returns the pose's smiles"""
 		if not self._smiles:
 			from molparse.rdkit import mol_to_smiles
-			self._smiles = mol_to_smiles(self.mol)
-			self.db.update(table='pose', id=self.id, key='pose_smiles', value=self._smiles)
+			try:
+				mol = self.mol
+				self._smiles = mol_to_smiles(mol)
+				self.db.update(table='pose', id=self.id, key='pose_smiles', value=self._smiles)
+			except InvalidMolError:
+				logger.warning(f'Taking smiles from {self.compound}')
+				self._smiles = self.compound.smiles
 		return self._smiles
 
 	@property
@@ -132,6 +137,15 @@ class Pose:
 		if isinstance(self._reference, int):
 			self._reference = self.db.get_pose(id=self._reference)
 		return self._reference
+
+	@reference.setter
+	def reference(self, p):
+		"""Set the pose's reference"""
+		if not isinstance(p, int):
+			assert p._table == 'pose'
+			p = p.id
+		self._reference = p
+		self.db.update(table='pose', id=self.id, key='pose_reference', value=p)
 
 	@property
 	def mol(self):
@@ -168,8 +182,7 @@ class Pose:
 
 						lig_res.plot3d()
 
-						raise Exception
-						return None
+						raise InvalidMolError
 
 					# clean up bond orders
 					from rdkit.Chem.AllChem import MolFromSmiles, AssignBondOrdersFromTemplate
@@ -193,6 +206,12 @@ class Pose:
 
 				# logger.reading(self.path)
 				mol = mp.parse(self.path, verbosity=False)
+
+				if not mol:
+					logger.error(f'[{self}] Error computing RDKit Mol from .mol={self.path}')
+					
+					raise InvalidMolError
+
 				self.mol = mol
 
 			else:
@@ -207,6 +226,7 @@ class Pose:
 	@mol.setter
 	def mol(self, m):
 		"""Set the pose's rdkit.Chem.Mol"""
+		assert m
 		self._mol = m
 		self.db.update(table='pose', id=self.id, key='pose_mol', value=m.ToBinary())
 
@@ -304,6 +324,29 @@ class Pose:
 	def table(self):
 		return self._table
 
+	@property
+	def num_heavy_atoms(self):
+		"""Number of heavy atoms"""
+		from rdkit import Chem
+		try:
+			mol = self.mol
+		except InvalidMolError:
+			return None
+		return Chem.Mol.GetNumHeavyAtoms(mol)
+
+	@property
+	def num_atoms_added(self):
+		"""Get the number of heavy atoms added w.r.t. to the inspirations (assuming perfect merge)"""
+		inspirations = self.inspirations
+		assert inspirations
+
+		count = 0
+		for i in inspirations:
+			count += i.num_heavy_atoms
+
+		if (self_count := self.num_heavy_atoms) is None:
+			return None
+		return self.num_heavy_atoms - count
 
 	### METHODS
 
@@ -348,13 +391,15 @@ class Pose:
 		data = {}
 		for key in serialisable_fields:
 			data[key] = getattr(self, key)
-
 		if duplicate_name:
 			assert isinstance(duplicate_name, str)
 			data[duplicate_name] = data['name']
 
 		if mol:
-			data['mol'] = self.mol
+			try:
+				data['mol'] = self.mol
+			except InvalidMolError:
+				data['mol'] = None
 
 		data['compound'] = self.compound.name
 		data['target'] = self.target.name
@@ -488,7 +533,10 @@ class Pose:
 		logger.var('target', repr(self.target))
 		logger.var('reference', self.reference)
 		logger.var('tags', self.tags)
-		logger.var('inspirations', self.inspirations)
+		logger.var('num_heavy_atoms', self.num_heavy_atoms)
+		if (inspirations := self.inspirations):
+			logger.var('inspirations', self.inspirations)
+			logger.var('num_atoms_added', self.num_atoms_added)
 		if metadata:
 			logger.var('metadata', str(self.metadata))
 
@@ -521,3 +569,7 @@ class Pose:
 			return self.id == other
 
 		return self.id == other.id
+
+
+class InvalidMolError(Exception):
+	...

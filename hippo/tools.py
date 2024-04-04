@@ -7,6 +7,9 @@ from rdkit.Chem import MolFromSmiles, MolToSmiles
 import mcol
 import mout
 
+from mlog import setup_logger
+logger = setup_logger('HIPPO')
+
 def df_row_to_dict(df_row):
 
 	assert len(df_row) == 1, f'{len(df_row)=}'
@@ -67,7 +70,7 @@ def smiles_has_isotope(smiles, regex=True):
 		mol = MolFromSmiles(smiles)
 		return any(atom.GetIsotope() for atom in mol.GetAtoms())
 
-def sanitise_smiles(s, verbosity=False):
+def sanitise_smiles(s, verbosity=False, sanitisation_failed='error'):
 
 	orig_smiles = s
 
@@ -85,7 +88,13 @@ def sanitise_smiles(s, verbosity=False):
 		smiles = remove_isotopes_from_smiles(smiles)
 
 	# canonicalise
-	smiles = MolToSmiles(MolFromSmiles(smiles),True)
+	mol = MolFromSmiles(smiles)
+	if mol:
+		smiles = MolToSmiles(mol,True)
+	elif sanitisation_failed =='error':
+		raise SanitisationError
+	elif sanitisation_failed =='warning':
+		logger.warning(f'sanitisation failed for {smiles=}')
 
 	if verbosity:
 
@@ -115,3 +124,6 @@ def pose_gap(a, b):
 				min_dist = dist
 
 	return min_dist
+
+class SanitisationError(Exception):
+	...
