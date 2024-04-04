@@ -98,8 +98,13 @@ class Pose:
 		"""Returns the pose's smiles"""
 		if not self._smiles:
 			from molparse.rdkit import mol_to_smiles
-			self._smiles = mol_to_smiles(self.mol)
-			self.db.update(table='pose', id=self.id, key='pose_smiles', value=self._smiles)
+			try:
+				mol = self.mol
+				self._smiles = mol_to_smiles(mol)
+				self.db.update(table='pose', id=self.id, key='pose_smiles', value=self._smiles)
+			except InvalidMolError:
+				logger.warning(f'Taking smiles from {self.compound}')
+				self._smiles = self.compound.smiles
 		return self._smiles
 
 	@property
@@ -165,8 +170,7 @@ class Pose:
 
 					lig_res.plot3d()
 
-					raise Exception
-					return None
+					raise InvalidMolError
 
 				# clean up bond orders
 				from rdkit.Chem.AllChem import MolFromSmiles, AssignBondOrdersFromTemplate
@@ -179,6 +183,12 @@ class Pose:
 
 				# logger.reading(self.path)
 				mol = mp.parse(self.path, verbosity=False)
+
+				if not mol:
+					logger.error(f'[{self}] Error computing RDKit Mol from .mol={self.path}')
+					
+					raise InvalidMolError
+
 				self.mol = mol
 
 			else:
@@ -193,6 +203,7 @@ class Pose:
 	@mol.setter
 	def mol(self, m):
 		"""Set the pose's rdkit.Chem.Mol"""
+		assert m
 		self._mol = m
 		self.db.update(table='pose', id=self.id, key='pose_mol', value=m.ToBinary())
 
@@ -334,13 +345,15 @@ class Pose:
 		data = {}
 		for key in serialisable_fields:
 			data[key] = getattr(self, key)
-
 		if duplicate_name:
 			assert isinstance(duplicate_name, str)
 			data[duplicate_name] = data['name']
 
 		if mol:
-			data['mol'] = self.mol
+			try:
+				data['mol'] = self.mol
+			except InvalidMolError:
+				data['mol'] = None
 
 		data['compound'] = self.compound.name
 		data['target'] = self.target.name
@@ -507,3 +520,7 @@ class Pose:
 			return self.id == other
 
 		return self.id == other.id
+
+
+class InvalidMolError(Exception):
+	...
