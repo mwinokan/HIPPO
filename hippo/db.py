@@ -871,13 +871,13 @@ class Database:
 
 		return result
 
-	def select_id_where(self, table, key, value, multiple=False):
+	def select_id_where(self, table, key, value, multiple=False, none='error'):
 		"""Select ID's where key==value"""
-		return self.select_where(query=f'{table}_id', table=table, key=key, value=value, multiple=multiple)
+		return self.select_where(query=f'{table}_id', table=table, key=key, value=value, multiple=multiple, none=none)
 
-	def select_all_where(self, table, key, value, multiple=False):
+	def select_all_where(self, table, key, value, multiple=False, none='error'):
 		"""Select * where key==value"""
-		return self.select_where(query='*', table=table, key=key, value=value, multiple=multiple)
+		return self.select_where(query='*', table=table, key=key, value=value, multiple=multiple, none=none)
 
 	### DELETION
 
