@@ -321,8 +321,23 @@ class PoseSet(PoseTable):
 
 		return PoseSet(self.db, ids)
 
-	### TAGGING
+	### BULK SETTING
 
+	@property
+	def reference(self):
+		raise NotImplementedError
+	
+	@reference.setter
+	def reference(self, r):
+		"""Bulk set the references for poses in this set"""
+		if not isinstance(r, int):
+			assert r._table == 'pose'
+			r = r.id
+
+		for i in self.indices:
+			self.db.update(table='pose', id=i, key='pose_reference', value=r, commit=False)
+
+		self.db.commit()
 	
 	### SPLITTING
 

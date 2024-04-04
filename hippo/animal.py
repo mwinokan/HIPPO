@@ -445,13 +445,19 @@ class HIPPO:
 		*,
 		inspiration_map: dict | None = None,
 		base_only: bool = False,
+		tags: None | list = None,
 	):
 
-		logger.warning('Assuming this is a three-step reaction')
+		tags = tags or []
 		
+		if isinstance(df_path, str):
+			df_path = Path(df_path)
 		df = pd.read_pickle(df_path)
 
-		if '3_num_atom_diff' not in df.columns:
+		# work out number of reaction steps
+		n_steps = max([int(s.split('_')[0]) for s in df.columns if '_product_smiles' in s])
+
+		if f'{n_steps}_num_atom_diff' not in df.columns:
 			logger.error(df_path)
 			# return df.head()
 			print(df.columns)
@@ -459,22 +465,28 @@ class HIPPO:
 
 		base_id = None
 
-		for i,row in tqdm(df.iterrows()):
+		if base_only:
+			generator = df.iterrows()
+		else:
+			generator = tqdm(df.iterrows())
+
+		for i,row in generator:
 
 			# skip pose-less entries
-
 			if not row.path_to_mol:
 				continue
 
+			this_row_is_a_base = 'base' in row[f'{n_steps}_product_name']
+			# print(i, n_steps, this_row_is_a_base)
 
-			if base_only and row['3_num_atom_diff'] > 0:
+			if base_only and not this_row_is_a_base:
+				continue
+
+			if base_only and base_id and not this_row_is_a_base:
 				break
 
-			# if i > 100:
-			# 	break
-
 			# loop over each reaction step
-			for j in range(3):
+			for j in range(n_steps):
 
 				j += 1
 
@@ -487,7 +499,7 @@ class HIPPO:
 					reactant1_id = product.id
 					reactants.append(reactant1_id)
 				elif smiles := row[f'{j}_r1_smiles']:
-					reactant1_id = self.register_compound(smiles=smiles, commit=False, return_compound=False)
+					reactant1_id = self.register_compound(smiles=smiles, commit=False, return_compound=False, tags=tags)
 					reactants.append(reactant1_id)
 			
 				# reactant 2
@@ -495,27 +507,27 @@ class HIPPO:
 					reactant2_id = product.id
 					reactants.append(reactant2_id)
 				elif smiles := row[f'{j}_r2_smiles']:
-					reactant2_id = self.register_compound(smiles=smiles, commit=False, return_compound=False)
+					reactant2_id = self.register_compound(smiles=smiles, commit=False, return_compound=False, tags=tags)
 					reactants.append(reactant2_id)
 			
 				# product
 				if smiles := row[f'{j}_product_smiles']:
-					if j != 3:
-						tags = ['intermediate']
-					elif row['3_num_atom_diff'] == 0:
-						tags = ['base']
 
-					else:
-						tags = ['elab']
-
-					if j == 3:
-						base = base_id
-					else:
+					if j != n_steps:
+						this_tags = ['intermediate'] + tags
 						base = None
 
-					product = self.register_compound(smiles=smiles, tags=tags, commit=False, return_compound=True, base=base)
+					elif this_row_is_a_base:
+						this_tags = ['base'] + tags
+						base = None
+
+					else:
+						this_tags = ['elab'] + tags
+						base = base_id
+
+					product = self.register_compound(smiles=smiles, tags=this_tags, commit=False, return_compound=True, base=base)
 					
-					if j == 3 and i == 0:
+					if not base_id and j == n_steps and this_row_is_a_base:
 						base_id = product.id
 
 				# register the reaction
@@ -545,14 +557,19 @@ class HIPPO:
 				path=row.path_to_mol, 
 				inspirations=inspirations, 
 				metadata=metadata, 
-				tags=tags, 
+				tags=this_tags, 
 				commit=False, 
 				return_pose=False,
 				overwrite_metadata=True,
+				warn_duplicate=False,
 			)
 
 		self.db.commit()
-		logger.success('Committed changes')
+		if not base_only:
+			logger.success(f'Loaded compounds from {df_path.name}')
+		else:
+			# logger.success(f'Loaded base compound from {df_path.name}')
+			return base_id
 
 	### SINGLE INSERTION
 
@@ -656,6 +673,7 @@ class HIPPO:
 		return_pose: bool = True,
 		commit: bool = True,
 		overwrite_metadata: bool = True,
+		warn_duplicate: bool = True,
 	) -> Pose:
 
 		if isinstance(compound, int):
@@ -665,7 +683,7 @@ class HIPPO:
 		
 		pose_id = self.db.insert_pose(
 			compound=compound, name=name, target=target, path=path, 
-			tags=tags, metadata=metadata, reference=reference, warn_duplicate=True, commit=commit)
+			tags=tags, metadata=metadata, reference=reference, warn_duplicate=warn_duplicate, commit=commit)
 		
 		if not pose_id:
 			if isinstance(path, Path):
