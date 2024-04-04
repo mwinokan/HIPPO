@@ -307,6 +307,20 @@ class PoseSet(PoseTable):
 			return None
 		return PoseSet(self.db, [v for v, in values])
 
+	def filter(self, function, inverse=False):
+		"""Filter this poseset by selecting members where function(pose) is truthy"""
+		
+		ids = set()
+		for pose in self:
+			value = function(pose)
+			# logger.debug(f'{pose=} {value=}')
+			if value and not inverse:
+				ids.add(pose.id)
+			elif not value and inverse:
+				ids.add(pose.id)
+
+		return PoseSet(self.db, ids)
+
 	### TAGGING
 
 	
