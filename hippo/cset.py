@@ -199,7 +199,7 @@ class CompoundSet(CompoundTable):
 		ids = [v for v, in ids]
 		return PoseSet(self.db, ids)
 
-	### METHODS
+	### FILTERING
 
 	def get_by_tag(self,tag):
 		"""Get all child compounds with a certain tag"""
@@ -218,6 +218,8 @@ class CompoundSet(CompoundTable):
 			ids = [i for i,d in results if d and f'"{key}": {value}' in d and i in self.ids]
 		return CompoundSet(self.db, ids)		
 
+	### OUTPUT
+
 	def draw(self):
 		"""Draw a grid of all contained molecules"""
 		from molparse.rdkit import draw_grid
@@ -228,6 +230,58 @@ class CompoundSet(CompoundTable):
 		labels = [d[0] for d in data]
 
 		return draw_grid(mols, labels=labels)
+
+	def summary(self):
+		"""Print a summary of this compound set"""
+		logger.header('CompoundSet()')
+		logger.var('#compounds', len(self))
+		logger.var('#poses', self.num_poses)
+		logger.var('tags', self.tags)
+
+	def interactive(self):
+		"""Creates a ipywidget to interactively navigate this PoseSet."""
+
+		from ipywidgets import interactive, BoundedIntText, Checkbox, interactive_output, HBox, GridBox, Layout, VBox
+		from IPython.display import display
+		from pprint import pprint
+
+		a = BoundedIntText(
+				value=0,
+				min=0,
+				max=len(self)-1,
+				step=1,
+				description=f'Pose (/{len(self)}):',
+				disabled=False,
+			)
+
+		b = Checkbox(description='Name', value=True)
+		c = Checkbox(description='Summary', value=False)
+		d = Checkbox(description='2D', value=True)
+		e = Checkbox(description='poses', value=False)
+		f = Checkbox(description='Metadata', value=False)
+
+		ui = GridBox([b, c, d, e, f], layout=Layout(grid_template_columns="repeat(5, 100px)"))
+		ui = VBox([a, ui])
+		
+		def widget(i, name=True, summary=True, draw=True, poses=True, metadata=True):
+			comp = self[i]
+			
+			if name:
+				print(repr(comp))
+
+			if summary: comp.summary(metadata=False)
+			if draw: comp.draw()
+			if poses: comp.poses.draw()
+			if metadata:
+				logger.title('Metadata:')
+				pprint(comp.metadata)
+
+		out = interactive_output(widget, {'i': a, 'name': b, 'summary': c, 'draw':d, 'poses':e, 'metadata':f})
+
+		display(ui, out)
+
+
+	### OTHER METHODS
 
 	def get_recipe(self, 
 		amount: float = 1, 
@@ -275,13 +329,6 @@ class CompoundSet(CompoundTable):
 					intermediates.append(intermediate) 
 
 		return Recipe(products=products, reactants=reactants, reactions=reactions, intermediates=intermediates)
-
-	def summary(self):
-		"""Print a summary of this compound set"""
-		logger.header('CompoundSet()')
-		logger.var('#compounds', len(self))
-		logger.var('#poses', self.num_poses)
-		logger.var('tags', self.tags)
 
 	### DUNDERS
 
