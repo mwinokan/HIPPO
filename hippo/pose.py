@@ -10,6 +10,8 @@ from .tags import TagSet
 
 import pickle
 
+from pathlib import Path
+
 import logging
 logger = logging.getLogger('HIPPO')
 
@@ -142,27 +144,48 @@ class Pose:
 				sys = mp.parse(self.path, verbosity=False)
 				
 				self.protein_system = sys.protein_system
-				
-				lig_residues = sys['rLIG']
-				if len(lig_residues) > 1:
-					logger.warning(f'Multiple ligands in PDB {self}')
 
-				lig_res = lig_residues[0]
+				# look for ligand mol from Fragalysis
+				mol_path = list(Path(self.path).parent.glob("*_ligand.mol")) # str(Path(self.path).name).replace('.pdb','_ligand.mol')
 				
-				if not (mol := lig_res.rdkit_mol):
-					logger.error(f'[{self}] Error computing RDKit Mol from PDB={self.path}')
+				if len(mol_path) == 1:
+					mol_path = mol_path[0]
+					from rdkit.Chem import MolFromMolFile
+					mol = MolFromMolFile(str(mol_path.resolve()))
+
+				elif len(mol_path) == 0:
+				
+					lig_residues = sys['rLIG']
+					if len(lig_residues) > 1:
+						logger.warning(f'Multiple ligands in PDB {self}')
+
+					lig_res = lig_residues[0]
 					
-					print(lig_res.pdb_block)
+					if not (mol := lig_res.rdkit_mol):
+						logger.error(f'[{self}] Error computing RDKit Mol from PDB={self.path}')
+						
+						print(lig_res.pdb_block)
 
-					lig_res.plot3d()
+						lig_res.plot3d()
 
-					raise Exception
-					return None
+						raise Exception
+						return None
 
-				# clean up bond orders
-				from rdkit.Chem.AllChem import MolFromSmiles, AssignBondOrdersFromTemplate
-				template = MolFromSmiles(self.compound.smiles)
-				mol = AssignBondOrdersFromTemplate(template, mol)
+					# clean up bond orders
+					from rdkit.Chem.AllChem import MolFromSmiles, AssignBondOrdersFromTemplate
+					template = MolFromSmiles(self.compound.smiles)
+					try:
+						mol = AssignBondOrdersFromTemplate(template, mol)
+					except Exception as e:
+						logger.error(f'Exception occured during AssignBondOrdersFromTemplate for {self}.mol')
+						print(f'template_smiles={self.compound.smiles}')
+						print(f'pdbblock={print(lig_res.pdb_block)}')
+						logger.error(e)
+						mol = lig_res.rdkit_mol
+				
+				else:
+
+					logger.warning(f'There are multiple *_ligand.mol files in {Path(self.path).parent}')
 
 				self.mol = mol
 
