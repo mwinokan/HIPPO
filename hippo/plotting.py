@@ -586,7 +586,7 @@ def plot_compound_property(animal, prop, compounds=None, style='bar', null=None)
 	return fig
 
 @hippo_graph
-def plot_pose_property(animal, prop, poses=None, style='bar', null=None):
+def plot_pose_property(animal, prop, poses=None, style='bar', null=None, color=None):
 
 	"""
 	Get an arbitrary property from all the poses in animal.poses
@@ -630,18 +630,29 @@ def plot_pose_property(animal, prop, poses=None, style='bar', null=None):
 
 		title = f'Pose {prop[0]}'
 
-		fig = px.histogram(plot_data, x=prop[0])
+		fig = px.histogram(plot_data, x=prop[0], color=color)
 		
 		fig.update_layout(xaxis_title=prop[0], yaxis_title='Quantity')
 
 	elif len(prop) == 2:
 
-		title = f'Pose {prop[0]} vs {prop[1]}'
-		
-		func = eval(f'px.{style}')
-		fig = func(plot_data, x=prop[0], y=prop[1])
+		if style == 'histogram':
 
-		fig.update_layout(xaxis_title=prop[1], yaxis_title=prop[1])
+			x = [d[prop[0]] for d in plot_data]
+			y = [d[prop[1]] for d in plot_data]
+
+			fig = go.Figure(go.Histogram2d(x=x, y=y))
+
+		else:
+			
+			if style == 'bar':
+				style='scatter'
+			
+			func = eval(f'px.{style}')
+			fig = func(plot_data, x=prop[0], y=prop[1], color=color)
+
+		title = f'Pose {prop[0]} vs {prop[1]}'
+		fig.update_layout(xaxis_title=prop[0], yaxis_title=prop[1])
 
 	else:
 		mout.error('Unsupported', code='plotting.plot_pose_property.1')
