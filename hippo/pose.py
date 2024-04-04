@@ -131,6 +131,15 @@ class Pose:
 			self._reference = self.db.get_pose(id=self._reference)
 		return self._reference
 
+	@reference.setter
+	def reference(self, p):
+		"""Set the pose's reference"""
+		if not isinstance(p, int):
+			assert p._table == 'pose'
+			p = p.id
+		self._reference = p
+		self.db.update(table='pose', id=self.id, key='pose_reference', value=p)
+
 	@property
 	def mol(self):
 		"""Returns a pose's rdkit.Chem.Mol"""
