@@ -674,6 +674,8 @@ class HIPPO:
 		commit: bool = True,
 		overwrite_metadata: bool = True,
 		warn_duplicate: bool = True,
+		check_RMSD: bool = False,
+		RMSD_tolerance: float = 1.0,
 	) -> Pose:
 
 		if isinstance(compound, int):
