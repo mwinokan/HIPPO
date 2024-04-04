@@ -301,6 +301,29 @@ class Pose:
 	def table(self):
 		return self._table
 
+	@property
+	def num_heavy_atoms(self):
+		"""Number of heavy atoms"""
+		from rdkit import Chem
+		try:
+			mol = self.mol
+		except InvalidMolError:
+			return None
+		return Chem.Mol.GetNumHeavyAtoms(mol)
+
+	@property
+	def num_atoms_added(self):
+		"""Get the number of heavy atoms added w.r.t. to the inspirations (assuming perfect merge)"""
+		inspirations = self.inspirations
+		assert inspirations
+
+		count = 0
+		for i in inspirations:
+			count += i.num_heavy_atoms
+
+		if (self_count := self.num_heavy_atoms) is None:
+			return None
+		return self.num_heavy_atoms - count
 
 	### METHODS
 
@@ -487,7 +510,10 @@ class Pose:
 		logger.var('target', repr(self.target))
 		logger.var('reference', self.reference)
 		logger.var('tags', self.tags)
-		logger.var('inspirations', self.inspirations)
+		logger.var('num_heavy_atoms', self.num_heavy_atoms)
+		if (inspirations := self.inspirations):
+			logger.var('inspirations', self.inspirations)
+			logger.var('num_atoms_added', self.num_atoms_added)
 		if metadata:
 			logger.var('metadata', str(self.metadata))
 
