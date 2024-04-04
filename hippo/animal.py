@@ -2,7 +2,7 @@
 import pandas as pd
 
 from .cset import CompoundTable
-from .pset import PoseTable
+from .pset import PoseTable, PoseSet
 from .tags import TagTable
 from .rset import ReactionSet
 from .compound import Compound
@@ -282,6 +282,8 @@ class HIPPO:
 		stop_after: int | None = None,
 		skip_equal_dict: dict | None = None,
 		skip_not_equal_dict: dict | None = None,
+		check_pose_RMSD: bool = False,
+		pose_RMSD_tolerance: float = 1.0,
 	):
 
 		"""Add virtual hits from an SDF into the database.
@@ -432,7 +434,9 @@ class HIPPO:
 				metadata=metadata, 
 				inspirations=inspirations, 
 				tags=tags, 
-				reference=reference
+				reference=reference,
+				check_RMSD=check_pose_RMSD,
+				RMSD_tolerance=pose_RMSD_tolerance,
 			)
 
 			if stop_after and i+1 >= stop_after:
@@ -682,7 +686,58 @@ class HIPPO:
 			compound_id = compound
 		else:
 			compound_id = compound.id
-		
+
+		if check_RMSD:
+			
+			# print(path, compound_id)
+
+			# check if the compound has existing poses
+			other_pose_ids = self.db.select_id_where(table='pose', key='compound', value=compound_id, none='quiet', multiple=True)
+			
+			if other_pose_ids:
+				# print(other_pose_ids)
+				other_poses = PoseSet(self.db, [i for i, in other_pose_ids])
+
+				from molparse.rdkit import draw_mols, draw_flat
+				from rdkit.Chem import MolFromMolFile
+				from numpy.linalg import norm
+				from numpy import array
+				mol = MolFromMolFile(str(path.resolve()))
+				
+				c1 = mol.GetConformer()
+				atoms1 = [a for a in mol.GetAtoms()]
+				symbols1 = [a.GetSymbol() for a in atoms1]
+				positions1 = [c1.GetAtomPosition(i) for i,_ in enumerate(atoms1)]
+
+				for pose in other_poses:
+					# print(f'checking {pose}')
+
+					c2 = pose.mol.GetConformer()
+					atoms2 = [a for a in pose.mol.GetAtoms()]
+					symbols2 = [a.GetSymbol() for a in atoms2]
+					positions2 = [c2.GetAtomPosition(i) for i,_ in enumerate(atoms2)]
+					
+					for s1,p1 in zip(symbols1, positions1):
+						for s2,p2 in zip(symbols2, positions2):
+							if s2 != s1:
+								continue
+							if norm(array(p2-p1)) <= RMSD_tolerance:
+								# this atom (1) is within tolerance
+								break
+						else:
+							# this atom (1) is outside of tolerance
+							break
+					else:
+						# all atoms within tolerance --> too similar
+						# print(f'found similar: {pose}')
+						logger.warning(f'Found similar {pose=}')
+						if return_pose:
+							return pose
+						else:
+							return pose.id
+					
+					# print(f'found not similar: {pose}')
+
 		pose_id = self.db.insert_pose(
 			compound=compound, name=name, target=target, path=path, 
 			tags=tags, metadata=metadata, reference=reference, warn_duplicate=warn_duplicate, commit=commit)
