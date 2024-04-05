@@ -542,7 +542,7 @@ class Pose:
 		logger.var('tags', self.tags)
 		logger.var('num_heavy_atoms', self.num_heavy_atoms)
 		if (inspirations := self.inspirations):
-			logger.var('inspirations', self.inspirations)
+			logger.var('inspirations', self.inspirations.names)
 			logger.var('num_atoms_added', self.num_atoms_added)
 		if metadata:
 			logger.var('metadata', str(self.metadata))
