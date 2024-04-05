@@ -596,11 +596,31 @@ def plot_pose_property(animal, prop, poses=None, style='scatter', null=None, col
 
 	"""
 
-	if not isinstance(prop, list):
-		prop = [prop]
-
 	if not poses:
 		poses = animal.poses
+
+	if prop == 'tags':
+
+		plot_data = []
+
+		for tag in poses.tags:
+
+			num_poses = len(poses.get_by_tag(tag=tag))
+			data = dict(tag=tag, number=num_poses)
+			plot_data.append(data)
+			
+		fig = px.bar(plot_data, x='tag', y='number', color=color, log_y=log_y)
+
+		title = 'Tag Statistics'
+		
+		fig.update_layout(title=title,title_automargin=False, title_yref='container', barmode='group')
+
+		fig.update_layout(xaxis_title='Tag', yaxis_title='#')
+
+		return fig
+
+	if not isinstance(prop, list):
+		prop = [prop]
 
 	plot_data = []
 
