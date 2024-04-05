@@ -386,6 +386,14 @@ class HIPPO:
 						pose = inspiration_map(insp)
 						if pose:
 							inspirations.append(pose)
+					else:
+						pose = self.poses[insp]
+						if pose:
+							inspirations.append(pose)
+						else:
+							logger.error(f'Could not find inspiration pose {insp}')
+							continue
+						
 				else:
 					pose = self.poses[insp]
 					if pose:
