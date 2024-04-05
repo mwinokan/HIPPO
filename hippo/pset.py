@@ -351,7 +351,7 @@ class PoseSet(PoseTable):
 			sets[ref_id] = self.get_by_reference(ref_id)
 		return sets
 
-	def split_by_inspirations(self):
+	def split_by_inspirations(self, single_set=False):
 		
 		sets = {}
 
@@ -363,6 +363,10 @@ class PoseSet(PoseTable):
 				sets[insp_ids] = PoseSet(self.db, [pose.id])
 			else:
 				sets[insp_ids]._indices.append(pose.id)
+
+		if single_set:
+			logger.var('#unique inspiration combinations', len(sets))
+			sets = PoseSet(self.db, sum([s.ids for s in sets.values()], []))
 
 		return sets
 
