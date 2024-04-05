@@ -95,6 +95,13 @@ class Pose:
 		"""Returns the pose's name"""
 		return self._name
 
+	@name.setter
+	def name(self, n):
+		"""Set the pose's name"""
+		assert isinstance(n, str)
+		self._name = n
+		self.db.update(table='pose', id=self.id, key='pose_name', value=n)
+
 	@property
 	def smiles(self):
 		"""Returns the pose's smiles"""
