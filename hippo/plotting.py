@@ -586,11 +586,7 @@ def plot_compound_property(animal, prop, compounds=None, style='bar', null=None)
 	return fig
 
 @hippo_graph
-<<<<<<< HEAD
-def plot_pose_property(animal, prop, poses=None, style='scatter', null=None):
-=======
-def plot_pose_property(animal, prop, poses=None, style='bar', null=None, color=None):
->>>>>>> f72f49d0fc24efb18be9d6a3f194cf322d4d32d0
+def plot_pose_property(animal, prop, poses=None, style='scatter', null=None, color=None, log_y=False):
 
 	"""
 	Get an arbitrary property from all the poses in animal.poses
