@@ -496,7 +496,7 @@ class Database:
 			reference = self.get_pose(id=reference)
 
 		assert isinstance(compound, Compound), f'incompatible {compound}'
-		assert isinstance(reference, Pose) or reference is None, f'incompatible pose={name}'
+		assert isinstance(reference, Pose) or reference is None, f'incompatible reference={reference}'
 
 		if reference:
 			reference = reference.id
