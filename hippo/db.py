@@ -899,6 +899,8 @@ class Database:
 
 		return None
 
+	def delete_tag(self, tag):
+		self.delete_where(table='tag', key='name', value=tag)
 
 	### UPDATE
 
