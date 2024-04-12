@@ -31,5 +31,14 @@ class MetaData(UserDict):
 		self._update_db()
 
 	def update(self, data, commit=True):
+		"""Wrapper for dict.update()"""
 		self.data.update(data)
 		self._update_db(commit=commit)
+
+	def append(self, key, value):
+		"""Create or append to a list-like value with given key"""
+		if key not in self:
+			self.data[key] = []
+		if value not in self.data[key]:
+			self.data[key].append(value)
+		self._update_db()

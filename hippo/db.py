@@ -1265,6 +1265,35 @@ class Database:
 
 		return pruned
 
+	def remove_metadata_list_item(self, *, table, key, value, remove_empty=True):
+		"""Remove a specific item from list-like values associated with a given key from all metadata entries in a given table"""
+
+		# get id's with specific metadata key and value
+		value_str = json.dumps(value)
+		result = self.select_where(query=f'{table}_id, {table}_metadata', table=table, key=f'{table}_metadata LIKE \'%"export": [%{value_str}%]%\'', multiple=True, none='quiet')
+
+		# loop over all matches
+		for id, metadata_str in result:
+
+			# read the metadata
+			metadata = json.loads(metadata_str)
+			
+			# modify the metadata
+			index = metadata[key].index(value)
+			metadata[key].pop(index)
+
+			if remove_empty and not metadata[key]:
+				del metadata[key]
+			
+			# update the database
+			metadata_str = json.dumps(metadata)
+			self.update(table=table, id=id, key=f'{table}_metadata', value=metadata_str, commit=False)
+
+		# only runs if non-zero matches
+		else:
+			# commit the changes
+			self.commit()
+
 	### PRINTING
 
 	def list_tables(self):

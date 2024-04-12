@@ -367,6 +367,24 @@ class PoseSet(PoseTable):
 
 		self.db.commit()
 	
+	def add_tag(self, t):
+		"""Add this tag to every member of the set"""
+
+		assert isinstance(t, str)
+
+		for i in self.indices:
+			self.db.insert_tag(name=t, pose=i, commit=False)	
+
+		logger.info(f'Tagged {self} w/ "{t}"')		
+
+		self.db.commit()
+
+	def append_to_metadata(self, key, value):
+		"""Create or append to a list-like value with given key for each pose in this set"""
+		for id in self.indices:
+			metadata = self.db.get_metadata(table='pose', id=id)
+			metadata.append(key, value)
+
 	### SPLITTING
 
 	def split_by_reference(self):
@@ -398,17 +416,23 @@ class PoseSet(PoseTable):
 	### EXPORTING
 
 	def write_sdf(self, out_path, name_col='name'):
-
 		"""Write an SDF"""
 
+		from pathlib import Path
+
 		df = self.get_df(mol=True)
-		
+
 		df.rename(inplace=True, columns={name_col:'_Name', 'mol':'ROMol'})
 
 		logger.writing(out_path)
 			
 		from rdkit.Chem import PandasTools
 		PandasTools.WriteSDF(df, out_path, "ROMol", "_Name", list(df.columns))
+
+		# keep record of export
+		value = str(Path(out_path).resolve())
+		self.db.remove_metadata_list_item(table='pose', key='exports', value=value)
+		self.append_to_metadata(key='exports', value=value)
 
 	def to_fragalysis(self, 
 		out_path,
@@ -427,6 +451,7 @@ class PoseSet(PoseTable):
 		"""Prepare an SDF for upload to the RHS of Fragalysis"""
 
 		from .fragalysis import generate_header
+		from pathlib import Path
 		from rdkit.Chem import SDWriter, PandasTools
 		assert out_path.endswith('.sdf')
 
@@ -446,9 +471,9 @@ class PoseSet(PoseTable):
 			 'smiles':'original SMILES',
 			})
 
+
 		if generate_pdbs:
 			
-			from pathlib import Path
 			from zipfile import ZipFile
 
 			# output subdirectory
@@ -512,6 +537,11 @@ class PoseSet(PoseTable):
 			with SDWriter(sdfh) as w:
 				w.write(header)
 			PandasTools.WriteSDF(pose_df, sdfh, mol_col, name_col, set(pose_df.columns))
+
+		# keep record of export
+		value = str(Path(out_path).resolve())
+		self.db.remove_metadata_list_item(table='pose', key='exports', value=value)
+		self.metadata.append(key='exports', value=value)
 
 		return pose_df
 
