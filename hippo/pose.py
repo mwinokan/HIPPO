@@ -40,7 +40,8 @@ class Pose:
 	def __init__(self, 
 		db,
 		id: int,
-		name: str,
+		inchikey: str | None,
+		alias: str | None,
 		smiles: str,
 		reference: int, # another pose
 		path: str,
@@ -53,7 +54,8 @@ class Pose:
 
 		self._db = db
 		self._id = id
-		self._name = name
+		self._inchikey = inchikey
+		self._alias = alias
 		self._smiles = smiles
 		self._compound_id = compound
 		self._target = target
@@ -91,25 +93,49 @@ class Pose:
 		return self._id
 
 	@property
+	def inchikey(self) -> str:
+		"""Returns the pose's inchikey"""
+		if not self._inchikey:
+			self.smiles
+		return self._inchikey
+
+	@property
+	def alias(self) -> str:
+		"""Returns the pose's alias"""
+		return self._alias
+
+	@property
 	def name(self) -> str:
 		"""Returns the pose's name"""
-		return self._name
+		if n := self.alias:
+			return n
+		else:
+			return self.inchikey
 
-	@name.setter
-	def name(self, n):
-		"""Set the pose's name"""
+	@alias.setter
+	def alias(self, n):
+		"""Set the pose's alias"""
 		assert isinstance(n, str)
-		self._name = n
-		self.db.update(table='pose', id=self.id, key='pose_name', value=n)
+		self._alias = n
+		self.db.update(table='pose', id=self.id, key='pose_alias', value=n)
+
+	@inchikey.setter
+	def inchikey(self, n):
+		"""Set the pose's inchikey"""
+		assert isinstance(n, str)
+		self._inchikey = n
+		self.db.update(table='pose', id=self.id, key='pose_inchikey', value=n)
 
 	@property
 	def smiles(self):
 		"""Returns the pose's smiles"""
 		if not self._smiles:
 			from molparse.rdkit import mol_to_smiles
+			from rdkit.Chem.inchi import MolToInchiKey
 			try:
 				mol = self.mol
 				self._smiles = mol_to_smiles(mol)
+				self.inchikey = MolToInchiKey(mol)
 				self.db.update(table='pose', id=self.id, key='pose_smiles', value=self._smiles)
 			except InvalidMolError:
 				logger.warning(f'Taking smiles from {self.compound}')
@@ -530,10 +556,12 @@ class Pose:
 
 	def summary(self, metadata:bool = True):
 		"""Print a summary of this pose"""
-		if self.name:
-			logger.header(f'{str(self)}: {self.name}')
+		if self.alias:
+			logger.header(f'{str(self)}: {self.alias}')
 		else:
-			logger.header(str(self))
+			logger.header(f'{str(self)}: {self.inchikey}')
+		logger.var('inchikey', self.inchikey)
+		logger.var('alias', self.alias)
 		logger.var('smiles', self.smiles)
 		logger.var('compound', repr(self.compound))
 		logger.var('path', self.path)

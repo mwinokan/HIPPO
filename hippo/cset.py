@@ -100,7 +100,10 @@ class CompoundTable:
 					return self.db.get_compound(table=self.table, id=key)
 
 			case str():
-				return self.db.get_compound(table=self.table, name=key)
+				comp = self.db.get_compound(table=self.table, inchikey=key)
+				if not comp:
+					comp = self.db.get_compound(table=self.table, alias=key)
+				return comp
 
 			case key if isinstance(key, list) or isinstance(key, tuple):
 

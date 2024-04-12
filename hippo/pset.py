@@ -37,8 +37,19 @@ class PoseTable:
 
 	@property
 	def names(self):
-		"""Returns the names of child poses"""
-		result = self.db.select(table=self.table, query='pose_name', multiple=True)
+		"""Returns the aliases of child poses"""
+		return self.aliases
+
+	@property
+	def aliases(self):
+		"""Returns the aliases of child poses"""
+		result = self.db.select(table=self.table, query='pose_alias', multiple=True)
+		return [q for q, in result]
+
+	@property
+	def inchikeys(self):
+		"""Returns the inchikeys of child poses"""
+		result = self.db.select(table=self.table, query='pose_inchikey', multiple=True)
 		return [q for q, in result]
 
 	@property
@@ -107,7 +118,10 @@ class PoseTable:
 					return self.db.get_pose(table=self.table, id=key)
 
 			case str():
-				return self.db.get_pose(name=key)
+				pose = self.db.get_pose(alias=key)
+				if not pose:
+					pose = self.db.get_pose(inchikey=key)
+				return pose
 
 			case key if isinstance(key, list) or isinstance(key, tuple) or isinstance(key, set):
 
@@ -186,8 +200,18 @@ class PoseSet(PoseTable):
 
 	@property
 	def names(self):
-		"""Returns the names of poses in this set"""
-		return [self.db.select_where(table=self.table, query='pose_name', key='id', value=i, multiple=False)[0] for i in self.indices]
+		"""Returns the aliases of poses in this set"""
+		return self.aliases
+
+	@property
+	def aliases(self):
+		"""Returns the aliases of child poses"""
+		return [self.db.select_where(table=self.table, query='pose_alias', key='id', value=i, multiple=False)[0] for i in self.indices]
+
+	@property
+	def inchikeys(self):
+		"""Returns the inchikeys of child poses"""
+		return [self.db.select_where(table=self.table, query='pose_inchikey', key='id', value=i, multiple=False)[0] for i in self.indices]
 
 	@property
 	def smiles(self):

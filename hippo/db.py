@@ -155,7 +155,7 @@ class Database:
 
 		sql = """CREATE TABLE compound(
 			compound_id INTEGER PRIMARY KEY,
-			compound_name TEXT,
+			compound_inchikey TEXT,
 			compound_alias TEXT,
 			compound_smiles TEXT,
 			compound_base INTEGER,
@@ -164,7 +164,8 @@ class Database:
 			compound_morgan_bfp bits(2048),
 			compound_metadata TEXT,
 			FOREIGN KEY (compound_base) REFERENCES compound(compound_id),
-			CONSTRAINT UC_compound_name UNIQUE (compound_name)
+			CONSTRAINT UC_compound_inchikey UNIQUE (compound_inchikey)
+			CONSTRAINT UC_compound_alias UNIQUE (compound_alias)
 			CONSTRAINT UC_compound_smiles UNIQUE (compound_smiles)
 		);
 		"""
@@ -225,7 +226,8 @@ class Database:
 
 		sql = """CREATE TABLE pose(
 			pose_id INTEGER PRIMARY KEY,
-			pose_name TEXT,
+			pose_inchikey TEXT,
+			pose_alias TEXT,
 			-- pose_longname TEXT,
 			pose_smiles TEXT,
 			pose_reference INTEGER,
@@ -236,7 +238,7 @@ class Database:
 			pose_fingerprint BLOB,
 			pose_metadata TEXT,
 			FOREIGN KEY (pose_compound) REFERENCES compound(compound_id),
-			-- CONSTRAINT UC_pose_longname UNIQUE (pose_longname)
+			CONSTRAINT UC_pose_alias UNIQUE (pose_alias)
 			CONSTRAINT UC_pose_path UNIQUE (pose_path)
 		);
 		"""
@@ -362,25 +364,22 @@ class Database:
 		# logger.debug(f'{base=}')
 
 		# generate the inchikey name
-		if inchikey:
-			name = inchikey
-		else:
-			name = inchikey_from_smiles(smiles)
+		inchikey = inchikey or inchikey_from_smiles(smiles)
 
 		# logger.debug(f'{smiles} --> {name}')
 
 		sql = """
-		INSERT INTO compound(compound_name, compound_smiles, compound_base, compound_mol, compound_pattern_bfp, compound_morgan_bfp, compound_alias)
+		INSERT INTO compound(compound_inchikey, compound_smiles, compound_base, compound_mol, compound_pattern_bfp, compound_morgan_bfp, compound_alias)
 		VALUES(?1, ?2, ?3, mol_from_smiles(?2), mol_pattern_bfp(mol_from_smiles(?2), 2048), mol_morgan_bfp(mol_from_smiles(?2), 2, 2048), ?4)
 		"""
 
 		try:
-			self.execute(sql, (name, smiles, base, alias))
+			self.execute(sql, (inchikey, smiles, base, alias))
 
 		except sqlite3.IntegrityError as e:
 			if 'UNIQUE constraint failed: compound.compound_name' in str(e):
 				if warn_duplicate:
-					logger.warning(f"Skipping compound with existing name \"{name}\"")
+					logger.warning(f"Skipping compound with existing inchikey \"{inchikey}\"")
 			elif 'UNIQUE constraint failed: compound.compound_smiles' in str(e):
 				if warn_duplicate:
 					logger.warning(f"Skipping compound with existing smiles \"{smiles}\"")
@@ -478,7 +477,8 @@ class Database:
 		compound: Compound | int,
 		target: int | str,
 		path: str,
-		name: str | None = None,
+		inchikey: str | None = None,
+		alias: str | None = None,
 		reference: int | None = None,
 		tags: None | list = None,
 		metadata: None | dict = None,
@@ -518,12 +518,12 @@ class Database:
 				return None
 
 		sql = """
-		INSERT INTO pose(pose_name, pose_smiles, pose_compound, pose_target, pose_path, pose_reference)
-		VALUES(?1, ?2, ?3, ?4, ?5, ?6)
+		INSERT INTO pose(pose_inchikey, pose_alias, pose_smiles, pose_compound, pose_target, pose_path, pose_reference)
+		VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7)
 		"""
 
 		try:
-			self.execute(sql, (name, None, compound.id, target, path, reference))
+			self.execute(sql, (inchikey, alias, None, compound.id, target, path, reference))
 
 		except sqlite3.IntegrityError as e:
 			if 'UNIQUE constraint failed: pose.pose_path' in str(e):
@@ -941,19 +941,20 @@ class Database:
 		*,
 		table: str = 'compound',
 		id: int | None = None,
-		name: str | None = None,
+		inchikey: str | None = None,
+		alias: str | None = None,
 		smiles: str | None = None,
 	) -> Compound:
 		"""Get a compound"""
 		
 		if id is None:
-			id = self.get_compound_id(name=name, smiles=smiles)
+			id = self.get_compound_id(inchikey=inchikey, smiles=smiles, alias=alias)
 
 		if not id:
 			logger.error(f'Invalid {id=}')
 			return None
 
-		query = 'compound_id, compound_name, compound_smiles, compound_base, compound_alias'
+		query = 'compound_id, compound_inchikey, compound_alias, compound_smiles, compound_base'
 		entry = self.select_where(query=query, table=table, key='id', value=id)
 		compound = Compound(self._animal, self, *entry, metadata=None, mol=None)
 		return compound
@@ -961,20 +962,24 @@ class Database:
 	def get_compound_id(self, 
 		*,
 		table: str = 'compound',
-		name: str | None = None, 
+		inchikey: str | None = None, 
+		alias: str | None = None, 
 		smiles: str | None = None, 
 		similar: str | Compound | int | None = None, 
 		threshold: float = 1.0,
 	) -> int:
 		"""Get a compound ID"""
 
-		if name:
-			entry = self.select_id_where(table=table, key='name', value=name)
+		if inchikey:
+			entry = self.select_id_where(table=table, key='inchikey', value=inchikey)
 
-		if smiles:
+		elif alias:
+			entry = self.select_id_where(table=table, key='alias', value=alias)
+
+		elif smiles:
 			entry = self.select_id_where(table=table, key='smiles', value=smiles)
 
-		if similar:
+		elif similar:
 			raise NotImplementedError
 
 		if entry:
@@ -986,20 +991,19 @@ class Database:
 		*,
 		table: str = 'pose',
 		id: int | None = None,
-		name: str = None,
-		# longname: str | None = None,
-		# smiles: str | None = None,
+		inchikey: str = None,
+		alias: str = None,
 	) -> Pose:
 		"""Get a pose"""
 		
 		if id is None:
-			id = self.get_pose_id(name=name)
+			id = self.get_pose_id(inchikey=inchikey, alias=alias)
 
 		if not id:
 			logger.error(f'Invalid {id=}')
 			return None
 
-		query = 'pose_id, pose_name, pose_smiles, pose_reference, pose_path, pose_compound, pose_target, pose_mol, pose_fingerprint'
+		query = 'pose_id, pose_inchikey, pose_alias, pose_smiles, pose_reference, pose_path, pose_compound, pose_target, pose_mol, pose_fingerprint'
 		entry = self.select_where(query=query, table=table, key='id', value=id)
 		pose = Pose(self, *entry)
 		return pose
@@ -1007,16 +1011,23 @@ class Database:
 	def get_pose_id(self, 
 		*,
 		table: str = 'pose',
-		longname: str | None = None, 
-		name: str | None = None, 
+		inchikey: str | None = None, 
+		alias: str | None = None, 
 	) -> int:
 		"""Get a pose ID"""
 
-		if name:
-			entry = self.select_id_where(table=table, key='name', value=name)
+		if inchikey:
+			# inchikey might not be unique
+			entries = self.select_id_where(table=table, key='inchikey', value=inchikey, multiple=True)
+			if len(entries) != 1:
+				logger.warning(f'Multiple poses with {inchikey=}')
+				return entries
+			else:
+				entry = entries[0]
 
-		elif longname:
-			entry = self.select_id_where(table=table, key='longname', value=longname)
+		elif alias:
+			entry = self.select_id_where(table=table, key='alias', value=alias)
+		
 		else:
 			raise NotImplementedError
 			

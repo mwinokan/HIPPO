@@ -24,16 +24,17 @@ class Compound:
 			animal,
 			db,
 			id: int,
-			name: str,
+			inchikey: str,
+			alias: str,
 			smiles: str,
 			base: int,
-			alias: str,
 			mol: Chem.Mol | bytes | None = None,
 			metadata: dict | None = None,
 	):
 		
 		self._id = id
-		self._name = name
+		self._inchikey = inchikey
+		self._alias = alias
 		self._smiles = smiles
 		self._animal = animal
 		self._base = base
@@ -60,9 +61,14 @@ class Compound:
 		return self._id
 	
 	@property
+	def inchikey(self) -> str:
+		"""Returns the compound's InChiKey"""
+		return self._inchikey
+	
+	@property
 	def name(self) -> str:
-		"""Returns the compound's name (InChiKey)"""
-		return self._name
+		"""Returns the compound's InChiKey"""
+		return self._inchikey
 	
 	@property
 	def smiles(self) -> str:
@@ -73,6 +79,13 @@ class Compound:
 	def alias(self) -> str:
 		"""Returns the compound's alias"""
 		return self._alias
+
+	@alias.setter
+	def alias(self, alias: str) -> None:
+		"""Set the compound's alias"""
+		assert isinstance(alias, str)
+		self._alias = alias
+		self.db.update(table='compound', id=self.id, key='compound_alias', value=alias, commit=commit)
 	
 	@property
 	def mol(self) -> Chem.Mol:
@@ -142,14 +155,14 @@ class Compound:
 	def dict(self) -> dict:
 		"""Returns a dictionary of this compound"""
 
-		serialisable_fields = ['id','name','smiles','alias']
+		serialisable_fields = ['id','inchikey','alias','smiles']
 
 		data = {}
 		for key in serialisable_fields:
 			data[key] = getattr(self, key)
 
 		if base := self.base:
-			data['base'] = base.name
+			data['base'] = base.inchikey
 
 		if metadata := self.metadata:
 			for key in metadata:
@@ -258,6 +271,8 @@ class Compound:
 	def summary(self, metadata: bool = True):
 		"""Print a summary of this compound"""
 		logger.header(repr(self))
+		logger.var('inchikey', self.inchikey)
+		logger.var('alias', self.alias)
 		logger.var('smiles', self.smiles)
 		logger.var('base', self.base)
 		logger.var('#poses', self.num_poses)

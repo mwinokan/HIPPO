@@ -252,7 +252,7 @@ class HIPPO:
 
 			pose_id = self.db.insert_pose(
 				compound=compound,
-				name=observation_shortname,
+				alias=observation_shortname,
 				target=target.id,
 				path=pose_path,
 				tags=tags,
@@ -593,6 +593,7 @@ class HIPPO:
 		metadata: None | dict = None,
 		return_compound: bool = True,
 		commit: bool = True,
+		alias: str | None = None,
 	) -> Compound:
 
 		"""Use a smiles string to add a compound to the database. If it already exists return the compound"""
@@ -608,9 +609,9 @@ class HIPPO:
 
 		compound_id = self.db.insert_compound(
 			smiles=smiles, base=base, inchikey=inchikey, tags=tags, 
-			metadata=metadata, warn_duplicate=False, commit=commit)
+			metadata=metadata, warn_duplicate=False, commit=commit, alias=alias)
 
-		if return_compound or metadata:
+		if return_compound or metadata or alias:
 			if not compound_id:
 				compound = self.compounds[inchikey]
 			else:
@@ -619,6 +620,9 @@ class HIPPO:
 			if metadata:
 				compound.metadata.update(metadata)
 
+			if alias:
+				compound.alias = alias
+
 			if return_compound:
 				return compound
 			else:
@@ -626,7 +630,7 @@ class HIPPO:
 
 		else:
 			if not compound_id:
-				compound_id = self.db.get_compound_id(name=inchikey)
+				compound_id = self.db.get_compound_id(inchikey=inchikey)
 			return compound_id
 
 	def register_reaction(self,
@@ -677,7 +681,8 @@ class HIPPO:
 		compound: Compound | int,
 		target: str,
 		path: str,
-		name: str | None = None,
+		inchikey: str | None = None,
+		alias: str | None = None,
 		reference: int | None = None,
 		tags: None | list = None,
 		metadata: None | dict = None,
@@ -747,7 +752,7 @@ class HIPPO:
 					# print(f'found not similar: {pose}')
 
 		pose_id = self.db.insert_pose(
-			compound=compound, name=name, target=target, path=path, 
+			compound=compound, inchikey=inchikey, alias=alias, target=target, path=path, 
 			tags=tags, metadata=metadata, reference=reference, warn_duplicate=warn_duplicate, commit=commit)
 		
 		if not pose_id:
@@ -757,7 +762,8 @@ class HIPPO:
 
 		if not pose_id:
 			logger.var('compound', compound)
-			logger.var('name', name)
+			logger.var('inchikey', inchikey)
+			logger.var('alias', alias)
 			logger.var('target', target)
 			logger.var('path', path)
 			logger.var('reference', reference)
