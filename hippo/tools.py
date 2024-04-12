@@ -51,6 +51,10 @@ def inchikey_from_smiles(smiles):
 	mol = mol_from_smiles(smiles)
 	return MolToInchiKey(mol)
 
+def flat_inchikey(smiles):
+	smiles = sanitise_smiles(smiles)
+	return inchikey_from_smiles(smiles)
+
 def remove_isotopes_from_smiles(smiles):
 
 	mol = MolFromSmiles(smiles)
@@ -71,6 +75,8 @@ def smiles_has_isotope(smiles, regex=True):
 		return any(atom.GetIsotope() for atom in mol.GetAtoms())
 
 def sanitise_smiles(s, verbosity=False, sanitisation_failed='error'):
+
+	assert isinstance(s, str), f'non-string smiles={s}'
 
 	orig_smiles = s
 
@@ -106,6 +112,10 @@ def sanitise_smiles(s, verbosity=False, sanitisation_failed='error'):
 			mout.warning(f'SMILES was changed: {annotated_smiles_str} --> {smiles}')
 
 	return smiles
+
+def sanitise_mol(m):
+	from rdkit.Chem import MolToMolBlock, MolFromMolBlock
+	return MolFromMolBlock(MolToMolBlock(m))
 
 def pose_gap(a, b):
 

@@ -260,7 +260,8 @@ class Pose:
 	def mol(self, m):
 		"""Set the pose's rdkit.Chem.Mol"""
 		assert m
-		self._mol = m
+		from .tools import sanitise_mol
+		self._mol = sanitise_mol(m)
 		self.db.update(table='pose', id=self.id, key='pose_mol', value=m.ToBinary())
 
 	@property
