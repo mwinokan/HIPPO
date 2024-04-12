@@ -257,7 +257,7 @@ class CompoundSet(CompoundTable):
 				min=0,
 				max=len(self)-1,
 				step=1,
-				description=f'Pose (/{len(self)}):',
+				description=f'Comp (/{len(self)}):',
 				disabled=False,
 			)
 
