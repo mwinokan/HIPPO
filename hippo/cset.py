@@ -83,6 +83,10 @@ class CompoundTable:
 
 	### DUNDERS
 
+	def __call__(self, tag=None):
+		if tag:
+			return self.get_by_tag(tag)
+
 	def __getitem__(self, key) -> Compound:
 		
 		match key:
