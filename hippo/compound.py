@@ -264,7 +264,8 @@ class Compound:
 
 		if self.base:
 			from molparse.rdkit import draw_mcs
-			return draw_mcs({self.base.smiles:f'{self.base} (base)', self.smiles:str(self)})
+			drawing = draw_mcs({self.base.smiles:f'{self.base} (base)', self.smiles:str(self)})
+			display(drawing)
 		else:
 			display(self.mol)
 
@@ -372,7 +373,8 @@ class Ingredient(Compound):
 
 	def __init__(self, inherit, amount, quote, max_lead_time=None, supplier=None):
 		self._id = inherit.id
-		self._name = inherit.name
+		self._inchikey = inherit.inchikey
+		self._alias = inherit.alias
 		self._smiles = inherit.smiles
 		self._base = inherit.base			
 		self._mol = inherit.mol

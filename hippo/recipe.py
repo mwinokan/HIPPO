@@ -119,15 +119,15 @@ class Recipe:
 
 		logger.var('\n#products', len(self.products))
 		for product in self.products:
-			logger.var(str(product), product.amount, dict(unit='mg'))
+			logger.var(str(product), f'{product.amount:.2f}', dict(unit='mg'))
 
 		logger.var('\n#intermediates', len(self.intermediates))
 		for intermediate in self.intermediates:
-			logger.var(str(intermediate), intermediate.amount, dict(unit='mg'))
+			logger.var(str(intermediate), f'{intermediate.amount:.2f}', dict(unit='mg'))
 
 		logger.var('\n#reactants', len(self.reactants))
 		for reactant in self.reactants:
-			logger.var(str(reactant), reactant.amount, dict(unit='mg'))
+			logger.var(str(reactant), f'{reactant.amount:.2f}', dict(unit='mg'))
 
 		logger.var('\n#reactions', len(self.reactions))
 		for reaction in self.reactions:

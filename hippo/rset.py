@@ -32,6 +32,11 @@ class ReactionSet:
 	def table(self):
 		return self._table
 
+	@property
+	def types(self):
+		result = self.db.select(table=self.table, query='reaction_type', multiple=True)
+		return [q for q, in result]
+
 	### DUNDERS
 
 	def __getitem__(self, key) -> Reaction:
