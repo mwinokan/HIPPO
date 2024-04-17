@@ -130,7 +130,9 @@ class PoseTable:
 					if isinstance(i,int):
 						index = i
 					elif isinstance(i,str):
-						index = self.db.get_pose_id(name=i)
+						index = self.db.get_pose_id(alias=i)
+						if not index:
+							index = self.db.get_pose_id(inchikey=i)
 					else:
 						raise NotImplementedError
 
@@ -461,10 +463,11 @@ class PoseSet(PoseTable):
 		# get the dataframe of poses
 
 		pose_df = self.get_df(mol=True, inspirations='fragalysis', duplicate_name='original ID', reference='name', metadata=metadata)
-		pose_df = pose_df.drop(columns=['id', 'path', 'compound', 'target', 'ref_pdb', 'original SMILES'], errors='ignore')
+		pose_df = pose_df.drop(columns=['path', 'compound', 'target', 'ref_pdb', 'original SMILES'], errors='ignore')
 
 		pose_df.rename(inplace=True, columns=
 			{'name':name_col, 
+			 'id':'HIPPO ID', 
 			 'mol':mol_col, 
 			 'inspirations':'ref_mols',
 			 'reference':'ref_pdb',
@@ -541,7 +544,7 @@ class PoseSet(PoseTable):
 		# keep record of export
 		value = str(Path(out_path).resolve())
 		self.db.remove_metadata_list_item(table='pose', key='exports', value=value)
-		self.metadata.append(key='exports', value=value)
+		self.append_to_metadata(key='exports', value=value)
 
 		return pose_df
 

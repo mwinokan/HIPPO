@@ -428,7 +428,7 @@ class HIPPO:
 			# print(metadata)
 
 			pose = self.register_pose(
-				name=name, 
+				alias=name, 
 				compound=comp, 
 				target=target, 
 				path=mol_path, 
