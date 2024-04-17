@@ -377,7 +377,7 @@ class Database:
 			self.execute(sql, (inchikey, smiles, base, alias))
 
 		except sqlite3.IntegrityError as e:
-			if 'UNIQUE constraint failed: compound.compound_name' in str(e):
+			if 'UNIQUE constraint failed: compound.compound_inchikey' in str(e):
 				if warn_duplicate:
 					logger.warning(f"Skipping compound with existing inchikey \"{inchikey}\"")
 			elif 'UNIQUE constraint failed: compound.compound_smiles' in str(e):
