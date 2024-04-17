@@ -180,9 +180,6 @@ class HIPPO:
 
 			assert len(sdfs) == 1, (path, sdfs)
 			assert len(pdbs) == 1, (path, pdbs)
-
-			# logger.var('sdfs[0]',sdfs[0])
-			# logger.var('PandasTools', PandasTools.__file__)
 			
 			# load the SDF
 			df = PandasTools.LoadSDF(str(sdfs[0]), molColName='ROMol', idName='ID', strictParsing=True)
@@ -193,8 +190,6 @@ class HIPPO:
 			mol = df.ROMol[0]
 			lig_res_number = int(observation_longname.split('-')[1].split('_')[2])
 			lig_chain = observation_longname.split('-')[1].split('_')[1]
-			
-			# logger.var('observation_longname',observation_longname)
 
 			# smiles			
 			smiles = mp.rdkit.mol_to_smiles(mol)
@@ -205,7 +200,6 @@ class HIPPO:
 
 			if len(sys.residues['LIG']) > 1 or any(r.contains_alternative_sites for r in sys.residues['LIG']):
 				# create the single ligand bound pdb
-				# logger.debug(str(pdbs[0].resolve()))
 				sys = remove_other_ligands(sys, lig_res_number, lig_chain)
 				sys.prune_alternative_sites('A', verbosity=0)
 				pose_path = str(pdbs[0].resolve()).replace('.pdb', '_hippo.pdb')
@@ -420,7 +414,6 @@ class HIPPO:
 					try:
 						value = float(value)
 					except TypeError:
-					# 	logger.warning(f'Could not convert column={col}.')
 						pass
 					except ValueError:
 						pass
@@ -458,6 +451,7 @@ class HIPPO:
 		inspiration_map: dict | None = None,
 		base_only: bool = False,
 		tags: None | list = None,
+		reaction_yield_map: dict | None = None,
 	):
 
 		tags = tags or []
@@ -471,7 +465,6 @@ class HIPPO:
 
 		if f'{n_steps}_num_atom_diff' not in df.columns:
 			logger.error(df_path)
-			# return df.head()
 			print(df.columns)
 			raise NotImplementedError
 
@@ -482,14 +475,20 @@ class HIPPO:
 		else:
 			generator = tqdm(df.iterrows())
 
+		n_comps = len(self.compounds)
+		n_poses = len(self.poses)
+
 		for i,row in generator:
 
+			path_to_mol = row.path_to_mol
+
 			# skip pose-less entries
-			if not row.path_to_mol:
+			if not path_to_mol:
 				continue
+			
+			path_to_mol = path_to_mol.replace('//','/')
 
 			this_row_is_a_base = 'base' in row[f'{n_steps}_product_name']
-			# print(i, n_steps, this_row_is_a_base)
 
 			if base_only and not this_row_is_a_base:
 				continue
@@ -543,7 +542,12 @@ class HIPPO:
 						base_id = product.id
 
 				# register the reaction
-				self.register_reaction(reactants=reactants, product=product, type=row[f'{j}_reaction'], commit=False)
+				if reaction_yield_map:
+					product_yield = reaction_yield_map[row[f'{j}_reaction']]
+				else:
+					product_yield = 1.0
+					
+				self.register_reaction(reactants=reactants, product=product, type=row[f'{j}_reaction'], commit=False, product_yield=product_yield)
 
 			# pose metadata
 			metadata = {
@@ -566,7 +570,7 @@ class HIPPO:
 			self.register_pose(
 				compound=product, 
 				target='A71EV2A', 
-				path=row.path_to_mol, 
+				path=path_to_mol, 
 				inspirations=inspirations, 
 				metadata=metadata, 
 				tags=this_tags, 
@@ -577,11 +581,22 @@ class HIPPO:
 			)
 
 		self.db.commit()
-		if not base_only:
-			logger.success(f'Loaded compounds from {df_path.name}')
+
+		n_comps = len(self.compounds) - n_comps
+		n_poses = len(self.poses) - n_poses
+
+		if n_comps:
+			if not base_only: 
+				logger.success(f'Loaded {n_comps} new compounds from {df_path.name}')
 		else:
-			# logger.success(f'Loaded base compound from {df_path.name}')
-			return base_id
+			logger.warning(f'Loaded {n_comps} new compounds from {df_path.name}')
+		if n_poses:
+			if not base_only: 
+				logger.success(f'Loaded {n_poses} new poses from {df_path.name}')
+		else:
+			logger.warning(f'Loaded {n_poses} new poses from {df_path.name}')
+
+		return base_id
 
 	### SINGLE INSERTION
 
@@ -639,6 +654,7 @@ class HIPPO:
 		product: Compound,
 		reactants: list[Compound | int],
 		commit: bool = True,
+		product_yield: float = 1.0,
 	) -> Reaction:
 
 		### CHECK FOR DUPLICATES
@@ -658,7 +674,7 @@ class HIPPO:
 
 			return reaction
 
-		reaction_id = self.db.insert_reaction(type=type, product=product, commit=commit)
+		reaction_id = self.db.insert_reaction(type=type, product=product, commit=commit, product_yield=product_yield)
 
 		for reactant in reactants:
 			self.db.insert_reactant(compound=reactant, reaction=reaction_id, commit=commit)
