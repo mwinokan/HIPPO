@@ -123,7 +123,8 @@ class Reaction:
 			reactions = reactant.get_reactions(none='quiet')
 
 			if reactions:
-				assert len(reactions) == 1
+				if not len(reactions) == 1:
+					logger.warning(f'{reactant=} has multiple reactions. Picking the first')
 				reaction = reactions[0]
 				_ingredients, _reactions, _intermediates = reaction.get_ingredients(reactant_amount, return_reactions=True, return_intermediates=True)
 
