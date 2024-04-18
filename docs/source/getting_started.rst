@@ -14,8 +14,8 @@ To create a HIPPO database or interface with an existing one, create a :class:`.
 Loading crystallographic hits from Fragalysis
 =============================================
 
-1. Go `Fragalysis (v2)
-<https://fragalysis.xchem.diamond.ac.uk>`_. and download a dataset 
+1. Go `Fragalysis
+<https://fragalysis.diamond.ac.uk>`_. and download a dataset 
 
 2. Load the crystallographic data
 
