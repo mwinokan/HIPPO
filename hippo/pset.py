@@ -715,9 +715,19 @@ class PoseSet(PoseTable):
 		return iter(self.db.get_pose(table=self.table, id=i) for i in self.indices)
 
 	def __getitem__(self, key) -> Pose:
-		try:
-			index = self.indices[key]
-		except IndexError:
-			logger.exception(f'list index out of range: {key=} for {self}')
-			raise
-		return self.db.get_pose(table=self.table, id=index)
+		match key:
+			
+			case int():
+				try:
+					index = self.indices[key]
+				except IndexError:
+					logger.exception(f'list index out of range: {key=} for {self}')
+					raise
+				return self.db.get_pose(table=self.table, id=index)
+			
+			case slice():
+				ids = self.indices[key]
+				return PoseSet(self.db, ids)
+
+			case _:
+				raise NotImplementedError
