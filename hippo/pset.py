@@ -493,7 +493,7 @@ class PoseSet(PoseTable):
 					# filenames
 					pdb_name = f"{out_key}_{row._Name}.pdb"
 					pdb_path = pdb_dir / pdb_name
-					pose_df.iloc[i]['ref_pdb'] = pdb_name
+					pose_df.loc[i, 'ref_pdb'] = pdb_name
 
 					# generate the PL-complex
 					sys = pose.complex_system
