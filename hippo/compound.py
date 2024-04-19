@@ -259,17 +259,17 @@ class Compound:
 		
 		return Ingredient(self, amount, quote, max_lead_time, supplier)
 
-	def draw(self):
+	def draw(self, align_substructure: bool = False):
 		"""Display this compound (and its base if it has one)"""
 
 		if self.base:
 			from molparse.rdkit import draw_mcs
-			drawing = draw_mcs({self.base.smiles:f'{self.base} (base)', self.smiles:str(self)})
+			drawing = draw_mcs({self.base.smiles:f'{self.base} (base)', self.smiles:str(self)}, align_substructure=align_substructure, show_mcs=False, highlight_common=False)
 			display(drawing)
 		else:
 			display(self.mol)
 
-	def summary(self, metadata: bool = True):
+	def summary(self, metadata: bool = True, draw: bool = True,):
 		"""Print a summary of this compound"""
 		logger.header(repr(self))
 		logger.var('inchikey', self.inchikey)
@@ -280,6 +280,8 @@ class Compound:
 		logger.var('#reactions (product)', self.num_reactions)
 		logger.var('#reactions (reactant)', self.num_reactant)
 		logger.var('tags', self.tags)
+		if draw:
+			self.draw()
 		if metadata:
 			logger.var('metadata', str(self.metadata))
 

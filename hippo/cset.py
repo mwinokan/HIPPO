@@ -74,6 +74,16 @@ class CompoundTable:
 			ids = [i for i,d in results if d and f'"{key}": {value}' in d]
 		return self[ids]		
 
+	def get_by_base(self,base):
+
+		if not isinstance(base, int):
+			assert base._table == 'compound'
+			base = base.id
+
+		values = self.db.select_where(query='compound_id', table='compound', key='base', value=base, multiple=True)
+		ids = [v for v, in values if v]
+		return self[ids]
+	
 	def summary(self):
 		"""Print a summary of this compound set"""
 		logger.header('CompoundTable()')
@@ -83,9 +93,13 @@ class CompoundTable:
 
 	### DUNDERS
 
-	def __call__(self, tag=None):
+	def __call__(self, *, tag=None, base=None):
 		if tag:
 			return self.get_by_tag(tag)
+		elif base:
+			return self.get_by_base(base)
+		else:
+			raise NotImplementedError
 
 	def __getitem__(self, key) -> Compound:
 		
@@ -163,9 +177,14 @@ class CompoundSet(CompoundTable):
 		self._db = db
 		self._table = table
 
-		self._indices = indices or []
+		indices = indices or []
 
-		self._indices = list(set(self.indices))
+		if not isinstance(indices, list):
+			indices = list(indices)
+
+		assert all(isinstance(i, int) for i in indices)
+
+		self._indices = sorted(list(set(indices)))
 
 	### PROPERTIES
 
@@ -181,8 +200,13 @@ class CompoundSet(CompoundTable):
 
 	@property
 	def names(self):
-		"""Returns the names of compounds in this set"""
-		return [self.db.select_where(table=self.table, query='compound_name', key='id', value=i, multiple=False)[0] for i in self.indices]
+		"""Returns the aliases of compounds in this set"""
+		return [self.db.select_where(table=self.table, query='compound_alias', key='id', value=i, multiple=False)[0] for i in self.indices]
+
+	@property
+	def inchikeys(self):
+		"""Returns the inchikeys of compounds in this set"""
+		return [self.db.select_where(table=self.table, query='compound_inchikey', key='id', value=i, multiple=False)[0] for i in self.indices]
 
 	@property
 	def tags(self):

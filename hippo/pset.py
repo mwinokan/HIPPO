@@ -186,7 +186,7 @@ class PoseSet(PoseTable):
 
 		assert all(isinstance(i, int) for i in indices)
 
-		self._indices = indices
+		self._indices = sorted(list(set(indices)))
 
 	### PROPERTIES
 

@@ -382,6 +382,10 @@ class Pose:
 			return None
 		return self.num_heavy_atoms - count
 
+	@property
+	def fields(self):
+		return [p for p in dir(self) if not p.startswith('_')]
+    
 	### METHODS
 
 	def get_compound(self):

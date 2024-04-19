@@ -550,8 +550,10 @@ def plot_compound_property(animal, prop, compounds=None, style='bar', null=None)
 				# get attr
 				if hasattr(comp,p):
 					v = getattr(comp,p)
-				elif p in comp.metadata:
-					v = comp.metadata[p]
+					
+				elif p in (m := comp.metadata):
+				    v = m[p]
+					
 				else:
 					v = null
 
@@ -624,9 +626,19 @@ def plot_pose_property(animal, prop, poses=None, style='scatter', null=None, col
 
 	plot_data = []
 
+	if len(poses) > 1000:
+		poses = tqdm(poses)
+
 	for pose in poses:
 
-		data = pose.dict
+		# if minimal_hover:
+		# data = dict(id=pose.id, name=pose.name)
+		if len(prop) > 1:
+			data = dict(id=pose.id)
+		else:
+			data = {}
+		# else:
+			# data = pose.dict
 
 		for p in prop:
 
@@ -637,8 +649,11 @@ def plot_pose_property(animal, prop, poses=None, style='scatter', null=None, col
 				# get attr
 				if hasattr(pose,p):
 					v = getattr(pose,p)
-				elif p in pose.metadata:
-					v = pose.metadata[p]
+					
+				elif p in (m := pose.metadata):
+					
+					v = m[p]
+				
 				else:
 					v = null
 
@@ -646,13 +661,13 @@ def plot_pose_property(animal, prop, poses=None, style='scatter', null=None, col
 
 		plot_data.append(data)
 
-	hover_data = ['name', 'id'] #, 'tags', 'inspirations']
+	hover_data = ['id'] #, 'alias', 'inchikey'] #, 'tags', 'inspirations']
 
 	if len(prop) == 1:
 
 		title = f'Pose {prop[0]}'
 
-		fig = px.histogram(plot_data, x=prop[0], hover_data=hover_data, color=color)
+		fig = px.histogram(plot_data, x=prop[0], hover_data=None, color=color)
 		
 		fig.update_layout(xaxis_title=prop[0], yaxis_title='Quantity')
 

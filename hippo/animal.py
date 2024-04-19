@@ -1,5 +1,6 @@
 
 import pandas as pd
+# import numpy as np
 
 from .cset import CompoundTable
 from .pset import PoseTable, PoseSet
@@ -496,58 +497,74 @@ class HIPPO:
 			if base_only and base_id and not this_row_is_a_base:
 				break
 
-			# loop over each reaction step
-			for j in range(n_steps):
-
-				j += 1
-
-				reactants = []
-
-				reactant_previous_product = row[f'{j}_r_previous_product']
-
-				# reactant 1
-				if reactant_previous_product == 1:
-					reactant1_id = product.id
-					reactants.append(reactant1_id)
-				elif smiles := row[f'{j}_r1_smiles']:
-					reactant1_id = self.register_compound(smiles=smiles, commit=False, return_compound=False, tags=tags)
-					reactants.append(reactant1_id)
-			
-				# reactant 2
-				if reactant_previous_product == 2:
-					reactant2_id = product.id
-					reactants.append(reactant2_id)
-				elif smiles := row[f'{j}_r2_smiles']:
-					reactant2_id = self.register_compound(smiles=smiles, commit=False, return_compound=False, tags=tags)
-					reactants.append(reactant2_id)
-			
-				# product
-				if smiles := row[f'{j}_product_smiles']:
-
-					if j != n_steps:
-						this_tags = ['intermediate'] + tags
-						base = None
-
-					elif this_row_is_a_base:
-						this_tags = ['base'] + tags
-						base = None
-
+			try:
+				
+				# loop over each reaction step
+				for j in range(n_steps):
+	
+					j += 1
+	
+					reactants = []
+	
+					reactant_previous_product = row[f'{j}_r_previous_product']
+	
+					# reactant 1
+					if reactant_previous_product == 1:
+						reactant1_id = product.id
+						reactants.append(reactant1_id)
+					elif smiles := row[f'{j}_r1_smiles']:
+						
+						if not isinstance(smiles, str):
+							raise InvalidRowError(f'non-string {j}_r1_smiles')
+							
+						reactant1_id = self.register_compound(smiles=smiles, commit=False, return_compound=False, tags=tags)
+						reactants.append(reactant1_id)
+				
+					# reactant 2
+					if reactant_previous_product == 2:
+						reactant2_id = product.id
+						reactants.append(reactant2_id)
+					elif smiles := row[f'{j}_r2_smiles']:
+						
+						if not isinstance(smiles, str):
+							raise InvalidRowError(f'non-string {j}_r2_smiles')
+							
+						reactant2_id = self.register_compound(smiles=smiles, commit=False, return_compound=False, tags=tags)
+						reactants.append(reactant2_id)
+				
+					# product
+					if smiles := row[f'{j}_product_smiles']:
+						if not isinstance(smiles, str):
+							raise InvalidRowError(f'non-string {j}_product_smiles')
+	
+						if j != n_steps:
+							this_tags = ['intermediate'] + tags
+							base = None
+	
+						elif this_row_is_a_base:
+							this_tags = ['base'] + tags
+							base = None
+	
+						else:
+							this_tags = ['elab'] + tags
+							base = base_id
+	
+						product = self.register_compound(smiles=smiles, tags=this_tags, commit=False, return_compound=True, base=base)
+						
+						if not base_id and j == n_steps and this_row_is_a_base:
+							base_id = product.id
+	
+					# register the reaction
+					if reaction_yield_map:
+						product_yield = reaction_yield_map[row[f'{j}_reaction']]
 					else:
-						this_tags = ['elab'] + tags
-						base = base_id
+						product_yield = 1.0
+						
+					self.register_reaction(reactants=reactants, product=product, type=row[f'{j}_reaction'], commit=False, product_yield=product_yield)
 
-					product = self.register_compound(smiles=smiles, tags=this_tags, commit=False, return_compound=True, base=base)
-					
-					if not base_id and j == n_steps and this_row_is_a_base:
-						base_id = product.id
-
-				# register the reaction
-				if reaction_yield_map:
-					product_yield = reaction_yield_map[row[f'{j}_reaction']]
-				else:
-					product_yield = 1.0
-					
-				self.register_reaction(reactants=reactants, product=product, type=row[f'{j}_reaction'], commit=False, product_yield=product_yield)
+			except InvalidRowError as e:
+				logger.error(f'Skipping invalid row {i=}: {e}')
+				continue
 
 			# pose metadata
 			metadata = {
@@ -614,9 +631,14 @@ class HIPPO:
 		"""Use a smiles string to add a compound to the database. If it already exists return the compound"""
 
 		assert smiles
+		assert isinstance(smiles, str), f'Non-string {smiles=}'
+		
 		try:
 			smiles = sanitise_smiles(smiles, sanitisation_failed='error')
 		except SanitisationError:
+			logger.error(f'Could not sanitise {smiles=}')
+			return None
+		except AssertionError:
 			logger.error(f'Could not sanitise {smiles=}')
 			return None
 
@@ -626,7 +648,7 @@ class HIPPO:
 			smiles=smiles, base=base, inchikey=inchikey, tags=tags, 
 			metadata=metadata, warn_duplicate=False, commit=commit, alias=alias)
 
-		if return_compound or metadata or alias:
+		if return_compound or metadata or alias or tags:
 			if not compound_id:
 				compound = self.compounds[inchikey]
 			else:
@@ -637,6 +659,10 @@ class HIPPO:
 
 			if alias:
 				compound.alias = alias
+
+			if tags:
+				for tag in tags:
+					compound.tags.add(tag)
 
 			if return_compound:
 				return compound
@@ -851,3 +877,6 @@ class HIPPO:
 	def __repr__(self) -> str:
 		"""Returns a command line representation"""
 		return f'HIPPO("{self.name}")'
+
+class InvalidRowError(Exception):
+	...
