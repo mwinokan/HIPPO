@@ -6,21 +6,36 @@ from .compound import Ingredient
 import logging
 logger = logging.getLogger('HIPPO')
 
-@dataclass
+# @dataclass
 class Recipe:
 	""" A Recipe stores data corresponding to a specific synthetic recipe involving several products, reactants, intermediates, and reactions."""
 
-	# list of Ingredient options
-	products: list = field(default_factory=list)
+	def __init__(self, products, reactants, intermediates, reactions):
 
-	# list of Ingredient objects
-	reactants: list = field(default_factory=list)
+		self._products = products
+		self._reactants = reactants
+		self._intermediates = intermediates
+		self._reactions = reactions
 
-	# list of Ingredient objects
-	intermediates: list = field(default_factory=list)
+	### PROPERTIES
+
+	@property
+	def products(self):
+		return self._products
+
+	@property
+	def reactants(self):
+		return self._reactants
+
+	@property
+	def intermediates(self):
+		return self._intermediates
+
+	@property
+	def reactions(self):
+		return self._reactions
 	
-	# list of Reaction objects
-	reactions: list = field(default_factory=list)
+	### METHODS
 
 	def draw(self, color_mapper = None, node_size=300, graph_only=False):
 
@@ -114,6 +129,8 @@ class Recipe:
 
 	def summary(self):
 		"""Print a summary of this recipe"""
+
+		import mcol
 		
 		logger.header('Recipe')
 
@@ -128,6 +145,7 @@ class Recipe:
 		logger.var('\n#reactants', len(self.reactants))
 		for reactant in self.reactants:
 			logger.var(str(reactant), f'{reactant.amount:.2f}', dict(unit='mg'))
+			# logger.out(f'{mcol.varName}{reactant}{mcol.clear} = {reactant.amount:.2f} {mcol.varType}mg{mcol.clear}, {self.get_reactant_reactions(reactant)}')
 
 		logger.var('\n#reactions', len(self.reactions))
 		for reaction in self.reactions:
@@ -136,3 +154,12 @@ class Recipe:
 	def get_ingredient(self, id):
 		"""Get an ingredient by its compound ID"""
 		return [r for r in self.reactants + self.products + self.intermediates if r.id == id][0]
+
+	# def get_reactant_reactions(self, reactant):
+	# 	"""Get reactions that a reactant is involved in"""
+	# 	return [r for r in self.reactions if reactant in r.reactants]
+
+	# def get_reactant_reaction_string(self, reactant):
+	# 	reactions = self.get_reactant_reactions(reactant)
+	# 	return ' '.join([str(r) for r in reactions])
+				

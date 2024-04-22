@@ -149,7 +149,7 @@ class Compound:
 	@property
 	def reactions(self):
 		"""Returns the reactions resulting in this compound"""
-		return self.get_reactions(none=False, prune_duplicate=False)
+		return self.get_reactions(none=False)
 
 	@property
 	def dict(self) -> dict:
@@ -209,23 +209,19 @@ class Compound:
 		
 		return quotes
 
-	def get_reactions(self, none='error', as_reactant=False, prune_duplicate=True) -> list:
+	def get_reactions(self, none='error', as_reactant=False) -> list:
 		"""Get the associated reactions as product, unless as_reactant is True."""
+
+		from .rset import ReactionSet
 
 		if as_reactant:
 			reaction_ids = self.db.select_where(query='reactant_reaction', table='reactant', key='compound', value=self.id, multiple=True, none=none)
 		else:
 			reaction_ids = self.db.select_where(query='reaction_id', table='reaction', key='product', value=self.id, multiple=True, none=none)
 
-		if reaction_ids:
-			reactions = [self.db.get_reaction(id=q[0]) for q in reaction_ids]
-		else:
-			return []
+		reaction_ids = [q for q, in reaction_ids]
 
-		if not as_reactant and prune_duplicate and len(reactions) > 1:
-			reactions = self.db.prune_reactions(compound=self, reactions=reactions)
-
-		return reactions
+		return ReactionSet(self.db, reaction_ids)
 
 	def get_poses(self, 
 		target: str = None
@@ -256,8 +252,13 @@ class Compound:
 			supplier=supplier,
 			none='quiet',
 		)
+
+		if not quote:
+			quote = None
+		else:
+			quote = quote.id
 		
-		return Ingredient(self, amount, quote, max_lead_time, supplier)
+		return Ingredient(self.db, self.id, amount, quote, supplier, max_lead_time)
 
 	def draw(self, align_substructure: bool = False):
 		"""Display this compound (and its base if it has one)"""
@@ -367,34 +368,84 @@ class Compound:
 	def __eq__(self, other):
 		return self.id == other.id
 
-class Ingredient(Compound):
+class Ingredient:
 
 	"""An ingredient is a :class:`.Compound` with a fixed quanitity and an attached quote.
 
 	Create one from a :meth:`.Compound.as_ingredient`"""
 
-	def __init__(self, inherit, amount, quote, max_lead_time=None, supplier=None):
-		self._id = inherit.id
-		self._inchikey = inherit.inchikey
-		self._alias = inherit.alias
-		self._smiles = inherit.smiles
-		self._base = inherit.base			
-		self._mol = inherit.mol
-		self._db = inherit.db
+	_table = 'ingredient'
+
+	def __init__(self, db, compound, amount, quote, max_lead_time=None, supplier=None):
+
+		assert compound
+
+		self._db = db
+			
+        # don't store inherited compound in memory until needed
+		self._compound = None
+    
+		if isinstance(compound, int):
+			self._compound_id = compound
+		else:
+			self._compound_id = compound.id
+			self._compound = None
+
+		if isinstance(quote, int):
+			self._quote_id = quote
+		elif quote is None:
+			self._quote_id = None
+			self._quote = None
+		else:
+			self._quote_id = quote.id
+			self._quote = None
+        
+		# self._id = inherit.id
+		# self._inchikey = inherit.inchikey
+		# self._alias = inherit.alias
+		# self._smiles = inherit.smiles
+		# self._base = inherit.base			
+		# self._mol = inherit.mol
+		# self._db = inherit.db
 		
+		self._amount = amount
 		self._max_lead_time = max_lead_time
 		self._supplier = supplier
-		self._amount = amount
-		self._quote = quote
 
+	### PROPERTIES
+
+	@property
+	def db(self):
+		return self._db
+	
 	@property
 	def amount(self) -> float:
 		"""Returns the amount"""
 		return self._amount
 
+	@property
+	def compound_id(self):
+		"""Returns the ID of the associated compound"""
+		return self._compound_id
+
+	@property
+	def quote_id(self):
+		"""Returns the ID of the associated quote"""
+		return self._quote_id
+
+	@property
+	def max_lead_time(self) -> float:
+		"""Returns the max_lead_time from the original quote query"""
+		return self._max_lead_time
+
+	@property
+	def supplier(self) -> float:
+		"""Returns the supplier from the original quote query"""
+		return self._supplier
+
 	@amount.setter
 	def amount(self, a):
-		"""Set the amount"""
+		"""Set the amount and update quotes"""
 
 		quote = self.get_quotes(
 			pick_cheapest=True, 
@@ -407,16 +458,30 @@ class Ingredient(Compound):
 		self._amount = a
 
 	@property
+	def compound(self):
+		"""Returns the associated :class:`Compound`"""
+		if not self._compound:
+			self._compound = self.db.get_compound(id=self.compound_id)
+		return self._compound
+		
+	@property
 	def quote(self):
 		"""Returns the associated :class:`Quote`"""
+		if not self._quote and (q_id := self.quote_id):
+			self._quote = self.db.get_quote(id=self.quote_id)
 		return self._quote
 
+	### DUNDERS
+
+	def __str__(self):
+		return f'{self.amount:.2f}mg of C{self._compound_id}'
+	
 	def __repr__(self):
-		return f'{self.amount:.2f}mg of {mcol.bold}{mcol.underline}{self} "{self.name}"{mcol.unbold}{mcol.ununderline}'
+		return f'{mcol.bold}{mcol.underline}{str(self)}{mcol.unbold}{mcol.ununderline}'
 
 	def __eq__(self, other):
 
-		if self.id != other.id:
+		if self.compound_id != other.compound_id:
 			return False
 
 		return self.amount == other.amount

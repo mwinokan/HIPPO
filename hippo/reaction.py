@@ -14,6 +14,8 @@ class Reaction:
 	:class:`.Reaction` objects should not be created directly. Instead use :meth:`.HIPPO.register_reaction` or :meth:`.HIPPO.reactions`
 	"""
 
+	_table = 'reaction'
+
 	def __init__(self,
 		db,
 		id: int,
@@ -105,16 +107,22 @@ class Reaction:
 		else:
 			return []
 
-	def get_ingredients(self, amount, return_reactions=False, return_intermediates=False):
+	def get_ingredients(self, amount, return_reactions=False, return_intermediates=False, debug=False):
 		"""recursively assemble a list of ingredients and reactions required to make the compound"""
 
-		ingredients = []
-		intermediates = []
-		reax = []
+		from .rset import ReactionSet
+		from .cset import IngredientSet
+
+		ingredients = IngredientSet(self.db)
+		intermediates = IngredientSet(self.db)
+		reax = ReactionSet(self.db)
 
 		pairs = self.get_reactant_amount_pairs()
 		  
 		for reactant, reactant_amount in pairs:
+
+			if debug:
+				logger.debug(f'{self} reactant: {reactant}')
 
 			# scale amount
 			reactant_amount *= amount #/total_reactant_amount
@@ -122,49 +130,53 @@ class Reaction:
 
 			reactions = reactant.get_reactions(none='quiet')
 
+			if debug:
+				logger.debug(f'{reactant} reactions: {reactions}')
+
 			if reactions:
 				if not len(reactions) == 1:
 					logger.warning(f'{reactant=} has multiple reactions. Picking the first')
 				reaction = reactions[0]
-				_ingredients, _reactions, _intermediates = reaction.get_ingredients(reactant_amount, return_reactions=True, return_intermediates=True)
+				_ingredients, _reactions, _intermediates = reaction.get_ingredients(reactant_amount, return_reactions=True, return_intermediates=True, debug=debug)
 
 				ingredients += _ingredients
 				reax += _reactions
 				intermediates += _intermediates
 
-				intermediates.append(reaction.product.as_ingredient(reactant_amount))
+				intermediates.add(reaction.product.as_ingredient(reactant_amount))
 
-				reax.append(reaction)
+				reax.add(reaction)
 
 			else:
+				# if debug:
+					# logger.debug(f'final ingredient {reactant}')
 				ingredient = reactant.as_ingredient(reactant_amount)
-				ingredients.append(ingredient)
+				ingredients.add(ingredient)
 
 		output = [ingredients]
 
 		if return_reactions:
-			reax.append(self)
+			reax.add(self)
+			reax = ReactionSet(self.db, [r.id for r in reax])
 			output.append(reax)
 
 		if return_intermediates:
 			output.append(intermediates)
 
-		match len(output):
-			case 1:
-				return output[0]
-			case 2:
-				return output[0], output[1]
-			case 3:
-				return output[0], output[1], output[2]
+		if len(output) == 1:
+			return output[0]
+		else:
+			return tuple(output)
 
 	def get_recipe(self, 
 		amount: float = 1, # in mg
+		debug: bool = False,
 	):
 		"""Get a :class:`.Recipe` describing how to make the product"""
 
 		products = [self.product.as_ingredient(amount=amount)]
 
-		reactants, reactions, intermediates = self.get_ingredients(amount=amount, return_reactions=True, return_intermediates=True)
+		reactants, reactions, intermediates = self.get_ingredients(amount=amount, return_reactions=True, return_intermediates=True, debug=debug)
 
 		recipe = Recipe(products=products, reactants=reactants, reactions=reactions, intermediates=intermediates)
 		
@@ -185,7 +197,7 @@ class Reaction:
 		ingredients = self.get_ingredients(amount=amount)
 		print(ingredients)
 
-		return self.get_recipe(amount)
+		# return self.get_recipe(amount)
 
 	def draw(self):
 		"""Draw the molecules involved in this reaction"""
@@ -224,3 +236,6 @@ class Reaction:
 			return False
 
 		return True
+
+	def __hash__(self):
+		return self.id

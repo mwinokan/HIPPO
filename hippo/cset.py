@@ -1,7 +1,7 @@
 
 # from .tools import df_row_to_dict
 
-from .compound import Compound
+from .compound import Compound, Ingredient
 from .db import Database
 
 from .recipe import Recipe
@@ -379,3 +379,89 @@ class CompoundSet(CompoundTable):
 			logger.exception(f'list index out of range: {key=} for {self}')
 			raise
 		return self.db.get_compound(table=self.table, id=index)
+
+class IngredientSet:
+
+	"""Refactor as a wrapper to a dataframe???"""
+
+	_columns = [
+		'compound_id',
+		'amount',
+		'quote_id',
+		'supplier',
+		'max_lead_time',
+	]
+	
+	def __init__(self, db, ingredients=None):
+
+		from pandas import DataFrame
+
+		ingredients = ingredients or []
+
+		self._db = db
+		
+		self._data = DataFrame(columns=self._columns)
+		
+		for ingredient in ingredients:
+			self.add(ingredient)
+
+	### PROPERTIES
+
+	@property
+	def df(self):
+		return self._data
+
+	### METHODS
+
+	def add(self, ingredient=None, *, compound_id=None, amount=None, quote_id=None, supplier=None, max_lead_time=None):
+
+		from pandas import DataFrame, concat
+
+		if ingredient:
+			assert ingredient._table == 'ingredient'
+			compound_id = ingredient.compound_id
+			amount = ingredient.amount
+			quote_id = ingredient.quote_id
+			supplier = ingredient.supplier
+			max_lead_time = ingredient.max_lead_time
+			
+		else:
+			assert id
+			assert amount
+
+		self._data = concat([self._data, DataFrame([dict(compound_id=compound_id, amount=amount, quote_id=quote_id, supplier=supplier, max_lead_time=max_lead_time)])], ignore_index=True)
+
+	def get_ingredient(self, series):
+		return Ingredient(
+			db=self._db,
+			compound=series['compound_id'],
+			amount=series['amount'],
+			quote=series['quote_id'],
+			supplier=series['supplier'],
+			max_lead_time=series['max_lead_time'],
+		)
+
+	### DUNDERS
+
+	def __len__(self):
+		return len(self._data)
+
+	def __repr__(self):
+		return f'{mcol.bold}{mcol.underline}''{'f'I x {len(self)}''}'f'{mcol.unbold}{mcol.ununderline}'
+
+	def __add__(self, other):
+		for id, amount in other._data.items():
+			self.add(id=id, amount=amount)
+		return self
+
+	def __getitem__(self, key):
+		match key:
+			case int():
+				series = self.df.loc[key]
+				self.get_ingredient(series)
+		
+			case _:
+				raise NotImplementedError
+
+	def __iter__(self):
+		return iter(self.get_ingredient(s) for i,s in self.df.iterrows())

@@ -5,7 +5,7 @@ import pandas as pd
 from .cset import CompoundTable
 from .pset import PoseTable, PoseSet
 from .tags import TagTable
-from .rset import ReactionSet
+from .rset import ReactionTable
 from .compound import Compound
 from .reaction import Reaction
 from .target import Target
@@ -60,7 +60,7 @@ class HIPPO:
 		self._compounds = CompoundTable(self.db, 'compound')
 		self._poses = PoseTable(self.db, 'pose')
 		self._tags = TagTable(self.db, 'tag')
-		self._reactions = ReactionSet(self.db, 'reaction')
+		self._reactions = ReactionTable(self.db, 'reaction')
 
 		logger.success(f"Initialised animal {self}")
 		
