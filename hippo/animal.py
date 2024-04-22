@@ -567,10 +567,7 @@ class HIPPO:
 				continue
 
 			# pose metadata
-			metadata = {
-				'ddG':row['∆∆G'],
-				'RMSD':row['comRMSD'],
-			}
+			metadata = {}
 
 			# inspirations
 			inspirations = []
@@ -595,6 +592,8 @@ class HIPPO:
 				return_pose=False,
 				overwrite_metadata=True,
 				warn_duplicate=False,
+				energy_score=row['∆∆G'],
+				distance_score=row['comRMSD'],
 			)
 
 		self.db.commit()
