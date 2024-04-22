@@ -37,6 +37,8 @@ class Pose:
 	:class:`.Pose` objects should not be created directly. Instead use :meth:`.HIPPO.register_pose` or :meth:`.HIPPO.poses`
 	"""
 
+	_table = 'pose'
+
 	def __init__(self, 
 		db,
 		id: int,
@@ -50,6 +52,8 @@ class Pose:
 		mol: Chem.Mol | bytes | None,
 		fingerprint: bytes,
 		metadata: dict | None = None,
+		energy_score: float | None = None,
+		distance_score: float | None = None,
 	):
 
 		self._db = db
@@ -61,7 +65,8 @@ class Pose:
 		self._target = target
 		self._path = path
 		self._protein_system = None
-		self._table = 'pose'
+		self._energy_score = energy_score
+		self._distance_score = distance_score
 
 		if fingerprint:
 			# logger.debug('unpickling fingerprint')
@@ -386,6 +391,14 @@ class Pose:
 	def fields(self):
 		return [p for p in dir(self) if not p.startswith('_')]
     
+	@property
+	def energy_score(self):
+		return self._energy_score
+
+	@property
+	def distance_score(self):
+		return self._distance_score
+
 	### METHODS
 
 	def get_compound(self):

@@ -236,6 +236,8 @@ class Database:
 			pose_target INTEGER,
 			pose_mol BLOB,
 			pose_fingerprint BLOB,
+			pose_energy_score REAL,
+			pose_distance_score REAL,
 			pose_metadata TEXT,
 			FOREIGN KEY (pose_compound) REFERENCES compound(compound_id),
 			CONSTRAINT UC_pose_alias UNIQUE (pose_alias)
@@ -481,6 +483,8 @@ class Database:
 		alias: str | None = None,
 		reference: int | None = None,
 		tags: None | list = None,
+		energy_score: float | None = None,
+		distance_score: float | None = None,
 		metadata: None | dict = None,
 		commit: bool = True,
 		longname: str = None,
@@ -518,12 +522,12 @@ class Database:
 				return None
 
 		sql = """
-		INSERT INTO pose(pose_inchikey, pose_alias, pose_smiles, pose_compound, pose_target, pose_path, pose_reference)
-		VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7)
+		INSERT INTO pose(pose_inchikey, pose_alias, pose_smiles, pose_compound, pose_target, pose_path, pose_reference, pose_energy_score, pose_distance_score)
+		VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
 		"""
 
 		try:
-			self.execute(sql, (inchikey, alias, None, compound.id, target, path, reference))
+			self.execute(sql, (inchikey, alias, None, compound.id, target, path, reference, energy_score, distance_score))
 
 		except sqlite3.IntegrityError as e:
 			if 'UNIQUE constraint failed: pose.pose_path' in str(e):
@@ -1005,7 +1009,7 @@ class Database:
 			logger.error(f'Invalid {id=}')
 			return None
 
-		query = 'pose_id, pose_inchikey, pose_alias, pose_smiles, pose_reference, pose_path, pose_compound, pose_target, pose_mol, pose_fingerprint'
+		query = 'pose_id, pose_inchikey, pose_alias, pose_smiles, pose_reference, pose_path, pose_compound, pose_target, pose_mol, pose_fingerprint, pose_energy_score, pose_distance_score'
 		entry = self.select_where(query=query, table=table, key='id', value=id)
 		pose = Pose(self, *entry)
 		return pose

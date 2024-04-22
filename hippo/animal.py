@@ -730,6 +730,8 @@ class HIPPO:
 		metadata: None | dict = None,
 		inspirations: None | list = None,
 		return_pose: bool = True,
+		energy_score: float | None = None,
+		distance_score: float | None = None,
 		commit: bool = True,
 		overwrite_metadata: bool = True,
 		warn_duplicate: bool = True,
@@ -744,13 +746,10 @@ class HIPPO:
 
 		if check_RMSD:
 			
-			# print(path, compound_id)
-
 			# check if the compound has existing poses
 			other_pose_ids = self.db.select_id_where(table='pose', key='compound', value=compound_id, none='quiet', multiple=True)
 			
 			if other_pose_ids:
-				# print(other_pose_ids)
 				other_poses = PoseSet(self.db, [i for i, in other_pose_ids])
 
 				from molparse.rdkit import draw_mols, draw_flat
@@ -765,8 +764,6 @@ class HIPPO:
 				positions1 = [c1.GetAtomPosition(i) for i,_ in enumerate(atoms1)]
 
 				for pose in other_poses:
-					# print(f'checking {pose}')
-
 					c2 = pose.mol.GetConformer()
 					atoms2 = [a for a in pose.mol.GetAtoms()]
 					symbols2 = [a.GetSymbol() for a in atoms2]
@@ -784,18 +781,26 @@ class HIPPO:
 							break
 					else:
 						# all atoms within tolerance --> too similar
-						# print(f'found similar: {pose}')
 						logger.warning(f'Found similar {pose=}')
 						if return_pose:
 							return pose
 						else:
 							return pose.id
 					
-					# print(f'found not similar: {pose}')
-
 		pose_id = self.db.insert_pose(
-			compound=compound, inchikey=inchikey, alias=alias, target=target, path=path, 
-			tags=tags, metadata=metadata, reference=reference, warn_duplicate=warn_duplicate, commit=commit)
+			compound=compound, 
+			inchikey=inchikey, 
+			alias=alias, 
+			target=target, 
+			path=path, 
+			tags=tags, 
+			metadata=metadata, 
+			reference=reference, 
+			warn_duplicate=warn_duplicate, 
+			commit=commit, 
+			energy_score=energy_score, 
+			distance_score=distance_score,
+		)
 		
 		if not pose_id:
 			if isinstance(path, Path):
