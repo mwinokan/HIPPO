@@ -51,9 +51,9 @@ class Pose:
 		target: str,
 		mol: Chem.Mol | bytes | None,
 		fingerprint: bytes,
-		metadata: dict | None = None,
 		energy_score: float | None = None,
 		distance_score: float | None = None,
+		metadata: dict | None = None,
 	):
 
 		self._db = db
