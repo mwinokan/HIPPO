@@ -435,6 +435,11 @@ class IngredientSet:
 	def df(self):
 		return self._data
 
+	@property
+	def db(self):
+		return self._db
+	
+
 	### METHODS
 
 	def add(self, ingredient=None, *, compound_id=None, amount=None, quote_id=None, supplier=None, max_lead_time=None):
@@ -482,10 +487,29 @@ class IngredientSet:
 		match key:
 			case int():
 				series = self.df.loc[key]
-				self.get_ingredient(series)
+				return self.get_ingredient(series)
 		
 			case _:
 				raise NotImplementedError
 
 	def __iter__(self):
 		return iter(self.get_ingredient(s) for i,s in self.df.iterrows())
+
+	def __call__(self, *, compound_id):
+
+		if compound_id:
+
+			# get the ingredient with the matching compound ID
+			matches = self.df[self.df['compound_id'] == compound_id]
+
+			if len(matches) != 1:
+
+				logger.warning(f'Multiple ingredients in set with {compound_id=}')
+				# print(matches)
+
+				return IngredientSet(self.db, [self.get_ingredient(s) for i,s in matches.iterrows()])
+
+			return self.get_ingredient(matches.iloc[0])
+
+		else:
+			raise NotImplementedError

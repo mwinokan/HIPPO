@@ -28,6 +28,13 @@ class Quote:
 			logger.warning(f'Quote is older than {quote_age} days')
 			logger.warning(self)
 
+	@property
+	def entry_str(self):
+		if self.catalogue:
+			return f'{self.supplier}:{self.catalogue}:{self.entry}'
+		else:
+			return f'{self.supplier}:{self.entry}'
+
 	def __repr__(self):
 
 		if self.purity:
@@ -35,10 +42,7 @@ class Quote:
 		else:
 			purity = ''
 
-		if self.catalogue:
-			return f'{mcol.bold}{mcol.underline}{self.supplier}:{self.catalogue}:{self.entry} {self.amount:>8}mg {purity} = {self.price:>8} {self.currency} ({self.lead_time} days) {self.smiles}{mcol.unbold}{mcol.ununderline}'
-		else:
-			return f'{mcol.bold}{mcol.underline}{self.supplier}:{self.entry} {self.amount:>8}mg @ {self.purity:.0%} = {self.price:>8} {self.currency} ({self.lead_time} days) {self.smiles}{mcol.unbold}{mcol.ununderline}'
+		return f'{mcol.bold}{mcol.underline}{self.entry_str} {self.amount:>8}mg {purity} = {self.price:>8} {self.currency} ({self.lead_time} days) {self.smiles}{mcol.unbold}{mcol.ununderline}'
 		
 	def asdict(self):
 		return asdict(self)

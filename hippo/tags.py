@@ -136,6 +136,10 @@ class TagSet(MutableSet):
 			self._elements.append(tag)
 			self._add_tag_to_db(tag, commit=commit)
 
+	def glob(self, pattern):
+		import fnmatch
+		return fnmatch.filter(self.tags, pattern)
+
 	### DUNDERS
 
 	def __contains__(self, tag):

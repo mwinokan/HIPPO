@@ -3,6 +3,7 @@
 
 from .db import Database
 from .pose import Pose
+from .cset import IngredientSet
 
 import mcol
 
@@ -489,6 +490,7 @@ class PoseSet(PoseTable):
 		sort_by: str | None = None,
 		sort_reverse: bool = False,
 		generate_pdbs: bool = False,
+		ingredients: IngredientSet = None,
 	):
 
 		"""Prepare an SDF for upload to the RHS of Fragalysis"""
@@ -504,7 +506,13 @@ class PoseSet(PoseTable):
 		# get the dataframe of poses
 
 		pose_df = self.get_df(mol=True, inspirations='fragalysis', duplicate_name='original ID', reference='name', metadata=metadata)
-		pose_df = pose_df.drop(columns=['path', 'compound', 'target', 'ref_pdb', 'original SMILES'], errors='ignore')
+		
+		drops = ['path', 'compound', 'target', 'ref_pdb', 'original SMILES']
+
+		if ingredients:
+			drops.pop(drops.index('compound'))
+		
+		pose_df = pose_df.drop(columns=drops, errors='ignore')
 
 		pose_df.rename(inplace=True, columns=
 			{'name':name_col, 
@@ -513,8 +521,50 @@ class PoseSet(PoseTable):
 			 'inspirations':'ref_mols',
 			 'reference':'ref_pdb',
 			 'smiles':'original SMILES',
+			 'compound':'compound inchikey',
 			})
 
+		extras={'smiles':'smiles', 'ref_mols':'fragment inspirations', 'original ID':'original ID'}
+
+		if ingredients:
+
+			q_entries = []
+			q_prices = []
+			q_lead_times = []
+			q_amounts = []
+
+			currency = None
+
+			for i,row in pose_df.iterrows():
+
+				compound_id = self.db.get_compound_id(inchikey=row['compound inchikey'])
+
+				ingredient = ingredients(compound_id=compound_id)
+
+				if isinstance(ingredient, IngredientSet):
+					ingredient = sorted([i for i in ingredient], key=lambda x: x.quote.price)[0]
+
+				quote = ingredient.quote
+				if not currency:
+					currency = quote.currency
+				else:
+					assert quote.currency == currency
+
+				q_entries.append(quote.entry_str)
+				q_prices.append(quote.price)
+				q_lead_times.append(quote.lead_time)
+				q_amounts.append(quote.amount)
+
+			pose_df['Supplier Catalogue Entry'] = q_entries
+			# pose_df['Supplier:Catalogue:Entry'] = q_entries
+			pose_df[f'Price ({currency})'] = q_prices
+			pose_df['Lead time (working days)'] = q_lead_times
+			pose_df['Amount (mg)'] = q_amounts
+
+			extras['Supplier Catalogue Entry'] = "Supplier Catalogue Entry string"
+			extras[f'Price ({currency})'] = "Quoted price"
+			extras['Lead time (working days)'] = "Quoted lead-time"
+			extras['Amount (mg)'] = "Quoted amount"
 
 		if generate_pdbs:
 			
@@ -557,7 +607,7 @@ class PoseSet(PoseTable):
 			submitter_name=submitter_name,
 			submitter_email=submitter_email,
 			submitter_institution=submitter_institution,
-			extras={'smiles':'smiles', 'ref_mols':'fragment inspirations', 'original ID':'original ID'},
+			extras=extras,
 			metadata=metadata,
 		)
 

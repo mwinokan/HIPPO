@@ -446,6 +446,7 @@ class Ingredient:
 
 		if isinstance(quote, int):
 			self._quote_id = quote
+			self._quote = None
 		elif quote is None:
 			self._quote_id = None
 			self._quote = None

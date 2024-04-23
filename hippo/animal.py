@@ -622,6 +622,88 @@ class HIPPO:
 
 		return base_id
 
+	def add_enamine_quote(
+		self, 
+		path: str | Path, 
+		*, 
+		orig_name_col: str = 'Diamond ID (Molecule Name)'
+	):
+
+		"""Load an Enamine quote provided as an excel file"""
+
+		df = pd.read_excel(path)
+
+		smiles_col = 'SMILES'
+		entry_col = 'Catalog ID'
+		purity_col = 'Purity, %'
+		amount_col = 'Amount, mg'
+		catalogue_col = 'Collection'
+		lead_time_col = 'Lead time'
+
+		assert smiles_col in df.columns, 'Unexpected Excel format (smiles_col)'
+		assert orig_name_col in df.columns, 'Unexpected Excel format (orig_name_col)'
+		assert entry_col in df.columns, 'Unexpected Excel format (entry_col)'
+		assert purity_col in df.columns, 'Unexpected Excel format (purity_col)'
+		assert amount_col in df.columns, 'Unexpected Excel format (amount_col)'
+		assert catalogue_col in df.columns, 'Unexpected Excel format (catalogue_col)'
+		assert 'Price, EUR' in df.columns or 'Price, USD' in df.columns, 'Unexpected Excel format (price_col)'
+		assert lead_time_col in df.columns, 'Unexpected Excel format (lead_time_col)'
+
+		price_cols = [c for c in df.columns if c.startswith('Price')]
+		assert len(price_cols) == 1
+		price_col = price_cols[0]
+		currency = price_col.split(', ')[-1]
+
+		ingredients = IngredientSet(self.db)
+	
+		for i,row in df.iterrows():
+			smiles = row.SMILES
+
+			if not isinstance(smiles, str):
+				break
+
+			compound = self.register_compound(smiles=smiles)
+
+
+			if (catalogue := row[catalogue_col]) == 'No starting material':
+				continue
+
+			if (price := row[price_col]) == 0.0:
+				continue
+
+			if not isinstance(row[lead_time_col], str):
+				continue
+
+			if 'week' in row[lead_time_col]:
+				lead_time = int(row[lead_time_col].split()[0].split('-')[-1])*5
+			else:
+				raise NotImplementedError
+
+			quote_data = dict(
+				compound=compound,
+				supplier='Enamine',
+				catalogue=catalogue,
+				entry=row[entry_col],
+				amount=row[amount_col],
+				purity=row[purity_col]/100,
+				lead_time=lead_time,
+				price=price,
+				currency=currency,
+				smiles=smiles,
+			)
+
+			q_id = self.db.insert_quote(**quote_data)
+
+			ingredients.add(
+				compound_id=compound.id,
+				amount=row[amount_col],
+				quote_id=q_id,
+				supplier='Enamine',
+				max_lead_time=None,
+			)
+
+		return ingredients
+
 	### SINGLE INSERTION
 
 	def register_compound(self, 
