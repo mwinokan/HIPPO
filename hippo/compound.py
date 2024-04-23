@@ -238,6 +238,56 @@ class Compound:
 
 		return PoseSet(self.db, [q[0] for q in pose_ids])
 
+	def get_dict(self, mol=True, reactions=False, metadata=True, count_by_target=False):
+		
+		"""Returns a dictionary representing this Compound"""
+
+		serialisable_fields = ['id','alias', 'inchikey', 'smiles', 'num_poses', 'num_reactant', 'num_reactions']
+
+		# poses
+		# reactions
+		# poses.targets
+
+		assert not reactions
+
+		data = {}
+		for key in serialisable_fields:
+			data[key] = getattr(self, key)
+
+		if mol:
+			try:
+				data['mol'] = self.mol
+			except InvalidMolError:
+				data['mol'] = None
+
+		if self.base:
+			data['base'] = self.base.name
+		else:
+			data['base'] = None
+
+		data['tags'] = self.tags
+		
+		poses = self.poses
+
+		# data['poses'] = [a if a else i for a,i in zip(poses.aliases, poses.inchikeys)]
+		# data['poses'] = self.poses.names
+		data['poses'] = poses.ids
+		
+		data['targets'] = poses.target_names
+		
+		if count_by_target:
+			target_ids = poses.target_ids
+
+			for target in self._animal.targets:
+				t_poses = poses(target=target.id) or []
+				data[f'#poses {target.name}'] = len(t_poses)
+		
+		if metadata and (metadict := self.metadata):
+			for key in metadict:
+				data[key] = metadict[key]
+
+		return data
+
 	def set_base(self, base, commit=True):
 		self._base = base
 		self.db.update(table='compound', id=self.id, key='compound_base', value=base, commit=commit)
@@ -277,7 +327,10 @@ class Compound:
 		logger.var('alias', self.alias)
 		logger.var('smiles', self.smiles)
 		logger.var('base', self.base)
-		logger.var('#poses', self.num_poses)
+		poses = self.poses
+		logger.var('#poses', len(poses))
+		if poses:
+			logger.var('targets', poses.targets)
 		logger.var('#reactions (product)', self.num_reactions)
 		logger.var('#reactions (reactant)', self.num_reactant)
 		logger.var('tags', self.tags)

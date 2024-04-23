@@ -91,6 +91,24 @@ class CompoundTable:
 		# logger.var('#poses', self.num_poses)
 		logger.var('tags', self.tags)
 
+	def draw(self):
+		return self[self.ids].draw()
+
+	def interactive(self):
+		return self[self.ids].interactive()
+
+	def get_df(self, **kwargs):
+
+		from pandas import DataFrame
+
+		data = []
+
+		for pose in self:
+			d = pose.get_dict(**kwargs)
+			data.append(d)
+
+		return DataFrame(data)
+
 	### DUNDERS
 
 	def __call__(self, *, tag=None, base=None):
@@ -297,12 +315,18 @@ class CompoundSet(CompoundTable):
 		def widget(i, name=True, summary=True, draw=True, poses=True, metadata=True):
 			comp = self[i]
 			
-			if name:
+			if name and not summary:
 				print(repr(comp))
 
-			if summary: comp.summary(metadata=False)
-			if draw: comp.draw()
-			if poses: comp.poses.draw()
+			if summary: 
+				comp.summary(metadata=False, draw=False)
+			
+			if draw: 
+				comp.draw()
+			
+			if poses and comp.poses: 
+				comp.poses.draw()
+			
 			if metadata:
 				logger.title('Metadata:')
 				pprint(comp.metadata)

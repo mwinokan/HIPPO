@@ -441,11 +441,12 @@ class Pose:
 
 		"""
 
-		serialisable_fields = ['id','name','smiles','path']
+		serialisable_fields = ['id','inchikey', 'alias', 'smiles', 'path']
 
 		data = {}
 		for key in serialisable_fields:
 			data[key] = getattr(self, key)
+
 		if duplicate_name:
 			assert isinstance(duplicate_name, str)
 			data[duplicate_name] = data['name']

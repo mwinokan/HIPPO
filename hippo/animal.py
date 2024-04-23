@@ -125,6 +125,12 @@ class HIPPO:
 		"""Returns the number of tags"""
 		return len(self.tags.unique)
 
+	@property
+	def targets(self):
+		"""Returns the targets registered in the DB"""
+		target_ids = self.db.select(table='target', query='target_id', multiple=True)
+		return [self.db.get_target(id=q) for q, in target_ids]	
+
 	### BULK INSERTION
 
 	def add_hits(self, 

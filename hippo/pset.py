@@ -38,7 +38,7 @@ class PoseTable:
 	@property
 	def names(self):
 		"""Returns the aliases of child poses"""
-		return self.aliases
+		return [p.name for p in self]
 
 	@property
 	def aliases(self):
@@ -73,6 +73,12 @@ class PoseTable:
 		# print(values)
 		return self[ids]
 
+	def get_by_target(self, *, id):
+		assert isinstance(id, int)
+		values = self.db.select_where(query='pose_id', table='pose', key='target', value=id, multiple=True)
+		ids = [v for v, in values if v]
+		return self[ids]
+
 	def get_by_metadata(self, key: str, value: str | None = None):
 		"""Get all child podrd with by their metadata. If no value is passed, then simply containing the key in the metadata dictionary is sufficient"""
 		results = self.db.select(query='pose_id, pose_metadata', table='pose', multiple=True)
@@ -96,11 +102,18 @@ class PoseTable:
 		logger.var('#poses', len(self))
 		logger.var('tags', self.tags)
 
+	def interactive(self):
+		return self[self.ids].interactive()
+
 	### DUNDERS
 
-	def __call__(self, tag=None):
+	def __call__(self, tag=None, target=None):
 		if tag:
 			return self.get_by_tag(tag)
+		elif target:
+			return self.get_by_target(id=target)
+		else:
+			raise NotImplementedError
 
 	def __getitem__(self, key) -> Pose:
 		
@@ -121,7 +134,7 @@ class PoseTable:
 				pose = self.db.get_pose(alias=key)
 				if not pose:
 					pose = self.db.get_pose(inchikey=key)
-				return pose
+				return pose				
 
 			case key if isinstance(key, list) or isinstance(key, tuple) or isinstance(key, set):
 
@@ -203,7 +216,7 @@ class PoseSet(PoseTable):
 	@property
 	def names(self):
 		"""Returns the aliases of poses in this set"""
-		return self.aliases
+		return [p.name for p in self]
 
 	@property
 	def aliases(self):
@@ -269,6 +282,26 @@ class PoseSet(PoseTable):
 				sets.append(insp_ids)
 		return sets
 
+	@property
+	def str_ids(self):
+		return str(tuple(self.ids)).replace(',)',')')
+
+	@property
+	def targets(self):
+		"""Returns the targets of poses in this set"""
+		return [self.db.get_target(id=q) for q in self.target_ids]
+
+	@property
+	def target_names(self):
+		"""Returns the targets of poses in this set"""
+		return [self.db.get_target_name(id=q) for q in self.target_ids]
+
+	@property
+	def target_ids(self):
+		"""Returns the target ID's of poses in this set"""
+		result = self.db.select_where(table=self.table, query='DISTINCT pose_target', key=f'pose_id in {self.str_ids}', multiple=True)
+		return [q for q, in result]
+
 	### FILTERING
 
 	def get_by_tag(self, tag, inverse=False):
@@ -323,7 +356,7 @@ class PoseSet(PoseTable):
 		for pose in self:
 			d = pose.get_dict(**kwargs)
 
-			if not d['mol']:
+			if skip_no_mol and not d['mol']:
 				logger.warning(f'Skipping pose with no mol: {d["id"]} {d["name"]}')
 				continue
 			data.append(d)
@@ -336,6 +369,14 @@ class PoseSet(PoseTable):
 		if not values:
 			return None
 		return PoseSet(self.db, [v for v, in values])
+
+	def get_by_target(self, *, id):
+		assert isinstance(id, int)
+		values = self.db.select_where(query='pose_id', table='pose', key=f'pose_target is {id} AND pose_id in {self.str_ids}', multiple=True, none='quiet')
+		ids = [v for v, in values if v]
+		if not ids:
+			return None
+		return PoseSet(self.db, ids)
 
 	def filter(self, function, inverse=False):
 		"""Filter this poseset by selecting members where function(pose) is truthy"""
@@ -731,3 +772,4 @@ class PoseSet(PoseTable):
 
 			case _:
 				raise NotImplementedError
+
