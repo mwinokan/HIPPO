@@ -2,7 +2,7 @@
 import pandas as pd
 # import numpy as np
 
-from .cset import CompoundTable
+from .cset import CompoundTable, IngredientSet
 from .pset import PoseTable, PoseSet
 from .tags import TagTable
 from .rset import ReactionTable
