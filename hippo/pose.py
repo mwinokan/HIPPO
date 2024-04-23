@@ -208,6 +208,10 @@ class Pose:
 				elif len(mol_path) == 0:
 				
 					lig_residues = sys['rLIG']
+
+					if not lig_residues:
+						lig_residues = [r for r in sys.residues if r.type == 'LIG']
+
 					if len(lig_residues) > 1:
 						logger.warning(f'Multiple ligands in PDB {self}')
 

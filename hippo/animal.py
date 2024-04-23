@@ -21,6 +21,8 @@ from .tools import inchikey_from_smiles, sanitise_smiles, SanitisationError
 from mlog import setup_logger
 logger = setup_logger('HIPPO')
 
+from rdkit.Chem import Mol
+
 class HIPPO:
 
 	"""The HIPPO 'animal' class. Instantiating a HIPPO object will create or link a HIPPO database.
@@ -736,7 +738,66 @@ class HIPPO:
 		warn_duplicate: bool = True,
 		check_RMSD: bool = False,
 		RMSD_tolerance: float = 1.0,
+		split_PDB: bool = False,
+		template_mol: str | Mol | None = None,
 	) -> Pose:
+
+		from molparse import parse
+
+		if split_PDB:
+
+			sys = parse(path, verbosity=False, alternative_site_warnings=False)
+
+			lig_residues = []
+
+			for res in sys.ligand_residues:
+				lig_residues += res.split_by_site()
+			
+			if len(lig_residues) > 1:
+
+				assert not energy_score
+				assert not distance_score
+
+				logger.warning(f'Splitting ligands in PDB: {path}')
+
+				results = []
+				for i,res in enumerate(lig_residues):
+					file = str(path).replace('.pdb',f'_hippo_{i}.pdb')
+
+					split_sys = sys.protein_system
+
+					for atom in res.atoms:
+						split_sys.add_atom(atom)
+
+					logger.writing(file)
+					split_sys.write(file, verbosity=False)
+
+					result = self.register_pose(
+						compound = compound,
+						target = target,
+						path = file,
+						inchikey = inchikey,
+						alias = alias,
+						reference = reference,
+						tags = tags,
+						metadata = metadata,
+						inspirations = inspirations,
+						return_pose = return_pose,
+						commit = commit,
+						overwrite_metadata = overwrite_metadata,
+						warn_duplicate = warn_duplicate,
+						check_RMSD = check_RMSD,
+						RMSD_tolerance = RMSD_tolerance,
+						split_PDB = False,
+						template_mol = template_mol,
+					)
+
+					results.append(result)
+
+				return results
+
+		if template_mol:
+			raise NotImplementedError
 
 		if isinstance(compound, int):
 			compound_id = compound
