@@ -441,7 +441,7 @@ class Pose:
 
 		"""
 
-		serialisable_fields = ['id','inchikey', 'alias', 'smiles', 'path']
+		serialisable_fields = ['id','inchikey', 'alias', 'name', 'smiles', 'path']
 
 		data = {}
 		for key in serialisable_fields:

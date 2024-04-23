@@ -746,7 +746,10 @@ class HIPPO:
 		RMSD_tolerance: float = 1.0,
 		split_PDB: bool = False,
 		template_mol: str | Mol | None = None,
+		duplicate_alias: str = 'modify',
 	) -> Pose:
+
+		assert duplicate_alias in ['error', 'modify']
 
 		from molparse import parse
 
@@ -852,8 +855,8 @@ class HIPPO:
 							return pose
 						else:
 							return pose.id
-					
-		pose_id = self.db.insert_pose(
+
+		pose_data = dict(
 			compound=compound, 
 			inchikey=inchikey, 
 			alias=alias, 
@@ -867,11 +870,40 @@ class HIPPO:
 			energy_score=energy_score, 
 			distance_score=distance_score,
 		)
+					
+		pose_id = self.db.insert_pose(**pose_data)
 		
 		if not pose_id:
+			
+			# constraint failed
 			if isinstance(path, Path):
 				path = path.resolve()
-			pose_id, = self.db.select_where(table='pose', query='pose_id', key='path', value=str(path))
+
+			# try getting by path
+			result = self.db.select_where(table='pose', query='pose_id', key='path', value=str(path), none='quiet')
+
+			# try getting by alias
+			if not result:
+				result = self.db.select_where(table='pose', query='pose_id', key='alias', value=alias)
+
+				if result and duplicate_alias == 'error':
+					raise Exception('could not register pose with existing alias')
+
+				elif result and duplicate_alias == 'modify':
+
+					new_alias = alias + '_copy'
+
+					logger.warning(f'Modifying alias={alias} --> {new_alias}')
+
+					pose_data['alias'] = new_alias
+					pose_id = self.db.insert_pose(**pose_data)
+
+				else:
+					pose_id, = result
+			else:
+				pose_id, = result
+
+			assert pose_id
 
 		if not pose_id:
 			logger.var('compound', compound)

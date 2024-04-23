@@ -532,7 +532,10 @@ class Database:
 		except sqlite3.IntegrityError as e:
 			if 'UNIQUE constraint failed: pose.pose_path' in str(e):
 				if warn_duplicate:
-					logger.warning(f"Skipping pose with existing path \"{path}\"")
+					logger.warning(f"Could not insert pose with duplicate path \"{path}\"")
+			elif 'UNIQUE constraint failed: pose.pose_alias' in str(e):
+				if warn_duplicate:
+					logger.warning(f"Could not insert pose with duplicate alias \"{alias}\"")
 			else:
 				logger.exception(e)
 			return None
