@@ -902,6 +902,9 @@ class HIPPO:
 
 	def plot_tag_statistics(self, *args, **kwargs):
 		"""Plot an overview of the number of compounds and poses for each tag"""
+		if not self.num_tags:
+			logger.error('No tagged compounds or poses')
+			return
 		from .plotting import plot_tag_statistics
 		return plot_tag_statistics(self, *args, **kwargs)
 
