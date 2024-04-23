@@ -588,7 +588,7 @@ def plot_compound_property(animal, prop, compounds=None, style='bar', null=None)
 	return fig
 
 @hippo_graph
-def plot_pose_property(animal, prop, poses=None, style='scatter', null=None, color=None, log_y=False):
+def plot_pose_property(animal, prop, poses=None, style='scatter', title=None, null=None, color=None, log_y=False):
 
 	"""
 	Get an arbitrary property from all the poses in animal.poses
@@ -598,74 +598,99 @@ def plot_pose_property(animal, prop, poses=None, style='scatter', null=None, col
 
 	"""
 
-	if not poses:
-		poses = animal.poses
+	# fetch these directly from the database
+	if prop in ['energy_score', 'distance_score']:
 
-	if prop == 'tags':
-
-		plot_data = []
-
-		for tag in poses.tags:
-
-			num_poses = len(poses.get_by_tag(tag=tag))
-			data = dict(tag=tag, number=num_poses)
-			plot_data.append(data)
-			
-		fig = px.bar(plot_data, x='tag', y='number', color=color, log_y=log_y)
-
-		title = 'Tag Statistics'
+		p = prop
 		
-		fig.update_layout(title=title,title_automargin=False, title_yref='container', barmode='group')
-
-		fig.update_layout(xaxis_title='Tag', yaxis_title='#')
-
-		return fig
-
-	if not isinstance(prop, list):
-		prop = [prop]
-
-	plot_data = []
-
-	if len(poses) > 1000:
-		poses = tqdm(poses)
-
-	for pose in poses:
-
-		# if minimal_hover:
-		# data = dict(id=pose.id, name=pose.name)
-		if len(prop) > 1:
-			data = dict(id=pose.id)
+		if not poses:
+			# great all poses!
+			poses = animal.poses
+			n_poses = len(poses)
+			logger.out(f'Querying database for {n_poses} poses...')
+			field = f'pose_{p}'
+			title = f'{p} of all poses'
+			query = animal.db.select_where(table='pose', query=field, key=f'{field} is not NULL', multiple=True)
+			
 		else:
-			data = {}
-		# else:
-			# data = pose.dict
 
-		for p in prop:
+			# subset of poses
+			n_poses = len(poses)
+			logger.out(f'Querying database for {n_poses} poses...')
+			field = f'pose_{p}'
+			title = f'{p} of pose subset'
+			query = animal.db.select_where(table='pose', query=field, key=f'{field} is not NULL and pose_id in {poses.str_ids}', multiple=True)
+			
+		plot_data = [{p:v} for v, in query]
 
-			# has attr
+		if p == 'energy_score':
+			subtitle = f'#poses={n_poses}, energy_score < 0 = {len([None for d in plot_data if d[p] < 0])/n_poses:.1%}'
+		elif p == 'distance_score':
+			subtitle = f'#poses={n_poses}, distance_score < 2 = {len([None for d in plot_data if d[p] < 2])/n_poses:.1%}'
+		else:
+			subtitle = f'#poses={n_poses}'
 
-			if p not in data:
+		prop = [prop]
+	
+	else:
 
-				# get attr
-				if hasattr(pose,p):
-					v = getattr(pose,p)
-					
-				elif p in (m := pose.metadata):
-					
-					v = m[p]
+		if not poses:
+			poses = animal.poses
+
+		if prop == 'tags':
+
+			plot_data = []
+	
+			for tag in poses.tags:
+	
+				num_poses = len(poses.get_by_tag(tag=tag))
+				data = dict(tag=tag, number=num_poses)
+				plot_data.append(data)
 				
-				else:
-					v = null
+			fig = px.bar(plot_data, x='tag', y='number', color=color, log_y=log_y)
+	
+			title = 'Tag Statistics'
+			
+			fig.update_layout(title=title,title_automargin=False, title_yref='container', barmode='group')
+	
+			fig.update_layout(xaxis_title='Tag', yaxis_title='#')
+	
+			return fig
 
-				data[p] = v
-
-		plot_data.append(data)
+		if not isinstance(prop, list):
+			prop = [prop]
+	
+		plot_data = []
+		if len(poses) > 1000:
+			poses = tqdm(poses)
+	
+		for pose in poses:
+			if len(prop) > 1:
+				data = dict(id=pose.id)
+			else:
+				data = {}
+	
+			for p in prop:
+				if p not in data:
+					# get attr
+					if hasattr(pose,p):
+						v = getattr(pose,p)
+		
+					elif p in (m := pose.metadata):				
+						v = m[p]
+					
+					else:
+						v = null
+	
+					data[p] = v
+	
+			plot_data.append(data)
 
 	hover_data = ['id'] #, 'alias', 'inchikey'] #, 'tags', 'inspirations']
 
 	if len(prop) == 1:
 
-		title = f'Pose {prop[0]}'
+		title = title or f'Pose {prop[0]}'
 
 		fig = px.histogram(plot_data, x=prop[0], hover_data=None, color=color)
 		
@@ -688,13 +713,16 @@ def plot_pose_property(animal, prop, poses=None, style='scatter', null=None, col
 			func = eval(f'px.{style}')
 			fig = func(plot_data, x=prop[0], y=prop[1], color=color, hover_data=hover_data)
 
-		title = f'Pose {prop[0]} vs {prop[1]}'
+		title = title or f'Pose {prop[0]} vs {prop[1]}'
 		fig.update_layout(xaxis_title=prop[0], yaxis_title=prop[1])
 
 	else:
 		mout.error('Unsupported', code='plotting.plot_pose_property.1')
 
-	title = f'<b>{animal.name}</b>: {title}<br>'
+	if subtitle:
+		title = f'<b>{animal.name}</b>: {title}<br><sup><i>{subtitle}</i></sup>'
+	else:
+		title = f'<b>{animal.name}</b>: {title}<br>'
 
 	fig.update_layout(title=title,title_automargin=False, title_yref='container', barmode='group')
 
