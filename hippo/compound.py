@@ -37,10 +37,12 @@ class Compound:
 		self._alias = alias
 		self._smiles = smiles
 		self._animal = animal
-		self._base = base
+		self._base_id = base
+		self._base = None
 		self._alias = alias
 		self._tags = None
 		self._table = 'compound'
+		self._num_heavy_atoms = None
 
 		self._metadata = metadata
 		
@@ -96,6 +98,21 @@ class Compound:
 		return self._mol
 
 	@property
+	def num_heavy_atoms(self):
+		"""Get the number of heavy atoms"""
+		if self._num_heavy_atoms is None:
+			self._num_heavy_atoms = self.db.get_compound_computed_property('num_heavy_atoms', self.id)
+		return self._num_heavy_atoms
+
+	@property
+	def num_atoms_added(self):
+		"""Calculate the number of atoms added relative to the base compound"""
+		assert (b_id := self._base_id), f'{self} has no base defined'
+		n_e = self.num_heavy_atoms
+		n_b = self.db.get_compound_computed_property('num_heavy_atoms', b_id)
+		return n_e - n_b
+	
+	@property
 	def metadata(self) -> dict:
 		"""Returns the compound's metadata dict"""
 		if self._metadata is None:
@@ -137,8 +154,8 @@ class Compound:
 	@property
 	def base(self):
 		"""Returns the base compound for this elaboration"""
-		if isinstance(self._base, int):
-			self._base = self.db.get_compound(id=self._base)
+		if self._base_id and self._base is None:
+			self._base = self.db.get_compound(id=self._base_id)
 		return self._base
 
 	@base.setter
@@ -289,7 +306,10 @@ class Compound:
 		return data
 
 	def set_base(self, base, commit=True):
-		self._base = base
+		if not isinstance(base, int):
+			assert base._table == 'compound'
+			base = base.id
+		self._base_id = base
 		self.db.update(table='compound', id=self.id, key='compound_base', value=base, commit=commit)
 
 	def as_ingredient(self, amount, max_lead_time=None, supplier=None):

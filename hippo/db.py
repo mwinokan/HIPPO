@@ -988,13 +988,19 @@ class Database:
 		elif smiles:
 			entry = self.select_id_where(table=table, key='smiles', value=smiles)
 
-		elif similar:
+		else:
 			raise NotImplementedError
 
 		if entry:
 			return entry[0]
 
 		return None
+
+	def get_compound_computed_property(self, prop, compound_id):
+		"""Use chemicalite to calculate a property from the stored binary molecule"""
+		function = CHEMICALITE_COMPOUND_PROPERTY_MAP[prop]
+		val, = self.select_where(query=f'{function}(compound_mol)', table='compound', key='id', value=compound_id, multiple=False)
+		return val
 
 	def get_pose(self,
 		*,
@@ -1314,3 +1320,7 @@ class Database:
 		pprint(self.cursor.fetchall())
 
 	### DUNDERS
+
+CHEMICALITE_COMPOUND_PROPERTY_MAP = {
+	'num_heavy_atoms':'mol_num_hvyatms',
+}
