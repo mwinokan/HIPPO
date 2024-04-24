@@ -974,8 +974,6 @@ class Database:
 		inchikey: str | None = None, 
 		alias: str | None = None, 
 		smiles: str | None = None, 
-		similar: str | Compound | int | None = None, 
-		threshold: float = 1.0,
 	) -> int:
 		"""Get a compound ID"""
 
