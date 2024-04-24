@@ -171,8 +171,22 @@ class Compound:
 	@property
 	def dict(self) -> dict:
 		"""Returns a dictionary of this compound"""
+		return self.get_dict()
+
+	@property
+	def table(self):
+		return self._table
+	
+	
+	### METHODS
+
+	def get_dict(self, mol=False):
+		"""Returns a dictionary of this compound"""
 
 		serialisable_fields = ['id','inchikey','alias','smiles']
+
+		if mol:
+			serialisable_fields.append('mol')
 
 		data = {}
 		for key in serialisable_fields:
@@ -187,12 +201,6 @@ class Compound:
 
 		return data
 
-	@property
-	def table(self):
-		return self._table
-	
-	
-	### METHODS
 
 	def get_tags(self) -> set:
 		tags = self.db.select_where(query='tag_name', table='tag', key='compound', value=self.id, multiple=True, none='quiet')
