@@ -506,6 +506,10 @@ class Ingredient:
 		return self._amount
 
 	@property
+	def id(self):
+		return self._compound_id
+
+	@property
 	def compound_id(self):
 		"""Returns the ID of the associated compound"""
 		return self._compound_id
@@ -529,13 +533,14 @@ class Ingredient:
 	def amount(self, a):
 		"""Set the amount and update quotes"""
 
-		quote = self.get_quotes(
-			pick_cheapest=True, 
+		quote_id = self.get_cheapest_quote_id( 
 			min_amount=a, 
 			max_lead_time=self._max_lead_time, 
 			supplier=self._supplier,
 			none='quiet',
 		)
+
+		self._quote_id = quote_id 
 		
 		self._amount = a
 
@@ -552,6 +557,24 @@ class Ingredient:
 		if not self._quote and (q_id := self.quote_id):
 			self._quote = self.db.get_quote(id=self.quote_id)
 		return self._quote
+
+	### METHODS
+
+	def get_cheapest_quote_id(self, min_amount=None, supplier=None, max_lead_time=None, none='quiet') -> list[dict]:
+		"""Query quotes associated to this ingredient"""
+
+		supplier_str = f' AND quote_supplier IS "{supplier}"' if supplier else ""
+		lead_time_str = f' AND quote_lead_time <= {max_lead_time}' if max_lead_time else ""
+		key_str = f'quote_compound IS {self.compound_id} AND quote_amount >= {min_amount}{supplier_str}{lead_time_str} ORDER BY quote_price'
+
+		result = self.db.select_where(query='quote_id', table='quote', key=key_str, multiple=False, none=none)
+
+		if result:
+			quote_id, = result
+			return quote_id
+		
+		else:
+			return None
 
 	### DUNDERS
 

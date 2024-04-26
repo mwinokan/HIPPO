@@ -42,7 +42,7 @@ class CompoundTable:
 		"""Returns the names of child compounds"""
 		result = self.db.select(table=self.table, query='compound_name', multiple=True)
 		return [q for q, in result]
-
+	
 	@property
 	def ids(self):
 		"""Returns the IDs of child compounds"""
@@ -173,7 +173,7 @@ class CompoundTable:
 		return None
 
 	def __repr__(self) -> str:
-		return f'{mcol.bold}{mcol.underline}set(C x {len(self)}){mcol.unbold}{mcol.ununderline}'
+		return f'{mcol.bold}{mcol.underline}''{'f'C x {len(self)}''}'f'{mcol.unbold}{mcol.ununderline}'
 
 	def __len__(self) -> int:
 		return self.db.count(self.table)
@@ -219,12 +219,20 @@ class CompoundSet(CompoundTable):
 	@property
 	def names(self):
 		"""Returns the aliases of compounds in this set"""
-		return [self.db.select_where(table=self.table, query='compound_alias', key='id', value=i, multiple=False)[0] for i in self.indices]
+		result = self.db.select_where(query='compound_alias', table='compound', key=f'compound_id in {tuple(self.ids)}', multiple=True)
+		return [q for q, in result]
 
+	@property
+	def smiles(self) -> list:
+		"""Returns the smiles of child compounds"""
+		result = self.db.select_where(query='compound_smiles', table='compound', key=f'compound_id in {tuple(self.ids)}', multiple=True)
+		return [q for q, in result]
+	
 	@property
 	def inchikeys(self):
 		"""Returns the inchikeys of compounds in this set"""
-		return [self.db.select_where(table=self.table, query='compound_inchikey', key='id', value=i, multiple=False)[0] for i in self.indices]
+		result = self.db.select_where(query='compound_inchikey', table='compound', key=f'compound_id in {tuple(self.ids)}', multiple=True)
+		return [q for q, in result]
 
 	@property
 	def tags(self):
@@ -338,6 +346,15 @@ class CompoundSet(CompoundTable):
 
 	### OTHER METHODS
 
+	def add(self, compound):
+		"""Add a compound to this set"""
+		if isinstance(compound, Compound):
+			compound = compound.id
+
+		if compound not in self.ids:
+			from bisect import insort
+			insort(self.ids, compound)
+	
 	def get_recipe(self, 
 		amount: float = 1, 
 		simplify_network: bool = True,
@@ -351,44 +368,40 @@ class CompoundSet(CompoundTable):
 		if not hasattr(amount, '__iter__'):
 			amount = [amount] * n_comps
 
-		products = []
-		reactants = []
-		reactions = []
-		intermediates = []
+		from .cset import IngredientSet
+		from .rset import ReactionSet
+		
+		products = IngredientSet(self.db)
+		reactants = IngredientSet(self.db)
+		intermediates = IngredientSet(self.db)
+		reactions = ReactionSet(self.db)
 
 		for comp, a in zip(self, amount):
 
 			reax = comp.reactions
 
 			assert len(reax) == 1
+			# logger.warning(f'Picking first reaction for {comp} from {reax}')
 
 			recipe = reax[0].get_recipe(a)
 
-			products.append(comp.as_ingredient(amount=a))
+			products.add(comp.as_ingredient(amount=a))
 
-			for reactant in recipe.reactants:
-				matches = [r for r in reactants if r.id == reactant.id]
-				if matches:
-					matches[0].amount += reactant.amount
-				else:
-					reactants.append(reactant) 
+			intermediates += recipe.intermediates
+			
+			reactants += recipe.reactants
 
-			for reaction in recipe.reactions:
-				matches = [r for r in reactions if r.id == reaction.id]
-				if not matches:
-					reactions.append(reaction) 
-
-			for intermediate in recipe.intermediates:
-				matches = [r for r in intermediates if r.id == intermediate.id]
-				if not matches:
-					intermediates.append(intermediate) 
-
+			reactions += recipe.reactions
+			
 		return Recipe(products=products, reactants=reactants, reactions=reactions, intermediates=intermediates)
 
+	def copy(self):
+		return CompoundSet(self.db, self.ids)
+	
 	### DUNDERS
 
-	def __repr__(self) -> str:
-		return f'{mcol.bold}{mcol.underline}subset(C x {len(self)}){mcol.unbold}{mcol.ununderline}'
+	# def __repr__(self) -> str:
+		# return f'{mcol.bold}{mcol.underline}''{'f'C x {len(self)}''}'f'{mcol.unbold}{mcol.ununderline}'
 
 	def __len__(self) -> int:
 		return len(self.indices)
@@ -397,12 +410,56 @@ class CompoundSet(CompoundTable):
 		return iter(self.db.get_compound(table=self.table, id=i) for i in self.indices)
 
 	def __getitem__(self, key) -> Compound:
-		try:
-			index = self.indices[key]
-		except IndexError:
-			logger.exception(f'list index out of range: {key=} for {self}')
-			raise
-		return self.db.get_compound(table=self.table, id=index)
+		match key:
+			case int():
+				index = self.indices[key]
+				return self.db.get_compound(table=self.table, id=index)
+			
+			case slice():
+				indices = self.indices[key]
+				return	CompoundSet(self.db, indices)
+
+			case _:
+				raise NotImplementedError	
+
+	def __sub__(self, other):
+
+		match other:
+		
+			case CompoundSet():
+				ids = set(self.ids) - set(other.ids)
+				return CompoundSet(self.db, ids)
+				
+			case _:
+				raise NotImplementedError
+
+	def __add__(self, other):
+
+		match other:
+
+			case Compound():
+				return self.add(other)
+
+			case int():
+				return self.add(other)
+		
+			case CompoundSet():
+				ids = set(self.ids) | set(other.ids)
+				return CompoundSet(self.db, ids)
+				
+			case _:
+				raise NotImplementedError
+
+	def __xor__(self, other):
+
+		match other:
+		
+			case CompoundSet():
+				ids = set(self.ids) ^ set(other.ids)
+				return CompoundSet(self.db, ids)
+				
+			case _:
+				raise NotImplementedError
 
 class IngredientSet:
 
@@ -458,7 +515,12 @@ class IngredientSet:
 			assert id
 			assert amount
 
-		self._data = concat([self._data, DataFrame([dict(compound_id=compound_id, amount=amount, quote_id=quote_id, supplier=supplier, max_lead_time=max_lead_time)])], ignore_index=True)
+		addition = DataFrame([dict(compound_id=compound_id, amount=amount, quote_id=quote_id, supplier=supplier, max_lead_time=max_lead_time)])
+
+		if self._data.empty:
+			self._data = addition
+		else:
+			self._data = concat([self._data, addition], ignore_index=True)
 
 	def get_ingredient(self, series):
 		return Ingredient(
@@ -479,8 +541,14 @@ class IngredientSet:
 		return f'{mcol.bold}{mcol.underline}''{'f'I x {len(self)}''}'f'{mcol.unbold}{mcol.ununderline}'
 
 	def __add__(self, other):
-		for id, amount in other._data.items():
-			self.add(id=id, amount=amount)
+		for i,row in other._data.iterrows():
+			self.add(
+				compound_id=row.compound_id,
+				amount=row.amount,
+				quote_id=row.quote_id,
+				supplier=row.supplier,
+				max_lead_time=row.max_lead_time,
+			)
 		return self
 
 	def __getitem__(self, key):

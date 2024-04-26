@@ -696,7 +696,7 @@ class Database:
 
 	def insert_quote(self,
 		*,
-		compound: Compound,
+		compound: Compound | int,
 		supplier: str,
 		catalogue: str,
 		entry: str,
@@ -706,10 +706,14 @@ class Database:
 		purity: float,
 		lead_time: int,
 		smiles: str | None = None,
+		commit: bool = True,
 	) -> int | None:
 		"""Insert a quote"""
 
-		assert isinstance(compound, Compound), f'incompatible {compound=}'
+		if not isinstance(compound, int):
+			assert isinstance(compound, Compound), f'incompatible {compound=}'
+			compound = compound.id
+			
 		assert currency in ['GBP', 'EUR', 'USD'], f'incompatible {currency=}'
 
 		smiles = smiles or ""
@@ -732,11 +736,11 @@ class Database:
 		"""
 
 		try:
-			self.execute(sql, (smiles, amount, supplier, catalogue, entry, lead_time, price, currency, purity, compound.id))
+			self.execute(sql, (smiles, amount, supplier, catalogue, entry, lead_time, price, currency, purity, compound))
 
 		except sqlite3.InterfaceError as e:
 			logger.error(e)
-			logger.debug((smiles, amount, supplier, catalogue, entry, lead_time, price, currency, purity, compound.id))
+			logger.debug((smiles, amount, supplier, catalogue, entry, lead_time, price, currency, purity, compound))
 			raise
 
 		except Exception as e:
@@ -744,7 +748,8 @@ class Database:
 			return None
 			
 		quote_id = self.cursor.lastrowid
-		self.commit()
+		if commit:
+			self.commit()
 		return quote_id
 
 	def insert_target(self,

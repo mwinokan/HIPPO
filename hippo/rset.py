@@ -107,13 +107,12 @@ class ReactionSet(ReactionTable):
 
 	def add(self, r):
 		assert r._table == 'reaction'
-		if (id := r.id) in self._indices:
+		if (id := r.id) not in self._indices:
 			self._indices.append(id)
 	
 	### DUNDERS
 
 	def __repr__(self) -> str:
-		# return f'{mcol.bold}{mcol.underline}subset(R x {len(self)}){mcol.unbold}{mcol.ununderline}'
 		return f'{mcol.bold}{mcol.underline}''{'f'R x {len(self)}''}'f'{mcol.unbold}{mcol.ununderline}'
 
 	def __len__(self) -> int:

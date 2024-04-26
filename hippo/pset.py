@@ -464,7 +464,7 @@ class PoseSet(PoseTable):
 
 		from pathlib import Path
 
-		df = self.get_df(mol=True)
+		df = self.get_df(mol=True, inspirations='fragalysis')
 
 		df.rename(inplace=True, columns={name_col:'_Name', 'mol':'ROMol'})
 

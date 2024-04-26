@@ -461,6 +461,7 @@ class HIPPO:
 		base_only: bool = False,
 		tags: None | list = None,
 		reaction_yield_map: dict | None = None,
+		require_truthy=['path_to_mol', 'intra_geometry_pass'],
 	):
 
 		tags = tags or []
@@ -491,8 +492,8 @@ class HIPPO:
 
 			path_to_mol = row.path_to_mol
 
-			# skip pose-less entries
-			if not path_to_mol:
+			# skip entries that have non-truthy columns from require_truthy
+			if any(not row[key] for key in require_truthy):
 				continue
 			
 			path_to_mol = path_to_mol.replace('//','/')
@@ -1048,6 +1049,16 @@ class HIPPO:
 		from .plotting import plot_residue_interactions
 		return plot_residue_interactions(self, poses=poses, residue_number=residue_number, **kwargs)
 
+	def plot_compound_availability(self, compounds=None, **kwargs):
+		"""Plot a bar chart of compound availability by supplier/catalogue"""
+		from .plotting import plot_compound_availability
+		plot_compound_availability(self, compound=compounds, **kwargs)
+
+	def plot_compound_price(self, min_amount, compounds=None, **kwargs):
+		"""Plot a bar chart of minimum compound price for a given minimum amount"""
+		from .plotting import plot_compound_price
+		plot_compound_price(self, min_amount=min_amount, compound=compounds, **kwargs)
+	
 	### OTHER
 
 	def summary(self):

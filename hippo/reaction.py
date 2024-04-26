@@ -174,9 +174,14 @@ class Reaction:
 	):
 		"""Get a :class:`.Recipe` describing how to make the product"""
 
-		products = [self.product.as_ingredient(amount=amount)]
+		from .cset import IngredientSet
+		from .rset import ReactionSet
+		
+		products = IngredientSet(self.db, [self.product.as_ingredient(amount=amount)])
 
 		reactants, reactions, intermediates = self.get_ingredients(amount=amount, return_reactions=True, return_intermediates=True, debug=debug)
+		
+		reactions = ReactionSet(self.db, [self.id]) + reactions
 
 		recipe = Recipe(products=products, reactants=reactants, reactions=reactions, intermediates=intermediates)
 		

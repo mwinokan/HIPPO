@@ -33,6 +33,9 @@ def hippo_graph(func):
 
 		fig = func(animal, *args, **kwargs)
 
+		if not isinstance(fig, go.Figure):
+			return fig
+
 		if wrapper_kwargs['show']:
 				fig.show()
 
@@ -588,7 +591,7 @@ def plot_compound_property(animal, prop, compounds=None, style='bar', null=None)
 	return fig
 
 @hippo_graph
-def plot_pose_property(animal, prop, poses=None, style='scatter', title=None, null=None, color=None, log_y=False):
+def plot_pose_property(animal, prop, poses=None, style='scatter', title=None, null=None, color=None, log_y=False, subtitle=None, data_only=False, **kwargs):
 
 	"""
 	Get an arbitrary property from all the poses in animal.poses
@@ -624,13 +627,63 @@ def plot_pose_property(animal, prop, poses=None, style='scatter', title=None, nu
 		plot_data = [{p:v} for v, in query]
 
 		if p == 'energy_score':
-			subtitle = f'#poses={n_poses}, energy_score < 0 = {len([None for d in plot_data if d[p] < 0])/n_poses:.1%}'
+			subtitle = subtitle or f'#poses={n_poses}, energy_score < 0 = {len([None for d in plot_data if d[p] < 0])/n_poses:.1%}'
 		elif p == 'distance_score':
-			subtitle = f'#poses={n_poses}, distance_score < 2 = {len([None for d in plot_data if d[p] < 2])/n_poses:.1%}'
+			subtitle = subtitle or f'#poses={n_poses}, distance_score < 2 = {len([None for d in plot_data if d[p] < 2])/n_poses:.1%}'
 		else:
-			subtitle = f'#poses={n_poses}'
+			subtitle = subtitle or f'#poses={n_poses}'
 
 		prop = [prop]
+
+	elif prop == ['energy_score', 'distance_score'] or prop == ['distance_score', 'energy_score']:
+		
+		query = f'pose_id, pose_distance_score, pose_energy_score'
+		
+		if not poses:
+			# great all poses!
+			poses = animal.poses
+			n_poses = len(poses)
+			logger.out(f'Querying database for {n_poses} poses...')
+			title = f'distance & energy scores of all poses'
+			query = animal.db.select(table='pose', query=query, multiple=True)
+			
+		else:
+
+			# subset of poses
+			n_poses = len(poses)
+			logger.out(f'Querying database for {n_poses} poses...')
+			title = f'distance & energy scores of pose subset'
+			query = animal.db.select_where(table='pose', query=query, key=f'pose_id in {poses.str_ids}', multiple=True)
+			
+		plot_data = [{'id':id, 'distance_score':v1, 'energy_score':v2 } for id,v1,v2 in query]
+		
+		subtitle = subtitle or f'#poses={n_poses}'
+
+	# elif prop == ['num_atoms_added', 'energy_score'] or prop == ['num_atoms_added', 'energy_score']:
+	# 	logger.error('Use animal.plot_pose_risk_vs_placement')
+	# 	raise NotImplementedError
+		
+	# 	query = f'pose_id, , pose_distance_score, pose_energy_score'
+		
+	# 	if not poses:
+	# 		# great all poses!
+	# 		poses = animal.poses
+	# 		n_poses = len(poses)
+	# 		logger.out(f'Querying database for {n_poses} poses...')
+	# 		title = f'distance & energy scores of all poses'
+	# 		query = animal.db.select(table='pose', query=query, multiple=True)
+			
+	# 	else:
+
+	# 		# subset of poses
+	# 		n_poses = len(poses)
+	# 		logger.out(f'Querying database for {n_poses} poses...')
+	# 		title = f'distance & energy scores of pose subset'
+	# 		query = animal.db.select_where(table='pose', query=query, key=f'pose_id in {poses.str_ids}', multiple=True)
+			
+	# 	plot_data = [{'id':id, 'distance_score':v1, 'energy_score':v2 } for id,v1,v2 in query]
+		
+	# 	subtitle = f'#poses={n_poses}'
 	
 	else:
 
@@ -683,16 +736,33 @@ def plot_pose_property(animal, prop, poses=None, style='scatter', title=None, nu
 						v = null
 	
 					data[p] = v
+
+			if color:
+				if color not in data:
+					# get attr
+					if hasattr(pose,color):
+						v = getattr(pose,color)
+		
+					elif color in (m := pose.metadata):				
+						v = m[color]
+					
+					else:
+						v = null
+	
+					data[color] = v
 	
 			plot_data.append(data)
 
+	if data_only:
+		return plot_data
+	
 	hover_data = ['id'] #, 'alias', 'inchikey'] #, 'tags', 'inspirations']
 
 	if len(prop) == 1:
 
 		title = title or f'Pose {prop[0]}'
 
-		fig = px.histogram(plot_data, x=prop[0], hover_data=None, color=color)
+		fig = px.histogram(plot_data, x=prop[0], hover_data=None, color=color, **kwargs)
 		
 		fig.update_layout(xaxis_title=prop[0], yaxis_title='Quantity')
 
@@ -703,7 +773,7 @@ def plot_pose_property(animal, prop, poses=None, style='scatter', title=None, nu
 			x = [d[prop[0]] for d in plot_data]
 			y = [d[prop[1]] for d in plot_data]
 
-			fig = go.Figure(go.Histogram2d(x=x, y=y))
+			fig = go.Figure(go.Histogram2d(x=x, y=y, **kwargs))
 
 		else:
 			
@@ -711,7 +781,7 @@ def plot_pose_property(animal, prop, poses=None, style='scatter', title=None, nu
 				style='scatter'
 			
 			func = eval(f'px.{style}')
-			fig = func(plot_data, x=prop[0], y=prop[1], color=color, hover_data=hover_data)
+			fig = func(plot_data, x=prop[0], y=prop[1], color=color, hover_data=hover_data, **kwargs)
 
 		title = title or f'Pose {prop[0]} vs {prop[1]}'
 		fig.update_layout(xaxis_title=prop[0], yaxis_title=prop[1])
@@ -725,6 +795,75 @@ def plot_pose_property(animal, prop, poses=None, style='scatter', title=None, nu
 		title = f'<b>{animal.name}</b>: {title}<br>'
 
 	fig.update_layout(title=title,title_automargin=False, title_yref='container', barmode='group')
+
+	return fig
+
+@hippo_graph
+def plot_compound_availability(animal, compounds=None, subtitle=None):
+
+	from .cset import CompoundTable
+	
+	compounds = compounds or animal.compounds
+
+	match compounds:
+		case CompoundTable():
+			pairs = animal.db.select(table='quote', query='DISTINCT quote_supplier, quote_catalogue', multiple=True)
+		
+			plot_data = []
+			for supplier, catalogue in pairs:
+		
+				count, = animal.db.select_where(table='quote', query='COUNT(DISTINCT quote_compound)', key=f'quote_supplier IS "{supplier}" AND quote_catalogue IS "{catalogue}"')
+				plot_data.append(dict(supplier=supplier, catalogue=catalogue, count=count))
+				
+		case _:
+			raise NotImplementedError
+		
+	fig = px.bar(plot_data, x='catalogue', y='count', color='supplier')
+
+	title = 'Compound availability'
+	
+	if subtitle:
+		title = f'<b>{animal.name}</b>: {title}<br><sup><i>{subtitle}</i></sup>'
+	else:
+		title = f'<b>{animal.name}</b>: {title}<br>'
+
+	fig.update_layout(title=title) #,title_automargin=False, title_yref='container', barmode='group')
+
+	return fig
+
+@hippo_graph
+def plot_compound_price(animal, compounds=None, min_amount=1, subtitle=None):
+
+	from .cset import CompoundTable
+	
+	compounds = compounds or animal.compounds
+
+	match compounds:
+		case CompoundTable():
+
+			data = animal.db.select_where(table='quote', query='quote_amount, MIN(quote_price)', key=f'quote_amount >= {min_amount} GROUP BY quote_compound', multiple=True)
+
+			plot_data = []
+			for amount, price in data:
+				plot_data.append(dict(min_price=price, quoted_amount=amount))
+	
+		case _:
+			raise NotImplementedError
+
+	plot_data = sorted(plot_data, key=lambda x: x['quoted_amount'])
+		
+	fig = px.histogram(plot_data, color='quoted_amount', x='min_price')
+
+	title = 'Compound price'
+
+	subtitle = subtitle or f'{min_amount=} mg'
+	
+	if subtitle:
+		title = f'<b>{animal.name}</b>: {title}<br><sup><i>{subtitle}</i></sup>'
+	else:
+		title = f'<b>{animal.name}</b>: {title}<br>'
+
+	fig.update_layout(title=title) #,title_automargin=False, title_yref='container', barmode='group')
 
 	return fig
 

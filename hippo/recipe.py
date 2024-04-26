@@ -12,6 +12,15 @@ class Recipe:
 
 	def __init__(self, products, reactants, intermediates, reactions):
 
+		from .cset import IngredientSet
+		from .rset import ReactionSet
+		
+		# check typing
+		assert isinstance(products, IngredientSet)
+		assert isinstance(reactants, IngredientSet)
+		assert isinstance(intermediates, IngredientSet)
+		assert isinstance(reactions, ReactionSet)
+		
 		self._products = products
 		self._reactants = reactants
 		self._intermediates = intermediates
@@ -162,4 +171,10 @@ class Recipe:
 	# def get_reactant_reaction_string(self, reactant):
 	# 	reactions = self.get_reactant_reactions(reactant)
 	# 	return ' '.join([str(r) for r in reactions])
-				
+
+	### DUNDERS
+
+	def __repr__(self):
+		return f'Recipe({self.reactants} --> {self.intermediates} --> {self.products} via {self.reactions})'
+
+		
