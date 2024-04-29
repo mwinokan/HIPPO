@@ -171,8 +171,7 @@ class PoseTable:
 		return None
 
 	def __repr__(self) -> str:
-		# return f'PoseTable(table="{self.table}")'
-		return f'{mcol.bold}{mcol.underline}set(P x {len(self)}){mcol.unbold}{mcol.ununderline}'
+		return f'{mcol.bold}{mcol.underline}'"{"f'P x {len(self)}'"}"f'{mcol.unbold}{mcol.ununderline}'
 
 	def __len__(self) -> int:
 		return self.db.count(self.table)
@@ -181,17 +180,16 @@ class PoseTable:
 		return iter(self[i+1] for i in range(len(self)))
 
 
-class PoseSet(PoseTable):
+class PoseSet:
 	"""Object representing a subset of the 'pose' table in the :class:`.Database`."""
 
+	_table = 'pose'
+	
 	def __init__(self,
 		db: Database,
 		indices: list = None,
-		*,
-		table: str = 'pose',
 	):
 		self._db = db
-		self._table = table
 
 		indices = indices or []
 
@@ -203,6 +201,14 @@ class PoseSet(PoseTable):
 		self._indices = sorted(list(set(indices)))
 
 	### PROPERTIES
+
+	@property
+	def db(self):
+		return self._db
+
+	@property
+	def table(self):
+		return self._table
 
 	@property
 	def indices(self):
@@ -797,7 +803,7 @@ class PoseSet(PoseTable):
 	### DUNDERS
 
 	def __repr__(self) -> str:
-		return f'{mcol.bold}{mcol.underline}subset(P x {len(self)}){mcol.unbold}{mcol.ununderline}'
+		return f'{mcol.bold}{mcol.underline}'"{"f'P x {len(self)}'"}"f'{mcol.unbold}{mcol.ununderline}'
 
 	def __len__(self) -> int:
 		return len(self.indices)

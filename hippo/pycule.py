@@ -81,9 +81,9 @@ class Quoter:
 			raise NotImplementedError
 
 
-	def get_quote(self, compound):
+	def get_quote(self, compound, **kwargs):
 		"""Get quotes for a compound"""
-		return self._get_quote(compound)
+		return self._get_quote(compound, **kwargs)
 
 	def get_batch_quote(self, compounds, **kwargs):
 		"""Get quotes for a compound set"""
@@ -95,7 +95,7 @@ class Quoter:
 
 	### ENAMINE
 
-	def get_enamine_batch_quote(self, compounds, currency="USD", catalogues=None):
+	def get_enamine_batch_quote(self, compounds, currency="USD", catalogues=None, exact=False, forms=False, analogues=False, equivalents=False):
 
 		import time
 		from .cset import CompoundSet
@@ -110,7 +110,13 @@ class Quoter:
 							  
 		# perform an exact search on the batch of smiles (for each catalog)
 
-		payload = dict(compounds=compounds.smiles)
+		payload = dict(compounds=compounds.smiles, currency=currency)
+
+		include = []
+		if forms: include.append('FORMS')
+		if analogues: include.append('ANALOGS')
+		if equivalents: include.append('EQUIVALENTS')
+		if include: payload['include'] = include
 
 		catalogues = catalogues or ENAMINE_V2_CATALOGUES
 
@@ -118,11 +124,17 @@ class Quoter:
 
 		for catalogue in catalogues:
 
-			logger.debug(f'Exact search in Enamine:{ENAMINE_V2_CATALOGUES[catalogue]}...')
+			if exact:
+				logger.debug(f'Exact search in Enamine:{ENAMINE_V2_CATALOGUES[catalogue]}...')
+			else:
+				logger.debug(f'Similarity==1.0 search in Enamine:{ENAMINE_V2_CATALOGUES[catalogue]}...')
 
 			# send the request
 			t_catalogue_start = time.perf_counter()
-			url = ENAMINE_V2_BASE_URL + f'/catalog/search/in/{catalogue}/by/SMILEs/EXACT'
+			if exact:
+				url = ENAMINE_V2_BASE_URL + f'/catalog/search/in/{catalogue}/by/SMILEs/EXACT'
+			else:
+				url = ENAMINE_V2_BASE_URL + f'/catalog/search/in/{catalogue}/by/SMILEs/SIMILARITY/1.00'
 			response = requests.post(url=url, json=payload)
 			logger.var(f'{catalogue} request time = ', time.perf_counter() - t_catalogue_start)
 
@@ -146,6 +158,8 @@ class Quoter:
 			matched += this_matched
 			unmatched -= this_matched
 
+			return data
+		
 			# break
 
 		logger.var('Total time = ', time.perf_counter() - t_start)
@@ -439,7 +453,7 @@ class Quoter:
 
 	### MCULE
 
-	def get_mcule_quote(self, compound):
+	def get_mcule_quote(self, compound, exact=False):
 
 		try:
 
@@ -447,9 +461,12 @@ class Quoter:
 
 			smiles = compound.smiles
 
-			logger.header(f'Exact search: {smiles=}')
-
-			result = self.wrapper.singlequerysearch(smiles)
+			if exact:
+				logger.header(f'Exact search: {smiles=}')
+				result = self.wrapper.singlequerysearch(smiles)
+			else:
+				logger.header(f'Similarity==1.0 search: {smiles=}')
+				result = self.wrapper.similaritysearch(smiles, threshold=1.0)
 
 			if result['response']['results']:
 

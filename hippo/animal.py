@@ -129,7 +129,57 @@ class HIPPO:
 	def targets(self):
 		"""Returns the targets registered in the DB"""
 		target_ids = self.db.select(table='target', query='target_id', multiple=True)
-		return [self.db.get_target(id=q) for q, in target_ids]	
+		return [self.db.get_target(id=q) for q, in target_ids]
+
+	@property
+	def reactants(self):
+		"""Returns a CompoundSet of all compounds that are used as a reactants"""
+		return self.compounds.reactants
+
+	@property
+	def products(self):
+		"""Returns a CompoundSet of all compounds that are a product of a reaction but not a reactant"""
+		return self.compounds.products
+
+	@property
+	def intermediates(self):
+		"""Returns a CompoundSet of all compounds that are products and reactants"""
+		return self.compounds.intermediates
+
+	@property
+	def num_reactants(self):
+		"""Returns the number of reactants (see HIPPO.reactants)"""
+		return len(self.reactants)
+
+	@property
+	def num_intermediates(self):
+		"""Returns the number of intermediates (see HIPPO.intermediates)"""
+		return len(self.intermediates)
+	
+	@property
+	def num_products(self):
+		"""Returns the number of products (see HIPPO.products)"""
+		return len(self.products)
+
+	@property
+	def elabs(self):
+		"""Returns a CompoundSet of all compounds that are a an elaboration of an existing base"""
+		return self.compounds.elabs
+
+	@property
+	def bases(self):
+		"""Returns a CompoundSet of all compounds that are the basis for a set of elaborations"""
+		return self.compounds.bases
+
+	@property
+	def num_elabs(self):
+		"""Returns the number of compounds that are a an elaboration of an existing base"""
+		return len(self.elabs)
+
+	@property
+	def num_bases(self):
+		"""Returns the number of compounds that are the basis for a set of elaborations"""
+		return len(self.bases)
 
 	### BULK INSERTION
 
@@ -462,6 +512,7 @@ class HIPPO:
 		tags: None | list = None,
 		reaction_yield_map: dict | None = None,
 		require_truthy=['path_to_mol', 'intra_geometry_pass'],
+		stop_after=None,
 	):
 
 		tags = tags or []
@@ -479,6 +530,7 @@ class HIPPO:
 			raise NotImplementedError
 
 		base_id = None
+		base_reactants = {}
 
 		if base_only:
 			generator = df.iterrows()
@@ -526,7 +578,9 @@ class HIPPO:
 						if not isinstance(smiles, str):
 							raise InvalidRowError(f'non-string {j}_r1_smiles')
 							
-						reactant1_id = self.register_compound(smiles=smiles, commit=False, return_compound=False, tags=tags)
+						base = base_reactants[j][1] if not this_row_is_a_base else None
+						
+						reactant1_id = self.register_compound(smiles=smiles, commit=False, return_compound=False, tags=tags, base=base)
 						reactants.append(reactant1_id)
 				
 					# reactant 2
@@ -537,6 +591,8 @@ class HIPPO:
 						
 						if not isinstance(smiles, str):
 							raise InvalidRowError(f'non-string {j}_r2_smiles')
+
+						base = base_reactants[j][1] if not this_row_is_a_base else None
 							
 						reactant2_id = self.register_compound(smiles=smiles, commit=False, return_compound=False, tags=tags)
 						reactants.append(reactant2_id)
@@ -547,18 +603,21 @@ class HIPPO:
 							raise InvalidRowError(f'non-string {j}_product_smiles')
 	
 						if j != n_steps:
-							this_tags = ['intermediate'] + tags
-							base = None
+							this_tags = tags #+ ['intermediate']
+							base = base_reactants[j]['product'] if not this_row_is_a_base else None
 	
 						elif this_row_is_a_base:
-							this_tags = ['base'] + tags
+							this_tags = ['Syndirella base'] + tags
 							base = None
 	
 						else:
-							this_tags = ['elab'] + tags
+							this_tags = tags #+ ['Syndirella elaboration']
 							base = base_id
 	
 						product = self.register_compound(smiles=smiles, tags=this_tags, commit=False, return_compound=True, base=base)
+
+						if not base_id:
+							base_reactants[j] = {1:reactant1_id, 2:reactant2_id, 'product':product.id }
 						
 						if not base_id and j == n_steps and this_row_is_a_base:
 							base_id = product.id
@@ -570,7 +629,7 @@ class HIPPO:
 						product_yield = 1.0
 						
 					self.register_reaction(reactants=reactants, product=product, type=row[f'{j}_reaction'], commit=False, product_yield=product_yield)
-
+			
 			except InvalidRowError as e:
 				logger.error(f'Skipping invalid row {i=}: {e}')
 				continue
@@ -604,6 +663,9 @@ class HIPPO:
 				energy_score=row['∆∆G'],
 				distance_score=row['comRMSD'],
 			)
+
+			if stop_after and i > stop_after:
+				break
 
 		self.db.commit()
 
@@ -732,6 +794,9 @@ class HIPPO:
 			logger.error(f'Could not sanitise {smiles=}')
 			return None
 
+		if base and isinstance(base, Compound):
+			base = base.id
+
 		inchikey = inchikey_from_smiles(smiles)
 
 		compound_id = self.db.insert_compound(
@@ -750,6 +815,9 @@ class HIPPO:
 			if alias:
 				compound.alias = alias
 
+			if base:
+				compound.base = base
+
 			if tags:
 				for tag in tags:
 					compound.tags.add(tag)
@@ -762,6 +830,10 @@ class HIPPO:
 		else:
 			if not compound_id:
 				compound_id = self.db.get_compound_id(inchikey=inchikey)
+
+				if base:
+					self.db.update(table='compound', id=compound_id, key='compound_base', value=base, commit=commit)
+			
 			return compound_id
 
 	def register_reaction(self,
@@ -1052,12 +1124,16 @@ class HIPPO:
 	def plot_compound_availability(self, compounds=None, **kwargs):
 		"""Plot a bar chart of compound availability by supplier/catalogue"""
 		from .plotting import plot_compound_availability
-		plot_compound_availability(self, compound=compounds, **kwargs)
+		return plot_compound_availability(self, compound=compounds, **kwargs)
 
 	def plot_compound_price(self, min_amount, compounds=None, **kwargs):
 		"""Plot a bar chart of minimum compound price for a given minimum amount"""
 		from .plotting import plot_compound_price
-		plot_compound_price(self, min_amount=min_amount, compound=compounds, **kwargs)
+		return plot_compound_price(self, min_amount=min_amount, compound=compounds, **kwargs)
+
+	def plot_reaction_funnel(self, **kwargs):
+		from .plotting import plot_reaction_funnel
+		return plot_reaction_funnel(self, **kwargs)
 	
 	### OTHER
 
@@ -1070,6 +1146,9 @@ class HIPPO:
 		logger.var('#reactions', self.num_reactions)
 		logger.var('#tags', self.num_tags)
 		logger.var('tags', self.tags.unique)
+		# logger.var('#products', len(self.products))
+
+		
 
 	### DUNDERS
 

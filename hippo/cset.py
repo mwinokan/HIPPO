@@ -55,6 +55,72 @@ class CompoundTable:
 		values = self.db.select_where(table='tag', query='DISTINCT tag_name', key='tag_compound IS NOT NULL', multiple=True)
 		return set(v for v, in values)
 
+	@property
+	def reactants(self):
+		"""Returns a CompoundSet of all compounds that are used as a reactants"""
+		# ids = self.db.select(table='reactant', query='DISTINCT reactant_compound', multiple=True)
+		ids = self.db.execute('SELECT reactant_compound FROM reactant LEFT JOIN reaction ON reactant.reactant_compound = reaction.reaction_product WHERE reaction.reaction_product IS NULL').fetchall()
+		ids = [q for q, in ids]
+		from .cset import CompoundSet
+		return CompoundSet(self.db, ids)
+
+	@property
+	def products(self):
+		"""Returns a CompoundSet of all compounds that are a product of a reaction but not a reactant"""
+		ids = self.db.execute('SELECT reaction_product FROM reaction LEFT JOIN reactant ON reaction.reaction_product = reactant.reactant_compound WHERE reactant.reactant_compound IS NULL').fetchall()
+		ids = [q for q, in ids]
+		from .cset import CompoundSet
+		return CompoundSet(self.db, ids)
+
+	@property
+	def intermediates(self):
+		"""Returns a CompoundSet of all compounds that are products and reactants"""
+		ids = self.db.execute('SELECT DISTINCT reaction_product FROM reaction INNER JOIN reactant ON reaction.reaction_product = reactant.reactant_compound').fetchall()
+		ids = [q for q, in ids]
+		from .cset import CompoundSet
+		return CompoundSet(self.db, ids)
+
+	@property
+	def num_reactants(self):
+		"""Returns the number of reactants (see HIPPO.reactants)"""
+		return len(self.reactants)
+
+	@property
+	def num_intermediates(self):
+		"""Returns the number of intermediates (see HIPPO.intermediates)"""
+		return len(self.intermediates)
+	
+	@property
+	def num_products(self):
+		"""Returns the number of products (see HIPPO.products)"""
+		return len(self.products)
+
+	@property
+	def elabs(self):
+		"""Returns a CompoundSet of all compounds that are a an elaboration of an existing base"""
+		ids = self.db.select_where(query='compound_id', table='compound', key='compound_base IS NOT NULL', multiple=True)
+		ids = [q for q, in ids]
+		from .cset import CompoundSet
+		return CompoundSet(self.db, ids)
+
+	@property
+	def bases(self):
+		"""Returns a CompoundSet of all compounds that are the basis for a set of elaborations"""
+		ids = self.db.select_where(query='DISTINCT compound_base', table='compound', key='compound_base IS NOT NULL', multiple=True)
+		ids = [q for q, in ids]
+		from .cset import CompoundSet
+		return CompoundSet(self.db, ids)
+
+	@property
+	def num_elabs(self):
+		"""Returns the number of compounds that are a an elaboration of an existing base"""
+		return len(self.elabs)
+
+	@property
+	def num_bases(self):
+		"""Returns the number of compounds that are the basis for a set of elaborations"""
+		return len(self.bases)
+
 	### METHODS
 
 	def get_by_tag(self,tag):
@@ -90,6 +156,11 @@ class CompoundTable:
 		logger.var('#compounds', len(self))
 		# logger.var('#poses', self.num_poses)
 		logger.var('tags', self.tags)
+		logger.var('#bases', self.num_bases)
+		logger.var('#elabs', self.num_elabs)
+		logger.var('#reactants', self.num_reactants)
+		logger.var('#intermediates', self.num_intermediates)
+		logger.var('#products', self.num_products)
 
 	def draw(self):
 		return self[self.ids].draw()
@@ -182,18 +253,17 @@ class CompoundTable:
 		return iter(self[i+1] for i in range(len(self)))
 
 
-class CompoundSet(CompoundTable):
+class CompoundSet:
 	"""Object representing a subset of the 'compound' table in the :class:`.Database`."""
 
+	_table = 'compound'
+	
 	def __init__(self,
 		db: Database,
 		indices: list = None,
-		*,
-		table: str = 'compound',
 	):
 
 		self._db = db
-		self._table = table
 
 		indices = indices or []
 
@@ -205,6 +275,14 @@ class CompoundSet(CompoundTable):
 		self._indices = sorted(list(set(indices)))
 
 	### PROPERTIES
+
+	@property
+	def db(self):
+		return self._db
+
+	@property
+	def table(self):
+		return self._table
 
 	@property
 	def indices(self):
@@ -219,25 +297,25 @@ class CompoundSet(CompoundTable):
 	@property
 	def names(self):
 		"""Returns the aliases of compounds in this set"""
-		result = self.db.select_where(query='compound_alias', table='compound', key=f'compound_id in {tuple(self.ids)}', multiple=True)
+		result = self.db.select_where(query='compound_alias', table='compound', key=f'compound_id in {self.str_ids}', multiple=True)
 		return [q for q, in result]
 
 	@property
 	def smiles(self) -> list:
 		"""Returns the smiles of child compounds"""
-		result = self.db.select_where(query='compound_smiles', table='compound', key=f'compound_id in {tuple(self.ids)}', multiple=True)
+		result = self.db.select_where(query='compound_smiles', table='compound', key=f'compound_id in {self.str_ids}', multiple=True)
 		return [q for q, in result]
 	
 	@property
 	def inchikeys(self):
 		"""Returns the inchikeys of compounds in this set"""
-		result = self.db.select_where(query='compound_inchikey', table='compound', key=f'compound_id in {tuple(self.ids)}', multiple=True)
+		result = self.db.select_where(query='compound_inchikey', table='compound', key=f'compound_id in {self.str_ids}', multiple=True)
 		return [q for q, in result]
 
 	@property
 	def tags(self):
 		"""Returns the set of unique tags present in this compound set"""
-		values = self.db.select_where(table='tag', query='DISTINCT tag_name', key=f'tag_compound in {tuple(self.ids)}', multiple=True)
+		values = self.db.select_where(table='tag', query='DISTINCT tag_name', key=f'tag_compound in {self.str_ids}', multiple=True)
 		if not values:
 			return set()
 		return set(v for v, in values)
@@ -246,15 +324,19 @@ class CompoundSet(CompoundTable):
 	def num_poses(self):
 		"""Count the poses associated to this set of compounds"""
 		from .pset import PoseSet
-		return self.db.count_where(table='pose', key=f'pose_compound in {tuple(self.ids)}')
+		return self.db.count_where(table='pose', key=f'pose_compound in {self.str_ids}')
 
 	@property
 	def poses(self):
 		"""Get the poses associated to this set of compounds"""
 		from .pset import PoseSet
-		ids = self.db.select_where(query='pose_id', table='pose', key=f'pose_compound in {tuple(self.ids)}', multiple=True)
+		ids = self.db.select_where(query='pose_id', table='pose', key=f'pose_compound in {self.str_ids}', multiple=True)
 		ids = [v for v, in ids]
 		return PoseSet(self.db, ids)
+
+	@property
+	def str_ids(self):
+		return str(tuple(self.ids)).replace(',)',')')
 
 	### FILTERING
 
@@ -460,6 +542,10 @@ class CompoundSet(CompoundTable):
 				
 			case _:
 				raise NotImplementedError
+
+	def __repr__(self) -> str:
+		return f'{mcol.bold}{mcol.underline}''{'f'C x {len(self)}''}'f'{mcol.unbold}{mcol.ununderline}'
+
 
 class IngredientSet:
 

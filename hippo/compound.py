@@ -176,7 +176,24 @@ class Compound:
 	@property
 	def table(self):
 		return self._table
-	
+
+	@property
+	def elabs(self):
+		"""Return the set of elaborations based on this compound"""
+		ids = self.db.select_where(query='compound_id', table='compound', key='base', value=self.id, multiple=True)
+		ids = [q for q, in ids]
+		from .cset import CompoundSet
+		return CompoundSet(self.db, ids)
+
+	@property
+	def is_base(self):
+		"""Is this Compound the basis for any elaborations?"""
+		return bool(self.db.select_where(query='compound_id', table='compound', key='base', value=self.id, multiple=False, none='quiet'))
+
+	@property
+	def is_elab(self):
+		"""Is this Compound the based on any other compound?"""
+		return bool(self.base)
 	
 	### METHODS
 
@@ -254,8 +271,8 @@ class Compound:
 
 		pose_ids = self.db.select_where(query='pose_id', table='pose', key='compound', value=self.id, multiple=True, none=False)
 
-		if not pose_ids:
-			return None
+		# if not pose_ids:
+			# return None
 
 		# poses = [self.db.get_pose(id=q[0]) for q in pose_ids]
 
@@ -356,6 +373,7 @@ class Compound:
 		logger.var('smiles', self.smiles)
 		logger.var('base', self.base)
 		poses = self.poses
+		logger.var('is_base', self.is_base)
 		logger.var('#poses', len(poses))
 		if poses:
 			logger.var('targets', poses.targets)

@@ -948,6 +948,24 @@ def plot_reactant_sankey(animal, subtitle):
 
 	return fig
 
+@hippo_graph
+def plot_reaction_funnel(animal):
+
+	compounds = animal.compounds
+
+	data = dict(
+		number=[compounds.num_reactants, compounds.num_intermediates, compounds.num_products],
+		category=["Reactants", "Intermediates", "Products"]
+	)
+	
+	fig = px.funnel(data, x='category', y='number')
+
+	title = f'<b>{animal.name}</b>: Reaction statistics'
+
+	fig.update_layout(title=title, title_automargin=False, title_yref='container')
+	
+	return fig
+
 HIPPO_LOGO_URL = 'https://raw.githubusercontent.com/mwinokan/HIPPO/main/logos/hippo_logo_tightcrop.png'
 HIPPO_HEAD_URL = 'https://raw.githubusercontent.com/mwinokan/HIPPO/main/logos/hippo_assets-02.png'
 
