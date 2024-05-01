@@ -309,6 +309,17 @@ class PoseSet:
 		result = self.db.select_where(table=self.table, query='DISTINCT pose_target', key=f'pose_id in {self.str_ids}', multiple=True)
 		return [q for q, in result]
 
+	@property
+	def best_placed_pose(self):
+		"""Returns the pose with the best distance_score in this subset"""
+		return self.db.get_pose(id=self.best_placed_pose_id)
+
+	@property
+	def best_placed_pose_id(self):
+		query = f'pose_id, MIN(pose_distance_score)'
+		query = self.db.select_where(table='pose', query=query, key=f'pose_id in {self.str_ids}', multiple=False)
+		return query[0]
+
 	### FILTERING
 
 	def get_by_tag(self, tag, inverse=False):

@@ -335,8 +335,35 @@ class CompoundSet:
 		return PoseSet(self.db, ids)
 
 	@property
+	def best_placed_poses(self):
+		"""Get the best placed pose for each compound in this set"""
+		from .pset import PoseSet
+		query = self.db.select_where(table='pose', query='pose_id, MIN(pose_distance_score)', key=f'pose_compound in {self.str_ids} GROUP BY pose_compound', multiple=True)
+		ids = [i for i,s in query]
+		return PoseSet(self.db, ids)
+
+	@property
 	def str_ids(self):
 		return str(tuple(self.ids)).replace(',)',')')
+
+	@property
+	def num_heavy_atoms(self):
+		return sum([c.num_heavy_atoms for c in self])
+
+	@property
+	def num_rings(self):
+		return sum([c.num_rings for c in self])
+
+	@property
+	def formula(self):
+		from .tools import atomtype_dict_to_formula
+		return atomtype_dict_to_formula(self.atomtype_dict)
+
+	@property
+	def atomtype_dict(self):
+		from .tools import formula_to_atomtype_dict, combine_atomtype_dicts
+		atomtype_dicts = [c.atomtype_dict for c in self]
+		return combine_atomtype_dicts(atomtype_dicts)
 
 	### FILTERING
 
@@ -581,7 +608,6 @@ class IngredientSet:
 	@property
 	def db(self):
 		return self._db
-	
 
 	### METHODS
 
@@ -598,15 +624,25 @@ class IngredientSet:
 			max_lead_time = ingredient.max_lead_time
 			
 		else:
-			assert id
+			assert compound_id
 			assert amount
 
-		addition = DataFrame([dict(compound_id=compound_id, amount=amount, quote_id=quote_id, supplier=supplier, max_lead_time=max_lead_time)])
-
 		if self._data.empty:
+			addition = DataFrame([dict(compound_id=compound_id, amount=amount, quote_id=quote_id, supplier=supplier, max_lead_time=max_lead_time)])
 			self._data = addition
+
 		else:
-			self._data = concat([self._data, addition], ignore_index=True)
+
+			if compound_id in self._data['compound_id'].values:
+				index = self._data.index[self._data['compound_id'] == compound_id].tolist()[0]
+				self._data.loc[index, 'amount'] += amount
+				self._data.loc[index, 'quote_id'] = None
+
+			else:
+				from numpy import nan
+				addition = DataFrame([dict(compound_id=compound_id, amount=amount, quote_id=quote_id, supplier=supplier, max_lead_time=max_lead_time)])
+				self._data = concat([self._data, addition], ignore_index=True)
+				self._data = self._data.replace({nan: None})
 
 	def get_ingredient(self, series):
 		return Ingredient(

@@ -187,7 +187,7 @@ class Reaction:
 		
 		return recipe
 
-	def summary(self, amount=1):
+	def summary(self, amount=1, draw=True):
 		"""Print a summary of this reaction's information"""
 
 		print(f'{self}.id={self.id}')
@@ -198,9 +198,13 @@ class Reaction:
 		reactants = self.get_reactant_amount_pairs()
 		print(f'{self}.reactants={reactants}')
 
+
 		print(f'Ingredients for {amount} mg of product:')
 		ingredients = self.get_ingredients(amount=amount)
 		print(ingredients)
+
+		if draw:
+			return self.draw()
 
 		# return self.get_recipe(amount)
 
@@ -220,6 +224,10 @@ class Reaction:
 		labels.append(f'-> {product}')
 
 		return draw_grid(mols, labels=labels, highlightAtomLists=None)
+
+	def check_chemistry(self, debug=False):
+		from .chem import check_chemistry
+		return check_chemistry(self.type, self.reactants, self.product, debug=debug)
 
 	### DUNDERS
 

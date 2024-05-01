@@ -24,7 +24,7 @@ import functools
 def hippo_graph(func):
 
 	@functools.wraps(func)
-	def wrapper(animal, *args, **kwargs):
+	def wrapper(animal, *args, logo='top right', **kwargs):
 
 		wrapper_kwargs = {}
 		wrapper_keys = ['show', 'html', 'pdf', 'png']
@@ -57,8 +57,8 @@ def hippo_graph(func):
 				file = f'{file}.png'
 			mp.write(file, fig)
 
-		if not fig.layout.images:
-			add_hippo_logo(fig)
+		if not fig.layout.images and logo:
+			add_hippo_logo(fig, position=logo)
 
 		return fig
 	
@@ -612,16 +612,17 @@ def plot_pose_property(animal, prop, poses=None, style='scatter', title=None, nu
 			n_poses = len(poses)
 			logger.out(f'Querying database for {n_poses} poses...')
 			field = f'pose_{p}'
-			title = f'{p} of all poses'
+			title = title or f'{p} of all poses'
 			query = animal.db.select_where(table='pose', query=field, key=f'{field} is not NULL', multiple=True)
 			
 		else:
 
 			# subset of poses
+			assert poses.table == 'pose', f'{poses=} is not a set of Pose objects'
 			n_poses = len(poses)
 			logger.out(f'Querying database for {n_poses} poses...')
 			field = f'pose_{p}'
-			title = f'{p} of pose subset'
+			title = title or f'{p} of pose subset'
 			query = animal.db.select_where(table='pose', query=field, key=f'{field} is not NULL and pose_id in {poses.str_ids}', multiple=True)
 			
 		plot_data = [{p:v} for v, in query]
@@ -638,6 +639,13 @@ def plot_pose_property(animal, prop, poses=None, style='scatter', title=None, nu
 	elif prop == ['energy_score', 'distance_score'] or prop == ['distance_score', 'energy_score']:
 		
 		query = f'pose_id, pose_distance_score, pose_energy_score'
+
+		# hardcoded errorbars
+		distance_score_err = 0.03
+		energy_score_err = 6
+
+		if color:
+			query += f', {color}'
 		
 		if not poses:
 			# great all poses!
@@ -655,7 +663,18 @@ def plot_pose_property(animal, prop, poses=None, style='scatter', title=None, nu
 			title = f'distance & energy scores of pose subset'
 			query = animal.db.select_where(table='pose', query=query, key=f'pose_id in {poses.str_ids}', multiple=True)
 			
-		plot_data = [{'id':id, 'distance_score':v1, 'energy_score':v2 } for id,v1,v2 in query]
+		plot_data = []
+		for q in query:
+			d = {'id':q[0], 'distance_score':q[1], 'energy_score':q[2], 'distance_score_err':distance_score_err, 'energy_score_err':energy_score_err} 
+			if color:
+				d[color] = q[-1]
+				if color == 'pose_compound':
+					d[color] = f'C{d[color]}'
+
+			plot_data.append(d)
+
+		kwargs['error_x'] = 'energy_score_err'
+		kwargs['error_y'] = 'distance_score_err'
 		
 		subtitle = subtitle or f'#poses={n_poses}'
 
@@ -789,17 +808,17 @@ def plot_pose_property(animal, prop, poses=None, style='scatter', title=None, nu
 	else:
 		mout.error('Unsupported', code='plotting.plot_pose_property.1')
 
+	title = title or f'<b>{animal.name}</b>: {title}<br>'
+	
 	if subtitle:
-		title = f'<b>{animal.name}</b>: {title}<br><sup><i>{subtitle}</i></sup>'
-	else:
-		title = f'<b>{animal.name}</b>: {title}<br>'
+		title = f'{title}<br><sup><i>{subtitle}</i></sup>'
 
 	fig.update_layout(title=title,title_automargin=False, title_yref='container', barmode='group')
 
 	return fig
 
 @hippo_graph
-def plot_compound_availability(animal, compounds=None, subtitle=None):
+def plot_compound_availability(animal, compounds=None, title=None, subtitle=None):
 
 	from .cset import CompoundTable
 	
@@ -822,17 +841,17 @@ def plot_compound_availability(animal, compounds=None, subtitle=None):
 
 	title = 'Compound availability'
 	
+	title = title or f'<b>{animal.name}</b>: Compound availability<br>'
+	
 	if subtitle:
-		title = f'<b>{animal.name}</b>: {title}<br><sup><i>{subtitle}</i></sup>'
-	else:
-		title = f'<b>{animal.name}</b>: {title}<br>'
+		title = f'{title}<br><sup><i>{subtitle}</i></sup>'
 
 	fig.update_layout(title=title) #,title_automargin=False, title_yref='container', barmode='group')
 
 	return fig
 
 @hippo_graph
-def plot_compound_price(animal, compounds=None, min_amount=1, subtitle=None):
+def plot_compound_price(animal, compounds=None, min_amount=1, subtitle=None, title=None, style='histogram', **kwargs):
 
 	from .cset import CompoundTable
 	
@@ -843,25 +862,31 @@ def plot_compound_price(animal, compounds=None, min_amount=1, subtitle=None):
 
 			data = animal.db.select_where(table='quote', query='quote_amount, MIN(quote_price)', key=f'quote_amount >= {min_amount} GROUP BY quote_compound', multiple=True)
 
+			n_compounds = len(data)
+
 			plot_data = []
 			for amount, price in data:
 				plot_data.append(dict(min_price=price, quoted_amount=amount))
 	
 		case _:
-			raise NotImplementedError
+			raise NotImplementedError('CompoundSet not yet supported')
 
 	plot_data = sorted(plot_data, key=lambda x: x['quoted_amount'])
 		
-	fig = px.histogram(plot_data, color='quoted_amount', x='min_price')
+	match style:
+		case 'histogram':
+			fig = px.histogram(plot_data, color='quoted_amount', x='min_price', **kwargs)
+		case 'violin':
+			fig = px.violin(plot_data, color='quoted_amount', x='min_price', **kwargs)
+		case _:
+			raise NotImplementedError(f'{style=}')
 
-	title = 'Compound price'
-
-	subtitle = subtitle or f'{min_amount=} mg'
+	subtitle = subtitle or f'#compounds={n_compounds}, {min_amount=} mg'
+	
+	title = title or f'<b>{animal.name}</b>: Compound price<br>'
 	
 	if subtitle:
-		title = f'<b>{animal.name}</b>: {title}<br><sup><i>{subtitle}</i></sup>'
-	else:
-		title = f'<b>{animal.name}</b>: {title}<br>'
+		title = f'{title}<br><sup><i>{subtitle}</i></sup>'
 
 	fig.update_layout(title=title) #,title_automargin=False, title_yref='container', barmode='group')
 
@@ -949,7 +974,7 @@ def plot_reactant_sankey(animal, subtitle):
 	return fig
 
 @hippo_graph
-def plot_reaction_funnel(animal):
+def plot_reaction_funnel(animal, title=None, subtitle=None):
 
 	compounds = animal.compounds
 
@@ -960,7 +985,10 @@ def plot_reaction_funnel(animal):
 	
 	fig = px.funnel(data, x='category', y='number')
 
-	title = f'<b>{animal.name}</b>: Reaction statistics'
+	title = title or f'<b>{animal.name}</b>: Reaction statistics'
+
+	if subtitle:
+		title = f'{title}<br><sup><i>{subtitle}</i></sup>'
 
 	fig.update_layout(title=title, title_automargin=False, title_yref='container')
 	
@@ -969,20 +997,42 @@ def plot_reaction_funnel(animal):
 HIPPO_LOGO_URL = 'https://raw.githubusercontent.com/mwinokan/HIPPO/main/logos/hippo_logo_tightcrop.png'
 HIPPO_HEAD_URL = 'https://raw.githubusercontent.com/mwinokan/HIPPO/main/logos/hippo_assets-02.png'
 
-def add_hippo_logo(fig, in_plot=True):
+def add_hippo_logo(fig, in_plot=True, position='top right'):
 
 	assert fig.layout.title.text, 'Figure must have a title to add the HIPPO logo'
 
 	if in_plot:
 
+		sizex=0.3
+		sizey=0.3
+
+		if 'top' in position:
+			yanchor="top"
+			y = 0.95
+		elif 'bottom' in position:
+			yanchor="bottom"
+			y = 0.05
+		else:
+			yanchor="middle"
+			y = 0.50
+
+		if 'left' in position:
+			xanchor = "left"
+			x = 0.05
+		elif 'right' in position:
+			xanchor = "right"
+			x = 0.95
+		else:
+			xanchor = "center"
+			x = 0.50
+
 		fig.add_layout_image(dict(
 			source=HIPPO_LOGO_URL,
 			xref="paper", yref="paper",
 			# layer='below',
-			
-			x=0.95, y=0.95,
-			sizex=0.3, sizey=0.3,
-			xanchor="right", yanchor="top",
+			x=x, y=y,
+			sizex=sizex, sizey=sizey,
+			xanchor=xanchor, yanchor=yanchor,
 		))
 
 		return fig

@@ -9,6 +9,7 @@ logger = logging.getLogger('HIPPO')
 class Quote:
 	"""Dataclass representing a quote in the database"""
 
+	id: int
 	compound: int
 	smiles: str
 	supplier: str

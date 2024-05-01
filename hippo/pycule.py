@@ -3,6 +3,11 @@ import pycule
 from .quote import Quote
 import requests
 
+import logging
+# logging.getLogger("requests").setLevel(logging.WARNING)
+# logging.getLogger("mcule:core").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+
 ENAMINE_CATALOGUES = [
 	'BB',
 	'SCR',
@@ -121,6 +126,8 @@ class Quoter:
 		catalogues = catalogues or ENAMINE_V2_CATALOGUES
 
 		t_start = time.perf_counter()
+
+		# return payload
 
 		for catalogue in catalogues:
 
@@ -486,7 +493,7 @@ class Quoter:
 					result = self.wrapper.compoundprices(mcule_id)
 
 					for pack in result['response']['best_prices']:
-						self.parse_mcule_pack(compound, mcule_id, pack, smile)
+						self.parse_mcule_pack(compound.db, compound, mcule_id, pack, smile)
 
 					# logger.header(f'{self.wrapper.compoundpricesamount(mcule_id)=}')
 
@@ -496,9 +503,76 @@ class Quoter:
 			logger.warning('Interrupted quoting')
 
 	def get_mcule_batch_quote(self, compounds):
-		raise NotImplementedError
+
+		import time
+		from .cset import CompoundSet
+		from .tools import flat_inchikey
+		from tqdm import tqdm
+
+		db = compounds.db
+		
+		n_comps = len(compounds)
+
+		matched = CompoundSet(db)
+
+		logger.var('batch size', n_comps)
+		assert n_comps <= 1000
+
+		# bulk query compound availability
+
+		t_start = time.perf_counter()
+		data = self.wrapper.multiplequerieswithavailability(compounds.smiles)
+		
+		logger.var('availability query time', time.perf_counter() - t_start)
+
+		results = data['response']['results']
+		
+		logger.var('#results', len(results))
+
+		for result in tqdm(results):
+			
+			entry = result['mcule_id']
+			smiles = result['smiles']
+
+			# match to compound
+			compound_id = db.get_compound_id(inchikey=flat_inchikey(smiles))
+
+			if not compound_id:
+				logger.error(f'Could not find compound matching {smiles=}')
+				continue
+			
+			matched.add(compound_id)
+
+			prices = self.wrapper.compoundprices(entry)
+			
+			try:
+				best_prices = prices['response']['best_prices']
+			except KeyError as e:
+				print(prices)
+				logger.error(f'Unsupported prices {e}')
+				continue
+
+			for pack in prices['response']['best_prices']:
+				try:
+					self.parse_mcule_pack(db, compound_id, entry, pack, smiles, commit=False)
+				except KeyError as e:
+					print(pack)
+					logger.error(f'Unsupported pack {e}')
+					continue
+
+		logger.var('Total time = ', time.perf_counter() - t_start)
+
+		unmatched = compounds - matched
+
+		if unmatched:
+			logger.error(f'Did not find quotes for {len(unmatched)} compounds')
+
+		logger.success('Committing changes to the database...')
+		db.commit()
+
+		return dict(matched=matched, unmatched=unmatched)
 	
-	def parse_mcule_pack(self, compound, entry, pack, smiles):
+	def parse_mcule_pack(self, db, compound, entry, pack, smiles, commit=True):
 
 		supplier = 'MCule'
 
@@ -512,10 +586,15 @@ class Quoter:
 
 		price = pack['price']
 		currency = pack['currency']
-		purity = pack['purity'] / 100
+
+		if 'purity' in pack:
+			purity = pack['purity'] / 100
+		else:
+			purity = None
+			
 		lead_time = pack['delivery_time_working_days']
 
-		compound.db.insert_quote(
+		db.insert_quote(
 			compound=compound,
 			supplier=supplier,
 			catalogue=None,
@@ -526,6 +605,7 @@ class Quoter:
 			purity=purity,
 			lead_time=lead_time,
 			smiles=smiles,
+			commit=commit,
 		)
 
 class NoDataInReponse(Exception):

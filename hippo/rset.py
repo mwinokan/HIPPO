@@ -34,8 +34,23 @@ class ReactionTable:
 
 	@property
 	def types(self):
-		result = self.db.select(table=self.table, query='reaction_type', multiple=True)
+		result = self.db.select(table=self.table, query='DISTINCT reaction_type', multiple=True)
 		return [q for q, in result]
+
+	@property
+	def ids(self):
+		"""Returns the IDs of child reactions"""
+		result = self.db.select(table=self.table, query='reaction_id', multiple=True)
+		return [q for q, in result]
+
+	### METHODS
+
+	def interactive(self):
+		return self[self.ids].interactive()
+
+	def get_by_type(self, reaction_type: str):
+		result = self.db.select_where(table=self.table, query='reaction_id', key='type', value=reaction_type, multiple=True)
+		return self[[q for q, in result]]
 
 	### DUNDERS
 
@@ -55,8 +70,8 @@ class ReactionTable:
 				else:
 					return self.db.get_reaction(table=self.table, id=key)
 
-			case str():
-				return self.db.get_reaction(table=self.table, name=key)
+			case key if isinstance(key, list) or isinstance(key, tuple) or isinstance(key, set):
+				return ReactionSet(self.db, key)
 
 			case _:
 				logger.error(f'Unsupported type for ReactionSet.__getitem__(): {key=} {type(key)}')
@@ -109,6 +124,41 @@ class ReactionSet(ReactionTable):
 		assert r._table == 'reaction'
 		if (id := r.id) not in self._indices:
 			self._indices.append(id)
+
+	def interactive(self):
+		"""Creates a ipywidget to interactively navigate this PoseSet."""
+
+		from ipywidgets import interactive, BoundedIntText, Checkbox, interactive_output, HBox, GridBox, Layout, VBox
+		from IPython.display import display
+		from pprint import pprint
+
+		a = BoundedIntText(
+				value=0,
+				min=0,
+				max=len(self)-1,
+				step=1,
+				description=f'Pose (/{len(self)}):',
+				disabled=False,
+			)
+
+		b = Checkbox(description='Name', value=True)
+		c = Checkbox(description='Summary', value=False)
+		d = Checkbox(description='Draw', value=True)
+		e = Checkbox(description='Check chemistry', value=False)
+
+		ui = GridBox([b, c, d, e], layout=Layout(grid_template_columns="repeat(5, 100px)"))
+		ui = VBox([a, ui])
+		
+		def widget(i, name=True, summary=True, draw=True, check_chemistry=True):
+			reaction = self[i]
+			if name: print(repr(reaction))
+			if summary: reaction.summary()
+			if draw: display(reaction.draw())
+			if check_chemistry: reaction.check_chemistry(debug=True)
+
+		out = interactive_output(widget, {'i': a, 'name': b, 'summary': c, 'draw':d, 'check_chemistry':e })
+
+		display(ui, out)
 	
 	### DUNDERS
 

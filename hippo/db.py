@@ -481,7 +481,7 @@ class Database:
 		path: str,
 		inchikey: str | None = None,
 		alias: str | None = None,
-		reference: int | None = None,
+		reference: int | Pose | None = None,
 		tags: None | list = None,
 		energy_score: float | None = None,
 		distance_score: float | None = None,
@@ -493,17 +493,14 @@ class Database:
 	):
 		"""Insert a pose"""
 
-		if isinstance(compound, int):
-			compound = self.get_compound(id=compound)
+		if isinstance(compound, Compound):
+			compound = compound.id
 
-		if isinstance(reference, int):
-			reference = self.get_pose(id=reference)
-
-		assert isinstance(compound, Compound), f'incompatible {compound}'
-		assert isinstance(reference, Pose) or reference is None, f'incompatible reference={reference}'
-
-		if reference:
+		if isinstance(reference, Pose):
 			reference = reference.id
+
+		# assert isinstance(compound, Compound), f'incompatible {compound}'
+		# assert isinstance(reference, Pose) or reference is None, f'incompatible reference={reference}'
 
 		if isinstance(target, str):
 			target = self.get_target_id(name=target)
@@ -527,7 +524,7 @@ class Database:
 		"""
 
 		try:
-			self.execute(sql, (inchikey, alias, None, compound.id, target, path, reference, energy_score, distance_score))
+			self.execute(sql, (inchikey, alias, None, compound, target, path, reference, energy_score, distance_score))
 
 		except sqlite3.IntegrityError as e:
 			if 'UNIQUE constraint failed: pose.pose_path' in str(e):
@@ -629,16 +626,16 @@ class Database:
 	def insert_reaction(self,
 		*,
 		type: str,
-		product: Compound,
+		product: Compound | int,
 		product_yield: float = 1.0,
 		commit: bool = True,
 	) -> int:
 		"""Insert a reaction"""
 
-		if isinstance(product, int):
-			product = self.get_compound(id=product)
+		if isinstance(product, Compound):
+			product = product.id
 
-		assert isinstance(product, Compound), f'incompatible {product=}'
+		# assert isinstance(product, Compound), f'incompatible {product=}'
 		assert isinstance(type, str), f'incompatible {type=}'
 
 		sql = """
@@ -647,7 +644,7 @@ class Database:
 		"""
 
 		try:
-			self.execute(sql, (type, product.id, product_yield))
+			self.execute(sql, (type, product, product_yield))
 
 		except Exception as e:
 			logger.exception(e)
@@ -1079,10 +1076,11 @@ class Database:
 	) -> list[dict]:
 		"""Get a quote"""
 		
-		query = 'quote_compound, quote_supplier, quote_catalogue, quote_entry, quote_amount, quote_price, quote_currency, quote_lead_time, quote_purity, quote_date, quote_smiles '
+		query = 'quote_compound, quote_supplier, quote_catalogue, quote_entry, quote_amount, quote_price, quote_currency, quote_lead_time, quote_purity, quote_date, quote_smiles, quote_id '
 		entry = self.select_where(query=query, table=table, key='id', value=id, none=none)
 
 		return Quote(
+			id=entry[11],
 			compound=entry[0],
 			supplier=entry[1],
 			catalogue=entry[2],
@@ -1326,4 +1324,6 @@ class Database:
 
 CHEMICALITE_COMPOUND_PROPERTY_MAP = {
 	'num_heavy_atoms':'mol_num_hvyatms',
+	'formula':'mol_formula',
+	'num_rings':'mol_num_rings',
 }

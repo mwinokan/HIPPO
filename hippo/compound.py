@@ -8,6 +8,7 @@ from .pose import Pose
 from .tags import TagSet
 # from .rset import ReactionSet
 from .target import Target
+from .quote import Quote
 
 import logging
 logger = logging.getLogger('HIPPO')
@@ -32,6 +33,7 @@ class Compound:
 			metadata: dict | None = None,
 	):
 		
+		# from compound table
 		self._id = id
 		self._inchikey = inchikey
 		self._alias = alias
@@ -42,9 +44,12 @@ class Compound:
 		self._alias = alias
 		self._tags = None
 		self._table = 'compound'
-		self._num_heavy_atoms = None
-
 		self._metadata = metadata
+		
+		# computed properties
+		self._num_heavy_atoms = None
+		self._num_rings = None
+		self._formula = None
 		
 		if isinstance(mol, bytes):
 			mol = Chem.Mol(mol)
@@ -105,6 +110,25 @@ class Compound:
 		return self._num_heavy_atoms
 
 	@property
+	def num_rings(self):
+		"""Get the number of rings"""
+		if self._num_rings is None:
+			self._num_rings = self.db.get_compound_computed_property('num_rings', self.id)
+		return self._num_rings
+
+	@property
+	def formula(self):
+		"""Get the chemical formula"""
+		if self._formula is None:
+			self._formula = self.db.get_compound_computed_property('formula', self.id)
+		return self._formula
+
+	@property
+	def atomtype_dict(self):
+		from .tools import formula_to_atomtype_dict
+		return formula_to_atomtype_dict(self.formula)
+
+	@property
 	def num_atoms_added(self):
 		"""Calculate the number of atoms added relative to the base compound"""
 		assert (b_id := self._base_id), f'{self} has no base defined'
@@ -135,6 +159,10 @@ class Compound:
 	def poses(self):
 		"""Returns the compound's poses"""
 		return self.get_poses()
+
+	@property
+	def best_placed_pose(self):
+		return self.poses.best_placed_pose
 
 	@property
 	def num_poses(self) -> int:
@@ -194,6 +222,12 @@ class Compound:
 	def is_elab(self):
 		"""Is this Compound the based on any other compound?"""
 		return bool(self.base)
+
+	@property
+	def is_product(self):
+		"""Is this Compound a product of at least one reaction"""
+		return bool(self.get_reactions(none=False))
+	
 	
 	### METHODS
 
@@ -365,25 +399,35 @@ class Compound:
 		else:
 			display(self.mol)
 
-	def summary(self, metadata: bool = True, draw: bool = True,):
+	def summary(self, metadata: bool = True, draw: bool = True):
 		"""Print a summary of this compound"""
 		logger.header(repr(self))
+
 		logger.var('inchikey', self.inchikey)
 		logger.var('alias', self.alias)
 		logger.var('smiles', self.smiles)
 		logger.var('base', self.base)
-		poses = self.poses
+		
 		logger.var('is_base', self.is_base)
+		logger.var('num_heavy_atoms', self.num_heavy_atoms)
+		logger.var('num_rings', self.num_rings)
+		logger.var('formula', self.formula)
+
+		poses = self.poses
 		logger.var('#poses', len(poses))
 		if poses:
 			logger.var('targets', poses.targets)
+		
 		logger.var('#reactions (product)', self.num_reactions)
 		logger.var('#reactions (reactant)', self.num_reactant)
+		
 		logger.var('tags', self.tags)
-		if draw:
-			self.draw()
+		
 		if metadata:
 			logger.var('metadata', str(self.metadata))
+		
+		if draw:
+			return self.draw()
 
 	def place(self,
 		*,
@@ -490,14 +534,16 @@ class Ingredient:
 			self._compound_id = compound.id
 			self._compound = None
 
-		if isinstance(quote, int):
-			self._quote_id = quote
+		if isinstance(quote, Quote):
+			self._quote_id = quote.id
 			self._quote = None
+
 		elif quote is None:
 			self._quote_id = None
 			self._quote = None
+		
 		else:
-			self._quote_id = quote.id
+			self._quote_id = int(quote)
 			self._quote = None
         
 		# self._id = inherit.id
