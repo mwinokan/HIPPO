@@ -217,14 +217,8 @@ class CompoundTable:
 				return CompoundSet(self.db, indices)
 
 			case slice():
-
-				start = key.start or 1
-				stop = key.stop or len(self)
-				step = key.step or 1
-
-				indices = [i for i in range(start, stop, step)]
-
-				return CompoundSet(self.db, indices)
+				ids = self.db.slice_ids(table=self.table, start=key.start, stop=key.stop, step=key.step)
+				return self[ids]
 
 			case _:
 				logger.error(f'Unsupported type for CompoundTable.__getitem__(): {key=} {type(key)}')

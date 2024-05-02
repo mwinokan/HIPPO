@@ -1256,6 +1256,42 @@ class Database:
 		self.execute(sql)
 		return self.cursor.fetchone()[0]
 
+	### ID SELECTION
+
+	def min_id(self, table):
+		"""Return the smallest ID in the given table"""
+		id, = self.select(table=table, query=f'MIN({table}_id)')
+		return id
+
+	def max_id(self, table):
+		"""Return the largest ID in the given table"""
+		id, = self.select(table=table, query=f'MAX({table}_id)')
+		return id
+
+	def slice_ids(self, *, table, start, stop, step=1):
+		"""Return a list of indices in the given slice"""
+
+		min_id = self.min_id(table)
+		max_id = self.max_id(table)
+
+		start = start or min_id
+		stop = stop or max_id + 1
+		step = step or 1
+
+		if not (start >= 0 and start <= max_id):
+			raise IndexError(f'Slice {start=} outside of DB {table}_id range ({min_id}, {max_id})')
+
+		if not (stop >= 0 and stop <= max_id + 1):
+			raise IndexError(f'Slice {stop=} outside of DB {table}_id range ({min_id}, {max_id})')
+
+		if step != 1:
+			raise NotImplementedError(f'Slice {step=} not supported')
+
+		ids = self.select_where(table=table, query=f'{table}_id', key=f'{table}_id >= {start} AND {table}_id < {stop}', multiple=True)
+		ids = [q for q, in ids]
+
+		return ids
+
 	### PRUNING
 
 	def prune_reactions(self, compound, reactions):

@@ -73,6 +73,10 @@ class ReactionTable:
 			case key if isinstance(key, list) or isinstance(key, tuple) or isinstance(key, set):
 				return ReactionSet(self.db, key)
 
+			case slice():
+				ids = self.db.slice_ids(table=self.table, start=key.start, stop=key.stop, step=key.step)
+				return self[ids]
+
 			case _:
 				logger.error(f'Unsupported type for ReactionSet.__getitem__(): {key=} {type(key)}')
 

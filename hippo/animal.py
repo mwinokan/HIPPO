@@ -541,6 +541,7 @@ class HIPPO:
 
 		if f'{n_steps}_num_atom_diff' not in df.columns:
 			logger.error(df_path)
+			logger.error(f'{n_steps}_num_atom_diff not in columns:')
 			print(df.columns)
 			raise NotImplementedError
 

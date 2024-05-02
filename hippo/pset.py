@@ -156,14 +156,8 @@ class PoseTable:
 				return PoseSet(self.db, indices)
 
 			case slice():
-
-				start = key.start or 1
-				stop = key.stop or len(self)
-				step = key.step or 1
-
-				indices = [i for i in range(start, stop, step)]
-
-				return self[indices]
+				ids = self.db.slice_ids(table=self.table, start=key.start, stop=key.stop, step=key.step)
+				return self[ids]
 
 			case _:
 				logger.error(f'Unsupported type for PoseTable.__getitem__(): {type(key)}')
