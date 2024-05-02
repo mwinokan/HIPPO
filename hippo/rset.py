@@ -52,6 +52,75 @@ class ReactionTable:
 		result = self.db.select_where(table=self.table, query='reaction_id', key='type', value=reaction_type, multiple=True)
 		return self[[q for q, in result]]
 
+	def get_df(self, smiles=True, mols=True, **kwargs):
+		"""Construct a pandas.DataFrame of all reactions in the database"""
+
+		### SQL QUERY
+
+		data = {}
+		
+		if not smiles and not mols:
+			
+			sql = 'SELECT reaction_id, reaction_type, reaction_product, reactant_compound FROM reaction INNER JOIN reactant ON reaction.reaction_id = reactant.reactant_reaction'
+
+			triples = self.db.execute(sql).fetchall()
+			
+			for reaction_id, product_id, reactant_id in triples:
+				if reaction_id not in data:
+					data[reaction_id] = dict(product_id=product_id, reactant_ids=[])
+				else:
+					assert data[reaction_id]['product_id'] == product_id
+
+				data[reaction_id]['reactant_ids'].append(reactant_id)
+
+		else:
+
+
+			sql = '''
+			SELECT {query}
+			FROM reaction 
+
+			INNER JOIN reactant 
+			    ON reaction.reaction_id = reactant.reactant_reaction
+
+			INNER JOIN compound c_r
+			    ON c_r.compound_id = reactant.reactant_compound
+
+			INNER JOIN compound c_p
+			    ON c_p.compound_id = reaction.reaction_product
+			'''
+
+			if not mols:
+				sql = sql.format(query='reaction_id, reaction_type, reaction_product, reactant_compound, c_p.compound_smiles, c_r.compound_smiles')
+
+			else:
+				sql = sql.format(query='reaction_id, reaction_type, reaction_product, reactant_compound, c_p.compound_smiles, c_r.compound_smiles, mol_to_binary_mol(c_p.compound_mol), mol_to_binary_mol(c_r.compound_mol)')
+
+			results = self.db.execute(sql).fetchall()
+			
+			for result in results:
+
+				reaction_id, reaction_type, product_id, reactant_id, product_smiles, reactant_smiles = result[:6]
+				
+				if mols:
+					product_mol, reactant_mol = result[6:]
+
+				if reaction_id not in data:
+					data[reaction_id] = dict(reaction_id=reaction_id, reaction_type=reaction_type, product_id=product_id, reactant_ids=set(), product_smiles=product_smiles, reactant_smiles=set())
+					if mols:
+						data[reaction_id]['product_mol']=Mol(product_mol)
+						data[reaction_id]['reactant_mols']=set()
+				else:
+					assert data[reaction_id]['product_id'] == product_id
+
+				data[reaction_id]['reactant_ids'].add(reactant_id)
+				data[reaction_id]['reactant_smiles'].add(reactant_smiles)
+				if mols:
+					data[reaction_id]['reactant_mols'].add(Mol(reactant_mol))
+
+		data = data.values()
+		return DataFrame(data)
+
 	### DUNDERS
 
 	def __getitem__(self, key) -> Reaction:
@@ -180,80 +249,12 @@ class ReactionSet:
 		from tqdm import tqdm
 		from rdkit.Chem import Mol
 
-		if kwargs:
+		logger.warning('Using slower Reaction.dict rather than direct SQL query')
 
-			logger.warning('Using slower Reaction.dict rather than direct SQL query')
+		data = []
+		for r in tqdm(self):
+			data.append(r.get_dict(smiles=smiles, mols=mols, **kwargs))
 
-			data = []
-			for r in tqdm(self):
-				data.append(r.get_dict(smiles=smiles, mols=mols, **kwargs))
-
-			return DataFrame(data)
-
-		### SQL QUERY
-
-		data = {}
-		
-		if not smiles and not mols:
-			
-			sql = 'SELECT reaction_id, reaction_type, reaction_product, reactant_compound FROM reaction INNER JOIN reactant ON reaction.reaction_id = reactant.reactant_reaction'
-
-			triples = self.db.execute(sql).fetchall()
-			
-			for reaction_id, product_id, reactant_id in triples:
-				if reaction_id not in data:
-					data[reaction_id] = dict(product_id=product_id, reactant_ids=[])
-				else:
-					assert data[reaction_id]['product_id'] == product_id
-
-				data[reaction_id]['reactant_ids'].append(reactant_id)
-
-		else:
-
-
-			sql = '''
-			SELECT {query}
-			FROM reaction 
-
-			INNER JOIN reactant 
-			    ON reaction.reaction_id = reactant.reactant_reaction
-
-			INNER JOIN compound c_r
-			    ON c_r.compound_id = reactant.reactant_compound
-
-			INNER JOIN compound c_p
-			    ON c_p.compound_id = reaction.reaction_product
-			'''
-
-			if not mols:
-				sql = sql.format(query='reaction_id, reaction_type, reaction_product, reactant_compound, c_p.compound_smiles, c_r.compound_smiles')
-
-			else:
-				sql = sql.format(query='reaction_id, reaction_type, reaction_product, reactant_compound, c_p.compound_smiles, c_r.compound_smiles, mol_to_binary_mol(c_p.compound_mol), mol_to_binary_mol(c_r.compound_mol)')
-
-			results = self.db.execute(sql).fetchall()
-			
-			for result in results:
-
-				reaction_id, reaction_type, product_id, reactant_id, product_smiles, reactant_smiles = result[:6]
-				
-				if mols:
-					product_mol, reactant_mol = result[6:]
-
-				if reaction_id not in data:
-					data[reaction_id] = dict(reaction_id=reaction_id, reaction_type=reaction_type, product_id=product_id, reactant_ids=set(), product_smiles=product_smiles, reactant_smiles=set())
-					if mols:
-						data[reaction_id]['product_mol']=Mol(product_mol)
-						data[reaction_id]['reactant_mols']=set()
-				else:
-					assert data[reaction_id]['product_id'] == product_id
-
-				data[reaction_id]['reactant_ids'].add(reactant_id)
-				data[reaction_id]['reactant_smiles'].add(reactant_smiles)
-				if mols:
-					data[reaction_id]['reactant_mols'].add(Mol(reactant_mol))
-
-		data = data.values()
 		return DataFrame(data)
 
 	### DUNDERS
