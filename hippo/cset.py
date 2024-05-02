@@ -42,7 +42,7 @@ class CompoundTable:
 		"""Returns the names of child compounds"""
 		result = self.db.select(table=self.table, query='compound_name', multiple=True)
 		return [q for q, in result]
-
+	
 	@property
 	def ids(self):
 		"""Returns the IDs of child compounds"""
@@ -54,6 +54,72 @@ class CompoundTable:
 		"""Returns the set of unique tags present in this compound set"""
 		values = self.db.select_where(table='tag', query='DISTINCT tag_name', key='tag_compound IS NOT NULL', multiple=True)
 		return set(v for v, in values)
+
+	@property
+	def reactants(self):
+		"""Returns a CompoundSet of all compounds that are used as a reactants"""
+		# ids = self.db.select(table='reactant', query='DISTINCT reactant_compound', multiple=True)
+		ids = self.db.execute('SELECT reactant_compound FROM reactant LEFT JOIN reaction ON reactant.reactant_compound = reaction.reaction_product WHERE reaction.reaction_product IS NULL').fetchall()
+		ids = [q for q, in ids]
+		from .cset import CompoundSet
+		return CompoundSet(self.db, ids)
+
+	@property
+	def products(self):
+		"""Returns a CompoundSet of all compounds that are a product of a reaction but not a reactant"""
+		ids = self.db.execute('SELECT reaction_product FROM reaction LEFT JOIN reactant ON reaction.reaction_product = reactant.reactant_compound WHERE reactant.reactant_compound IS NULL').fetchall()
+		ids = [q for q, in ids]
+		from .cset import CompoundSet
+		return CompoundSet(self.db, ids)
+
+	@property
+	def intermediates(self):
+		"""Returns a CompoundSet of all compounds that are products and reactants"""
+		ids = self.db.execute('SELECT DISTINCT reaction_product FROM reaction INNER JOIN reactant ON reaction.reaction_product = reactant.reactant_compound').fetchall()
+		ids = [q for q, in ids]
+		from .cset import CompoundSet
+		return CompoundSet(self.db, ids)
+
+	@property
+	def num_reactants(self):
+		"""Returns the number of reactants (see HIPPO.reactants)"""
+		return len(self.reactants)
+
+	@property
+	def num_intermediates(self):
+		"""Returns the number of intermediates (see HIPPO.intermediates)"""
+		return len(self.intermediates)
+	
+	@property
+	def num_products(self):
+		"""Returns the number of products (see HIPPO.products)"""
+		return len(self.products)
+
+	@property
+	def elabs(self):
+		"""Returns a CompoundSet of all compounds that are a an elaboration of an existing base"""
+		ids = self.db.select_where(query='compound_id', table='compound', key='compound_base IS NOT NULL', multiple=True)
+		ids = [q for q, in ids]
+		from .cset import CompoundSet
+		return CompoundSet(self.db, ids)
+
+	@property
+	def bases(self):
+		"""Returns a CompoundSet of all compounds that are the basis for a set of elaborations"""
+		ids = self.db.select_where(query='DISTINCT compound_base', table='compound', key='compound_base IS NOT NULL', multiple=True, none='quiet')
+		ids = [q for q, in ids]
+		from .cset import CompoundSet
+		return CompoundSet(self.db, ids)
+
+	@property
+	def num_elabs(self):
+		"""Returns the number of compounds that are a an elaboration of an existing base"""
+		return len(self.elabs)
+
+	@property
+	def num_bases(self):
+		"""Returns the number of compounds that are the basis for a set of elaborations"""
+		return len(self.bases)
 
 	### METHODS
 
@@ -90,24 +156,17 @@ class CompoundTable:
 		logger.var('#compounds', len(self))
 		# logger.var('#poses', self.num_poses)
 		logger.var('tags', self.tags)
+		logger.var('#bases', self.num_bases)
+		logger.var('#elabs', self.num_elabs)
+		logger.var('#reactants', self.num_reactants)
+		logger.var('#intermediates', self.num_intermediates)
+		logger.var('#products', self.num_products)
 
 	def draw(self):
 		return self[self.ids].draw()
 
 	def interactive(self):
 		return self[self.ids].interactive()
-
-	def get_df(self, **kwargs):
-
-		from pandas import DataFrame
-
-		data = []
-
-		for pose in self:
-			d = pose.get_dict(**kwargs)
-			data.append(d)
-
-		return DataFrame(data)
 
 	### DUNDERS
 
@@ -158,14 +217,8 @@ class CompoundTable:
 				return CompoundSet(self.db, indices)
 
 			case slice():
-
-				start = key.start or 1
-				stop = key.stop or len(self)
-				step = key.step or 1
-
-				indices = [i for i in range(start, stop, step)]
-
-				return CompoundSet(self.db, indices)
+				ids = self.db.slice_ids(table=self.table, start=key.start, stop=key.stop, step=key.step)
+				return self[ids]
 
 			case _:
 				logger.error(f'Unsupported type for CompoundTable.__getitem__(): {key=} {type(key)}')
@@ -173,7 +226,7 @@ class CompoundTable:
 		return None
 
 	def __repr__(self) -> str:
-		return f'{mcol.bold}{mcol.underline}set(C x {len(self)}){mcol.unbold}{mcol.ununderline}'
+		return f'{mcol.bold}{mcol.underline}''{'f'C x {len(self)}''}'f'{mcol.unbold}{mcol.ununderline}'
 
 	def __len__(self) -> int:
 		return self.db.count(self.table)
@@ -182,18 +235,17 @@ class CompoundTable:
 		return iter(self[i+1] for i in range(len(self)))
 
 
-class CompoundSet(CompoundTable):
+class CompoundSet:
 	"""Object representing a subset of the 'compound' table in the :class:`.Database`."""
 
+	_table = 'compound'
+	
 	def __init__(self,
 		db: Database,
 		indices: list = None,
-		*,
-		table: str = 'compound',
 	):
 
 		self._db = db
-		self._table = table
 
 		indices = indices or []
 
@@ -205,6 +257,14 @@ class CompoundSet(CompoundTable):
 		self._indices = sorted(list(set(indices)))
 
 	### PROPERTIES
+
+	@property
+	def db(self):
+		return self._db
+
+	@property
+	def table(self):
+		return self._table
 
 	@property
 	def indices(self):
@@ -219,17 +279,25 @@ class CompoundSet(CompoundTable):
 	@property
 	def names(self):
 		"""Returns the aliases of compounds in this set"""
-		return [self.db.select_where(table=self.table, query='compound_alias', key='id', value=i, multiple=False)[0] for i in self.indices]
+		result = self.db.select_where(query='compound_alias', table='compound', key=f'compound_id in {self.str_ids}', multiple=True)
+		return [q for q, in result]
 
+	@property
+	def smiles(self) -> list:
+		"""Returns the smiles of child compounds"""
+		result = self.db.select_where(query='compound_smiles', table='compound', key=f'compound_id in {self.str_ids}', multiple=True)
+		return [q for q, in result]
+	
 	@property
 	def inchikeys(self):
 		"""Returns the inchikeys of compounds in this set"""
-		return [self.db.select_where(table=self.table, query='compound_inchikey', key='id', value=i, multiple=False)[0] for i in self.indices]
+		result = self.db.select_where(query='compound_inchikey', table='compound', key=f'compound_id in {self.str_ids}', multiple=True)
+		return [q for q, in result]
 
 	@property
 	def tags(self):
 		"""Returns the set of unique tags present in this compound set"""
-		values = self.db.select_where(table='tag', query='DISTINCT tag_name', key=f'tag_compound in {tuple(self.ids)}', multiple=True)
+		values = self.db.select_where(table='tag', query='DISTINCT tag_name', key=f'tag_compound in {self.str_ids}', multiple=True)
 		if not values:
 			return set()
 		return set(v for v, in values)
@@ -238,15 +306,46 @@ class CompoundSet(CompoundTable):
 	def num_poses(self):
 		"""Count the poses associated to this set of compounds"""
 		from .pset import PoseSet
-		return self.db.count_where(table='pose', key=f'pose_compound in {tuple(self.ids)}')
+		return self.db.count_where(table='pose', key=f'pose_compound in {self.str_ids}')
 
 	@property
 	def poses(self):
 		"""Get the poses associated to this set of compounds"""
 		from .pset import PoseSet
-		ids = self.db.select_where(query='pose_id', table='pose', key=f'pose_compound in {tuple(self.ids)}', multiple=True)
+		ids = self.db.select_where(query='pose_id', table='pose', key=f'pose_compound in {self.str_ids}', multiple=True)
 		ids = [v for v, in ids]
 		return PoseSet(self.db, ids)
+
+	@property
+	def best_placed_poses(self):
+		"""Get the best placed pose for each compound in this set"""
+		from .pset import PoseSet
+		query = self.db.select_where(table='pose', query='pose_id, MIN(pose_distance_score)', key=f'pose_compound in {self.str_ids} GROUP BY pose_compound', multiple=True)
+		ids = [i for i,s in query]
+		return PoseSet(self.db, ids)
+
+	@property
+	def str_ids(self):
+		return str(tuple(self.ids)).replace(',)',')')
+
+	@property
+	def num_heavy_atoms(self):
+		return sum([c.num_heavy_atoms for c in self])
+
+	@property
+	def num_rings(self):
+		return sum([c.num_rings for c in self])
+
+	@property
+	def formula(self):
+		from .tools import atomtype_dict_to_formula
+		return atomtype_dict_to_formula(self.atomtype_dict)
+
+	@property
+	def atomtype_dict(self):
+		from .tools import formula_to_atomtype_dict, combine_atomtype_dicts
+		atomtype_dicts = [c.atomtype_dict for c in self]
+		return combine_atomtype_dicts(atomtype_dicts)
 
 	### FILTERING
 
@@ -310,12 +409,13 @@ class CompoundSet(CompoundTable):
 		c = Checkbox(description='Summary', value=False)
 		d = Checkbox(description='2D', value=True)
 		e = Checkbox(description='poses', value=False)
-		f = Checkbox(description='Metadata', value=False)
+		f = Checkbox(description='reactions', value=False)
+		g = Checkbox(description='Metadata', value=False)
 
-		ui = GridBox([b, c, d, e, f], layout=Layout(grid_template_columns="repeat(5, 100px)"))
+		ui = GridBox([b, c, d, e, f, g], layout=Layout(grid_template_columns="repeat(6, 100px)"))
 		ui = VBox([a, ui])
 		
-		def widget(i, name=True, summary=True, draw=True, poses=True, metadata=True):
+		def widget(i, name=True, summary=True, draw=True, poses=True, reactions=True, metadata=True):
 			comp = self[i]
 			
 			if name and not summary:
@@ -329,18 +429,32 @@ class CompoundSet(CompoundTable):
 			
 			if poses and comp.poses: 
 				comp.poses.draw()
+
+			if reactions and (reactions := comp.reactions):
+				for r in reactions:
+					print(repr(r))
+					r.draw()
 			
 			if metadata:
 				logger.title('Metadata:')
 				pprint(comp.metadata)
 
-		out = interactive_output(widget, {'i': a, 'name': b, 'summary': c, 'draw':d, 'poses':e, 'metadata':f})
+		out = interactive_output(widget, {'i': a, 'name': b, 'summary': c, 'draw':d, 'poses':e, 'reactions':f, 'metadata':g})
 
 		display(ui, out)
 
 
 	### OTHER METHODS
 
+	def add(self, compound):
+		"""Add a compound to this set"""
+		if isinstance(compound, Compound):
+			compound = compound.id
+
+		if compound not in self.ids:
+			from bisect import insort
+			insort(self.ids, compound)
+	
 	def get_recipe(self, 
 		amount: float = 1, 
 		simplify_network: bool = True,
@@ -354,44 +468,55 @@ class CompoundSet(CompoundTable):
 		if not hasattr(amount, '__iter__'):
 			amount = [amount] * n_comps
 
-		products = []
-		reactants = []
-		reactions = []
-		intermediates = []
+		from .cset import IngredientSet
+		from .rset import ReactionSet
+		
+		products = IngredientSet(self.db)
+		reactants = IngredientSet(self.db)
+		intermediates = IngredientSet(self.db)
+		reactions = ReactionSet(self.db)
 
 		for comp, a in zip(self, amount):
 
 			reax = comp.reactions
 
 			assert len(reax) == 1
+			# logger.warning(f'Picking first reaction for {comp} from {reax}')
 
 			recipe = reax[0].get_recipe(a)
 
-			products.append(comp.as_ingredient(amount=a))
+			# recipe.summary()
+			
+			products.add(comp.as_ingredient(amount=a))
 
-			for reactant in recipe.reactants:
-				matches = [r for r in reactants if r.id == reactant.id]
-				if matches:
-					matches[0].amount += reactant.amount
-				else:
-					reactants.append(reactant) 
+			intermediates += recipe.intermediates
+			
+			reactants += recipe.reactants
 
-			for reaction in recipe.reactions:
-				matches = [r for r in reactions if r.id == reaction.id]
-				if not matches:
-					reactions.append(reaction) 
+			reactions += recipe.reactions
+			
+		return Recipe(self.db, products=products, reactants=reactants, reactions=reactions, intermediates=intermediates)
 
-			for intermediate in recipe.intermediates:
-				matches = [r for r in intermediates if r.id == intermediate.id]
-				if not matches:
-					intermediates.append(intermediate) 
+	def copy(self):
+		return CompoundSet(self.db, self.ids)
+	
+	def get_df(self, **kwargs):
 
-		return Recipe(products=products, reactants=reactants, reactions=reactions, intermediates=intermediates)
+		from tqdm import tqdm
+		from pandas import DataFrame
+
+		data = []
+
+		for comp in tqdm(self):
+			d = comp.get_dict(**kwargs)
+			data.append(d)
+
+		return DataFrame(data)
 
 	### DUNDERS
 
-	def __repr__(self) -> str:
-		return f'{mcol.bold}{mcol.underline}subset(C x {len(self)}){mcol.unbold}{mcol.ununderline}'
+	# def __repr__(self) -> str:
+		# return f'{mcol.bold}{mcol.underline}''{'f'C x {len(self)}''}'f'{mcol.unbold}{mcol.ununderline}'
 
 	def __len__(self) -> int:
 		return len(self.indices)
@@ -400,12 +525,60 @@ class CompoundSet(CompoundTable):
 		return iter(self.db.get_compound(table=self.table, id=i) for i in self.indices)
 
 	def __getitem__(self, key) -> Compound:
-		try:
-			index = self.indices[key]
-		except IndexError:
-			logger.exception(f'list index out of range: {key=} for {self}')
-			raise
-		return self.db.get_compound(table=self.table, id=index)
+		match key:
+			case int():
+				index = self.indices[key]
+				return self.db.get_compound(table=self.table, id=index)
+			
+			case slice():
+				indices = self.indices[key]
+				return	CompoundSet(self.db, indices)
+
+			case _:
+				raise NotImplementedError	
+
+	def __sub__(self, other):
+
+		match other:
+		
+			case CompoundSet():
+				ids = set(self.ids) - set(other.ids)
+				return CompoundSet(self.db, ids)
+				
+			case _:
+				raise NotImplementedError
+
+	def __add__(self, other):
+
+		match other:
+
+			case Compound():
+				return self.add(other)
+
+			case int():
+				return self.add(other)
+		
+			case CompoundSet():
+				ids = set(self.ids) | set(other.ids)
+				return CompoundSet(self.db, ids)
+				
+			case _:
+				raise NotImplementedError
+
+	def __xor__(self, other):
+
+		match other:
+		
+			case CompoundSet():
+				ids = set(self.ids) ^ set(other.ids)
+				return CompoundSet(self.db, ids)
+				
+			case _:
+				raise NotImplementedError
+
+	def __repr__(self) -> str:
+		return f'{mcol.bold}{mcol.underline}''{'f'C x {len(self)}''}'f'{mcol.unbold}{mcol.ununderline}'
+
 
 class IngredientSet:
 
@@ -441,7 +614,6 @@ class IngredientSet:
 	@property
 	def db(self):
 		return self._db
-	
 
 	### METHODS
 
@@ -453,15 +625,35 @@ class IngredientSet:
 			assert ingredient._table == 'ingredient'
 			compound_id = ingredient.compound_id
 			amount = ingredient.amount
+
+			if ingredient.quote and not ingredient.quote_id:
+				logger.warning(f'Losing quote! {ingredient.quote=}')
+
 			quote_id = ingredient.quote_id
+			
 			supplier = ingredient.supplier
 			max_lead_time = ingredient.max_lead_time
 			
 		else:
-			assert id
+			assert compound_id
 			assert amount
 
-		self._data = concat([self._data, DataFrame([dict(compound_id=compound_id, amount=amount, quote_id=quote_id, supplier=supplier, max_lead_time=max_lead_time)])], ignore_index=True)
+		if self._data.empty:
+			addition = DataFrame([dict(compound_id=compound_id, amount=amount, quote_id=quote_id, supplier=supplier, max_lead_time=max_lead_time)])
+			self._data = addition
+
+		else:
+
+			if compound_id in self._data['compound_id'].values:
+				index = self._data.index[self._data['compound_id'] == compound_id].tolist()[0]
+				self._data.loc[index, 'amount'] += amount
+				self._data.loc[index, 'quote_id'] = None
+
+			else:
+				from numpy import nan
+				addition = DataFrame([dict(compound_id=compound_id, amount=amount, quote_id=quote_id, supplier=supplier, max_lead_time=max_lead_time)])
+				self._data = concat([self._data, addition], ignore_index=True)
+				self._data = self._data.replace({nan: None})
 
 	def get_ingredient(self, series):
 		return Ingredient(
@@ -482,8 +674,14 @@ class IngredientSet:
 		return f'{mcol.bold}{mcol.underline}''{'f'I x {len(self)}''}'f'{mcol.unbold}{mcol.ununderline}'
 
 	def __add__(self, other):
-		for id, amount in other._data.items():
-			self.add(id=id, amount=amount)
+		for i,row in other._data.iterrows():
+			self.add(
+				compound_id=row.compound_id,
+				amount=row.amount,
+				quote_id=row.quote_id,
+				supplier=row.supplier,
+				max_lead_time=row.max_lead_time,
+			)
 		return self
 
 	def __getitem__(self, key):

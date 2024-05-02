@@ -8,6 +8,7 @@ from .pose import Pose
 from .tags import TagSet
 # from .rset import ReactionSet
 from .target import Target
+from .quote import Quote
 
 import logging
 logger = logging.getLogger('HIPPO')
@@ -32,6 +33,7 @@ class Compound:
 			metadata: dict | None = None,
 	):
 		
+		# from compound table
 		self._id = id
 		self._inchikey = inchikey
 		self._alias = alias
@@ -42,9 +44,12 @@ class Compound:
 		self._alias = alias
 		self._tags = None
 		self._table = 'compound'
-		self._num_heavy_atoms = None
-
 		self._metadata = metadata
+		
+		# computed properties
+		self._num_heavy_atoms = None
+		self._num_rings = None
+		self._formula = None
 		
 		if isinstance(mol, bytes):
 			mol = Chem.Mol(mol)
@@ -105,6 +110,25 @@ class Compound:
 		return self._num_heavy_atoms
 
 	@property
+	def num_rings(self):
+		"""Get the number of rings"""
+		if self._num_rings is None:
+			self._num_rings = self.db.get_compound_computed_property('num_rings', self.id)
+		return self._num_rings
+
+	@property
+	def formula(self):
+		"""Get the chemical formula"""
+		if self._formula is None:
+			self._formula = self.db.get_compound_computed_property('formula', self.id)
+		return self._formula
+
+	@property
+	def atomtype_dict(self):
+		from .tools import formula_to_atomtype_dict
+		return formula_to_atomtype_dict(self.formula)
+
+	@property
 	def num_atoms_added(self):
 		"""Calculate the number of atoms added relative to the base compound"""
 		assert (b_id := self._base_id), f'{self} has no base defined'
@@ -135,6 +159,10 @@ class Compound:
 	def poses(self):
 		"""Returns the compound's poses"""
 		return self.get_poses()
+
+	@property
+	def best_placed_pose(self):
+		return self.poses.best_placed_pose
 
 	@property
 	def num_poses(self) -> int:
@@ -176,30 +204,53 @@ class Compound:
 	@property
 	def table(self):
 		return self._table
+
+	@property
+	def elabs(self):
+		"""Return the set of elaborations based on this compound"""
+		ids = self.db.select_where(query='compound_id', table='compound', key='base', value=self.id, multiple=True)
+		ids = [q for q, in ids]
+		from .cset import CompoundSet
+		return CompoundSet(self.db, ids)
+
+	@property
+	def is_base(self):
+		"""Is this Compound the basis for any elaborations?"""
+		return bool(self.db.select_where(query='compound_id', table='compound', key='base', value=self.id, multiple=False, none='quiet'))
+
+	@property
+	def is_elab(self):
+		"""Is this Compound the based on any other compound?"""
+		return bool(self.base)
+
+	@property
+	def is_product(self):
+		"""Is this Compound a product of at least one reaction"""
+		return bool(self.get_reactions(none=False))
 	
 	
 	### METHODS
 
-	def get_dict(self, mol=False):
-		"""Returns a dictionary of this compound"""
+	# def get_dict(self, mol=False):
+	# 	"""Returns a dictionary of this compound"""
 
-		serialisable_fields = ['id','inchikey','alias','smiles']
+	# 	serialisable_fields = ['id','inchikey','alias','smiles']
 
-		if mol:
-			serialisable_fields.append('mol')
+	# 	if mol:
+	# 		serialisable_fields.append('mol')
 
-		data = {}
-		for key in serialisable_fields:
-			data[key] = getattr(self, key)
+	# 	data = {}
+	# 	for key in serialisable_fields:
+	# 		data[key] = getattr(self, key)
 
-		if base := self.base:
-			data['base'] = base.inchikey
+	# 	if base := self.base:
+	# 		data['base'] = base.inchikey
 
-		if metadata := self.metadata:
-			for key in metadata:
-				data[key] = metadata[key]
+	# 	if metadata := self.metadata:
+	# 		for key in metadata:
+	# 			data[key] = metadata[key]
 
-		return data
+	# 	return data
 
 
 	def get_tags(self) -> set:
@@ -214,23 +265,30 @@ class Compound:
 		if quote_ids:
 			quotes = [self.db.get_quote(id=q[0]) for q in quote_ids]
 		else:
-			return []
+			return None
 
 		if supplier:
 			quotes = [q for q in quotes if q.supplier == supplier]
 
-		if min_amount:
-			quotes = [q for q in quotes if q.amount >= min_amount]
-
 		if max_lead_time:
 			quotes = [q for q in quotes if q.lead_time <= max_lead_time]
+
+		if min_amount:
+			suitable_quotes = [q for q in quotes if q.amount >= min_amount]
+			
+			if not suitable_quotes:
+				# logger.debug(f'No quote available with amount >= {min_amount} mg')
+				quotes = [Quote.combination(min_amount, quotes)]
+
+			else:
+				quotes = suitable_quotes
 
 		if pick_cheapest:
 			return sorted(quotes, key=lambda x: x.price)[0]
 
 		if df:
 			from pandas import DataFrame
-			return DataFrame([q.asdict() for q in quotes]).drop(columns='compound')
+			return DataFrame([q.dict for q in quotes]).drop(columns='compound')
 		
 		return quotes
 
@@ -254,8 +312,8 @@ class Compound:
 
 		pose_ids = self.db.select_where(query='pose_id', table='pose', key='compound', value=self.id, multiple=True, none=False)
 
-		if not pose_ids:
-			return None
+		# if not pose_ids:
+			# return None
 
 		# poses = [self.db.get_pose(id=q[0]) for q in pose_ids]
 
@@ -263,17 +321,18 @@ class Compound:
 
 		return PoseSet(self.db, [q[0] for q in pose_ids])
 
-	def get_dict(self, mol=True, reactions=False, metadata=True, count_by_target=False):
+	def get_dict(self, mol=True, reactions=False, metadata=True, count_by_target=False, poses=True):
 		
 		"""Returns a dictionary representing this Compound"""
 
-		serialisable_fields = ['id','alias', 'inchikey', 'smiles', 'num_poses', 'num_reactant', 'num_reactions']
+		# serialisable_fields = ['id','alias', 'inchikey', 'smiles', 'num_poses', 'num_reactant', 'num_reactions']
+		serialisable_fields = ['id','alias', 'inchikey', 'smiles', 'num_reactant', 'num_reactions']
 
 		# poses
 		# reactions
 		# poses.targets
 
-		assert not reactions
+		# assert not reactions
 
 		data = {}
 		for key in serialisable_fields:
@@ -292,20 +351,23 @@ class Compound:
 
 		data['tags'] = self.tags
 		
-		poses = self.poses
+		if poses:
 
-		# data['poses'] = [a if a else i for a,i in zip(poses.aliases, poses.inchikeys)]
-		# data['poses'] = self.poses.names
-		data['poses'] = poses.ids
-		
-		data['targets'] = poses.target_names
-		
-		if count_by_target:
-			target_ids = poses.target_ids
+			poses = self.poses
+			
+			if poses:
 
-			for target in self._animal.targets:
-				t_poses = poses(target=target.id) or []
-				data[f'#poses {target.name}'] = len(t_poses)
+				# data['poses'] = [a if a else i for a,i in zip(poses.aliases, poses.inchikeys)]
+				# data['poses'] = self.poses.names
+				data['poses'] = poses.ids
+				data['targets'] = poses.target_names
+			
+				if count_by_target:
+					target_ids = poses.target_ids
+
+					for target in self._animal.targets:
+						t_poses = poses(target=target.id) or []
+						data[f'#poses {target.name}'] = len(t_poses)
 		
 		if metadata and (metadict := self.metadata):
 			for key in metadict:
@@ -333,8 +395,9 @@ class Compound:
 
 		if not quote:
 			quote = None
-		else:
-			quote = quote.id
+
+		# else:
+			# quote = quote.id
 		
 		return Ingredient(self.db, self.id, amount, quote, supplier, max_lead_time)
 
@@ -348,24 +411,35 @@ class Compound:
 		else:
 			display(self.mol)
 
-	def summary(self, metadata: bool = True, draw: bool = True,):
+	def summary(self, metadata: bool = True, draw: bool = True):
 		"""Print a summary of this compound"""
 		logger.header(repr(self))
+
 		logger.var('inchikey', self.inchikey)
 		logger.var('alias', self.alias)
 		logger.var('smiles', self.smiles)
 		logger.var('base', self.base)
+		
+		logger.var('is_base', self.is_base)
+		logger.var('num_heavy_atoms', self.num_heavy_atoms)
+		logger.var('num_rings', self.num_rings)
+		logger.var('formula', self.formula)
+
 		poses = self.poses
 		logger.var('#poses', len(poses))
 		if poses:
 			logger.var('targets', poses.targets)
+		
 		logger.var('#reactions (product)', self.num_reactions)
 		logger.var('#reactions (reactant)', self.num_reactant)
+		
 		logger.var('tags', self.tags)
-		if draw:
-			self.draw()
+		
 		if metadata:
 			logger.var('metadata', str(self.metadata))
+		
+		if draw:
+			return self.draw()
 
 	def place(self,
 		*,
@@ -472,14 +546,23 @@ class Ingredient:
 			self._compound_id = compound.id
 			self._compound = None
 
-		if isinstance(quote, int):
-			self._quote_id = quote
-			self._quote = None
+		if isinstance(quote, Quote):
+
+			if id := quote.id:
+				self._quote_id = quote.id
+				self._quote = None
+
+			else:
+				# logger.debug('Initialising Ingredient with estimated quote')
+				self._quote_id = None
+				self._quote = quote
+
 		elif quote is None:
 			self._quote_id = None
 			self._quote = None
+		
 		else:
-			self._quote_id = quote.id
+			self._quote_id = int(quote)
 			self._quote = None
         
 		# self._id = inherit.id
@@ -506,6 +589,10 @@ class Ingredient:
 		return self._amount
 
 	@property
+	def id(self):
+		return self._compound_id
+
+	@property
 	def compound_id(self):
 		"""Returns the ID of the associated compound"""
 		return self._compound_id
@@ -529,13 +616,14 @@ class Ingredient:
 	def amount(self, a):
 		"""Set the amount and update quotes"""
 
-		quote = self.get_quotes(
-			pick_cheapest=True, 
+		quote_id = self.get_cheapest_quote_id( 
 			min_amount=a, 
 			max_lead_time=self._max_lead_time, 
 			supplier=self._supplier,
 			none='quiet',
 		)
+
+		self._quote_id = quote_id 
 		
 		self._amount = a
 
@@ -549,9 +637,43 @@ class Ingredient:
 	@property
 	def quote(self):
 		"""Returns the associated :class:`Quote`"""
-		if not self._quote and (q_id := self.quote_id):
-			self._quote = self.db.get_quote(id=self.quote_id)
+		if not self._quote:
+			if (q_id := self.quote_id):
+				self._quote = self.db.get_quote(id=self.quote_id)
+			
+			else:
+				self._quote = self.compound.get_quotes(
+					pick_cheapest=True, 
+					min_amount=self.amount, 
+					max_lead_time=self.max_lead_time, 
+					supplier=self.supplier,
+					none='quiet',
+				)
+
 		return self._quote
+
+	@property
+	def compound_price_amount_str(self):
+		# return f'{self} {self.quote.currency_symbol}{self.quote.price} ({self.amount})'
+		return f'{self} ({self.amount})'
+
+	### METHODS
+
+	def get_cheapest_quote_id(self, min_amount=None, supplier=None, max_lead_time=None, none='quiet') -> list[dict]:
+		"""Query quotes associated to this ingredient"""
+
+		supplier_str = f' AND quote_supplier IS "{supplier}"' if supplier else ""
+		lead_time_str = f' AND quote_lead_time <= {max_lead_time}' if max_lead_time else ""
+		key_str = f'quote_compound IS {self.compound_id} AND quote_amount >= {min_amount}{supplier_str}{lead_time_str} ORDER BY quote_price'
+
+		result = self.db.select_where(query='quote_id', table='quote', key=key_str, multiple=False, none=none)
+
+		if result:
+			quote_id, = result
+			return quote_id
+		
+		else:
+			return None
 
 	### DUNDERS
 

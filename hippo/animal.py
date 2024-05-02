@@ -1,8 +1,9 @@
 
+
 import pandas as pd
 # import numpy as np
 
-from .cset import CompoundTable, IngredientSet
+from .cset import CompoundTable, IngredientSet, CompoundSet
 from .pset import PoseTable, PoseSet
 from .tags import TagTable
 from .rset import ReactionTable
@@ -63,6 +64,13 @@ class HIPPO:
 		self._poses = PoseTable(self.db, 'pose')
 		self._tags = TagTable(self.db, 'tag')
 		self._reactions = ReactionTable(self.db, 'reaction')
+
+		### in memory subsets
+		self._reactants = None
+		self._products = None
+		self._intermediates = None
+		self._bases = None
+		self._elabs = None
 
 		logger.success(f"Initialised animal {self}")
 		
@@ -129,7 +137,67 @@ class HIPPO:
 	def targets(self):
 		"""Returns the targets registered in the DB"""
 		target_ids = self.db.select(table='target', query='target_id', multiple=True)
-		return [self.db.get_target(id=q) for q, in target_ids]	
+		return [self.db.get_target(id=q) for q, in target_ids]
+
+	@property
+	def reactants(self):
+		"""Returns a CompoundSet of all compounds that are used as a reactants"""
+		if self._reactants is None or self._reactants['total_changes'] != self.db.total_changes:
+			self._reactants = dict(set=self.compounds.reactants, total_changes=self.db.total_changes)
+		return self._reactants['set']
+
+	@property
+	def products(self):
+		"""Returns a CompoundSet of all compounds that are a product of a reaction but not a reactant"""
+		if self._products is None or self._products['total_changes'] != self.db.total_changes:
+			self._products = dict(set=self.compounds.products, total_changes=self.db.total_changes)
+		return self._products['set']
+
+	@property
+	def intermediates(self):
+		"""Returns a CompoundSet of all compounds that are products and reactants"""
+		if self._intermediates is None or self._intermediates['total_changes'] != self.db.total_changes:
+			self._intermediates = dict(set=self.compounds.intermediates, total_changes=self.db.total_changes)
+		return self._intermediates['set']
+
+	@property
+	def num_reactants(self):
+		"""Returns the number of reactants (see HIPPO.reactants)"""
+		return len(self.reactants)
+
+	@property
+	def num_intermediates(self):
+		"""Returns the number of intermediates (see HIPPO.intermediates)"""
+		return len(self.intermediates)
+	
+	@property
+	def num_products(self):
+		"""Returns the number of products (see HIPPO.products)"""
+		return len(self.products)
+
+	@property
+	def elabs(self):
+		"""Returns a CompoundSet of all compounds that are a an elaboration of an existing base"""
+		if self._elabs is None or self._elabs['total_changes'] != self.db.total_changes:
+			self._elabs = dict(set=self.compounds.elabs, total_changes=self.db.total_changes)
+		return self._elabs['set']
+
+	@property
+	def bases(self):
+		"""Returns a CompoundSet of all compounds that are the basis for a set of elaborations"""
+		if self._bases is None or self._bases['total_changes'] != self.db.total_changes:
+			self._bases = dict(set=self.compounds.bases, total_changes=self.db.total_changes)
+		return self._bases['set']
+
+	@property
+	def num_elabs(self):
+		"""Returns the number of compounds that are a an elaboration of an existing base"""
+		return len(self.elabs)
+
+	@property
+	def num_bases(self):
+		"""Returns the number of compounds that are the basis for a set of elaborations"""
+		return len(self.bases)
 
 	### BULK INSERTION
 
@@ -459,11 +527,22 @@ class HIPPO:
 		*,
 		inspiration_map: dict | None = None,
 		base_only: bool = False,
-		tags: None | list = None,
+		tags: None | list[str] = None,
 		reaction_yield_map: dict | None = None,
+		require_truthy_bases: None | list[str] = None,
+		require_truthy_elabs: None | list[str] = None,
+		require_nonzero_truthy_bases: None | list[str] = None,
+		stop_after=None,
+		check_chemistry=True,
 	):
 
+		from .chem import check_reaction_types, InvalidChemistryError
+
 		tags = tags or []
+		require_truthy_bases = require_truthy_bases or ['path_to_mol', 'intra_geometry_pass']
+		require_truthy_elabs = require_truthy_elabs or ['path_to_mol', 'intra_geometry_pass']
+		require_nonzero_truthy_bases = require_nonzero_truthy_bases or ['path_to_mol', 'intra_geometry_pass']
+		assert all([k in require_truthy_bases for k in require_nonzero_truthy_bases])
 		
 		if isinstance(df_path, str):
 			df_path = Path(df_path)
@@ -472,12 +551,24 @@ class HIPPO:
 		# work out number of reaction steps
 		n_steps = max([int(s.split('_')[0]) for s in df.columns if '_product_smiles' in s])
 
+		# check chemistries
+		chemistries = set(sum([df[df[f'{j+1}_reaction'].notnull()][f'{j+1}_reaction'].tolist() for j in range(n_steps)], []))
+		logger.var('Present reactions', str(chemistries))
+		check_reaction_types(chemistries)
+
 		if f'{n_steps}_num_atom_diff' not in df.columns:
 			logger.error(df_path)
+			logger.error(f'{n_steps}_num_atom_diff not in columns:')
 			print(df.columns)
 			raise NotImplementedError
 
+		for key in require_nonzero_truthy_bases:
+			if not any(df[df[f'{n_steps}_product_name'].str.contains("base")][key].values):
+				logger.warning(f'No bases have {key}. Inserting them anyway')
+				require_truthy_bases.pop(require_truthy_bases.index(key))
+
 		base_id = None
+		base_reactants = {}
 
 		if base_only:
 			generator = df.iterrows()
@@ -486,139 +577,229 @@ class HIPPO:
 
 		n_comps = len(self.compounds)
 		n_poses = len(self.poses)
+		n_reactions = len(self.reactions)
 
-		for i,row in generator:
+		skipped_smaller = 0
+		skipped_reactions = 0
+		skipped_invalid_smiles = 0
 
-			path_to_mol = row.path_to_mol
+		try:
 
-			# skip pose-less entries
-			if not path_to_mol:
-				continue
-			
-			path_to_mol = path_to_mol.replace('//','/')
+			for i,row in generator:
 
-			this_row_is_a_base = 'base' in row[f'{n_steps}_product_name']
+				path_to_mol = row.path_to_mol
 
-			if base_only and not this_row_is_a_base:
-				continue
+				this_row_is_a_base = 'base' in row[f'{n_steps}_product_name']
 
-			if base_only and base_id and not this_row_is_a_base:
-				break
+				# skip entries that have non-truthy columns
+				if this_row_is_a_base:
 
-			try:
+					if any(not row[key] for key in require_truthy_bases):
+						continue
+
+					# for key in warn_not_truthy_bases:
+					# 	if not row[key]:
+					# 		logger.warning(f'Base (row {i=}) has {key}={row[key]}')
+
+				elif any(not row[key] for key in require_truthy_elabs):
+					continue
 				
-				# loop over each reaction step
-				for j in range(n_steps):
-	
-					j += 1
-	
-					reactants = []
-	
-					reactant_previous_product = row[f'{j}_r_previous_product']
-	
-					# reactant 1
-					if reactant_previous_product == 1:
-						reactant1_id = product.id
-						reactants.append(reactant1_id)
-					elif smiles := row[f'{j}_r1_smiles']:
-						
-						if not isinstance(smiles, str):
-							raise InvalidRowError(f'non-string {j}_r1_smiles')
+				if row[f'{n_steps}_num_atom_diff'] <= 0 and not this_row_is_a_base:
+					skipped_smaller += 1
+					continue
+
+				if base_only and not this_row_is_a_base:
+					continue
+
+				if base_only and base_id and not this_row_is_a_base:
+					break
+
+				if this_row_is_a_base and skipped_smaller and not base_id:
+					logger.warning(f"Skipped {skipped_smaller} elaborations that are smaller than the base compound")
+
+				elabs_registered = set()
+
+				try:
+					
+					# loop over each reaction step
+					for j in range(n_steps):
+		
+						j += 1
+		
+						reactants = []
+		
+						reactant_previous_product = row[f'{j}_r_previous_product']
+		
+						# reactant 1
+						if reactant_previous_product == 1:
+							reactant1_id = product_id
+							reactants.append(reactant1_id)
+						elif smiles := row[f'{j}_r1_smiles']:
 							
-						reactant1_id = self.register_compound(smiles=smiles, commit=False, return_compound=False, tags=tags)
-						reactants.append(reactant1_id)
-				
-					# reactant 2
-					if reactant_previous_product == 2:
-						reactant2_id = product.id
-						reactants.append(reactant2_id)
-					elif smiles := row[f'{j}_r2_smiles']:
-						
-						if not isinstance(smiles, str):
-							raise InvalidRowError(f'non-string {j}_r2_smiles')
+							if not isinstance(smiles, str):
+								raise InvalidRowError(f'non-string {j}_r1_smiles')
 							
-						reactant2_id = self.register_compound(smiles=smiles, commit=False, return_compound=False, tags=tags)
-						reactants.append(reactant2_id)
-				
-					# product
-					if smiles := row[f'{j}_product_smiles']:
-						if not isinstance(smiles, str):
-							raise InvalidRowError(f'non-string {j}_product_smiles')
-	
-						if j != n_steps:
-							this_tags = ['intermediate'] + tags
-							base = None
-	
-						elif this_row_is_a_base:
-							this_tags = ['base'] + tags
-							base = None
-	
+							try:
+								base = base_reactants[j][1] if not this_row_is_a_base else None
+							except KeyError:
+								print(row)
+								logger.error(f'Expected base_reactants to contain data when {this_row_is_a_base=}')
+								raise
+								
+							reactant1_id, duplicate = self.register_compound(smiles=smiles, commit=False, return_compound=False, tags=tags, base=base, register_base_if_duplicate=False, return_duplicate=True)
+
+							if duplicate and reactant1_id not in elabs_registered:
+								if base:
+									self.db.update(table='compound', id=reactant1_id, key='compound_base', value=base, commit=False)
+								elabs_registered.add(reactant1_id)
+							
+							reactants.append(reactant1_id)
+					
+						# reactant 2
+						if reactant_previous_product == 2:
+							reactant2_id = product_id
+							reactants.append(reactant2_id)
+						elif smiles := row[f'{j}_r2_smiles']:
+							
+							if not isinstance(smiles, str):
+								raise InvalidRowError(f'non-string {j}_r2_smiles')
+
+							# base = base_reactants[j][1] if not this_row_is_a_base else None
+							# reactant2_id = self.register_compound(smiles=smiles, commit=False, return_compound=False, tags=tags)
+							base = base_reactants[j][2] if not this_row_is_a_base else None
+
+							reactant2_id, duplicate = self.register_compound(smiles=smiles, commit=False, return_compound=False, tags=tags, base=base, register_base_if_duplicate=False, return_duplicate=True)
+
+							if duplicate and reactant2_id not in elabs_registered:
+								if base:
+									self.db.update(table='compound', id=reactant2_id, key='compound_base', value=base, commit=False)
+								elabs_registered.add(reactant2_id)
+								
+							reactants.append(reactant2_id)
+					
+						# product
+						if smiles := row[f'{j}_product_smiles']:
+							if not isinstance(smiles, str):
+								raise InvalidRowError(f'non-string {j}_product_smiles')
+		
+							if j != n_steps:
+								this_tags = tags #+ ['intermediate']
+								# base = base_reactants[j]['product'] if not this_row_is_a_base else None
+								base = None
+		
+							elif this_row_is_a_base:
+								this_tags = ['Syndirella base'] + tags
+								base = None
+		
+							else:
+								this_tags = tags #+ ['Syndirella elaboration']
+								base = base_id
+
+							product_id, duplicate = self.register_compound(smiles=smiles, tags=this_tags, commit=False, return_compound=False, base=base, register_base_if_duplicate=False, return_duplicate=True)
+
+							if duplicate and product_id not in elabs_registered:
+								if base:
+									self.db.update(table='compound', id=product_id, key='compound_base', value=base, commit=False)
+								elabs_registered.add(product_id)
+
+							if not base_id:
+								base_reactants[j] = {1:reactant1_id, 2:reactant2_id, 'product':product_id }
+							
+							if not base_id and j == n_steps and this_row_is_a_base:
+								base_id = product_id
+		
+						# register the reaction
+						if reaction_yield_map:
+							product_yield = reaction_yield_map[row[f'{j}_reaction']]
 						else:
-							this_tags = ['elab'] + tags
-							base = base_id
-	
-						product = self.register_compound(smiles=smiles, tags=this_tags, commit=False, return_compound=True, base=base)
-						
-						if not base_id and j == n_steps and this_row_is_a_base:
-							base_id = product.id
-	
-					# register the reaction
-					if reaction_yield_map:
-						product_yield = reaction_yield_map[row[f'{j}_reaction']]
+							product_yield = 1.0
+							
+						try:
+							self.register_reaction(
+								reactants=reactants, 
+								product=product_id, 
+								type=row[f'{j}_reaction'], 
+								commit=False, 
+								product_yield=product_yield,
+								check_chemistry=check_chemistry,
+							)
+						except InvalidChemistryError as e:
+							skipped_reactions += 1
+				
+				except InvalidRowError as e:
+					# logger.error(f'Skipping invalid row {i=}: {e}')
+					skipped_invalid_smiles += 1
+					continue
+
+				# pose metadata
+				metadata = {}
+
+				# inspirations
+				inspirations = []
+				for inspiration in row.regarded:
+					if inspiration_map:
+						inspiration = inspiration_map[inspiration]
 					else:
-						product_yield = 1.0
-						
-					self.register_reaction(reactants=reactants, product=product, type=row[f'{j}_reaction'], commit=False, product_yield=product_yield)
+						# this is really expensive
+						inspiration = self.poses[inspiration]
+					if inspiration:
+						inspirations.append(inspiration)
+				
+				if path_to_mol:
+					
+					path_to_mol = path_to_mol.replace('//','/')
 
-			except InvalidRowError as e:
-				logger.error(f'Skipping invalid row {i=}: {e}')
-				continue
+					# register the pose
+					self.register_pose(
+						compound=product_id, 
+						target='A71EV2A', 
+						path=path_to_mol, 
+						inspirations=inspirations, 
+						metadata=metadata, 
+						tags=this_tags, 
+						commit=False, 
+						return_pose=False,
+						overwrite_metadata=True,
+						warn_duplicate=False,
+						energy_score=row['∆∆G'],
+						distance_score=row['comRMSD'],
+					)
 
-			# pose metadata
-			metadata = {}
+				if stop_after and i > stop_after:
+					break
 
-			# inspirations
-			inspirations = []
-			for inspiration in row.regarded:
-				if inspiration_map:
-					inspiration = inspiration_map[inspiration]
-				else:
-					# this is really expensive
-					inspiration = self.poses[inspiration]
-				if inspiration:
-					inspirations.append(inspiration)
-			
-			# register the pose
-			self.register_pose(
-				compound=product, 
-				target='A71EV2A', 
-				path=path_to_mol, 
-				inspirations=inspirations, 
-				metadata=metadata, 
-				tags=this_tags, 
-				commit=False, 
-				return_pose=False,
-				overwrite_metadata=True,
-				warn_duplicate=False,
-				energy_score=row['∆∆G'],
-				distance_score=row['comRMSD'],
-			)
+		except KeyboardInterrupt:
+			logger.error('KeyboardInterrupt')
 
 		self.db.commit()
 
 		n_comps = len(self.compounds) - n_comps
 		n_poses = len(self.poses) - n_poses
+		n_reactions = len(self.reactions) - n_reactions
+
+		if skipped_reactions:
+			logger.warning(f'Skipped {skipped_reactions} invalid reactions')
+
+		if skipped_invalid_smiles:
+			logger.warning(f'Skipped {skipped_invalid_smiles} rows with NaN smiles')
 
 		if n_comps:
 			if not base_only: 
 				logger.success(f'Loaded {n_comps} new compounds from {df_path.name}')
 		else:
 			logger.warning(f'Loaded {n_comps} new compounds from {df_path.name}')
+		
 		if n_poses:
 			if not base_only: 
 				logger.success(f'Loaded {n_poses} new poses from {df_path.name}')
 		else:
 			logger.warning(f'Loaded {n_poses} new poses from {df_path.name}')
+
+		if n_reactions:
+			if not base_only: 
+				logger.success(f'Loaded {n_reactions} new reactions from {df_path.name}')
+		else:
+			logger.warning(f'Loaded {n_reactions} new reactions from {df_path.name}')
 
 		return base_id
 
@@ -715,6 +896,8 @@ class HIPPO:
 		return_compound: bool = True,
 		commit: bool = True,
 		alias: str | None = None,
+		return_duplicate: bool = False,
+		register_base_if_duplicate: bool = True,
 	) -> Compound:
 
 		"""Use a smiles string to add a compound to the database. If it already exists return the compound"""
@@ -731,11 +914,24 @@ class HIPPO:
 			logger.error(f'Could not sanitise {smiles=}')
 			return None
 
+		if base and isinstance(base, Compound):
+			base = base.id
+
 		inchikey = inchikey_from_smiles(smiles)
 
 		compound_id = self.db.insert_compound(
 			smiles=smiles, base=base, inchikey=inchikey, tags=tags, 
 			metadata=metadata, warn_duplicate=False, commit=commit, alias=alias)
+
+		duplicate = not bool(compound_id)
+
+		def _return(compound, duplicate, return_compound, return_duplicate):
+			if not return_compound and not isinstance(compound, int):
+				compound = compound.id
+			if return_duplicate:
+				return compound, duplicate
+			else:
+				return compound
 
 		if return_compound or metadata or alias or tags:
 			if not compound_id:
@@ -749,10 +945,15 @@ class HIPPO:
 			if alias:
 				compound.alias = alias
 
+			if base and not (register_base_if_duplicate and duplicate):
+				compound.base = base
+
 			if tags:
 				for tag in tags:
 					compound.tags.add(tag)
-
+			
+			return _return(compound, duplicate, return_compound, return_duplicate)
+			
 			if return_compound:
 				return compound
 			else:
@@ -761,37 +962,66 @@ class HIPPO:
 		else:
 			if not compound_id:
 				compound_id = self.db.get_compound_id(inchikey=inchikey)
-			return compound_id
+
+				if base and not (register_base_if_duplicate and duplicate):
+					self.db.update(table='compound', id=compound_id, key='compound_base', value=base, commit=commit)
+			
+			return _return(compound_id, duplicate, return_compound, return_duplicate)
 
 	def register_reaction(self,
 		*,
 		type: str,
-		product: Compound,
+		product: Compound | int,
 		reactants: list[Compound | int],
 		commit: bool = True,
 		product_yield: float = 1.0,
+		check_chemistry: bool = False,
 	) -> Reaction:
+
+		### CHECK REACTION VALIDITY
+
+		if check_chemistry:
+			from .chem import check_chemistry, InvalidChemistryError
+
+			if not isinstance(product, Compound):
+				product = self.db.get_compound(id=product)
+
+			if not isinstance(reactants, CompoundSet):
+				reactants = CompoundSet(self.db, reactants)
+
+			valid = check_chemistry(type, reactants, product)
+
+			if not valid:
+				raise InvalidChemistryError(f'{type=}, {reactants.ids=}, {product.id=}')
 
 		### CHECK FOR DUPLICATES
 		
-		reactant_ids = set(v if isinstance(v, int) else v.id for v in reactants)
-		
-		for reaction in product.reactions:
+		if isinstance(product, Compound):
+			product = product.id
 
-			if reaction.type != type:
-				continue
+		reactant_ids = set(v.id if isinstance(v, Compound) else v for v in reactants)
 
-			if reaction.product != product:
-				continue
+		pairs = self.db.execute(f'SELECT reactant_reaction, reactant_compound FROM reactant INNER JOIN reaction ON reactant.reactant_reaction = reaction.reaction_id WHERE reaction_type="{type}" AND reaction_product = {product}').fetchall()
 
-			if reaction.reactant_ids != reactant_ids:
-				continue
+		if pairs:
 
-			return reaction
+			reax_dict = {}
+			for reaction_id, reactant_id in pairs:
+				if reaction_id not in reax_dict:
+					reax_dict[reaction_id] = set()
+				reax_dict[reaction_id].add(reactant_id)
+
+			for reaction_id, reactants in reax_dict.items():
+				if reactants == reactant_ids:
+					return self.reactions[reaction_id]
+				
+		### INSERT A NEW REACTION
 
 		reaction_id = self.db.insert_reaction(type=type, product=product, commit=commit, product_yield=product_yield)
+		
+		### INSERT REACTANTS
 
-		for reactant in reactants:
+		for reactant in reactant_ids:
 			self.db.insert_reactant(compound=reactant, reaction=reaction_id, commit=commit)
 
 		return self.reactions[reaction_id]
@@ -1018,6 +1248,25 @@ class HIPPO:
 
 		return pose
 
+	### QUOTING
+
+	def quote_compounds(self, quoter, compounds):
+		"""Get batch quotes using the hippo.Quoter object supplied and add the quotes to the database"""
+		logger.header(f'Getting {quoter.supplier} quotes for {len(compounds)} compounds')
+		batch_size = quoter.batch_size
+		for i in range(0, len(compounds), batch_size):
+			logger.debug(f'batch {i%batch_size}')
+			batch = compounds[i:i+batch_size]
+			quoter.get_batch_quote(batch)
+
+	def quote_reactants(self, quoter):
+		"""Get batch quotes for all reactants in the database"""
+		self.quote_compounds(quoter=quoter, compounds=self.reactants)
+	
+	def quote_intermediates(self, quoter):
+		"""Get batch quotes for all reactants in the database"""
+		self.quote_compounds(quoter=quoter, compounds=self.intermediates)
+
 	### PLOTTING
 
 	def plot_tag_statistics(self, *args, **kwargs):
@@ -1048,6 +1297,20 @@ class HIPPO:
 		from .plotting import plot_residue_interactions
 		return plot_residue_interactions(self, poses=poses, residue_number=residue_number, **kwargs)
 
+	def plot_compound_availability(self, compounds=None, **kwargs):
+		"""Plot a bar chart of compound availability by supplier/catalogue"""
+		from .plotting import plot_compound_availability
+		return plot_compound_availability(self, compound=compounds, **kwargs)
+
+	def plot_compound_price(self, min_amount, compounds=None, **kwargs):
+		"""Plot a bar chart of minimum compound price for a given minimum amount"""
+		from .plotting import plot_compound_price
+		return plot_compound_price(self, min_amount=min_amount, compounds=compounds, **kwargs)
+
+	def plot_reaction_funnel(self, **kwargs):
+		from .plotting import plot_reaction_funnel
+		return plot_reaction_funnel(self, **kwargs)
+	
 	### OTHER
 
 	def summary(self):
@@ -1059,6 +1322,9 @@ class HIPPO:
 		logger.var('#reactions', self.num_reactions)
 		logger.var('#tags', self.num_tags)
 		logger.var('tags', self.tags.unique)
+		# logger.var('#products', len(self.products))
+
+		
 
 	### DUNDERS
 

@@ -71,6 +71,11 @@ class Database:
 			self._cursor = self.connection.cursor()
 		return self._cursor
 
+	@property
+	def total_changes(self):
+		"""Return the total number of database rows that have been modified, inserted, or deleted since the database connection was opened."""
+		return self.connection.total_changes
+
 	### PUBLIC METHODS / API CALLS
 
 	def close(self) -> None:
@@ -481,7 +486,7 @@ class Database:
 		path: str,
 		inchikey: str | None = None,
 		alias: str | None = None,
-		reference: int | None = None,
+		reference: int | Pose | None = None,
 		tags: None | list = None,
 		energy_score: float | None = None,
 		distance_score: float | None = None,
@@ -493,17 +498,14 @@ class Database:
 	):
 		"""Insert a pose"""
 
-		if isinstance(compound, int):
-			compound = self.get_compound(id=compound)
+		if isinstance(compound, Compound):
+			compound = compound.id
 
-		if isinstance(reference, int):
-			reference = self.get_pose(id=reference)
-
-		assert isinstance(compound, Compound), f'incompatible {compound}'
-		assert isinstance(reference, Pose) or reference is None, f'incompatible reference={reference}'
-
-		if reference:
+		if isinstance(reference, Pose):
 			reference = reference.id
+
+		# assert isinstance(compound, Compound), f'incompatible {compound}'
+		# assert isinstance(reference, Pose) or reference is None, f'incompatible reference={reference}'
 
 		if isinstance(target, str):
 			target = self.get_target_id(name=target)
@@ -527,7 +529,7 @@ class Database:
 		"""
 
 		try:
-			self.execute(sql, (inchikey, alias, None, compound.id, target, path, reference, energy_score, distance_score))
+			self.execute(sql, (inchikey, alias, None, compound, target, path, reference, energy_score, distance_score))
 
 		except sqlite3.IntegrityError as e:
 			if 'UNIQUE constraint failed: pose.pose_path' in str(e):
@@ -629,16 +631,16 @@ class Database:
 	def insert_reaction(self,
 		*,
 		type: str,
-		product: Compound,
+		product: Compound | int,
 		product_yield: float = 1.0,
 		commit: bool = True,
 	) -> int:
 		"""Insert a reaction"""
 
-		if isinstance(product, int):
-			product = self.get_compound(id=product)
+		if isinstance(product, Compound):
+			product = product.id
 
-		assert isinstance(product, Compound), f'incompatible {product=}'
+		# assert isinstance(product, Compound), f'incompatible {product=}'
 		assert isinstance(type, str), f'incompatible {type=}'
 
 		sql = """
@@ -647,7 +649,7 @@ class Database:
 		"""
 
 		try:
-			self.execute(sql, (type, product.id, product_yield))
+			self.execute(sql, (type, product, product_yield))
 
 		except Exception as e:
 			logger.exception(e)
@@ -696,7 +698,7 @@ class Database:
 
 	def insert_quote(self,
 		*,
-		compound: Compound,
+		compound: Compound | int,
 		supplier: str,
 		catalogue: str,
 		entry: str,
@@ -706,10 +708,14 @@ class Database:
 		purity: float,
 		lead_time: int,
 		smiles: str | None = None,
+		commit: bool = True,
 	) -> int | None:
 		"""Insert a quote"""
 
-		assert isinstance(compound, Compound), f'incompatible {compound=}'
+		if not isinstance(compound, int):
+			assert isinstance(compound, Compound), f'incompatible {compound=}'
+			compound = compound.id
+			
 		assert currency in ['GBP', 'EUR', 'USD'], f'incompatible {currency=}'
 
 		smiles = smiles or ""
@@ -732,11 +738,11 @@ class Database:
 		"""
 
 		try:
-			self.execute(sql, (smiles, amount, supplier, catalogue, entry, lead_time, price, currency, purity, compound.id))
+			self.execute(sql, (smiles, amount, supplier, catalogue, entry, lead_time, price, currency, purity, compound))
 
 		except sqlite3.InterfaceError as e:
 			logger.error(e)
-			logger.debug((smiles, amount, supplier, catalogue, entry, lead_time, price, currency, purity, compound.id))
+			logger.debug((smiles, amount, supplier, catalogue, entry, lead_time, price, currency, purity, compound))
 			raise
 
 		except Exception as e:
@@ -744,7 +750,8 @@ class Database:
 			return None
 			
 		quote_id = self.cursor.lastrowid
-		self.commit()
+		if commit:
+			self.commit()
 		return quote_id
 
 	def insert_target(self,
@@ -1074,10 +1081,12 @@ class Database:
 	) -> list[dict]:
 		"""Get a quote"""
 		
-		query = 'quote_compound, quote_supplier, quote_catalogue, quote_entry, quote_amount, quote_price, quote_currency, quote_lead_time, quote_purity, quote_date, quote_smiles '
+		query = 'quote_compound, quote_supplier, quote_catalogue, quote_entry, quote_amount, quote_price, quote_currency, quote_lead_time, quote_purity, quote_date, quote_smiles, quote_id '
 		entry = self.select_where(query=query, table=table, key='id', value=id, none=none)
 
 		return Quote(
+			db=self,
+			id=entry[11],
 			compound=entry[0],
 			supplier=entry[1],
 			catalogue=entry[2],
@@ -1252,6 +1261,42 @@ class Database:
 		self.execute(sql)
 		return self.cursor.fetchone()[0]
 
+	### ID SELECTION
+
+	def min_id(self, table):
+		"""Return the smallest ID in the given table"""
+		id, = self.select(table=table, query=f'MIN({table}_id)')
+		return id
+
+	def max_id(self, table):
+		"""Return the largest ID in the given table"""
+		id, = self.select(table=table, query=f'MAX({table}_id)')
+		return id
+
+	def slice_ids(self, *, table, start, stop, step=1):
+		"""Return a list of indices in the given slice"""
+
+		min_id = self.min_id(table)
+		max_id = self.max_id(table)
+
+		start = start or min_id
+		stop = stop or max_id + 1
+		step = step or 1
+
+		if not (start >= 0 and start <= max_id):
+			raise IndexError(f'Slice {start=} outside of DB {table}_id range ({min_id}, {max_id})')
+
+		if not (stop >= 0 and stop <= max_id + 1):
+			raise IndexError(f'Slice {stop=} outside of DB {table}_id range ({min_id}, {max_id})')
+
+		if step != 1:
+			raise NotImplementedError(f'Slice {step=} not supported')
+
+		ids = self.select_where(table=table, query=f'{table}_id', key=f'{table}_id >= {start} AND {table}_id < {stop}', multiple=True)
+		ids = [q for q, in ids]
+
+		return ids
+
 	### PRUNING
 
 	def prune_reactions(self, compound, reactions):
@@ -1321,4 +1366,6 @@ class Database:
 
 CHEMICALITE_COMPOUND_PROPERTY_MAP = {
 	'num_heavy_atoms':'mol_num_hvyatms',
+	'formula':'mol_formula',
+	'num_rings':'mol_num_rings',
 }

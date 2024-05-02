@@ -10,14 +10,30 @@ logger = logging.getLogger('HIPPO')
 class Recipe:
 	""" A Recipe stores data corresponding to a specific synthetic recipe involving several products, reactants, intermediates, and reactions."""
 
-	def __init__(self, products, reactants, intermediates, reactions):
+	_db = None
 
+	def __init__(self, db, products, reactants, intermediates, reactions):
+
+		from .cset import IngredientSet
+		from .rset import ReactionSet
+		
+		# check typing
+		assert isinstance(products, IngredientSet)
+		assert isinstance(reactants, IngredientSet)
+		assert isinstance(intermediates, IngredientSet)
+		assert isinstance(reactions, ReactionSet)
+		
 		self._products = products
 		self._reactants = reactants
 		self._intermediates = intermediates
 		self._reactions = reactions
+		self._db = db
 
 	### PROPERTIES
+
+	@property
+	def db(self):
+		return self._db
 
 	@property
 	def products(self):
@@ -34,6 +50,27 @@ class Recipe:
 	@property
 	def reactions(self):
 		return self._reactions
+
+	@property
+	def quotes(self):
+		return self.get_quotes()
+
+	@property
+	def price(self):
+		total = 0
+		quotes = self.quotes
+		if not quotes:
+			return None
+		assert len((currencies := set([q.currency for q in quotes]))) == 1, 'Multiple currencies'
+		return sum([q.price for q in quotes]), list(currencies)[0]
+
+	@property
+	def lead_time(self):
+		total = 0
+		quotes = self.quotes
+		if not quotes:
+			return None
+		return max([q.lead_time for q in quotes])
 	
 	### METHODS
 
@@ -52,38 +89,45 @@ class Recipe:
 		for reaction in self.reactions:
 			for reactant in reaction.reactants:
 				key = str(reactant)
+				# ingredient = self.get_ingredient(id=reactant.id)
+				# key = ingredient.compound_price_amount_str
 				graph.add_node(key)
-				sizes[key] = self.get_ingredient(id=reactant.id).amount
+
+				if not graph_only:
+					sizes[key] = self.get_ingredient(id=reactant.id).amount
+					if key in color_mapper:
+						colors[key] = color_mapper[key]
+					else:
+						colors[key] = (0.7,0.7,0.7)
+
+		for product in self.products:
+			key = str(product)
+			# ingredient = self.get_ingredient(id=reactant.id)
+			# key = ingredient.compound_price_amount_str
+			graph.add_node(key)
+			if not graph_only:
+				sizes[key] = product.amount
 				if key in color_mapper:
 					colors[key] = color_mapper[key]
 				else:
 					colors[key] = (0.7,0.7,0.7)
-
-		for product in self.products:
-			key = str(product)
-			graph.add_node(key)
-			sizes[key] = product.amount
-			if key in color_mapper:
-				colors[key] = color_mapper[key]
-			else:
-				colors[key] = (0.7,0.7,0.7)
 
 		for reaction in self.reactions:
 			for reactant in reaction.reactants:
 				graph.add_edge(str(reactant), str(reaction.product))
 
 		# rescale sizes
-		s_min = min(sizes.values())
-		sizes = [s/s_min*node_size for s in sizes.values()]
-
-		# pos = nx.spring_layout(graph, iterations=200, k=30)
-		pos = nx.spring_layout(graph)
+		if not graph_only:
+			s_min = min(sizes.values())
+			sizes = [s/s_min*node_size for s in sizes.values()]
 
 		if graph_only:
 			return graph
 		else:
 			import matplotlib as plt
 			# return nx.draw(graph, pos, with_labels=True, font_weight='bold')
+			# pos = nx.spring_layout(graph, iterations=200, k=30)
+			pos = nx.spring_layout(graph)
 			return nx.draw(graph, pos=pos, with_labels=True, font_weight='bold', node_color=list(colors.values()), node_size=sizes)
 
 	def sankey(self):
@@ -155,6 +199,58 @@ class Recipe:
 		"""Get an ingredient by its compound ID"""
 		return [r for r in self.reactants + self.products + self.intermediates if r.id == id][0]
 
+	def get_quotes(self, df=False):
+
+		quotes = [quote for i in self.reactants if (quote := i.quote)]
+
+		if df:
+			from pandas import DataFrame
+			return DataFrame([q.dict for q in quotes])
+
+		return quotes
+
+	def write_json(self, file, indent=4):
+
+		"""Serialise this recipe object and write it to disk
+
+		Store
+		=====
+
+		- Path to database
+		- Timestamp
+		- Reactants (& their quotes, amounts)
+		- Intermediates (& their quotes)
+		- Products (& their poses/scores/fingerprints)
+		- Reactions
+		- Total Price
+		- Lead time
+
+		"""
+
+		import json
+		from datetime import datetime
+
+		data = {}
+
+		# Database
+		data['database'] = str(self.db.path.resolve())
+		data['timestamp'] = str(datetime.now())
+
+		# Recipe properties
+		data['price'] = self.price
+		data['lead_time'] = self.price
+
+		# IngredientSet's
+		data['reactants'] = self.reactants.df.to_json(indent=indent)
+		data['intermediates'] = self.intermediates.df.to_json(indent=indent)
+		data['products'] = self.products.df.to_json(indent=indent)
+		
+		# ReactionSet
+		data['reaction_ids'] = self.reactions.ids
+
+		logger.writing(file)
+		json.dump(open(file, 'wt'), data, indent=indent)
+
 	# def get_reactant_reactions(self, reactant):
 	# 	"""Get reactions that a reactant is involved in"""
 	# 	return [r for r in self.reactions if reactant in r.reactants]
@@ -162,4 +258,10 @@ class Recipe:
 	# def get_reactant_reaction_string(self, reactant):
 	# 	reactions = self.get_reactant_reactions(reactant)
 	# 	return ' '.join([str(r) for r in reactions])
-				
+
+	### DUNDERS
+
+	def __repr__(self):
+		return f'Recipe({self.reactants} --> {self.intermediates} --> {self.products} via {self.reactions})'
+
+		

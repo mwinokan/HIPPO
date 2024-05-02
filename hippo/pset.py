@@ -156,14 +156,8 @@ class PoseTable:
 				return PoseSet(self.db, indices)
 
 			case slice():
-
-				start = key.start or 1
-				stop = key.stop or len(self)
-				step = key.step or 1
-
-				indices = [i for i in range(start, stop, step)]
-
-				return self[indices]
+				ids = self.db.slice_ids(table=self.table, start=key.start, stop=key.stop, step=key.step)
+				return self[ids]
 
 			case _:
 				logger.error(f'Unsupported type for PoseTable.__getitem__(): {type(key)}')
@@ -171,8 +165,7 @@ class PoseTable:
 		return None
 
 	def __repr__(self) -> str:
-		# return f'PoseTable(table="{self.table}")'
-		return f'{mcol.bold}{mcol.underline}set(P x {len(self)}){mcol.unbold}{mcol.ununderline}'
+		return f'{mcol.bold}{mcol.underline}'"{"f'P x {len(self)}'"}"f'{mcol.unbold}{mcol.ununderline}'
 
 	def __len__(self) -> int:
 		return self.db.count(self.table)
@@ -181,17 +174,16 @@ class PoseTable:
 		return iter(self[i+1] for i in range(len(self)))
 
 
-class PoseSet(PoseTable):
+class PoseSet:
 	"""Object representing a subset of the 'pose' table in the :class:`.Database`."""
 
+	_table = 'pose'
+	
 	def __init__(self,
 		db: Database,
 		indices: list = None,
-		*,
-		table: str = 'pose',
 	):
 		self._db = db
-		self._table = table
 
 		indices = indices or []
 
@@ -203,6 +195,14 @@ class PoseSet(PoseTable):
 		self._indices = sorted(list(set(indices)))
 
 	### PROPERTIES
+
+	@property
+	def db(self):
+		return self._db
+
+	@property
+	def table(self):
+		return self._table
 
 	@property
 	def indices(self):
@@ -302,6 +302,17 @@ class PoseSet(PoseTable):
 		"""Returns the target ID's of poses in this set"""
 		result = self.db.select_where(table=self.table, query='DISTINCT pose_target', key=f'pose_id in {self.str_ids}', multiple=True)
 		return [q for q, in result]
+
+	@property
+	def best_placed_pose(self):
+		"""Returns the pose with the best distance_score in this subset"""
+		return self.db.get_pose(id=self.best_placed_pose_id)
+
+	@property
+	def best_placed_pose_id(self):
+		query = f'pose_id, MIN(pose_distance_score)'
+		query = self.db.select_where(table='pose', query=query, key=f'pose_id in {self.str_ids}', multiple=False)
+		return query[0]
 
 	### FILTERING
 
@@ -464,7 +475,7 @@ class PoseSet(PoseTable):
 
 		from pathlib import Path
 
-		df = self.get_df(mol=True)
+		df = self.get_df(mol=True, inspirations='fragalysis')
 
 		df.rename(inplace=True, columns={name_col:'_Name', 'mol':'ROMol'})
 
@@ -781,7 +792,8 @@ class PoseSet(PoseTable):
 
 		mols = [p.mol for p in self]
 
-		return draw_mols(mols)
+		drawing = draw_mols(mols)
+		display(drawing)
 
 	def grid(self):
 		"""Draw a grid of all contained molecules"""
@@ -797,7 +809,7 @@ class PoseSet(PoseTable):
 	### DUNDERS
 
 	def __repr__(self) -> str:
-		return f'{mcol.bold}{mcol.underline}subset(P x {len(self)}){mcol.unbold}{mcol.ununderline}'
+		return f'{mcol.bold}{mcol.underline}'"{"f'P x {len(self)}'"}"f'{mcol.unbold}{mcol.ununderline}'
 
 	def __len__(self) -> int:
 		return len(self.indices)

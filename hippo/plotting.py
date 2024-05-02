@@ -24,7 +24,7 @@ import functools
 def hippo_graph(func):
 
 	@functools.wraps(func)
-	def wrapper(animal, *args, **kwargs):
+	def wrapper(animal, *args, logo='top right', **kwargs):
 
 		wrapper_kwargs = {}
 		wrapper_keys = ['show', 'html', 'pdf', 'png']
@@ -32,6 +32,9 @@ def hippo_graph(func):
 			wrapper_kwargs[key] = kwargs.pop(key,None)
 
 		fig = func(animal, *args, **kwargs)
+
+		if not isinstance(fig, go.Figure):
+			return fig
 
 		if wrapper_kwargs['show']:
 				fig.show()
@@ -54,8 +57,8 @@ def hippo_graph(func):
 				file = f'{file}.png'
 			mp.write(file, fig)
 
-		if not fig.layout.images:
-			add_hippo_logo(fig)
+		if not fig.layout.images and logo:
+			add_hippo_logo(fig, position=logo)
 
 		return fig
 	
@@ -588,7 +591,7 @@ def plot_compound_property(animal, prop, compounds=None, style='bar', null=None)
 	return fig
 
 @hippo_graph
-def plot_pose_property(animal, prop, poses=None, style='scatter', title=None, null=None, color=None, log_y=False):
+def plot_pose_property(animal, prop, poses=None, style='scatter', title=None, null=None, color=None, log_y=False, subtitle=None, data_only=False, **kwargs):
 
 	"""
 	Get an arbitrary property from all the poses in animal.poses
@@ -609,28 +612,97 @@ def plot_pose_property(animal, prop, poses=None, style='scatter', title=None, nu
 			n_poses = len(poses)
 			logger.out(f'Querying database for {n_poses} poses...')
 			field = f'pose_{p}'
-			title = f'{p} of all poses'
+			title = title or f'{p} of all poses'
 			query = animal.db.select_where(table='pose', query=field, key=f'{field} is not NULL', multiple=True)
+			
+		else:
+
+			# subset of poses
+			assert poses.table == 'pose', f'{poses=} is not a set of Pose objects'
+			n_poses = len(poses)
+			logger.out(f'Querying database for {n_poses} poses...')
+			field = f'pose_{p}'
+			title = title or f'{p} of pose subset'
+			query = animal.db.select_where(table='pose', query=field, key=f'{field} is not NULL and pose_id in {poses.str_ids}', multiple=True)
+			
+		plot_data = [{p:v} for v, in query]
+
+		if p == 'energy_score':
+			subtitle = subtitle or f'#poses={n_poses}, energy_score < 0 = {len([None for d in plot_data if d[p] < 0])/n_poses:.1%}'
+		elif p == 'distance_score':
+			subtitle = subtitle or f'#poses={n_poses}, distance_score < 2 = {len([None for d in plot_data if d[p] < 2])/n_poses:.1%}'
+		else:
+			subtitle = subtitle or f'#poses={n_poses}'
+
+		prop = [prop]
+
+	elif prop == ['energy_score', 'distance_score'] or prop == ['distance_score', 'energy_score']:
+		
+		query = f'pose_id, pose_distance_score, pose_energy_score'
+
+		# hardcoded errorbars
+		distance_score_err = 0.03
+		energy_score_err = 6
+
+		if color:
+			query += f', {color}'
+		
+		if not poses:
+			# great all poses!
+			poses = animal.poses
+			n_poses = len(poses)
+			logger.out(f'Querying database for {n_poses} poses...')
+			title = f'distance & energy scores of all poses'
+			query = animal.db.select(table='pose', query=query, multiple=True)
 			
 		else:
 
 			# subset of poses
 			n_poses = len(poses)
 			logger.out(f'Querying database for {n_poses} poses...')
-			field = f'pose_{p}'
-			title = f'{p} of pose subset'
-			query = animal.db.select_where(table='pose', query=field, key=f'{field} is not NULL and pose_id in {poses.str_ids}', multiple=True)
+			title = f'distance & energy scores of pose subset'
+			query = animal.db.select_where(table='pose', query=query, key=f'pose_id in {poses.str_ids}', multiple=True)
 			
-		plot_data = [{p:v} for v, in query]
+		plot_data = []
+		for q in query:
+			d = {'id':q[0], 'distance_score':q[1], 'energy_score':q[2], 'distance_score_err':distance_score_err, 'energy_score_err':energy_score_err} 
+			if color:
+				d[color] = q[-1]
+				if color == 'pose_compound':
+					d[color] = f'C{d[color]}'
 
-		if p == 'energy_score':
-			subtitle = f'#poses={n_poses}, energy_score < 0 = {len([None for d in plot_data if d[p] < 0])/n_poses:.1%}'
-		elif p == 'distance_score':
-			subtitle = f'#poses={n_poses}, distance_score < 2 = {len([None for d in plot_data if d[p] < 2])/n_poses:.1%}'
-		else:
-			subtitle = f'#poses={n_poses}'
+			plot_data.append(d)
 
-		prop = [prop]
+		kwargs['error_x'] = 'energy_score_err'
+		kwargs['error_y'] = 'distance_score_err'
+		
+		subtitle = subtitle or f'#poses={n_poses}'
+
+	# elif prop == ['num_atoms_added', 'energy_score'] or prop == ['num_atoms_added', 'energy_score']:
+	# 	logger.error('Use animal.plot_pose_risk_vs_placement')
+	# 	raise NotImplementedError
+		
+	# 	query = f'pose_id, , pose_distance_score, pose_energy_score'
+		
+	# 	if not poses:
+	# 		# great all poses!
+	# 		poses = animal.poses
+	# 		n_poses = len(poses)
+	# 		logger.out(f'Querying database for {n_poses} poses...')
+	# 		title = f'distance & energy scores of all poses'
+	# 		query = animal.db.select(table='pose', query=query, multiple=True)
+			
+	# 	else:
+
+	# 		# subset of poses
+	# 		n_poses = len(poses)
+	# 		logger.out(f'Querying database for {n_poses} poses...')
+	# 		title = f'distance & energy scores of pose subset'
+	# 		query = animal.db.select_where(table='pose', query=query, key=f'pose_id in {poses.str_ids}', multiple=True)
+			
+	# 	plot_data = [{'id':id, 'distance_score':v1, 'energy_score':v2 } for id,v1,v2 in query]
+		
+	# 	subtitle = f'#poses={n_poses}'
 	
 	else:
 
@@ -683,16 +755,33 @@ def plot_pose_property(animal, prop, poses=None, style='scatter', title=None, nu
 						v = null
 	
 					data[p] = v
+
+			if color:
+				if color not in data:
+					# get attr
+					if hasattr(pose,color):
+						v = getattr(pose,color)
+		
+					elif color in (m := pose.metadata):				
+						v = m[color]
+					
+					else:
+						v = null
+	
+					data[color] = v
 	
 			plot_data.append(data)
 
+	if data_only:
+		return plot_data
+	
 	hover_data = ['id'] #, 'alias', 'inchikey'] #, 'tags', 'inspirations']
 
 	if len(prop) == 1:
 
 		title = title or f'Pose {prop[0]}'
 
-		fig = px.histogram(plot_data, x=prop[0], hover_data=None, color=color)
+		fig = px.histogram(plot_data, x=prop[0], hover_data=None, color=color, **kwargs)
 		
 		fig.update_layout(xaxis_title=prop[0], yaxis_title='Quantity')
 
@@ -703,7 +792,7 @@ def plot_pose_property(animal, prop, poses=None, style='scatter', title=None, nu
 			x = [d[prop[0]] for d in plot_data]
 			y = [d[prop[1]] for d in plot_data]
 
-			fig = go.Figure(go.Histogram2d(x=x, y=y))
+			fig = go.Figure(go.Histogram2d(x=x, y=y, **kwargs))
 
 		else:
 			
@@ -711,7 +800,7 @@ def plot_pose_property(animal, prop, poses=None, style='scatter', title=None, nu
 				style='scatter'
 			
 			func = eval(f'px.{style}')
-			fig = func(plot_data, x=prop[0], y=prop[1], color=color, hover_data=hover_data)
+			fig = func(plot_data, x=prop[0], y=prop[1], color=color, hover_data=hover_data, **kwargs)
 
 		title = title or f'Pose {prop[0]} vs {prop[1]}'
 		fig.update_layout(xaxis_title=prop[0], yaxis_title=prop[1])
@@ -719,12 +808,87 @@ def plot_pose_property(animal, prop, poses=None, style='scatter', title=None, nu
 	else:
 		mout.error('Unsupported', code='plotting.plot_pose_property.1')
 
+	title = title or f'<b>{animal.name}</b>: {title}<br>'
+	
 	if subtitle:
-		title = f'<b>{animal.name}</b>: {title}<br><sup><i>{subtitle}</i></sup>'
-	else:
-		title = f'<b>{animal.name}</b>: {title}<br>'
+		title = f'{title}<br><sup><i>{subtitle}</i></sup>'
 
 	fig.update_layout(title=title,title_automargin=False, title_yref='container', barmode='group')
+
+	return fig
+
+@hippo_graph
+def plot_compound_availability(animal, compounds=None, title=None, subtitle=None):
+
+	from .cset import CompoundTable
+	
+	compounds = compounds or animal.compounds
+
+	match compounds:
+		case CompoundTable():
+			pairs = animal.db.select(table='quote', query='DISTINCT quote_supplier, quote_catalogue', multiple=True)
+		
+			plot_data = []
+			for supplier, catalogue in pairs:
+		
+				count, = animal.db.select_where(table='quote', query='COUNT(DISTINCT quote_compound)', key=f'quote_supplier IS "{supplier}" AND quote_catalogue IS "{catalogue}"')
+				plot_data.append(dict(supplier=supplier, catalogue=catalogue, count=count))
+				
+		case _:
+			raise NotImplementedError
+		
+	fig = px.bar(plot_data, x='catalogue', y='count', color='supplier')
+
+	title = 'Compound availability'
+	
+	title = title or f'<b>{animal.name}</b>: Compound availability<br>'
+	
+	if subtitle:
+		title = f'{title}<br><sup><i>{subtitle}</i></sup>'
+
+	fig.update_layout(title=title) #,title_automargin=False, title_yref='container', barmode='group')
+
+	return fig
+
+@hippo_graph
+def plot_compound_price(animal, compounds=None, min_amount=1, subtitle=None, title=None, style='histogram', **kwargs):
+
+	from .cset import CompoundTable
+	
+	compounds = compounds or animal.compounds
+
+	match compounds:
+		case CompoundTable():
+
+			data = animal.db.select_where(table='quote', query='quote_amount, MIN(quote_price)', key=f'quote_amount >= {min_amount} GROUP BY quote_compound', multiple=True)
+
+			n_compounds = len(data)
+
+			plot_data = []
+			for amount, price in data:
+				plot_data.append(dict(min_price=price, quoted_amount=amount))
+	
+		case _:
+			raise NotImplementedError('CompoundSet not yet supported')
+
+	plot_data = sorted(plot_data, key=lambda x: x['quoted_amount'])
+		
+	match style:
+		case 'histogram':
+			fig = px.histogram(plot_data, color='quoted_amount', x='min_price', **kwargs)
+		case 'violin':
+			fig = px.violin(plot_data, color='quoted_amount', x='min_price', **kwargs)
+		case _:
+			raise NotImplementedError(f'{style=}')
+
+	subtitle = subtitle or f'#compounds={n_compounds}, {min_amount=} mg'
+	
+	title = title or f'<b>{animal.name}</b>: Compound price<br>'
+	
+	if subtitle:
+		title = f'{title}<br><sup><i>{subtitle}</i></sup>'
+
+	fig.update_layout(title=title) #,title_automargin=False, title_yref='container', barmode='group')
 
 	return fig
 
@@ -809,23 +973,66 @@ def plot_reactant_sankey(animal, subtitle):
 
 	return fig
 
+@hippo_graph
+def plot_reaction_funnel(animal, title=None, subtitle=None):
+
+	compounds = animal.compounds
+
+	data = dict(
+		number=[compounds.num_reactants, compounds.num_intermediates, compounds.num_products],
+		category=["Reactants", "Intermediates", "Products"]
+	)
+	
+	fig = px.funnel(data, x='category', y='number')
+
+	title = title or f'<b>{animal.name}</b>: Reaction statistics'
+
+	if subtitle:
+		title = f'{title}<br><sup><i>{subtitle}</i></sup>'
+
+	fig.update_layout(title=title, title_automargin=False, title_yref='container')
+	
+	return fig
+
 HIPPO_LOGO_URL = 'https://raw.githubusercontent.com/mwinokan/HIPPO/main/logos/hippo_logo_tightcrop.png'
 HIPPO_HEAD_URL = 'https://raw.githubusercontent.com/mwinokan/HIPPO/main/logos/hippo_assets-02.png'
 
-def add_hippo_logo(fig, in_plot=True):
+def add_hippo_logo(fig, in_plot=True, position='top right'):
 
 	assert fig.layout.title.text, 'Figure must have a title to add the HIPPO logo'
 
 	if in_plot:
 
+		sizex=0.3
+		sizey=0.3
+
+		if 'top' in position:
+			yanchor="top"
+			y = 0.95
+		elif 'bottom' in position:
+			yanchor="bottom"
+			y = 0.05
+		else:
+			yanchor="middle"
+			y = 0.50
+
+		if 'left' in position:
+			xanchor = "left"
+			x = 0.05
+		elif 'right' in position:
+			xanchor = "right"
+			x = 0.95
+		else:
+			xanchor = "center"
+			x = 0.50
+
 		fig.add_layout_image(dict(
 			source=HIPPO_LOGO_URL,
 			xref="paper", yref="paper",
 			# layer='below',
-			
-			x=0.95, y=0.95,
-			sizex=0.3, sizey=0.3,
-			xanchor="right", yanchor="top",
+			x=x, y=y,
+			sizex=sizex, sizey=sizey,
+			xanchor=xanchor, yanchor=yanchor,
 		))
 
 		return fig

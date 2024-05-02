@@ -68,6 +68,9 @@ class Pose:
 		self._energy_score = energy_score
 		self._distance_score = distance_score
 
+		self._base_id = None
+		self._num_heavy_atoms = None
+
 		if fingerprint:
 			# logger.debug('unpickling fingerprint')
 			fingerprint = pickle.loads(fingerprint)		
@@ -370,26 +373,41 @@ class Pose:
 	@property
 	def num_heavy_atoms(self):
 		"""Number of heavy atoms"""
-		from rdkit import Chem
-		try:
-			mol = self.mol
-		except InvalidMolError:
-			return None
-		return Chem.Mol.GetNumHeavyAtoms(mol)
+		if not self._num_heavy_atoms:
+			# print(self.compound_id)
+			self._num_heavy_atoms = self.db.get_compound_computed_property('num_heavy_atoms', self.compound_id)
+		return self._num_heavy_atoms
 
 	@property
 	def num_atoms_added(self):
-		"""Get the number of heavy atoms added w.r.t. to the inspirations (assuming perfect merge)"""
-		inspirations = self.inspirations
-		assert inspirations
+		"""Calculate the number of atoms added relative to the base or inspirations"""
+		# use base
+		if (b_id := self.base_id):
+			n_e = self.num_heavy_atoms
+			n_b = self.db.get_compound_computed_property('num_heavy_atoms', b_id)
+			return n_e - n_b
+			
+		# use inspirations
+		else:
+			# raise NotImplementedError
+			inspirations = self.inspirations
+			assert inspirations
+	
+			count = 0
+			for i in inspirations:
+				count += i.num_heavy_atoms
+	
+			if (self_count := self.num_heavy_atoms) is None:
+				return None
+			return self.num_heavy_atoms - count
 
-		count = 0
-		for i in inspirations:
-			count += i.num_heavy_atoms
-
-		if (self_count := self.num_heavy_atoms) is None:
-			return None
-		return self.num_heavy_atoms - count
+	@property
+	def base_id(self):
+		"""Get the base compound ID"""
+		if not self._base_id:
+			val, = self.db.select_where(table='compound', query='compound_base', key='id', value=self.compound_id)
+			self._base_id = val
+		return self._base_id
 
 	@property
 	def fields(self):

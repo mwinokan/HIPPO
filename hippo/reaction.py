@@ -84,6 +84,22 @@ class Reaction:
 		"""Returns the product ID"""
 		return self.product.id
 	
+	@property
+	def product_smiles(self):
+		return self.product.smiles
+
+	@property
+	def reactant_smiles(self):
+		return [r.smiles for r in self.reactants]
+
+	@property
+	def product_mol(self):
+		return self.product.mol
+
+	@property
+	def reactant_mols(self):
+		return [r.mol for r in self.reactants]
+
 	### METHODS
 
 	def get_reactant_amount_pairs(self) -> list[Compound]:
@@ -174,15 +190,20 @@ class Reaction:
 	):
 		"""Get a :class:`.Recipe` describing how to make the product"""
 
-		products = [self.product.as_ingredient(amount=amount)]
+		from .cset import IngredientSet
+		from .rset import ReactionSet
+		
+		products = IngredientSet(self.db, [self.product.as_ingredient(amount=amount)])
 
 		reactants, reactions, intermediates = self.get_ingredients(amount=amount, return_reactions=True, return_intermediates=True, debug=debug)
+		
+		reactions = ReactionSet(self.db, [self.id]) + reactions
 
-		recipe = Recipe(products=products, reactants=reactants, reactions=reactions, intermediates=intermediates)
+		recipe = Recipe(self.db, products=products, reactants=reactants, reactions=reactions, intermediates=intermediates)
 		
 		return recipe
 
-	def summary(self, amount=1):
+	def summary(self, amount=1, draw=True):
 		"""Print a summary of this reaction's information"""
 
 		print(f'{self}.id={self.id}')
@@ -193,9 +214,13 @@ class Reaction:
 		reactants = self.get_reactant_amount_pairs()
 		print(f'{self}.reactants={reactants}')
 
+
 		print(f'Ingredients for {amount} mg of product:')
 		ingredients = self.get_ingredients(amount=amount)
 		print(ingredients)
+
+		if draw:
+			return self.draw()
 
 		# return self.get_recipe(amount)
 
@@ -214,7 +239,32 @@ class Reaction:
 		labels = [f'+ {r}' if i>0 else f'{r}' for i,r in enumerate(reactants)]
 		labels.append(f'-> {product}')
 
-		return draw_grid(mols, labels=labels, highlightAtomLists=None)
+		drawing = draw_grid(mols, labels=labels, highlightAtomLists=None)
+		display(drawing)
+
+	def check_chemistry(self, debug=False):
+		from .chem import check_chemistry
+		return check_chemistry(self.type, self.reactants, self.product, debug=debug)
+
+	def get_dict(self, smiles=True, mols=True):
+
+		"""Returns a dictionary representing this Reaction"""
+
+		serialisable_fields = ['id','type', 'product_id', 'reactant_ids']
+
+		data = {}
+		for key in serialisable_fields:
+			data[key] = getattr(self, key)
+
+		if smiles:
+			data['product_smiles'] = self.product_smiles
+			data['reactant_smiles'] = self.reactant_smiles
+
+		if mols:
+			data['product_mol'] = self.product_mol
+			data['reactant_mols'] = self.reactant_mols
+
+		return data
 
 	### DUNDERS
 
