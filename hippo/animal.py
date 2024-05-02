@@ -65,6 +65,13 @@ class HIPPO:
 		self._tags = TagTable(self.db, 'tag')
 		self._reactions = ReactionTable(self.db, 'reaction')
 
+		### in memory subsets
+		self._reactants = None
+		self._products = None
+		self._intermediates = None
+		self._bases = None
+		self._elabs = None
+
 		logger.success(f"Initialised animal {self}")
 		
 	### FACTORIES
@@ -135,17 +142,23 @@ class HIPPO:
 	@property
 	def reactants(self):
 		"""Returns a CompoundSet of all compounds that are used as a reactants"""
-		return self.compounds.reactants
+		if self._reactants is None or self._reactants['total_changes'] != self.db.total_changes:
+			self._reactants = dict(set=self.compounds.reactants, total_changes=self.db.total_changes)
+		return self._reactants['set']
 
 	@property
 	def products(self):
 		"""Returns a CompoundSet of all compounds that are a product of a reaction but not a reactant"""
-		return self.compounds.products
+		if self._products is None or self._products['total_changes'] != self.db.total_changes:
+			self._products = dict(set=self.compounds.products, total_changes=self.db.total_changes)
+		return self._products['set']
 
 	@property
 	def intermediates(self):
 		"""Returns a CompoundSet of all compounds that are products and reactants"""
-		return self.compounds.intermediates
+		if self._intermediates is None or self._intermediates['total_changes'] != self.db.total_changes:
+			self._intermediates = dict(set=self.compounds.intermediates, total_changes=self.db.total_changes)
+		return self._intermediates['set']
 
 	@property
 	def num_reactants(self):
@@ -165,12 +178,16 @@ class HIPPO:
 	@property
 	def elabs(self):
 		"""Returns a CompoundSet of all compounds that are a an elaboration of an existing base"""
-		return self.compounds.elabs
+		if self._elabs is None or self._elabs['total_changes'] != self.db.total_changes:
+			self._elabs = dict(set=self.compounds.elabs, total_changes=self.db.total_changes)
+		return self._elabs['set']
 
 	@property
 	def bases(self):
 		"""Returns a CompoundSet of all compounds that are the basis for a set of elaborations"""
-		return self.compounds.bases
+		if self._bases is None or self._bases['total_changes'] != self.db.total_changes:
+			self._bases = dict(set=self.compounds.bases, total_changes=self.db.total_changes)
+		return self._bases['set']
 
 	@property
 	def num_elabs(self):

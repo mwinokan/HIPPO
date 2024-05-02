@@ -71,6 +71,11 @@ class Database:
 			self._cursor = self.connection.cursor()
 		return self._cursor
 
+	@property
+	def total_changes(self):
+		"""Return the total number of database rows that have been modified, inserted, or deleted since the database connection was opened."""
+		return self.connection.total_changes
+
 	### PUBLIC METHODS / API CALLS
 
 	def close(self) -> None:
