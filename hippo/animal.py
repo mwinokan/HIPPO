@@ -1248,6 +1248,25 @@ class HIPPO:
 
 		return pose
 
+	### QUOTING
+
+	def quote_compounds(self, quoter, compounds):
+		"""Get batch quotes using the hippo.Quoter object supplied and add the quotes to the database"""
+		logger.header(f'Getting {quoter.supplier} quotes for {len(compounds)} compounds')
+		batch_size = quoter.batch_size
+		for i in range(0, len(compounds), batch_size):
+			logger.debug(f'batch {i%batch_size}')
+			batch = compounds[i:i+batch_size]
+			quoter.get_batch_quote(batch)
+
+	def quote_reactants(self, quoter):
+		"""Get batch quotes for all reactants in the database"""
+		self.quote_compounds(quoter=quoter, compounds=self.reactants)
+	
+	def quote_intermediates(self, quoter):
+		"""Get batch quotes for all reactants in the database"""
+		self.quote_compounds(quoter=quoter, compounds=self.intermediates)
+
 	### PLOTTING
 
 	def plot_tag_statistics(self, *args, **kwargs):

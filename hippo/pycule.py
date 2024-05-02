@@ -62,6 +62,7 @@ class Quoter:
 		if supplier == 'Enamine':
 
 			self.supplier = 'Enamine'
+			self.batch_size = 2000
 			self.catalogues = ENAMINE_CATALOGUES
 			self._get_quote = self.get_enamine_quote
 			self._get_batch_quote = self.get_enamine_batch_quote
@@ -74,6 +75,7 @@ class Quoter:
 		elif supplier == 'MCule':
 
 			self.supplier = 'MCule'
+			self.batch_size = 1000
 			self._get_quote = self.get_mcule_quote
 			self._get_batch_quote = self.get_mcule_batch_quote
 			
@@ -521,6 +523,7 @@ class Quoter:
 		# bulk query compound availability
 
 		t_start = time.perf_counter()
+		logger.title('MCule bulk availability query...')
 		data = self.wrapper.multiplequerieswithavailability(compounds.smiles)
 		
 		logger.var('availability query time', time.perf_counter() - t_start)
@@ -529,6 +532,7 @@ class Quoter:
 		
 		logger.var('#results', len(results))
 
+		logger.title('MCule single price queries...')
 		for result in tqdm(results):
 			
 			entry = result['mcule_id']
