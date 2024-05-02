@@ -84,6 +84,22 @@ class Reaction:
 		"""Returns the product ID"""
 		return self.product.id
 	
+	@property
+	def product_smiles(self):
+		return self.product.smiles
+
+	@property
+	def reactant_smiles(self):
+		return [r.smiles for r in self.reactants]
+
+	@property
+	def product_mol(self):
+		return self.product.mol
+
+	@property
+	def reactant_mols(self):
+		return [r.mol for r in self.reactants]
+
 	### METHODS
 
 	def get_reactant_amount_pairs(self) -> list[Compound]:
@@ -228,6 +244,26 @@ class Reaction:
 	def check_chemistry(self, debug=False):
 		from .chem import check_chemistry
 		return check_chemistry(self.type, self.reactants, self.product, debug=debug)
+
+	def get_dict(self, smiles=True, mols=True):
+
+		"""Returns a dictionary representing this Reaction"""
+
+		serialisable_fields = ['id','type', 'product_id', 'reactant_ids']
+
+		data = {}
+		for key in serialisable_fields:
+			data[key] = getattr(self, key)
+
+		if smiles:
+			data['product_smiles'] = self.product_smiles
+			data['reactant_smiles'] = self.reactant_smiles
+
+		if mols:
+			data['product_mol'] = self.product_mol
+			data['reactant_mols'] = self.reactant_mols
+
+		return data
 
 	### DUNDERS
 

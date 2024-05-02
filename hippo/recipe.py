@@ -198,6 +198,12 @@ class Recipe:
 
 		return quotes
 
+	def write_json(self):
+
+		"""Serialise this recipe object and write it to disk"""
+
+		raise NotImplementedError
+
 	# def get_reactant_reactions(self, reactant):
 	# 	"""Get reactions that a reactant is involved in"""
 	# 	return [r for r in self.reactions if reactant in r.reactants]

@@ -332,7 +332,7 @@ class Compound:
 		# reactions
 		# poses.targets
 
-		assert not reactions
+		# assert not reactions
 
 		data = {}
 		for key in serialisable_fields:
