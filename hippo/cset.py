@@ -406,12 +406,13 @@ class CompoundSet:
 		c = Checkbox(description='Summary', value=False)
 		d = Checkbox(description='2D', value=True)
 		e = Checkbox(description='poses', value=False)
-		f = Checkbox(description='Metadata', value=False)
+		f = Checkbox(description='reactions', value=False)
+		g = Checkbox(description='Metadata', value=False)
 
-		ui = GridBox([b, c, d, e, f], layout=Layout(grid_template_columns="repeat(5, 100px)"))
+		ui = GridBox([b, c, d, e, f, g], layout=Layout(grid_template_columns="repeat(6, 100px)"))
 		ui = VBox([a, ui])
 		
-		def widget(i, name=True, summary=True, draw=True, poses=True, metadata=True):
+		def widget(i, name=True, summary=True, draw=True, poses=True, reactions=True, metadata=True):
 			comp = self[i]
 			
 			if name and not summary:
@@ -425,12 +426,17 @@ class CompoundSet:
 			
 			if poses and comp.poses: 
 				comp.poses.draw()
+
+			if reactions and (reactions := comp.reactions):
+				for r in reactions:
+					print(repr(r))
+					r.draw()
 			
 			if metadata:
 				logger.title('Metadata:')
 				pprint(comp.metadata)
 
-		out = interactive_output(widget, {'i': a, 'name': b, 'summary': c, 'draw':d, 'poses':e, 'metadata':f})
+		out = interactive_output(widget, {'i': a, 'name': b, 'summary': c, 'draw':d, 'poses':e, 'reactions':f, 'metadata':g})
 
 		display(ui, out)
 

@@ -792,7 +792,8 @@ class PoseSet:
 
 		mols = [p.mol for p in self]
 
-		return draw_mols(mols)
+		drawing = draw_mols(mols)
+		display(drawing)
 
 	def grid(self):
 		"""Draw a grid of all contained molecules"""

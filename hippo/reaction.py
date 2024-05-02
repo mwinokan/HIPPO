@@ -239,7 +239,8 @@ class Reaction:
 		labels = [f'+ {r}' if i>0 else f'{r}' for i,r in enumerate(reactants)]
 		labels.append(f'-> {product}')
 
-		return draw_grid(mols, labels=labels, highlightAtomLists=None)
+		drawing = draw_grid(mols, labels=labels, highlightAtomLists=None)
+		display(drawing)
 
 	def check_chemistry(self, debug=False):
 		from .chem import check_chemistry
