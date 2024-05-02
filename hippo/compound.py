@@ -265,7 +265,7 @@ class Compound:
 		if quote_ids:
 			quotes = [self.db.get_quote(id=q[0]) for q in quote_ids]
 		else:
-			return []
+			return None
 
 		if supplier:
 			quotes = [q for q in quotes if q.supplier == supplier]

@@ -492,7 +492,7 @@ class CompoundSet:
 
 			reactions += recipe.reactions
 			
-		return Recipe(products=products, reactants=reactants, reactions=reactions, intermediates=intermediates)
+		return Recipe(self.db, products=products, reactants=reactants, reactions=reactions, intermediates=intermediates)
 
 	def copy(self):
 		return CompoundSet(self.db, self.ids)

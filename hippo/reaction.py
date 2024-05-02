@@ -199,7 +199,7 @@ class Reaction:
 		
 		reactions = ReactionSet(self.db, [self.id]) + reactions
 
-		recipe = Recipe(products=products, reactants=reactants, reactions=reactions, intermediates=intermediates)
+		recipe = Recipe(self.db, products=products, reactants=reactants, reactions=reactions, intermediates=intermediates)
 		
 		return recipe
 

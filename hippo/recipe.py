@@ -10,7 +10,9 @@ logger = logging.getLogger('HIPPO')
 class Recipe:
 	""" A Recipe stores data corresponding to a specific synthetic recipe involving several products, reactants, intermediates, and reactions."""
 
-	def __init__(self, products, reactants, intermediates, reactions):
+	_db = None
+
+	def __init__(self, db, products, reactants, intermediates, reactions):
 
 		from .cset import IngredientSet
 		from .rset import ReactionSet
@@ -25,8 +27,13 @@ class Recipe:
 		self._reactants = reactants
 		self._intermediates = intermediates
 		self._reactions = reactions
+		self._db = db
 
 	### PROPERTIES
+
+	@property
+	def db(self):
+		return self._db
 
 	@property
 	def products(self):
@@ -52,6 +59,8 @@ class Recipe:
 	def price(self):
 		total = 0
 		quotes = self.quotes
+		if not quotes:
+			return None
 		assert len((currencies := set([q.currency for q in quotes]))) == 1, 'Multiple currencies'
 		return sum([q.price for q in quotes]), list(currencies)[0]
 
@@ -59,6 +68,8 @@ class Recipe:
 	def lead_time(self):
 		total = 0
 		quotes = self.quotes
+		if not quotes:
+			return None
 		return max([q.lead_time for q in quotes])
 	
 	### METHODS
@@ -190,7 +201,7 @@ class Recipe:
 
 	def get_quotes(self, df=False):
 
-		quotes = [i.quote for i in self.reactants]
+		quotes = [quote for i in self.reactants if (quote := i.quote)]
 
 		if df:
 			from pandas import DataFrame
@@ -198,11 +209,47 @@ class Recipe:
 
 		return quotes
 
-	def write_json(self):
+	def write_json(self, file, indent=4):
 
-		"""Serialise this recipe object and write it to disk"""
+		"""Serialise this recipe object and write it to disk
 
-		raise NotImplementedError
+		Store
+		=====
+
+		- Path to database
+		- Timestamp
+		- Reactants (& their quotes, amounts)
+		- Intermediates (& their quotes)
+		- Products (& their poses/scores/fingerprints)
+		- Reactions
+		- Total Price
+		- Lead time
+
+		"""
+
+		import json
+		from datetime import datetime
+
+		data = {}
+
+		# Database
+		data['database'] = str(self.db.path.resolve())
+		data['timestamp'] = str(datetime.now())
+
+		# Recipe properties
+		data['price'] = self.price
+		data['lead_time'] = self.price
+
+		# IngredientSet's
+		data['reactants'] = self.reactants.df.to_json(indent=indent)
+		data['intermediates'] = self.intermediates.df.to_json(indent=indent)
+		data['products'] = self.products.df.to_json(indent=indent)
+		
+		# ReactionSet
+		data['reaction_ids'] = self.reactions.ids
+
+		logger.writing(file)
+		json.dump(open(file, 'wt'), data, indent=indent)
 
 	# def get_reactant_reactions(self, reactant):
 	# 	"""Get reactions that a reactant is involved in"""
