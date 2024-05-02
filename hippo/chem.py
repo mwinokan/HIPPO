@@ -84,7 +84,7 @@ def check_reaction_types(types):
 		if reaction_type not in SUPPORTED_CHEMISTRY:
 			logger.warning(f"Can't check chemistry of unsupported {reaction_type=}")
 
-def check_chemistry(reaction_type, reactants, product, debug=True):
+def check_chemistry(reaction_type, reactants, product, debug=False):
 
 	assert reaction_type in SUPPORTED_CHEMISTRY
 	assert reactants
@@ -109,7 +109,7 @@ def check_chemistry(reaction_type, reactants, product, debug=True):
 
 	if debug:
 		logger.success(f'{reaction_type}: All OK')
-		
+
 	return True
 
 def check_count_diff(check_type, reaction_type, reactants, product, debug=False):

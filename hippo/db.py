@@ -1080,6 +1080,7 @@ class Database:
 		entry = self.select_where(query=query, table=table, key='id', value=id, none=none)
 
 		return Quote(
+			db=self,
 			id=entry[11],
 			compound=entry[0],
 			supplier=entry[1],

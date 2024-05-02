@@ -106,7 +106,7 @@ class CompoundTable:
 	@property
 	def bases(self):
 		"""Returns a CompoundSet of all compounds that are the basis for a set of elaborations"""
-		ids = self.db.select_where(query='DISTINCT compound_base', table='compound', key='compound_base IS NOT NULL', multiple=True)
+		ids = self.db.select_where(query='DISTINCT compound_base', table='compound', key='compound_base IS NOT NULL', multiple=True, none='quiet')
 		ids = [q for q, in ids]
 		from .cset import CompoundSet
 		return CompoundSet(self.db, ids)
@@ -167,18 +167,6 @@ class CompoundTable:
 
 	def interactive(self):
 		return self[self.ids].interactive()
-
-	def get_df(self, **kwargs):
-
-		from pandas import DataFrame
-
-		data = []
-
-		for pose in self:
-			d = pose.get_dict(**kwargs)
-			data.append(d)
-
-		return DataFrame(data)
 
 	### DUNDERS
 
@@ -494,6 +482,8 @@ class CompoundSet:
 
 			recipe = reax[0].get_recipe(a)
 
+			# recipe.summary()
+			
 			products.add(comp.as_ingredient(amount=a))
 
 			intermediates += recipe.intermediates
@@ -507,6 +497,19 @@ class CompoundSet:
 	def copy(self):
 		return CompoundSet(self.db, self.ids)
 	
+	def get_df(self, **kwargs):
+
+		from tqdm import tqdm
+		from pandas import DataFrame
+
+		data = []
+
+		for comp in tqdm(self):
+			d = comp.get_dict(**kwargs)
+			data.append(d)
+
+		return DataFrame(data)
+
 	### DUNDERS
 
 	# def __repr__(self) -> str:
@@ -619,7 +622,12 @@ class IngredientSet:
 			assert ingredient._table == 'ingredient'
 			compound_id = ingredient.compound_id
 			amount = ingredient.amount
+
+			if ingredient.quote and not ingredient.quote_id:
+				logger.warning(f'Losing quote! {ingredient.quote=}')
+
 			quote_id = ingredient.quote_id
+			
 			supplier = ingredient.supplier
 			max_lead_time = ingredient.max_lead_time
 			

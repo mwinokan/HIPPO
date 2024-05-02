@@ -231,26 +231,26 @@ class Compound:
 	
 	### METHODS
 
-	def get_dict(self, mol=False):
-		"""Returns a dictionary of this compound"""
+	# def get_dict(self, mol=False):
+	# 	"""Returns a dictionary of this compound"""
 
-		serialisable_fields = ['id','inchikey','alias','smiles']
+	# 	serialisable_fields = ['id','inchikey','alias','smiles']
 
-		if mol:
-			serialisable_fields.append('mol')
+	# 	if mol:
+	# 		serialisable_fields.append('mol')
 
-		data = {}
-		for key in serialisable_fields:
-			data[key] = getattr(self, key)
+	# 	data = {}
+	# 	for key in serialisable_fields:
+	# 		data[key] = getattr(self, key)
 
-		if base := self.base:
-			data['base'] = base.inchikey
+	# 	if base := self.base:
+	# 		data['base'] = base.inchikey
 
-		if metadata := self.metadata:
-			for key in metadata:
-				data[key] = metadata[key]
+	# 	if metadata := self.metadata:
+	# 		for key in metadata:
+	# 			data[key] = metadata[key]
 
-		return data
+	# 	return data
 
 
 	def get_tags(self) -> set:
@@ -270,18 +270,25 @@ class Compound:
 		if supplier:
 			quotes = [q for q in quotes if q.supplier == supplier]
 
-		if min_amount:
-			quotes = [q for q in quotes if q.amount >= min_amount]
-
 		if max_lead_time:
 			quotes = [q for q in quotes if q.lead_time <= max_lead_time]
+
+		if min_amount:
+			suitable_quotes = [q for q in quotes if q.amount >= min_amount]
+			
+			if not suitable_quotes:
+				# logger.debug(f'No quote available with amount >= {min_amount} mg')
+				quotes = [Quote.combination(min_amount, quotes)]
+
+			else:
+				quotes = suitable_quotes
 
 		if pick_cheapest:
 			return sorted(quotes, key=lambda x: x.price)[0]
 
 		if df:
 			from pandas import DataFrame
-			return DataFrame([q.asdict() for q in quotes]).drop(columns='compound')
+			return DataFrame([q.dict for q in quotes]).drop(columns='compound')
 		
 		return quotes
 
@@ -314,11 +321,12 @@ class Compound:
 
 		return PoseSet(self.db, [q[0] for q in pose_ids])
 
-	def get_dict(self, mol=True, reactions=False, metadata=True, count_by_target=False):
+	def get_dict(self, mol=True, reactions=False, metadata=True, count_by_target=False, poses=True):
 		
 		"""Returns a dictionary representing this Compound"""
 
-		serialisable_fields = ['id','alias', 'inchikey', 'smiles', 'num_poses', 'num_reactant', 'num_reactions']
+		# serialisable_fields = ['id','alias', 'inchikey', 'smiles', 'num_poses', 'num_reactant', 'num_reactions']
+		serialisable_fields = ['id','alias', 'inchikey', 'smiles', 'num_reactant', 'num_reactions']
 
 		# poses
 		# reactions
@@ -343,20 +351,23 @@ class Compound:
 
 		data['tags'] = self.tags
 		
-		poses = self.poses
+		if poses:
 
-		# data['poses'] = [a if a else i for a,i in zip(poses.aliases, poses.inchikeys)]
-		# data['poses'] = self.poses.names
-		data['poses'] = poses.ids
-		
-		data['targets'] = poses.target_names
-		
-		if count_by_target:
-			target_ids = poses.target_ids
+			poses = self.poses
+			
+			if poses:
 
-			for target in self._animal.targets:
-				t_poses = poses(target=target.id) or []
-				data[f'#poses {target.name}'] = len(t_poses)
+				# data['poses'] = [a if a else i for a,i in zip(poses.aliases, poses.inchikeys)]
+				# data['poses'] = self.poses.names
+				data['poses'] = poses.ids
+				data['targets'] = poses.target_names
+			
+				if count_by_target:
+					target_ids = poses.target_ids
+
+					for target in self._animal.targets:
+						t_poses = poses(target=target.id) or []
+						data[f'#poses {target.name}'] = len(t_poses)
 		
 		if metadata and (metadict := self.metadata):
 			for key in metadict:
@@ -384,8 +395,9 @@ class Compound:
 
 		if not quote:
 			quote = None
-		else:
-			quote = quote.id
+
+		# else:
+			# quote = quote.id
 		
 		return Ingredient(self.db, self.id, amount, quote, supplier, max_lead_time)
 
@@ -535,8 +547,15 @@ class Ingredient:
 			self._compound = None
 
 		if isinstance(quote, Quote):
-			self._quote_id = quote.id
-			self._quote = None
+
+			if id := quote.id:
+				self._quote_id = quote.id
+				self._quote = None
+
+			else:
+				# logger.debug('Initialising Ingredient with estimated quote')
+				self._quote_id = None
+				self._quote = quote
 
 		elif quote is None:
 			self._quote_id = None
@@ -618,9 +637,25 @@ class Ingredient:
 	@property
 	def quote(self):
 		"""Returns the associated :class:`Quote`"""
-		if not self._quote and (q_id := self.quote_id):
-			self._quote = self.db.get_quote(id=self.quote_id)
+		if not self._quote:
+			if (q_id := self.quote_id):
+				self._quote = self.db.get_quote(id=self.quote_id)
+			
+			else:
+				self._quote = self.compound.get_quotes(
+					pick_cheapest=True, 
+					min_amount=self.amount, 
+					max_lead_time=self.max_lead_time, 
+					supplier=self.supplier,
+					none='quiet',
+				)
+
 		return self._quote
+
+	@property
+	def compound_price_amount_str(self):
+		# return f'{self} {self.quote.currency_symbol}{self.quote.price} ({self.amount})'
+		return f'{self} ({self.amount})'
 
 	### METHODS
 

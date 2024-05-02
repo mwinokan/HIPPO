@@ -43,6 +43,23 @@ class Recipe:
 	@property
 	def reactions(self):
 		return self._reactions
+
+	@property
+	def quotes(self):
+		return self.get_quotes()
+
+	@property
+	def price(self):
+		total = 0
+		quotes = self.quotes
+		assert len((currencies := set([q.currency for q in quotes]))) == 1, 'Multiple currencies'
+		return sum([q.price for q in quotes]), list(currencies)[0]
+
+	@property
+	def lead_time(self):
+		total = 0
+		quotes = self.quotes
+		return max([q.lead_time for q in quotes])
 	
 	### METHODS
 
@@ -61,38 +78,45 @@ class Recipe:
 		for reaction in self.reactions:
 			for reactant in reaction.reactants:
 				key = str(reactant)
+				# ingredient = self.get_ingredient(id=reactant.id)
+				# key = ingredient.compound_price_amount_str
 				graph.add_node(key)
-				sizes[key] = self.get_ingredient(id=reactant.id).amount
+
+				if not graph_only:
+					sizes[key] = self.get_ingredient(id=reactant.id).amount
+					if key in color_mapper:
+						colors[key] = color_mapper[key]
+					else:
+						colors[key] = (0.7,0.7,0.7)
+
+		for product in self.products:
+			key = str(product)
+			# ingredient = self.get_ingredient(id=reactant.id)
+			# key = ingredient.compound_price_amount_str
+			graph.add_node(key)
+			if not graph_only:
+				sizes[key] = product.amount
 				if key in color_mapper:
 					colors[key] = color_mapper[key]
 				else:
 					colors[key] = (0.7,0.7,0.7)
-
-		for product in self.products:
-			key = str(product)
-			graph.add_node(key)
-			sizes[key] = product.amount
-			if key in color_mapper:
-				colors[key] = color_mapper[key]
-			else:
-				colors[key] = (0.7,0.7,0.7)
 
 		for reaction in self.reactions:
 			for reactant in reaction.reactants:
 				graph.add_edge(str(reactant), str(reaction.product))
 
 		# rescale sizes
-		s_min = min(sizes.values())
-		sizes = [s/s_min*node_size for s in sizes.values()]
-
-		# pos = nx.spring_layout(graph, iterations=200, k=30)
-		pos = nx.spring_layout(graph)
+		if not graph_only:
+			s_min = min(sizes.values())
+			sizes = [s/s_min*node_size for s in sizes.values()]
 
 		if graph_only:
 			return graph
 		else:
 			import matplotlib as plt
 			# return nx.draw(graph, pos, with_labels=True, font_weight='bold')
+			# pos = nx.spring_layout(graph, iterations=200, k=30)
+			pos = nx.spring_layout(graph)
 			return nx.draw(graph, pos=pos, with_labels=True, font_weight='bold', node_color=list(colors.values()), node_size=sizes)
 
 	def sankey(self):
@@ -163,6 +187,16 @@ class Recipe:
 	def get_ingredient(self, id):
 		"""Get an ingredient by its compound ID"""
 		return [r for r in self.reactants + self.products + self.intermediates if r.id == id][0]
+
+	def get_quotes(self, df=False):
+
+		quotes = [i.quote for i in self.reactants]
+
+		if df:
+			from pandas import DataFrame
+			return DataFrame([q.dict for q in quotes])
+
+		return quotes
 
 	# def get_reactant_reactions(self, reactant):
 	# 	"""Get reactions that a reactant is involved in"""
