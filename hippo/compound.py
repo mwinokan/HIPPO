@@ -540,11 +540,11 @@ class Ingredient:
         # don't store inherited compound in memory until needed
 		self._compound = None
     
-		if isinstance(compound, int):
-			self._compound_id = compound
-		else:
+		if isinstance(compound, Compound):
 			self._compound_id = compound.id
 			self._compound = None
+		else:
+			self._compound_id = compound
 
 		if isinstance(quote, Quote):
 
@@ -656,6 +656,24 @@ class Ingredient:
 	def compound_price_amount_str(self):
 		# return f'{self} {self.quote.currency_symbol}{self.quote.price} ({self.amount})'
 		return f'{self} ({self.amount})'
+
+	@property
+	def smiles(self):
+		return self.compound.smiles
+
+	@property
+	def price(self):
+		if self.quote:
+			return self.quote.price
+		else:
+			return None
+
+	@property
+	def lead_time(self):
+		if self.quote:
+			return self.quote.lead_time
+		else:
+			return None
 
 	### METHODS
 

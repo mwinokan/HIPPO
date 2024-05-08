@@ -55,6 +55,9 @@ class ReactionTable:
 	def get_df(self, smiles=True, mols=True, **kwargs):
 		"""Construct a pandas.DataFrame of all reactions in the database"""
 
+		from rdkit.Chem import Mol
+		from pandas import DataFrame
+
 		### SQL QUERY
 
 		data = {}
@@ -256,6 +259,9 @@ class ReactionSet:
 			data.append(r.get_dict(smiles=smiles, mols=mols, **kwargs))
 
 		return DataFrame(data)
+
+	def copy(self):
+		return ReactionSet(self.db, self.ids)
 
 	### DUNDERS
 

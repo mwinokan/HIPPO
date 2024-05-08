@@ -831,7 +831,14 @@ def plot_compound_availability(animal, compounds=None, title=None, subtitle=None
 			plot_data = []
 			for supplier, catalogue in pairs:
 		
-				count, = animal.db.select_where(table='quote', query='COUNT(DISTINCT quote_compound)', key=f'quote_supplier IS "{supplier}" AND quote_catalogue IS "{catalogue}"')
+				if catalogue is None:
+					catalogue = 'None'
+					cat_str = 'NULL'
+				else:
+					cat_str = f'"{catalogue}"'
+
+				count, = animal.db.select_where(table='quote', query='COUNT(DISTINCT quote_compound)', key=f'quote_supplier IS "{supplier}" AND quote_catalogue IS {cat_str}')
+
 				plot_data.append(dict(supplier=supplier, catalogue=catalogue, count=count))
 				
 		case _:
@@ -854,30 +861,57 @@ def plot_compound_availability(animal, compounds=None, title=None, subtitle=None
 def plot_compound_price(animal, compounds=None, min_amount=1, subtitle=None, title=None, style='histogram', **kwargs):
 
 	from .cset import CompoundTable
+	import numpy as np
 	
 	compounds = compounds or animal.compounds
 
 	match compounds:
 		case CompoundTable():
 
-			data = animal.db.select_where(table='quote', query='quote_amount, MIN(quote_price)', key=f'quote_amount >= {min_amount} GROUP BY quote_compound', multiple=True)
+			if style=='scatter':
 
-			n_compounds = len(data)
+				sql = '''
+				SELECT quote_compound, quote_amount, MIN(quote_price), quote_lead_time, compound_smiles, COUNT(DISTINCT reactant_reaction)
+				FROM quote 
+				INNER JOIN compound ON quote.quote_compound = compound.compound_id
+				INNER JOIN reactant ON quote.quote_compound = reactant.reactant_compound
+				WHERE quote_amount >= {min_amount}
+				GROUP BY quote_compound
+				'''.format(min_amount=min_amount)
 
-			plot_data = []
-			for amount, price in data:
-				plot_data.append(dict(min_price=price, quoted_amount=amount))
+				results = animal.db.execute(sql).fetchall()
+
+				n_compounds = len(results)
+
+				plot_data = []
+				for compound_id, amount, price, lead_time, smiles, num_reactions in results:
+					plot_data.append(dict(compound_id=compound_id, min_price=price, quoted_amount=amount, lead_time=lead_time, smiles=smiles, num_reactions=num_reactions, log_price_per_reaction=np.log(price/num_reactions), price_per_reaction=price/num_reactions))
+
+			else:
+				data = animal.db.select_where(table='quote', query='quote_amount, MIN(quote_price)', key=f'quote_amount >= {min_amount} GROUP BY quote_compound', multiple=True)
+
+				n_compounds = len(data)
+
+				plot_data = []
+				for amount, price in data:
+					plot_data.append(dict(min_price=price, quoted_amount=amount))
 	
 		case _:
 			raise NotImplementedError('CompoundSet not yet supported')
 
 	plot_data = sorted(plot_data, key=lambda x: x['quoted_amount'])
-		
+
 	match style:
+		
 		case 'histogram':
 			fig = px.histogram(plot_data, color='quoted_amount', x='min_price', **kwargs)
+		
 		case 'violin':
 			fig = px.violin(plot_data, color='quoted_amount', x='min_price', **kwargs)
+		
+		case 'scatter':
+			fig = px.scatter(plot_data, color='log_price_per_reaction', x='min_price', y='lead_time', hover_data=plot_data[0].keys(), **kwargs)
+		
 		case _:
 			raise NotImplementedError(f'{style=}')
 
@@ -889,87 +923,6 @@ def plot_compound_price(animal, compounds=None, min_amount=1, subtitle=None, tit
 		title = f'{title}<br><sup><i>{subtitle}</i></sup>'
 
 	fig.update_layout(title=title) #,title_automargin=False, title_yref='container', barmode='group')
-
-	return fig
-
-@hippo_graph
-def plot_reactant_sankey(animal, subtitle):
-
-	'''
-		BBs (total)
-		BBs (in enamine)
-		BBs (within budget)
-		BBs (within lead-time)
-	'''
-
-	total = animal.building_blocks
-	quoted = [bb for bb in animal.building_blocks if bb.price_picker is not None]
-	lead_time = [bb for bb in quoted if bb.lead_time <= animal.max_lead_time]
-	budget = [bb for bb in quoted if bb.get_price(animal.min_bb_quantity) <= animal.max_bb_price]
-	bad = [bb for bb in quoted if bb not in lead_time and bb not in budget]
-	
-	n_total = len(total)
-	n_quoted = len(quoted)
-	n_quote_not_attempted = len([bb for bb in total if 'quote_attempted' not in bb.tags])
-	n_quote_attempted = n_total - n_quote_not_attempted
-	n_ok = len([bb for bb in quoted if bb in lead_time and bb in budget])
-	# n_bad = len(bad)
-	n_expensive = len([bb for bb in quoted if bb not in bad and bb not in budget and bb in lead_time])
-	n_slow = len([bb for bb in quoted if bb not in bad and bb in budget and bb not in lead_time])
-	n_bad = len(bad)
-
-	print(n_quote_not_attempted)
-
-	labels = [
-		f'Total = {n_total}',																# 0
-		f'Quote Succeeded = {n_quoted}',														# 1
-		f'Quote Failed = {n_quote_attempted - n_quoted}',											# 2
-		f'OK = {n_ok}',																			# 3
-		f'Too expensive ({animal.min_bb_quantity}mg > ${animal.max_bb_price}) = {n_expensive}',	# 4
-		f'Too slow (lead_time > {animal.max_lead_time} days) = {n_slow}',						# 5
-		f'Too expensive & slow = {n_bad}',													# 6
-		f'Quote not attempted = {n_quote_not_attempted}', # 7
-		f'Quote attempted = {n_quote_attempted}' #8
-	]
-
-	links = [
-		[8, 1, n_quoted], # total --> quote success
-		[8, 2, n_quote_attempted - n_quoted], # total --> not quoted
-		[1, 3, n_ok], # quoted --> ok
-		[1, 4, n_expensive], # quoted --> too expensive
-		[1, 5, n_slow], # quoted --> too slow
-		[1, 6, len(bad)], # quoted --> bad
-		[0, 7, n_quote_not_attempted], # total --> quote_not_attempted
-		[0, 8, n_quote_attempted], # total --> quote_attempted
-	]
-
-	source = [l[0] for l in links]
-	target = [l[1] for l in links]
-	value = [l[2] for l in links]
-
-	fig = go.Figure(data=[go.Sankey(
-			node = dict(
-			# pad = 15,
-			# thickness = 20,
-			# line = dict(color = "black", width = 0.5),
-			label = labels,
-			# color = "blue"
-		),
-			link = dict(
-			source = source,
-			target = target,
-			value = value,
-	))])
-
-	fig.update_layout(font_size=10)
-
-	title = 'Reactant Quoting'
-
-	subtitle = animal.reactant_catalog
-
-	title = f'<b>{animal.name}</b>: {title}<br><sup><i>{subtitle}</i></sup>'
-
-	fig.update_layout(title=title,title_automargin=False, title_yref='container')
 
 	return fig
 

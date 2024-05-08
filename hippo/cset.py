@@ -454,50 +454,48 @@ class CompoundSet:
 	
 	def get_recipe(self, 
 		amount: float = 1, 
-		simplify_network: bool = True,
+		debug=False,
+		pick_cheapest: bool = True,
 	):
 		"""Generate the :class:`.Recipe` to make these compounds."""
 
 		n_comps = len(self)
 
-		assert simplify_network
-
 		if not hasattr(amount, '__iter__'):
 			amount = [amount] * n_comps
 
-		from .cset import IngredientSet
-		from .rset import ReactionSet
-		
-		products = IngredientSet(self.db)
-		reactants = IngredientSet(self.db)
-		intermediates = IngredientSet(self.db)
-		reactions = ReactionSet(self.db)
+		options = []
 
 		for comp, a in zip(self, amount):
 
-			reax = comp.reactions
+			comp_options = []
 
-			assert len(reax) == 1
-			# logger.warning(f'Picking first reaction for {comp} from {reax}')
+			for reaction in comp.reactions:
+				recipes = reaction.get_recipe(a, pick_cheapest=pick_cheapest, debug=debug)	
+				comp_options += recipes
 
-			recipe = reax[0].get_recipe(a)
+			options.append(comp_options)
 
-			# recipe.summary()
-			
-			products.add(comp.as_ingredient(amount=a))
+		from itertools import product
+		combinations = list(product(*options))
 
-			intermediates += recipe.intermediates
-			
-			reactants += recipe.reactants
+		solutions = []
 
-			reactions += recipe.reactions
-			
-		return Recipe(self.db, products=products, reactants=reactants, reactions=reactions, intermediates=intermediates)
+		for combo in combinations:
+
+			solution = combo[0]
+
+			for recipe in combo[1:]:
+				solution += recipe
+
+			solutions.append(solution)
+
+		return solutions
 
 	def copy(self):
 		return CompoundSet(self.db, self.ids)
 	
-	def get_df(self, **kwargs):
+	def get_df(self, mol=False, reactions=False, metadata=False, count_by_target=False, poses=False, **kwargs):
 
 		from tqdm import tqdm
 		from pandas import DataFrame
@@ -505,10 +503,16 @@ class CompoundSet:
 		data = []
 
 		for comp in tqdm(self):
-			d = comp.get_dict(**kwargs)
+			d = comp.get_dict(mol=mol, reactions=reactions, metadata=metadata, count_by_target=count_by_target, poses=poses, **kwargs)
 			data.append(d)
 
 		return DataFrame(data)
+
+	def write_smiles_csv(self, file):
+		from pandas import DataFrame
+		smiles = self.smiles
+		df = DataFrame(dict(smiles=smiles))
+		df.to_csv(file)
 
 	### DUNDERS
 
@@ -602,6 +606,13 @@ class IngredientSet:
 		for ingredient in ingredients:
 			self.add(ingredient)
 
+	@classmethod
+	def from_ingredient_df(cls, db, df):
+		self = cls.__new__(cls)
+		self._db = db
+		self._data = df.copy()
+		return self
+
 	### PROPERTIES
 
 	@property
@@ -661,6 +672,9 @@ class IngredientSet:
 			supplier=series['supplier'],
 			max_lead_time=series['max_lead_time'],
 		)
+
+	def copy(self):
+		return IngredientSet.from_ingredient_df(self.db, self.df)
 
 	### DUNDERS
 

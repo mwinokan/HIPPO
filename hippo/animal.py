@@ -1300,12 +1300,12 @@ class HIPPO:
 	def plot_compound_availability(self, compounds=None, **kwargs):
 		"""Plot a bar chart of compound availability by supplier/catalogue"""
 		from .plotting import plot_compound_availability
-		return plot_compound_availability(self, compound=compounds, **kwargs)
+		return plot_compound_availability(self, compounds=compounds, **kwargs)
 
-	def plot_compound_price(self, min_amount, compounds=None, **kwargs):
+	def plot_compound_price(self, min_amount, compounds=None, plot_lead_time=False, style='histogram', **kwargs):
 		"""Plot a bar chart of minimum compound price for a given minimum amount"""
 		from .plotting import plot_compound_price
-		return plot_compound_price(self, min_amount=min_amount, compounds=compounds, **kwargs)
+		return plot_compound_price(self, min_amount=min_amount, compounds=compounds, style=style, **kwargs)
 
 	def plot_reaction_funnel(self, **kwargs):
 		from .plotting import plot_reaction_funnel

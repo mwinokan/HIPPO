@@ -122,86 +122,99 @@ class Reaction:
 			return [id for id, in compound_ids]
 		else:
 			return []
-
-	def get_ingredients(self, amount, return_reactions=False, return_intermediates=False, debug=False):
-		"""recursively assemble a list of ingredients and reactions required to make the compound"""
-
-		from .rset import ReactionSet
-		from .cset import IngredientSet
-
-		ingredients = IngredientSet(self.db)
-		intermediates = IngredientSet(self.db)
-		reax = ReactionSet(self.db)
-
-		pairs = self.get_reactant_amount_pairs()
-		  
-		for reactant, reactant_amount in pairs:
-
-			if debug:
-				logger.debug(f'{self} reactant: {reactant}')
-
-			# scale amount
-			reactant_amount *= amount #/total_reactant_amount
-			reactant_amount /= self.product_yield
-
-			reactions = reactant.get_reactions(none='quiet')
-
-			if debug:
-				logger.debug(f'{reactant} reactions: {reactions}')
-
-			if reactions:
-				if not len(reactions) == 1:
-					logger.warning(f'{reactant=} has multiple reactions. Picking the first')
-				reaction = reactions[0]
-				_ingredients, _reactions, _intermediates = reaction.get_ingredients(reactant_amount, return_reactions=True, return_intermediates=True, debug=debug)
-
-				ingredients += _ingredients
-				reax += _reactions
-				intermediates += _intermediates
-
-				intermediates.add(reaction.product.as_ingredient(reactant_amount))
-
-				reax.add(reaction)
-
-			else:
-				# if debug:
-					# logger.debug(f'final ingredient {reactant}')
-				ingredient = reactant.as_ingredient(reactant_amount)
-				ingredients.add(ingredient)
-
-		output = [ingredients]
-
-		if return_reactions:
-			reax.add(self)
-			reax = ReactionSet(self.db, [r.id for r in reax])
-			output.append(reax)
-
-		if return_intermediates:
-			output.append(intermediates)
-
-		if len(output) == 1:
-			return output[0]
-		else:
-			return tuple(output)
-
+	
 	def get_recipe(self, 
 		amount: float = 1, # in mg
 		debug: bool = False,
+		# recipes: None | list = None,
+		pick_cheapest = False,
 	):
 		"""Get a :class:`.Recipe` describing how to make the product"""
 
 		from .cset import IngredientSet
 		from .rset import ReactionSet
-		
-		products = IngredientSet(self.db, [self.product.as_ingredient(amount=amount)])
 
-		reactants, reactions, intermediates = self.get_ingredients(amount=amount, return_reactions=True, return_intermediates=True, debug=debug)
-		
-		reactions = ReactionSet(self.db, [self.id]) + reactions
+		if debug: logger.debug(f'Reaction.get_recipe({amount=}, {pick_cheapest=})')
+		if debug: logger.debug(f'{self.id=}')
+		if debug: logger.debug(f'{self.product.id=}')
+		if debug: logger.debug(f'{amount=}')
+		if debug: logger.debug(f'{self.reactants.ids=}')
 
-		recipe = Recipe(self.db, products=products, reactants=reactants, reactions=reactions, intermediates=intermediates)
+		# if recipes is None:
+		recipes = [Recipe(self.db, 
+			products=IngredientSet(self.db, [self.product.as_ingredient(amount=amount)]),
+			# products=IngredientSet(self.db, []),
+			reactants=IngredientSet(self.db, []),
+			intermediates=IngredientSet(self.db, []),
+			reactions=ReactionSet(self.db, [self.id]),
+		)]
 		
-		return recipe
+		pairs = self.get_reactant_amount_pairs()
+		for reactant, reactant_amount in pairs:
+			if debug: logger.debug(f'{reactant.id=}, {reactant_amount=}')
+
+			# scale amount
+			reactant_amount *= amount
+			reactant_amount /= self.product_yield
+
+			inner_reactions = reactant.get_reactions(none='quiet')
+
+			if inner_reactions:
+
+				if debug: 
+					if len(inner_reactions) == 1:
+						logger.debug(f'Reactant has ONE inner reaction')
+					else:
+						logger.warning(f'{reactant=} has MULTIPLE inner reactions')
+
+				new_recipes = []
+
+				inner_recipes = sum([r.get_recipe(amount=reactant_amount, debug=debug, pick_cheapest=False) for r in inner_reactions], [])
+
+				for recipe in recipes:
+
+					# logger.header(recipe.products[0])
+
+					for inner_recipe in inner_recipes:
+
+						combined_recipe = recipe.copy()
+
+						# current reactants will become intermediates?
+
+						combined_recipe.reactants += inner_recipe.reactants
+						combined_recipe.intermediates += inner_recipe.intermediates
+						combined_recipe.reactions += inner_recipe.reactions
+						
+						combined_recipe.intermediates.add(reactant.as_ingredient(reactant_amount))
+
+						new_recipes.append(combined_recipe)
+					
+					# logger.header(recipe.products[0])
+
+				recipes = new_recipes
+
+			else:
+
+				ingredient = reactant.as_ingredient(reactant_amount)
+				for recipe in recipes:
+					# logger.header(recipe.products[0])
+					recipe.reactants.add(ingredient)
+					# logger.header(recipe.products[0])
+
+		# for recipe in recipes:
+		# 	logger.title(recipe.products[0])
+
+		if len(recipes) > 1:
+			logger.out(f'Found {len(recipes)} recipes for {self}')
+
+		if pick_cheapest:
+			priced = [r for r in recipes if r.price]
+			if not priced:
+				logger.error("0 recipes with prices, can't choose cheapest")
+				return recipes
+			return sorted(priced, key=lambda r: r.price)[0]
+
+		return recipes
 
 	def summary(self, amount=1, draw=True):
 		"""Print a summary of this reaction's information"""
