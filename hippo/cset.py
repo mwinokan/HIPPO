@@ -371,11 +371,14 @@ class CompoundSet:
 	def draw(self):
 		"""Draw a grid of all contained molecules"""
 		from molparse.rdkit import draw_grid
-
+		
 		data = [(str(c), c.mol) for c in self]
-
 		mols = [d[1] for d in data]
 		labels = [d[0] for d in data]
+
+		# data = [c.get_dict(mol=True) for c in self]
+		# mols = [d['mol'] for d in data]
+		# labels = [d['__str__'] for d in data]
 
 		return draw_grid(mols, labels=labels)
 

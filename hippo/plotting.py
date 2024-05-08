@@ -574,12 +574,14 @@ def plot_compound_property(animal, prop, compounds=None, style='bar', null=None)
 
 	elif len(prop) == 2:
 
+		hover_data = prop + ['smiles']
+
 		title = f'Compound {prop[0]} vs {prop[1]}'
 		
 		func = eval(f'px.{style}')
-		fig = func(plot_data, x=prop[0], y=prop[1])
+		fig = func(plot_data, x=prop[0], y=prop[1], hover_data=hover_data)
 
-		fig.update_layout(xaxis_title=prop[1], yaxis_title=prop[1])
+		fig.update_layout(xaxis_title=prop[0], yaxis_title=prop[1])
 
 	else:
 		mout.error('Unsupported', code='plotting.plot_compound_property.1')
