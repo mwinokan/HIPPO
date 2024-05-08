@@ -688,15 +688,18 @@ class IngredientSet:
 		return f'{mcol.bold}{mcol.underline}''{'f'I x {len(self)}''}'f'{mcol.unbold}{mcol.ununderline}'
 
 	def __add__(self, other):
+
+		result = self.copy()
+
 		for i,row in other._data.iterrows():
-			self.add(
+			result.add(
 				compound_id=row.compound_id,
 				amount=row.amount,
 				quote_id=row.quote_id,
 				supplier=row.supplier,
 				max_lead_time=row.max_lead_time,
 			)
-		return self
+		return result
 
 	def __getitem__(self, key):
 		match key:
