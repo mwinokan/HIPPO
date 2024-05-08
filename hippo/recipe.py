@@ -105,14 +105,7 @@ class Recipe:
 		for reaction in self.reactions:
 			for reactant in reaction.reactants:
 				key = str(reactant)
-				# ingredient = self.get_ingredient(id=reactant.id)
-				# key = ingredient.compound_price_amount_str
-
-				# print(reactant.get_dict(mol=False, metadata=False, poses=False))
-
 				ingredient = self.get_ingredient(id=reactant.id)
-
-				print(ingredient)
 
 				graph.add_node(key, id=reactant.id, smiles=reactant.smiles, amount=ingredient.amount, price=ingredient.price, lead_time=ingredient.lead_time)
 
@@ -124,14 +117,8 @@ class Recipe:
 						colors[key] = (0.7,0.7,0.7)
 
 		for product in self.products:
-			key = str(product.compound)
-			# ingredient = self.get_ingredient(id=reactant.id)
-			# key = ingredient.compound_price_amount_str
-			# graph.add_node(key)
-			
+			key = str(product.compound)			
 			ingredient = self.get_ingredient(id=product.id)
-			
-			print(ingredient)
 
 			graph.add_node(key, id=product.id, smiles=product.smiles, amount=ingredient.amount, price=ingredient.price, lead_time=ingredient.lead_time)
 
