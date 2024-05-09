@@ -169,7 +169,10 @@ class Reaction:
 
 				new_recipes = []
 
-				inner_recipes = sum([r.get_recipe(amount=reactant_amount, debug=debug, pick_cheapest=False) for r in inner_reactions], [])
+				inner_recipes = []
+				for reaction in inner_reactions:
+					reaction_recipes = reaction.get_recipe(amount=reactant_amount, debug=debug, pick_cheapest=False)
+					inner_recipes += reaction_recipes
 
 				for recipe in recipes:
 
@@ -197,15 +200,7 @@ class Reaction:
 
 				ingredient = reactant.as_ingredient(reactant_amount)
 				for recipe in recipes:
-					# logger.header(recipe.products[0])
 					recipe.reactants.add(ingredient)
-					# logger.header(recipe.products[0])
-
-		# for recipe in recipes:
-		# 	logger.title(recipe.products[0])
-
-		if len(recipes) > 1:
-			logger.out(f'Found {len(recipes)} recipes for {self}')
 
 		if pick_cheapest:
 			priced = [r for r in recipes if r.price]

@@ -371,14 +371,11 @@ class CompoundSet:
 	def draw(self):
 		"""Draw a grid of all contained molecules"""
 		from molparse.rdkit import draw_grid
-		
+
 		data = [(str(c), c.mol) for c in self]
+
 		mols = [d[1] for d in data]
 		labels = [d[0] for d in data]
-
-		# data = [c.get_dict(mol=True) for c in self]
-		# mols = [d['mol'] for d in data]
-		# labels = [d['__str__'] for d in data]
 
 		return draw_grid(mols, labels=labels)
 
@@ -462,6 +459,8 @@ class CompoundSet:
 	):
 		"""Generate the :class:`.Recipe` to make these compounds."""
 
+		from tqdm import tqdm
+
 		n_comps = len(self)
 
 		if not hasattr(amount, '__iter__'):
@@ -469,12 +468,12 @@ class CompoundSet:
 
 		options = []
 
-		for comp, a in zip(self, amount):
+		for comp, a in tqdm(zip(self, amount), total=n_comps):
 
 			comp_options = []
 
 			for reaction in comp.reactions:
-				recipes = reaction.get_recipe(a, pick_cheapest=pick_cheapest, debug=debug)	
+				recipes = reaction.get_recipe(a, pick_cheapest=False, debug=debug)	
 				comp_options += recipes
 
 			options.append(comp_options)
@@ -492,6 +491,13 @@ class CompoundSet:
 				solution += recipe
 
 			solutions.append(solution)
+
+		if pick_cheapest:
+			priced = [r for r in solutions if r.price]
+			if not priced:
+				logger.error("0 recipes with prices, can't choose cheapest")
+				return solutions
+			return sorted(priced, key=lambda r: r.price)[0]
 
 		return solutions
 
@@ -626,6 +632,47 @@ class IngredientSet:
 	def db(self):
 		return self._db
 
+	@property
+	def price_df(self):
+		df = self.df.copy()
+		df['price'] = [i.price for i in self]
+		return df
+
+	@property
+	def price(self):
+		pairs = { i:q for i,q in enumerate(self.df['quote_id'])}
+
+		quote_ids = [q for q in pairs.values() if q is not None]
+
+		result = self.db.select_where(query='quote_price, quote_currency', table='quote', key=f'quote_id in {tuple(quote_ids)}', multiple=True)
+
+		prices = [a for a,b in result]
+		quoted = sum(prices)
+
+		currencies = list(set([b for a,b in result]))
+		assert len(currencies) == 1
+
+		unquoted = [i for i,q in pairs.items() if q is None]
+
+		unquoted = [self[i].price for i in unquoted]
+
+		# print(unquoted)
+
+		# unquoted = print([self[i].price for i in unquoted])
+
+		logger.warning(f"{len([p for p in unquoted if p is None])} ingredients don't have an price")
+
+		# print(unquoted)
+		# print([p for p in unquoted if p is not None])
+
+		return (quoted + sum([p for p in unquoted if p]), currencies)
+
+	@property
+	def smiles(self):
+		compound_ids = list(self.df['compound_id'])
+		result = self.db.select_where(query='compound_smiles', table='compound', key=f'compound_id in {tuple(compound_ids)}', multiple=True)
+		return [q for q, in result]
+
 	### METHODS
 
 	def add(self, ingredient=None, *, compound_id=None, amount=None, quote_id=None, supplier=None, max_lead_time=None):
@@ -688,18 +735,15 @@ class IngredientSet:
 		return f'{mcol.bold}{mcol.underline}''{'f'I x {len(self)}''}'f'{mcol.unbold}{mcol.ununderline}'
 
 	def __add__(self, other):
-
-		result = self.copy()
-
 		for i,row in other._data.iterrows():
-			result.add(
+			self.add(
 				compound_id=row.compound_id,
 				amount=row.amount,
 				quote_id=row.quote_id,
 				supplier=row.supplier,
 				max_lead_time=row.max_lead_time,
 			)
-		return result
+		return self
 
 	def __getitem__(self, key):
 		match key:

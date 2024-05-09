@@ -838,7 +838,7 @@ class HIPPO:
 		ingredients = IngredientSet(self.db)
 	
 		for i,row in df.iterrows():
-			smiles = row.SMILES
+			smiles = row[smiles_col]
 
 			if not isinstance(smiles, str):
 				break
@@ -882,6 +882,101 @@ class HIPPO:
 				supplier='Enamine',
 				max_lead_time=None,
 			)
+
+		return ingredients
+
+	def add_mcule_quote(
+		self,
+		path: str | Path,
+	):
+
+		### get lead time from suppliers sheet
+
+		sheet_name: str = 'List of suppliers'
+		df = pd.read_excel(path, sheet_name=sheet_name)
+
+		supplier_col = 'Supplier'
+		lead_time_col = 'Delivery time (working days)'
+
+		assert supplier_col in df.columns, 'Unexpected Excel format (supplier_col)'
+		assert lead_time_col in df.columns, 'Unexpected Excel format (lead_time_col)'
+
+		lead_time_lookup = { row[supplier_col]:row[lead_time_col] for i,row in df.iterrows() }
+
+		### parse individual compound quotes
+
+		sheet_name: str = 'List of products'
+		df = pd.read_excel(path, sheet_name=sheet_name)
+
+		# return df
+
+		smiles_col = 'Quoted product SMILES'
+		entry_col = 'Query Mcule ID'
+		purity_col = 'Guaranteed purity (%)'
+		amount_col = 'Quoted Amount (mg)'
+		catalogue_col = 'Supplier'
+		lead_time_col = 'Lead time'
+		price_col = 'Product price (USD)'
+		currency = 'USD'
+
+		assert smiles_col in df.columns, 'Unexpected Excel format (smiles_col)'
+		assert entry_col in df.columns, 'Unexpected Excel format (entry_col)'
+		assert purity_col in df.columns, 'Unexpected Excel format (purity_col)'
+		assert amount_col in df.columns, 'Unexpected Excel format (amount_col)'
+		assert catalogue_col in df.columns, 'Unexpected Excel format (catalogue_col)'
+		assert price_col in df.columns, 'Unexpected Excel format (price_col)'
+
+		ingredients = IngredientSet(self.db)
+	
+		for i,row in tqdm(df.iterrows()):
+			smiles = row[smiles_col]
+
+			if not isinstance(smiles, str):
+				break
+
+			compound = self.register_compound(smiles=smiles)
+
+			# if (catalogue := row[catalogue_col]) == 'No starting material':
+			# 	continue
+
+			catalogue = row[catalogue_col]
+			lead_time = lead_time_lookup[catalogue]
+
+			# if (price := row[price_col]) == 0.0:
+			# 	continue
+
+			# if not isinstance(row[lead_time_col], str):
+				# continue
+
+			# if 'week' in row[lead_time_col]:
+			# 	lead_time = int(row[lead_time_col].split()[0].split('-')[-1])*5
+			# else:
+			# 	raise NotImplementedError
+
+			quote_data = dict(
+				compound=compound,
+				supplier='MCule',
+				catalogue=catalogue,
+				entry=row[entry_col],
+				amount=row[amount_col],
+				purity=row[purity_col]/100,
+				lead_time=lead_time,
+				price=row[price_col],
+				currency=currency,
+				smiles=smiles,
+			)
+
+			q_id = self.db.insert_quote(**quote_data, commit=False)
+
+			ingredients.add(
+				compound_id=compound.id,
+				amount=row[amount_col],
+				quote_id=q_id,
+				supplier='MCule',
+				max_lead_time=None,
+			)
+
+		self.db.commit()
 
 		return ingredients
 

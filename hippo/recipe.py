@@ -67,26 +67,27 @@ class Recipe:
 	def reactions(self, a):
 		self._reactions = a
 
-	@property
-	def quotes(self):
-		return self.get_quotes()
+	# @property
+	# def quotes(self):
+		# return self.get_quotes()
 
 	@property
 	def price(self):
-		total = 0
-		quotes = self.quotes
-		if not quotes:
-			return None
-		assert len((currencies := set([q.currency for q in quotes]))) == 1, 'Multiple currencies'
-		return sum([q.price for q in quotes]), list(currencies)[0]
+		# total = 0
+		# quotes = self.quotes
+		# if not quotes:
+		# 	return None
+		# assert len((currencies := set([q.currency for q in quotes]))) == 1, 'Multiple currencies'
+		# return sum([q.price for q in quotes]), list(currencies)[0]
+		return self.reactants.price
 
-	@property
-	def lead_time(self):
-		total = 0
-		quotes = self.quotes
-		if not quotes:
-			return None
-		return max([q.lead_time for q in quotes])
+	# @property
+	# def lead_time(self):
+	# 	total = 0
+	# 	quotes = self.quotes
+	# 	if not quotes:
+	# 		return None
+	# 	return max([q.lead_time for q in quotes])
 	
 	### METHODS
 
@@ -131,7 +132,7 @@ class Recipe:
 
 		for reaction in self.reactions:
 			for reactant in reaction.reactants:
-				graph.add_edge(str(reactant), str(reaction.product), reaction_id=reaction.id)
+				graph.add_edge(str(reactant), str(reaction.product), id=reaction.id, type=reaction.type, product_yield=reaction.product_yield)
 
 		# rescale sizes
 		if not graph_only:
@@ -169,7 +170,6 @@ class Recipe:
 		source = [nodes[a] for a,b in graph.edges]
 		target = [nodes[b] for a,b in graph.edges]
 		value = [1 for l in graph.edges]
-		edgedata = [graph.edges[a,b]["reaction_id"] for a,b in graph.edges]
 
 		# print(graph.nodes)
 		
@@ -199,12 +199,35 @@ class Recipe:
 				customdata.append(d)
 				# id=product.id, smiles=product.smiles, amount=ingredient.amount, price=ingredient.price, lead_time=ingredient.lead_time
 
-		# print(customdata)
+		hoverkeys_edges = None
+		
+		# edgedata = [graph.edges[a,b]["reaction_id"] for a,b in graph.edges]
+
+		customdata_edges = []
+
+		for s,t in graph.edges.keys():
+			edge = graph.edges[s,t]
+			
+			if not hoverkeys_edges:
+				hoverkeys_edges = list(edge.keys())
+			
+			if not n:
+				logger.error(f'problem w/ edge {s=} {t=}')
+				customdata_edges.append((None, None, None))
+
+			else:
+				d = tuple(v if v is not None else 'N/A' for v in edge.values())
+				customdata_edges.append(d)
 
 		hoverlines = []
 		for i,key in enumerate(hoverkeys):
 			hoverlines.append(f'{key}=%''{'f'customdata[{i}]''}')
 		hovertemplate = 'Compound '+'<br>'.join(hoverlines)+'<extra></extra>'
+
+		hoverlines_edges = []
+		for i,key in enumerate(hoverkeys_edges):
+			hoverlines_edges.append(f'{key}=%''{'f'customdata[{i}]''}')
+		hovertemplate_edges = 'Reaction '+'<br>'.join(hoverlines_edges)+'<extra></extra>'
 
 		# print(hovertemplate)
 
@@ -229,8 +252,8 @@ class Recipe:
 				hovertemplate=hovertemplate,
 			),
 				link = dict(
-				customdata=edgedata,
-				hovertemplate='reaction_id=%{customdata}',
+				customdata=customdata_edges,
+				hovertemplate=hovertemplate_edges,
 				source = source,
 				target = target,
 				value = value,
@@ -263,7 +286,7 @@ class Recipe:
 		price = self.price
 		if price:
 			logger.var('\nprice', price[0], dict(unit=price[1]))
-			logger.var('lead-time', self.lead_time, dict(unit='working days'))
+			# logger.var('lead-time', self.lead_time, dict(unit='working days'))
 
 		logger.var('\n#products', len(self.products))
 		for product in self.products:
@@ -288,15 +311,18 @@ class Recipe:
 		assert len(matches) == 1
 		return matches[0]
 
-	def get_quotes(self, df=False):
+	def add_to_all_reactants(self, amount=20):
+		self.reactants.df['amount'] += amount
 
-		quotes = [quote for i in self.reactants if (quote := i.quote)]
+	# def get_quotes(self, df=False):
 
-		if df:
-			from pandas import DataFrame
-			return DataFrame([q.dict for q in quotes])
+	# 	quotes = [quote for i in self.reactants if (quote := i.quote)]
 
-		return quotes
+	# 	if df:
+	# 		from pandas import DataFrame
+	# 		return DataFrame([q.dict for q in quotes])
+
+	# 	return quotes
 
 	def write_json(self, file, indent=4):
 
