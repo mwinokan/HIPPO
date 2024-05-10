@@ -700,12 +700,12 @@ class Database:
 		*,
 		compound: Compound | int,
 		supplier: str,
-		catalogue: str,
-		entry: str,
+		catalogue: str | None,
+		entry: str | None,
 		amount: float,
 		price: float,
-		currency: str,
-		purity: float,
+		currency: str | None,
+		purity: float | None,
 		lead_time: int,
 		smiles: str | None = None,
 		commit: bool = True,
@@ -716,7 +716,9 @@ class Database:
 			assert isinstance(compound, Compound), f'incompatible {compound=}'
 			compound = compound.id
 			
-		assert currency in ['GBP', 'EUR', 'USD'], f'incompatible {currency=}'
+		assert currency in ['GBP', 'EUR', 'USD', None], f'incompatible {currency=}'
+		
+		assert supplier in ['MCule', 'Enamine', 'Stock'], f'incompatible {supplier=}'
 
 		smiles = smiles or ""
 		
@@ -895,13 +897,19 @@ class Database:
 
 	### DELETION
 
-	def delete_where(self, table, key, value):
+	def delete_where(self, table, key, value=None):
 		"""Delete where key==value"""
 
-		if isinstance(value, str):
-			value = f"'{value}'"
+		if value is not None:
 
-		sql = f'DELETE FROM {table} WHERE {table}_{key}={value}'
+			if isinstance(value, str):
+				value = f"'{value}'"
+
+			sql = f'DELETE FROM {table} WHERE {table}_{key}={value}'
+
+		else:
+			
+			sql = f'DELETE FROM {table} WHERE {key}'
 
 		try:
 			result = self.execute(sql)

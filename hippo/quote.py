@@ -71,12 +71,6 @@ class Quote:
 		unit_price = biggest_pack.price / biggest_pack.amount
 		estimated_price = unit_price * required_amount
 
-		# print(required_amount)
-		# print(quotes)
-		# print(biggest_pack)
-		# print(f'{unit_price} {biggest_pack.currency}/mg')
-		# print(f'{estimated_price=} {biggest_pack.currency}')
-
 		self = cls.__new__(cls)
 		self.__init__(
 			db=biggest_pack.db,
@@ -191,11 +185,14 @@ class Quote:
 	def __repr__(self):
 
 		if self.purity:
-			purity = f'@ {self.purity:.0%}'
+			purity = f' @ {self.purity:.0%}'
 		else:
 			purity = ''
 
+		if self.supplier == 'Stock':
+			return f'{mcol.bold}{mcol.underline}C{self.compound} In Stock: {self.amount:}mg{purity}{mcol.unbold}{mcol.ununderline}'
+
 		if self.type:
-			return f'{mcol.bold}{mcol.underline}{self.entry_str} {self.amount:}mg {purity} = {self.price:} {self.currency} ({self.lead_time} days) {self.smiles} [{self.type}]{mcol.unbold}{mcol.ununderline}'
+			return f'{mcol.bold}{mcol.underline}C{self.compound} {self.entry_str} {self.amount:}mg{purity} = {self.price:} {self.currency} ({self.lead_time} days) {self.smiles} [{self.type}]{mcol.unbold}{mcol.ununderline}'
 		else:
-			return f'{mcol.bold}{mcol.underline}{self.entry_str} {self.amount:}mg {purity} = {self.price:} {self.currency} ({self.lead_time} days) {self.smiles}{mcol.unbold}{mcol.ununderline}'
+			return f'{mcol.bold}{mcol.underline}C{self.compound} {self.entry_str} {self.amount:}mg{purity} = {self.price:} {self.currency} ({self.lead_time} days) {self.smiles}{mcol.unbold}{mcol.ununderline}'

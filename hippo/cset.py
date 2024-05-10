@@ -673,6 +673,10 @@ class IngredientSet:
 		result = self.db.select_where(query='compound_smiles', table='compound', key=f'compound_id in {tuple(compound_ids)}', multiple=True)
 		return [q for q, in result]
 
+	@property
+	def compound_ids(self):
+		return list(self.df['compound_id'].values)
+
 	### METHODS
 
 	def add(self, ingredient=None, *, compound_id=None, amount=None, quote_id=None, supplier=None, max_lead_time=None):

@@ -252,6 +252,65 @@ class Compound:
 
 	# 	return data
 
+	def add_stock(self, 
+		amount: float,
+		*,
+		purity: float | None = None,
+		entry: str | None = None,
+		location:str | None = None,
+		return_quote = True,
+	) -> int | Quote:
+
+		"""Register a certain quantity of compound stock in the Database."""
+
+		assert amount
+
+		# search for existing in stock quotes
+		existing = self.get_quotes(supplier='Stock', df=False)
+
+		# supersede old in stock records
+		if existing:
+			delete = set()
+			not_deleted = 0
+			for quote in existing:
+
+				if any([
+					quote.entry != entry,
+					quote.purity != purity,
+					quote.catalogue != location,
+				]):
+					not_deleted += 1
+					continue
+
+				delete.add(quote.id)
+
+			delete_str = str(tuple(delete)).replace(',)',')')
+
+			self.db.delete_where(table='quote', key=f'quote_id IN {delete_str}')
+
+			if delete:
+				logger.warning(f'Removed {len(delete)} existing In-Stock Quotes')
+			
+			if not_deleted:
+				logger.warning(f'Did not remove {not_deleted} existing In-Stock Quotes with differing entry/purity/location')
+
+		# insert the new quote
+		quote_id = self.db.insert_quote(
+			compound=self.id,
+			price=0,
+			lead_time=0,
+			currency=None,
+			supplier='Stock',
+			catalogue=location,
+			entry=entry,
+			amount=amount,
+			purity=purity,
+		)
+
+		if return_quote:
+			self.db.get_quote(id=quote_id)
+		else:
+			return quote_id
 
 	def get_tags(self) -> set:
 		tags = self.db.select_where(query='tag_name', table='tag', key='compound', value=self.id, multiple=True, none='quiet')
@@ -537,9 +596,9 @@ class Ingredient:
 
 		self._db = db
 			
-        # don't store inherited compound in memory until needed
+		# don't store inherited compound in memory until needed
 		self._compound = None
-    
+	
 		if isinstance(compound, Compound):
 			self._compound_id = compound.id
 			self._compound = None
@@ -564,7 +623,7 @@ class Ingredient:
 		else:
 			self._quote_id = int(quote)
 			self._quote = None
-        
+		
 		# self._id = inherit.id
 		# self._inchikey = inherit.inchikey
 		# self._alias = inherit.alias
