@@ -1376,4 +1376,5 @@ CHEMICALITE_COMPOUND_PROPERTY_MAP = {
 	'num_heavy_atoms':'mol_num_hvyatms',
 	'formula':'mol_formula',
 	'num_rings':'mol_num_rings',
+	'molecular_weight':'mol_amw',
 }

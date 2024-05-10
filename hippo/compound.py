@@ -50,6 +50,7 @@ class Compound:
 		self._num_heavy_atoms = None
 		self._num_rings = None
 		self._formula = None
+		self._molecular_weight = None
 		
 		if isinstance(mol, bytes):
 			mol = Chem.Mol(mol)
@@ -108,6 +109,13 @@ class Compound:
 		if self._num_heavy_atoms is None:
 			self._num_heavy_atoms = self.db.get_compound_computed_property('num_heavy_atoms', self.id)
 		return self._num_heavy_atoms
+
+	@property
+	def molecular_weight(self):
+		"""Get the molecular weight"""
+		if self._molecular_weight is None:
+			self._molecular_weight = self.db.get_compound_computed_property('molecular_weight', self.id)
+		return self._molecular_weight
 
 	@property
 	def num_rings(self):
