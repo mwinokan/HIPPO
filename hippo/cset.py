@@ -243,7 +243,7 @@ class CompoundSet:
 	def __init__(self,
 		db: Database,
 		indices: list = None,
-		sort=False,
+		sort: bool = True,
 	):
 
 		self._db = db

@@ -1237,11 +1237,11 @@ class Database:
 
 		if return_similarity:
 			ids, similarities = zip(*result)
-			cset = CompoundSet(self, ids)
+			cset = CompoundSet(self, ids, sort=False)
 			return cset, similarities
 
 		ids = [r for r, in result]
-		cset = CompoundSet(self, ids)
+		cset = CompoundSet(self, ids, sort=False)
 
 		return cset
 
