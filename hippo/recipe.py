@@ -29,6 +29,255 @@ class Recipe:
 		self._reactions = reactions
 		self._db = db
 
+	### FACTORIES
+
+
+	@classmethod
+	def from_reaction(cls, 
+		reaction, 
+		amount=1, 
+		debug: bool = False, 
+		pick_cheapest: bool = True,
+		permitted_reactions=None,
+		quoted_only: bool = False,
+		supplier: None | str = None,
+	):
+
+		from .reaction import Reaction
+		assert isinstance(reaction, Reaction)
+
+		from .cset import IngredientSet
+		from .rset import ReactionSet
+
+		if debug: logger.debug(f'Recipe.from_reaction({amount=}, {pick_cheapest=})')
+		if debug: logger.debug(f'{reaction.id=}')
+		if debug: logger.debug(f'{reaction.product.id=}')
+		if debug: logger.debug(f'{amount=}')
+		if debug: logger.debug(f'{reaction.reactants.ids=}')
+
+		if permitted_reactions:
+			assert reaction in permitted_reactions
+			# raise NotImplementedError
+
+		db = reaction.db
+
+		recipe = cls.__new__(cls)
+		recipe.__init__(db, 
+			products=IngredientSet(db, [reaction.product.as_ingredient(amount=amount)]),
+			reactants=IngredientSet(db, []),
+			intermediates=IngredientSet(db, []),
+			reactions=ReactionSet(db, [reaction.id]),
+		)
+
+		recipes = [recipe]
+
+		if quoted_only:
+			ok = reaction.check_reactant_availability(supplier=supplier)
+			if not ok:
+				logger.error(f'Reactants not available for {reaction=}')
+				return []
+		
+		pairs = reaction.get_reactant_amount_pairs()
+		for reactant, reactant_amount in pairs:
+			if debug: logger.debug(f'{reactant.id=}, {reactant_amount=}')
+
+			# scale amount
+			reactant_amount *= amount
+			reactant_amount /= reaction.product_yield
+
+			inner_reactions = reactant.get_reactions(none='quiet', permitted_reactions=permitted_reactions)
+
+			if inner_reactions:
+
+				if debug: 
+					if len(inner_reactions) == 1:
+						logger.debug(f'Reactant has ONE inner reaction')
+					else:
+						logger.warning(f'{reactant=} has MULTIPLE inner reactions')
+
+				new_recipes = []
+
+				inner_recipes = []
+				for reaction in inner_reactions:
+					reaction_recipes = Recipe.from_reaction(reaction=reaction, amount=reactant_amount, debug=debug, pick_cheapest=False)
+					inner_recipes += reaction_recipes
+
+				for recipe in recipes:
+
+					for inner_recipe in inner_recipes:
+
+						combined_recipe = recipe.copy()
+
+						combined_recipe.reactants += inner_recipe.reactants
+						combined_recipe.intermediates += inner_recipe.intermediates
+						combined_recipe.reactions += inner_recipe.reactions
+						combined_recipe.intermediates.add(reactant.as_ingredient(reactant_amount))
+
+						new_recipes.append(combined_recipe)
+					
+				recipes = new_recipes
+
+			else:
+
+				ingredient = reactant.as_ingredient(reactant_amount)
+				for recipe in recipes:
+					recipe.reactants.add(ingredient)
+
+		if pick_cheapest:
+			priced = [r for r in recipes if r.price]
+			if not priced:
+				logger.error("0 recipes with prices, can't choose cheapest")
+				return recipes
+			return sorted(priced, key=lambda r: r.price)[0]
+
+		return recipes
+
+	@classmethod
+	def from_reactions(cls, 
+		reactions, 
+		amount=1,
+		# pick_cheapest: bool = True,
+		permitted_reactions=None,
+	):
+
+		from .rset import ReactionSet
+		from .cset import IngredientSet
+		assert isinstance(reactions, ReactionSet)
+
+		# get all the products
+		products = reactions.products
+		recipe = Recipe.from_compounds(compounds=products, amount=amount, permitted_reactions=reactions)
+
+		return recipe
+
+	@classmethod
+	def from_compounds(cls,
+		compounds, 
+		amount: float = 1, 
+		debug: bool = False, 
+		pick_cheapest: bool = True,
+		permitted_reactions=None,
+		quoted_only: bool = False,
+		supplier: None | str = None,
+		solve_combinations: bool = True,
+		pick_first: bool = False,
+		warn_multiple_solutions: bool = True,
+		pick_cheapest_inner_routes: bool = False,
+	):
+
+		from tqdm import tqdm
+
+		from .cset import CompoundSet
+		assert isinstance(compounds, CompoundSet)
+
+		# if permitted_reactions:
+		# 	raise NotImplementedError
+
+		n_comps = len(compounds)
+
+		if not hasattr(amount, '__iter__'):
+			amount = [amount] * n_comps
+
+		options = []
+
+		logger.info('Solving individual compound recipes...')
+		for comp, a in tqdm(zip(compounds, amount), total=n_comps):
+
+			comp_options = []
+
+			for reaction in comp.reactions:
+				if pick_cheapest_inner_routes:
+					comp_options.append(Recipe.from_reaction(reaction=reaction, amount=a, pick_cheapest=True, debug=debug, permitted_reactions=permitted_reactions, quoted_only=quoted_only, supplier=supplier))
+				else:
+					comp_options += Recipe.from_reaction(reaction=reaction, amount=a, pick_cheapest=False, debug=debug, permitted_reactions=permitted_reactions, quoted_only=quoted_only, supplier=supplier)	
+
+			if warn_multiple_solutions and len(comp_options) > 1:
+				logger.warning(f'Multiple solutions for compound={comp}')
+
+			options.append(comp_options)
+
+		from itertools import product
+		logger.info('Solving recipe combinations...')
+		combinations = list(product(*options))
+
+		solutions = []
+
+		if not solve_combinations:
+			return combinations
+
+		if pick_first:
+			combinations = [combinations[0]]
+			
+		logger.info('Combining recipes...')
+		for combo in tqdm(combinations):
+
+			# logger.debug(f'Combination of {len(combo)} recipes')
+
+			solution = combo[0]
+
+			for recipe in combo[1:]:
+				solution += recipe
+
+			solutions.append(solution)
+
+		if not solutions:
+			logger.error('No solutions!')
+
+		if pick_first:
+			return solutions[0]
+
+		if pick_cheapest:
+			logger.info('Picking cheapest...')
+			priced = [r for r in solutions if r.price]
+			if not priced:
+				logger.error("0 recipes with prices, can't choose cheapest")
+				return solutions
+			return sorted(priced, key=lambda r: r.price)[0]
+
+		return solutions
+
+	@classmethod
+	def from_reactants(cls, reactants):
+
+		print(reactants.ids)
+
+		db = reactants.db
+
+		recipe = cls.__new__(cls)
+		
+		# recipe.__init__(db, 
+		# 	products=IngredientSet(db, [reaction.product.as_ingredient(amount=amount)]),
+		# 	reactants=IngredientSet(db, []),
+		# 	intermediates=IngredientSet(db, []),
+		# 	reactions=ReactionSet(db, [reaction.id]),
+		# )
+
+		result = db.execute(f'''
+		SELECT DISTINCT reactant_reaction FROM reactant
+		WHERE reactant_compound IN (85, 85, 89, 2162, 2183)
+		''').fetchall()
+
+		reaction_ids = [q for q, in result]
+
+		print(len(reaction_ids))
+
+		return reaction_ids
+
+		raise NotImplementedError
+	
+		# self = cls.__new__(cls)
+
+		# self.__init__(...)
+
+		# return self
+
+	@classmethod
+	def from_ingredients(cls, db, ingredients):
+		raise NotImplementedError
+		self = cls.__new__(cls)
+		self.__init__(...)
+		return self
+
 	### PROPERTIES
 
 	@property
@@ -247,7 +496,7 @@ class Recipe:
 				# color = "blue"
 				customdata=customdata,
 				# customdata = ["Long name A1", "Long name A2", "Long name B1", "Long name B2",
-                    # "Long name C1", "Long name C2"],
+					# "Long name C1", "Long name C2"],
 				# hovertemplate='Compound %{label}<br><br>smiles=%{customdata}<extra></extra>',
 				hovertemplate=hovertemplate,
 			),
@@ -260,7 +509,8 @@ class Recipe:
 		))])
 
 		if not title:
-			title = f"Recipe<br><sup>price={self.price}, lead-time={self.lead_time}</sup>"
+			# title = f"Recipe<br><sup>price={self.price}, lead-time={self.lead_time}</sup>"
+			title = f"Recipe<br><sup>price={self.price}</sup>"
 
 		fig.update_layout(title=title)
 
@@ -353,18 +603,20 @@ class Recipe:
 
 		# Recipe properties
 		data['price'] = self.price
-		data['lead_time'] = self.price
+		# data['lead_time'] = self.lead_time
 
-		# IngredientSet's
-		data['reactants'] = self.reactants.df.to_json(indent=indent)
-		data['intermediates'] = self.intermediates.df.to_json(indent=indent)
-		data['products'] = self.products.df.to_json(indent=indent)
+		# IngredientSets
+		data['reactants'] = self.reactants.df.to_dict(orient='records')
+		data['intermediates'] = self.intermediates.df.to_dict(orient='records')
+		data['products'] = self.products.df.to_dict(orient='records')
 		
 		# ReactionSet
 		data['reaction_ids'] = self.reactions.ids
 
+		# return data
+
 		logger.writing(file)
-		json.dump(open(file, 'wt'), data, indent=indent)
+		json.dump(data, open(file, 'wt'), indent=indent)
 
 	def copy(self):
 		return Recipe(self.db, self.products.copy(), self.reactants.copy(), self.intermediates.copy(), self.reactions.copy())

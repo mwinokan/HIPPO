@@ -1,7 +1,7 @@
 
 
 import pandas as pd
-# import numpy as np
+import numpy as np
 
 from .cset import CompoundTable, IngredientSet, CompoundSet
 from .pset import PoseTable, PoseSet
@@ -522,6 +522,139 @@ class HIPPO:
 
 		logger.success(f'Loaded compounds from {sdf_path}')
 
+	def add_syndirella_bases(self,
+		df_path: str | Path,
+		*,
+		tags: None | list[str] = None,
+		reaction_yield_map: dict | None = None,
+		check_chemistry=True,
+		debug=False,
+	):
+
+		from .chem import check_reaction_types, InvalidChemistryError
+
+		tags = tags or []
+
+		if isinstance(df_path, str):
+			df_path = Path(df_path)
+		df = pd.read_pickle(df_path)
+
+		reaction_cols = [c for c in df.columns if '_reaction' in c]
+		# print(reaction_cols)
+
+		product_ids = set()
+
+		# loop over rows
+
+		for i,row in tqdm(df.iterrows()):
+
+			# determine number of steps
+
+
+			reaction_types = [r for c in reaction_cols if isinstance((r:=row[c]), str)]
+			check_reaction_types(reaction_types)
+			
+			n_steps = len(reaction_types)
+
+			if debug:
+				logger.header(f'row={i}, {n_steps=}')
+
+			try:
+				
+				# loop over each reaction step
+				for j in range(n_steps):
+	
+					j += 1
+	
+					reactants = []
+	
+					reactant_previous_product = row[f'{j}_r_previous_product']
+	
+					# reactant 1
+					if reactant_previous_product == 1:
+						reactant1_id = product_id
+						reactants.append(reactant1_id)
+					elif smiles := row[f'{j}_r1_smiles']:
+						
+						if not isinstance(smiles, str):
+							raise InvalidRowError(f'non-string {j}_r1_smiles')
+													
+						reactant1_id, duplicate = self.register_compound(smiles=smiles, commit=False, return_compound=False, tags=tags, base=None, register_base_if_duplicate=False, return_duplicate=True)
+						
+						# logger.var(f'reactant {j} 1', reactant1_id)
+						
+						reactants.append(reactant1_id)
+				
+					# reactant 2
+					if reactant_previous_product == 2:
+						reactant2_id = product_id
+						reactants.append(reactant2_id)
+					elif smiles := row[f'{j}_r2_smiles']:
+						
+						if not isinstance(smiles, str):
+							raise InvalidRowError(f'non-string {j}_r2_smiles')
+
+						reactant2_id, duplicate = self.register_compound(smiles=smiles, commit=False, return_compound=False, tags=tags, base=None, register_base_if_duplicate=False, return_duplicate=True)
+						
+						# logger.var(f'reactant {j} 2', reactant2_id)
+							
+						reactants.append(reactant2_id)
+				
+					# product
+					if smiles := row[f'{j}_product_smiles']:
+						if not isinstance(smiles, str):
+							raise InvalidRowError(f'non-string {j}_product_smiles')
+	
+						if j != n_steps:
+							this_tags = tags #+ ['intermediate']
+	
+						else:
+							this_tags = ['Syndirella base'] + tags #+ ['Syndirella elaboration']
+						
+						product_id, duplicate = self.register_compound(smiles=smiles, tags=this_tags, commit=False, return_compound=False, base=None, register_base_if_duplicate=False, return_duplicate=True)
+	
+						if j == n_steps:
+							product_ids.add(product_id)
+
+						# logger.var(f'product {j}', product_id)
+
+					# register the reaction
+					if reaction_yield_map:
+						product_yield = reaction_yield_map[row[f'{j}_reaction']]
+					else:
+						product_yield = 1.0
+						
+					try:
+
+						reaction = self.register_reaction(
+							reactants=reactants, 
+							product=product_id, 
+							type=row[f'{j}_reaction'], 
+							commit=False, 
+							product_yield=product_yield,
+							check_chemistry=check_chemistry,
+						)
+
+						if debug:
+							logger.var(str(reaction), reaction.reaction_str)
+
+					except InvalidChemistryError as e:
+						skipped_reactions += 1
+			
+			except InvalidRowError as e:
+				# logger.error(f'Skipping invalid row {i=}: {e}')
+				skipped_invalid_smiles += 1
+				continue
+
+			# chemistries = set(sum([df[df[f'{j+1}_reaction'].notnull()][f'{j+1}_reaction'].tolist() for j in range(n_steps)], []))
+			# logger.var('Present reactions', str(reaction_types))
+
+			# break
+
+			# break
+
+		return self.compounds[product_ids]
+
 	def add_syndirella_elabs(self,
 		df_path: str | Path,
 		*,
@@ -801,7 +934,7 @@ class HIPPO:
 		else:
 			logger.warning(f'Loaded {n_reactions} new reactions from {df_path.name}')
 
-		return base_id
+		# return base_id
 
 	def add_enamine_quote(
 		self, 
@@ -1354,9 +1487,15 @@ class HIPPO:
 			batch = compounds[i:i+batch_size]
 			quoter.get_batch_quote(batch)
 
-	def quote_reactants(self, quoter):
+	def quote_reactants(self, quoter, *, unquoted_only=False):
 		"""Get batch quotes for all reactants in the database"""
-		self.quote_compounds(quoter=quoter, compounds=self.reactants)
+
+		if unquoted_only:
+			compounds = self.reactants.get_unquoted(supplier=quoter.supplier)
+		else:
+			compounds = self.reactants
+
+		self.quote_compounds(quoter=quoter, compounds=compounds)
 	
 	def quote_intermediates(self, quoter):
 		"""Get batch quotes for all reactants in the database"""

@@ -77,6 +77,16 @@ SUPPORTED_CHEMISTRY = {
 		},
 	},
 
+	"Nucleophilic_substitution" : 
+	{
+		"heavy_atoms_diff":1, 
+		"rings_diff":0,
+		# "atomtype":
+		# {
+		# 	"removed" : { "C":7, "H":6 },
+		# },
+	},
+
 }
 
 def check_reaction_types(types):
@@ -86,7 +96,13 @@ def check_reaction_types(types):
 
 def check_chemistry(reaction_type, reactants, product, debug=False):
 
-	assert reaction_type in SUPPORTED_CHEMISTRY
+	if reaction_type not in SUPPORTED_CHEMISTRY:
+
+		logger.var("reactants", reactants.ids)
+		logger.var("product", product)
+
+		raise UnsupportedChemistryError(f'Unsupported {reaction_type=}')
+
 	assert reactants
 	assert product	
 
@@ -213,4 +229,7 @@ def halogen_count(atomtype_dict):
 	return count
 
 class InvalidChemistryError(Exception):
+	pass
+
+class UnsupportedChemistryError(Exception):
 	pass

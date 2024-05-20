@@ -4,6 +4,7 @@ from .db import Database
 import mcol
 
 import os
+from numpy import int64
 
 import logging
 logger = logging.getLogger('HIPPO')
@@ -180,7 +181,7 @@ class ReactionSet:
 		if not isinstance(indices, list):
 			indices = list(indices)
 
-		assert all(isinstance(i, int) for i in indices)
+		assert all(isinstance(i, int) or isinstance(i, int64) for i in indices)
 
 		self._indices = sorted(list(set(indices)))
 
@@ -202,6 +203,35 @@ class ReactionSet:
 	@property
 	def ids(self):
 		return self._indices
+
+	@property
+	def str_ids(self):
+		return str(tuple(self.ids)).replace(',)',')')
+
+	@property
+	def products(self):
+		"""Get all product compounds that can be synthesised with these reactions (no intermediates)"""
+		from .cset import CompoundSet
+		intermediates = self.intermediates
+		product_ids = self.db.execute(f"""
+			SELECT compound_id FROM compound
+			INNER JOIN reaction ON compound_id = reaction_product
+			WHERE reaction_id IN {self.str_ids}
+			AND compound_id NOT IN {intermediates.str_ids}
+		""").fetchall()
+		return CompoundSet(self.db, [i for i, in product_ids])
+
+	@property
+	def intermediates(self):
+		"""Get all intermediate compounds that can be synthesised with these reactions"""
+		from .cset import CompoundSet
+		intermediate_ids = self.db.execute(f"""
+			SELECT DISTINCT compound_id FROM compound
+			INNER JOIN reaction ON compound_id = reaction_product
+			INNER JOIN reactant ON compound_id = reactant_compound
+			WHERE reaction_id IN {self.str_ids}
+		""").fetchall()
+		return CompoundSet(self.db, [i for i, in intermediate_ids])
 
 	### METHODS
 
@@ -262,6 +292,11 @@ class ReactionSet:
 
 	def copy(self):
 		return ReactionSet(self.db, self.ids)
+
+	def get_recipes(self, amounts=1):
+
+		from .recipe import Recipe
+		return Recipe.from_reactions(db=self.db, reactions=self, amounts=1)
 
 	### DUNDERS
 

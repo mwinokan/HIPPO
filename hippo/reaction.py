@@ -123,93 +123,16 @@ class Reaction:
 		else:
 			return []
 	
-	def get_recipe(self, 
+	def get_recipes(self, 
 		amount: float = 1, # in mg
 		debug: bool = False,
-		# recipes: None | list = None,
-		pick_cheapest = False,
+		pick_cheapest: bool = False,
+		permitted_reactions = None,
 	):
 		"""Get a :class:`.Recipe` describing how to make the product"""
 
-		from .cset import IngredientSet
-		from .rset import ReactionSet
-
-		if debug: logger.debug(f'Reaction.get_recipe({amount=}, {pick_cheapest=})')
-		if debug: logger.debug(f'{self.id=}')
-		if debug: logger.debug(f'{self.product.id=}')
-		if debug: logger.debug(f'{amount=}')
-		if debug: logger.debug(f'{self.reactants.ids=}')
-
-		# if recipes is None:
-		recipes = [Recipe(self.db, 
-			products=IngredientSet(self.db, [self.product.as_ingredient(amount=amount)]),
-			# products=IngredientSet(self.db, []),
-			reactants=IngredientSet(self.db, []),
-			intermediates=IngredientSet(self.db, []),
-			reactions=ReactionSet(self.db, [self.id]),
-		)]
-		
-		pairs = self.get_reactant_amount_pairs()
-		for reactant, reactant_amount in pairs:
-			if debug: logger.debug(f'{reactant.id=}, {reactant_amount=}')
-
-			# scale amount
-			reactant_amount *= amount
-			reactant_amount /= self.product_yield
-
-			inner_reactions = reactant.get_reactions(none='quiet')
-
-			if inner_reactions:
-
-				if debug: 
-					if len(inner_reactions) == 1:
-						logger.debug(f'Reactant has ONE inner reaction')
-					else:
-						logger.warning(f'{reactant=} has MULTIPLE inner reactions')
-
-				new_recipes = []
-
-				inner_recipes = []
-				for reaction in inner_reactions:
-					reaction_recipes = reaction.get_recipe(amount=reactant_amount, debug=debug, pick_cheapest=False)
-					inner_recipes += reaction_recipes
-
-				for recipe in recipes:
-
-					# logger.header(recipe.products[0])
-
-					for inner_recipe in inner_recipes:
-
-						combined_recipe = recipe.copy()
-
-						# current reactants will become intermediates?
-
-						combined_recipe.reactants += inner_recipe.reactants
-						combined_recipe.intermediates += inner_recipe.intermediates
-						combined_recipe.reactions += inner_recipe.reactions
-						
-						combined_recipe.intermediates.add(reactant.as_ingredient(reactant_amount))
-
-						new_recipes.append(combined_recipe)
-					
-					# logger.header(recipe.products[0])
-
-				recipes = new_recipes
-
-			else:
-
-				ingredient = reactant.as_ingredient(reactant_amount)
-				for recipe in recipes:
-					recipe.reactants.add(ingredient)
-
-		if pick_cheapest:
-			priced = [r for r in recipes if r.price]
-			if not priced:
-				logger.error("0 recipes with prices, can't choose cheapest")
-				return recipes
-			return sorted(priced, key=lambda r: r.price)[0]
-
-		return recipes
+		from .recipe import Recipe
+		return Recipe.from_reaction(self, amount=amount, debug=debug, pick_cheapest=pick_cheapest, permitted_reactions=permitted_reactions)
 
 	def summary(self, amount=1, draw=True):
 		"""Print a summary of this reaction's information"""
@@ -254,6 +177,44 @@ class Reaction:
 		from .chem import check_chemistry
 		return check_chemistry(self.type, self.reactants, self.product, debug=debug)
 
+	def check_reactant_availability(self, supplier: None | str = None, debug: bool = False):
+
+		if supplier is not None:
+			raise NotImplementedError
+
+		if debug:
+			logger.var('reaction', self.id)
+			logger.var('reactants', self.reactant_ids)
+			logger.var('supplier', supplier)
+
+		if supplier is None:
+
+			triples = self.db.execute(f'''
+				SELECT reactant_compound, quote_id, reaction_id FROM reactant 
+				LEFT JOIN quote ON quote_compound = reactant_compound
+				LEFT JOIN reaction ON reaction_product = reactant_compound 
+				WHERE reactant_reaction = {self.id}
+			''').fetchall()
+
+		else:
+
+			triples = self.db.execute(f'''
+				SELECT reactant_compound, quote_id, reaction_id FROM reactant 
+				LEFT JOIN quote ON quote_compound = reactant_compound
+				LEFT JOIN reaction ON reaction_product = reactant_compound 
+				WHERE reactant_reaction = {self.id}
+				AND quote_supplier = "{supplier}"
+			''').fetchall()
+
+		for reactant_compound, quote_id, reaction_id in triples:
+			if quote_id or reaction_id:
+				continue
+			if debug:
+				logger.warning(f'No quote or reaction for reactant={reactant_compound}')
+			return False
+
+		return True
+
 	def get_dict(self, smiles=True, mols=True):
 
 		"""Returns a dictionary representing this Reaction"""
@@ -284,16 +245,26 @@ class Reaction:
 
 	def __eq__(self, other):
 
-		if self.type != other.type:
-			return False
+		match other:
+			case int():
+				return self.id == other
 
-		if self.product != other.product:
-			return False
+			case Reaction():
+				
+				if self.type != other.type:
+					return False
 
-		if self.reactant_ids != other.reactant_ids:
-			return False
+				if self.product != other.product:
+					return False
 
-		return True
+				if self.reactant_ids != other.reactant_ids:
+					return False
+
+				return True
+
+			case _:
+				raise NotImplementedError
+
 
 	def __hash__(self):
 		return self.id

@@ -1170,6 +1170,27 @@ class Database:
 		entry = self.select_all_where(table='feature', key='id', value=id)
 		return Feature(*entry)
 
+	def get_possible_reaction_ids(self, *, compound_ids):
+
+		compound_ids_str = str(tuple(compound_ids)).replace(',)',')')
+
+		result = self.execute(f'''
+			WITH possible_reactants AS 
+			(
+				SELECT reactant_reaction, CASE WHEN reactant_compound IN {compound_ids_str} THEN reactant_compound END AS [possible_reactant] FROM reactant
+			)
+
+			, possible_reactions AS (
+				SELECT reactant_reaction, COUNT(CASE WHEN possible_reactant IS NULL THEN 1 END) AS [count_null] FROM possible_reactants
+				GROUP BY reactant_reaction
+			)
+			
+			SELECT reactant_reaction FROM possible_reactions
+			WHERE count_null = 0
+		''').fetchall()
+
+		return [q for q, in result]
+
 	### COMPOUND QUERY
 
 	def query_substructure(self, query, fast=True, none='error'):
