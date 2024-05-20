@@ -225,12 +225,14 @@ class ReactionSet:
 	def intermediates(self):
 		"""Get all intermediate compounds that can be synthesised with these reactions"""
 		from .cset import CompoundSet
-		intermediate_ids = self.db.execute(f"""
+		sql = f"""
 			SELECT DISTINCT compound_id FROM compound
 			INNER JOIN reaction ON compound_id = reaction_product
 			INNER JOIN reactant ON compound_id = reactant_compound
-			WHERE reaction_id IN {self.str_ids}
-		""").fetchall()
+			WHERE reactant_reaction IN {self.str_ids}
+		"""
+		# print(sql)
+		intermediate_ids = self.db.execute(sql).fetchall()
 		return CompoundSet(self.db, [i for i, in intermediate_ids])
 
 	### METHODS

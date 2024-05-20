@@ -1191,6 +1191,10 @@ class Database:
 
 		return [q for q, in result]
 
+	def get_possible_reaction_product_ids(self, *, reaction_ids):
+		reaction_ids_str = str(tuple(reaction_ids)).replace(',)',')')
+		return [q for q, in self.select_where(query='DISTINCT reaction_product', table='reaction', key=f'reaction_id IN {reaction_ids_str}', multiple=True)] 
+
 	### COMPOUND QUERY
 
 	def query_substructure(self, query, fast=True, none='error'):
@@ -1258,11 +1262,11 @@ class Database:
 
 		if return_similarity:
 			ids, similarities = zip(*result)
-			cset = CompoundSet(self, ids, sort=False)
+			cset = CompoundSet(self, ids)
 			return cset, similarities
 
 		ids = [r for r, in result]
-		cset = CompoundSet(self, ids, sort=False)
+		cset = CompoundSet(self, ids)
 
 		return cset
 
@@ -1397,5 +1401,4 @@ CHEMICALITE_COMPOUND_PROPERTY_MAP = {
 	'num_heavy_atoms':'mol_num_hvyatms',
 	'formula':'mol_formula',
 	'num_rings':'mol_num_rings',
-	'molecular_weight':'mol_amw',
 }

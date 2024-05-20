@@ -180,6 +180,8 @@ class Recipe:
 
 		options = []
 
+		logger.debug(f'{n_comps=}')
+
 		logger.info('Solving individual compound recipes...')
 		for comp, a in tqdm(zip(compounds, amount), total=n_comps):
 
@@ -193,6 +195,9 @@ class Recipe:
 
 			if warn_multiple_solutions and len(comp_options) > 1:
 				logger.warning(f'Multiple solutions for compound={comp}')
+
+			if not comp_options:
+				logger.error(f'No solutions for compound={comp}')
 
 			options.append(comp_options)
 
@@ -211,7 +216,7 @@ class Recipe:
 		logger.info('Combining recipes...')
 		for combo in tqdm(combinations):
 
-			# logger.debug(f'Combination of {len(combo)} recipes')
+			logger.debug(f'Combination of {len(combo)} recipes')
 
 			solution = combo[0]
 
@@ -237,39 +242,46 @@ class Recipe:
 		return solutions
 
 	@classmethod
-	def from_reactants(cls, reactants):
+	def from_reactants(cls, reactants, amount=1):
 
 		print(reactants.ids)
 
+		reactant_ids = reactants.ids
+
 		db = reactants.db
 
-		recipe = cls.__new__(cls)
-		
-		# recipe.__init__(db, 
-		# 	products=IngredientSet(db, [reaction.product.as_ingredient(amount=amount)]),
-		# 	reactants=IngredientSet(db, []),
-		# 	intermediates=IngredientSet(db, []),
-		# 	reactions=ReactionSet(db, [reaction.id]),
-		# )
+		compound_ids = reactant_ids
 
-		result = db.execute(f'''
-		SELECT DISTINCT reactant_reaction FROM reactant
-		WHERE reactant_compound IN (85, 85, 89, 2162, 2183)
-		''').fetchall()
+		possible_reactions = []
 
-		reaction_ids = [q for q, in result]
+		# recursively search for possible reactions
+		for i in range(300):
+			
+			reaction_ids = db.get_possible_reaction_ids(compound_ids=compound_ids)
 
-		print(len(reaction_ids))
+			if not reaction_ids:
+				break
 
-		return reaction_ids
+			possible_reactions += reaction_ids
 
-		raise NotImplementedError
-	
-		# self = cls.__new__(cls)
+			logger.var('reaction_ids', reaction_ids)
 
-		# self.__init__(...)
+			product_ids = db.get_possible_reaction_product_ids(reaction_ids=reaction_ids)
 
-		# return self
+			logger.var('product_ids', product_ids)
+
+			compound_ids = product_ids
+
+		else:
+			raise NotImplementedError('Maximum recursion depth exceeded')
+
+		logger.var('all possible reactions', possible_reactions)
+
+		from .rset import ReactionSet
+
+		rset = ReactionSet(db, possible_reactions)
+
+		return cls.from_reactions(rset, amount=amount, permitted_reactions=rset)
 
 	@classmethod
 	def from_ingredients(cls, db, ingredients):
