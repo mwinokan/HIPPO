@@ -1258,11 +1258,11 @@ class Database:
 
 		if return_similarity:
 			ids, similarities = zip(*result)
-			cset = CompoundSet(self, ids)
+			cset = CompoundSet(self, ids, sort=False)
 			return cset, similarities
 
 		ids = [r for r, in result]
-		cset = CompoundSet(self, ids)
+		cset = CompoundSet(self, ids, sort=False)
 
 		return cset
 
@@ -1397,4 +1397,5 @@ CHEMICALITE_COMPOUND_PROPERTY_MAP = {
 	'num_heavy_atoms':'mol_num_hvyatms',
 	'formula':'mol_formula',
 	'num_rings':'mol_num_rings',
+	'molecular_weight':'mol_amw',
 }
