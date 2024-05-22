@@ -359,7 +359,7 @@ class Compound:
 		
 		return quotes
 
-	def get_reactions(self, none='error', as_reactant=False) -> list:
+	def get_reactions(self, none='error', as_reactant=False, permitted_reactions=None) -> list:
 		"""Get the associated reactions as product, unless as_reactant is True."""
 
 		from .rset import ReactionSet
@@ -370,6 +370,9 @@ class Compound:
 			reaction_ids = self.db.select_where(query='reaction_id', table='reaction', key='product', value=self.id, multiple=True, none=none)
 
 		reaction_ids = [q for q, in reaction_ids]
+
+		if permitted_reactions:
+			reaction_ids = [i for i in reaction_ids if i in permitted_reactions]
 
 		return ReactionSet(self.db, reaction_ids)
 
@@ -471,10 +474,25 @@ class Compound:
 	def draw(self, align_substructure: bool = False):
 		"""Display this compound (and its base if it has one)"""
 
-		if self.base:
+		if (base := self.base):
+
+			# print(self.base)
+
 			from molparse.rdkit import draw_mcs
-			drawing = draw_mcs({self.base.smiles:f'{self.base} (base)', self.smiles:str(self)}, align_substructure=align_substructure, show_mcs=False, highlight_common=False)
-			display(drawing)
+
+			data = {self.base.smiles:f'{base} (base)', self.smiles:str(self)}
+
+			if len(data) == 2:
+
+				# print(data)
+
+				drawing = draw_mcs(data, align_substructure=align_substructure, show_mcs=False, highlight_common=False)
+				display(drawing)
+
+			else:
+				logger.error(f'Problem drawing {base.id=} vs {self.id=}, self referential?')
+				display(self.mol)
+		
 		else:
 			display(self.mol)
 

@@ -200,7 +200,7 @@ class CompoundTable:
 					comp = self.db.get_compound(table=self.table, alias=key)
 				return comp
 
-			case key if isinstance(key, list) or isinstance(key, tuple):
+			case key if isinstance(key, list) or isinstance(key, tuple) or isinstance(key, set):
 
 				indices = []
 				for i in key:
@@ -253,7 +253,12 @@ class CompoundSet:
 		if not isinstance(indices, list):
 			indices = list(indices)
 
-		assert all(isinstance(i, int) for i in indices)
+		# print(indices)
+		# print([type(i) for i in indices])
+
+		indices = [int(i) for i in indices]
+
+		# assert all(isinstance(i, int) for i in indices), indices
 
 		if sort:
 			self._indices = sorted(list(set(indices)))
@@ -381,7 +386,10 @@ class CompoundSet:
 		mols = [d[1] for d in data]
 		labels = [d[0] for d in data]
 
-		return draw_grid(mols, labels=labels)
+		display(draw_grid(mols, labels=labels))
+
+	def grid(self):
+		self.draw()
 
 	def summary(self):
 		"""Print a summary of this compound set"""
@@ -456,54 +464,18 @@ class CompoundSet:
 			from bisect import insort
 			insort(self.ids, compound)
 	
-	def get_recipe(self, 
+	def get_recipes(self, 
 		amount: float = 1, 
 		debug=False,
-		pick_cheapest: bool = True,
+		pick_cheapest: bool = False,
+		permitted_reactions=None,
+		quoted_only: bool = False,
+		supplier: None | str = None,
+		**kwargs,
 	):
 		"""Generate the :class:`.Recipe` to make these compounds."""
-
-		from tqdm import tqdm
-
-		n_comps = len(self)
-
-		if not hasattr(amount, '__iter__'):
-			amount = [amount] * n_comps
-
-		options = []
-
-		for comp, a in tqdm(zip(self, amount), total=n_comps):
-
-			comp_options = []
-
-			for reaction in comp.reactions:
-				recipes = reaction.get_recipe(a, pick_cheapest=False, debug=debug)	
-				comp_options += recipes
-
-			options.append(comp_options)
-
-		from itertools import product
-		combinations = list(product(*options))
-
-		solutions = []
-
-		for combo in combinations:
-
-			solution = combo[0]
-
-			for recipe in combo[1:]:
-				solution += recipe
-
-			solutions.append(solution)
-
-		if pick_cheapest:
-			priced = [r for r in solutions if r.price]
-			if not priced:
-				logger.error("0 recipes with prices, can't choose cheapest")
-				return solutions
-			return sorted(priced, key=lambda r: r.price)[0]
-
-		return solutions
+		from .recipe import Recipe
+		return Recipe.from_compounds(self, amount=amount, debug=debug, pick_cheapest=pick_cheapest, permitted_reactions=permitted_reactions, quoted_only=quoted_only, supplier=supplier, **kwargs)
 
 	def copy(self):
 		return CompoundSet(self.db, self.ids)
@@ -520,6 +492,29 @@ class CompoundSet:
 			data.append(d)
 
 		return DataFrame(data)
+
+	def get_quoted(self, *, supplier='any'):
+		"""Get all member compounds that have a quote from given supplier"""
+
+		if supplier != 'any':
+			key = f'quote_compound IN {self.str_ids} AND quote_supplier = "{supplier}"'
+		else:
+			key = f'quote_compound IN {self.str_ids}'
+
+		ids = self.db.select_where(
+			table='quote', 
+			query='DISTINCT quote_compound', 
+			key=key, 
+			multiple=True,
+		)
+		
+		ids = [i for i, in ids]
+		return CompoundSet(self.db, ids)
+
+	def get_unquoted(self, *, supplier='any'):
+		"""Get all member compounds that do not have a quote from given supplier"""
+		quoted = self.get_quoted(supplier=supplier)
+		return self - quoted
 
 	def write_smiles_csv(self, file):
 		from pandas import DataFrame
@@ -574,6 +569,10 @@ class CompoundSet:
 		
 			case CompoundSet():
 				ids = set(self.ids) | set(other.ids)
+				return CompoundSet(self.db, ids)
+
+			case IngredientSet():
+				ids = set(self.ids) | set(other.compound_ids)
 				return CompoundSet(self.db, ids)
 				
 			case _:
@@ -648,26 +647,29 @@ class IngredientSet:
 
 		quote_ids = [q for q in pairs.values() if q is not None]
 
-		result = self.db.select_where(query='quote_price, quote_currency', table='quote', key=f'quote_id in {tuple(quote_ids)}', multiple=True)
+		if quote_ids:
 
-		prices = [a for a,b in result]
-		quoted = sum(prices)
+			quote_id_str = str(tuple(quote_ids)).replace(',)', ')')
 
-		currencies = list(set([b for a,b in result]))
-		assert len(currencies) == 1
+			result = self.db.select_where(query='quote_price, quote_currency', table='quote', key=f'quote_id in {quote_id_str}', multiple=True)
+
+			prices = [a for a,b in result]
+			quoted = sum(prices)
+			
+			currencies = list(set([b for a,b in result]))
+			assert len(currencies) == 1
+
+		else:
+
+			quoted = 0
+			currencies = ('USD')
+
 
 		unquoted = [i for i,q in pairs.items() if q is None]
-
 		unquoted = [self[i].price for i in unquoted]
 
-		# print(unquoted)
 
-		# unquoted = print([self[i].price for i in unquoted])
-
-		logger.warning(f"{len([p for p in unquoted if p is None])} ingredients don't have an price")
-
-		# print(unquoted)
-		# print([p for p in unquoted if p is not None])
+		# logger.warning(f"{len([p for p in unquoted if p is None])} ingredients don't have a price")
 
 		return (quoted + sum([p for p in unquoted if p]), currencies)
 
@@ -680,6 +682,14 @@ class IngredientSet:
 	@property
 	def compound_ids(self):
 		return list(self.df['compound_id'].values)
+
+	@property
+	def str_compound_ids(self):
+		return str(tuple(self.df['compound_id'].values)).replace(',)',')')
+
+	@property
+	def compounds(self):
+		return CompoundSet(self.db, self.compound_ids)
 
 	### METHODS
 
@@ -733,6 +743,35 @@ class IngredientSet:
 
 	def copy(self):
 		return IngredientSet.from_ingredient_df(self.db, self.df)
+
+	def draw(self):
+		self.compounds.draw()
+
+	def set_amounts(self, amount):
+
+		self.df['amount'] = amount
+
+		# if amounts are modified the quotes should be cleared
+		self.df['quote_id'] = None
+
+		assert all(self.df['supplier'].isna()) and all(self.df['max_lead_time'].isna())
+
+		# update quotes
+		pairs = self.db.execute(f'''
+			WITH matching_quotes AS (
+				SELECT quote_id, quote_compound, MIN(quote_price) FROM quote
+				WHERE quote_compound IN {self.str_compound_ids}
+				AND quote_amount >= {amount}
+				GROUP BY quote_compound
+			)
+			SELECT compound_id, quote_id FROM compound
+			LEFT JOIN matching_quotes ON quote_compound = compound_id
+			WHERE compound_id IN {self.str_compound_ids}
+		''').fetchall()
+
+		for compound_id, quote_id in pairs:
+			match = self.df.index[self.df['compound_id'] == compound_id][0]
+			self.df.loc[match, 'quote_id'] = quote_id
 
 	### DUNDERS
 
