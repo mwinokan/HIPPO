@@ -1126,6 +1126,7 @@ class HIPPO:
 		alias: str | None = None,
 		return_duplicate: bool = False,
 		register_base_if_duplicate: bool = True,
+		radical: str = 'warning',
 	) -> Compound:
 
 		"""Use a smiles string to add a compound to the database. If it already exists return the compound"""
@@ -1134,9 +1135,10 @@ class HIPPO:
 		assert isinstance(smiles, str), f'Non-string {smiles=}'
 		
 		try:
-			smiles = sanitise_smiles(smiles, sanitisation_failed='error')
-		except SanitisationError:
+			smiles = sanitise_smiles(smiles, sanitisation_failed='error', radical=radical)
+		except SanitisationError as e:
 			logger.error(f'Could not sanitise {smiles=}')
+			logger.error(str(e))
 			return None
 		except AssertionError:
 			logger.error(f'Could not sanitise {smiles=}')

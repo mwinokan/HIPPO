@@ -3,7 +3,7 @@ import re
 import numpy as np
 from molparse.rdkit import mol_from_smiles
 from rdkit.Chem.inchi import MolToInchiKey
-from rdkit.Chem import MolFromSmiles, MolToSmiles
+from rdkit.Chem import MolFromSmiles, MolToSmiles, AddHs, RemoveHs
 import mcol
 import mout
 
@@ -78,7 +78,7 @@ def smiles_has_isotope(smiles, regex=True):
 		mol = MolFromSmiles(smiles)
 		return any(atom.GetIsotope() for atom in mol.GetAtoms())
 
-def sanitise_smiles(s, verbosity=False, sanitisation_failed='error'):
+def sanitise_smiles(s, verbosity=False, sanitisation_failed='error', radical='error'):
 
 	assert isinstance(s, str), f'non-string smiles={s}'
 
@@ -107,6 +107,31 @@ def sanitise_smiles(s, verbosity=False, sanitisation_failed='error'):
 		raise SanitisationError
 	elif sanitisation_failed =='warning':
 		logger.warning(f'sanitisation failed for {smiles=}')
+
+	# check radicals
+	reconstruct = False
+	for atom in mol.GetAtoms():
+		if not atom.GetNumRadicalElectrons():
+			continue
+
+		if radical == 'warning':
+			logger.warning(f'Radical atom in {smiles=}')
+		elif radical == 'error':
+			raise SanitisationError(f'Radical atom in {smiles=}')
+		elif radical == 'remove':
+			logger.warning(f'Removed radical atom')
+			atom.SetNumRadicalElectrons(0)         
+			smiles = MolToSmiles(mol,True)
+			reconstruct = True
+			# atom.SetFormalCharge(0)
+		else:
+			raise NotImplementedError(f'Unknown option {radical=}')
+
+	if reconstruct:
+		mol = AddHs(mol)
+		mol = RemoveHs(mol, implicitOnly=True)
+		smiles = MolToSmiles(mol,True)
+		logger.warning(f'New {smiles=}')
 
 	if verbosity:
 
