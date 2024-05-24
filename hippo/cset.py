@@ -375,6 +375,11 @@ class CompoundSet:
 			ids = [i for i,d in results if d and f'"{key}": {value}' in d and i in self.ids]
 		return CompoundSet(self.db, ids)		
 
+	def get_all_possible_reactants(self, debug=False):
+		"""Recursively searches for all the reactants that could possible be needed to synthesise these compounds."""
+		all_reactants, all_recipes = self.db.get_unsolved_reaction_tree(product_ids=self.ids, debug=debug) 
+		return all_reactants
+
 	### OUTPUT
 
 	def draw(self):

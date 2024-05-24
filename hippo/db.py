@@ -1191,16 +1191,21 @@ class Database:
 
 		return [q for q, in result]
 
-	def get_possible_reactants(self, *, product_ids):
+	def get_unsolved_reaction_tree(self, *, product_ids, debug=False):
+
+		from .cset import CompoundSet
+		from .rset import ReactionSet
 
 		all_reactants = set()
 		all_reactions = set()
 
 		for i in range(300):
 
-			logger.var('recursive depth',i+1)
+			if debug: 
+				logger.var('recursive depth',i+1)
 			
-			logger.var('#products', len(product_ids))
+			if debug: 
+				logger.var('#products', len(product_ids))
 
 			product_ids_str = str(tuple(product_ids)).replace(',)',')')
 
@@ -1214,14 +1219,15 @@ class Database:
 			for reaction_id in reaction_ids:
 				all_reactions.add(reaction_id)
 
-			logger.var('#reactions', len(reaction_ids))
+			if debug: 
+				logger.var('#reactions', len(reaction_ids))
 
-			
 			reaction_ids_str = str(tuple(reaction_ids)).replace(',)',')')
 
 			reactant_ids = self.select_where(table='reactant', query='DISTINCT reactant_compound', key=f'reactant_reaction in {reaction_ids_str}', multiple=True)
 			
-			logger.var('#reactants', len(reactant_ids))
+			if debug: 
+				logger.var('#reactants', len(reactant_ids))
 			
 			reactant_ids = [q for q, in reactant_ids]
 
@@ -1236,21 +1242,20 @@ class Database:
 		# all intermediates
 		ids = self.execute('SELECT DISTINCT reaction_product FROM reaction INNER JOIN reactant ON reaction.reaction_product = reactant.reactant_compound').fetchall()
 		ids = [q for q, in ids]
-		from .cset import CompoundSet
 		intermediates = CompoundSet(self, ids)
 
 		# remove intermediates
 		cset = CompoundSet(self, all_reactants)
-
 		all_reactants = cset - intermediates
 
-		# all_reactants = cset.reactants
+		# reactions
+		all_reactions = ReactionSet(self, all_reactions)
 
-		logger.var('#all_reactants', len(all_reactants))
-		logger.var('#all_reactions', len(all_reactions))
+		if debug:
+			logger.var('#all_reactants', len(all_reactants))
+			logger.var('#all_reactions', len(all_reactions))
 
-
-		return all_reactants #, all_reactions
+		return all_reactants, all_reactions
 
 	def get_possible_reaction_product_ids(self, *, reaction_ids):
 		reaction_ids_str = str(tuple(reaction_ids)).replace(',)',')')
