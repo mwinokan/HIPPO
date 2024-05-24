@@ -136,7 +136,7 @@ class Recipe:
 	def from_reactions(cls, 
 		reactions, 
 		amount=1,
-		# pick_cheapest: bool = True,
+		pick_cheapest: bool = True,
 		permitted_reactions=None,
 	):
 
@@ -146,7 +146,7 @@ class Recipe:
 
 		# get all the products
 		products = reactions.products
-		recipe = Recipe.from_compounds(compounds=products, amount=amount, permitted_reactions=reactions)
+		recipe = Recipe.from_compounds(compounds=products, amount=amount, permitted_reactions=reactions, pick_cheapest=pick_cheapest)
 
 		return recipe
 
@@ -188,6 +188,10 @@ class Recipe:
 			comp_options = []
 
 			for reaction in comp.reactions:
+
+				if permitted_reactions and reaction not in permitted_reactions:
+					continue
+
 				if pick_cheapest_inner_routes:
 					comp_options.append(Recipe.from_reaction(reaction=reaction, amount=a, pick_cheapest=True, debug=debug, permitted_reactions=permitted_reactions, quoted_only=quoted_only, supplier=supplier))
 				else:
@@ -242,11 +246,17 @@ class Recipe:
 		return solutions
 
 	@classmethod
-	def from_reactants(cls, reactants, amount=1):
+	def from_reactants(cls, reactants, amount=1, debug=False):
 
-		print(reactants.ids)
+		# print(reactants.ids)
 
-		reactant_ids = reactants.ids
+
+		from .cset import IngredientSet
+
+		if isinstance(reactants, IngredientSet):
+			reactant_ids = reactants.compound_ids
+		else:
+			reactant_ids = reactants.ids
 
 		db = reactants.db
 
@@ -264,24 +274,27 @@ class Recipe:
 
 			possible_reactions += reaction_ids
 
-			logger.var('reaction_ids', reaction_ids)
+			if debug:
+				logger.var('reaction_ids', reaction_ids)
 
 			product_ids = db.get_possible_reaction_product_ids(reaction_ids=reaction_ids)
 
-			logger.var('product_ids', product_ids)
+			if debug:
+				logger.var('product_ids', product_ids)
 
 			compound_ids = product_ids
 
 		else:
 			raise NotImplementedError('Maximum recursion depth exceeded')
 
-		logger.var('all possible reactions', possible_reactions)
+		if debug:
+			logger.var('all possible reactions', possible_reactions)
 
 		from .rset import ReactionSet
 
 		rset = ReactionSet(db, possible_reactions)
 
-		return cls.from_reactions(rset, amount=amount, permitted_reactions=rset)
+		return cls.from_reactions(rset, amount=amount, permitted_reactions=rset, pick_cheapest=False)
 
 	@classmethod
 	def from_ingredients(cls, db, ingredients):
