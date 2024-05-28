@@ -75,7 +75,10 @@ class Recipe:
 			ok = reaction.check_reactant_availability(supplier=supplier)
 			if not ok:
 				logger.error(f'Reactants not available for {reaction=}')
-				return []
+				if pick_cheapest:
+					return None
+				else:
+					return []
 		
 		pairs = reaction.get_reactant_amount_pairs()
 		for reactant, reactant_amount in pairs:
@@ -99,7 +102,7 @@ class Recipe:
 
 				inner_recipes = []
 				for reaction in inner_reactions:
-					reaction_recipes = Recipe.from_reaction(reaction=reaction, amount=reactant_amount, debug=debug, pick_cheapest=False)
+					reaction_recipes = Recipe.from_reaction(reaction=reaction, amount=reactant_amount, debug=debug, pick_cheapest=False, quoted_only=quoted_only)
 					inner_recipes += reaction_recipes
 
 				for recipe in recipes:
@@ -138,6 +141,7 @@ class Recipe:
 		amount=1,
 		pick_cheapest: bool = True,
 		permitted_reactions=None,
+		final_products_only=True,
 	):
 
 		from .rset import ReactionSet
@@ -146,6 +150,19 @@ class Recipe:
 
 		# get all the products
 		products = reactions.products
+
+		return products
+
+		if final_products_only:
+			ids = reactions.db.execute(f'''
+				SELECT DISTINCT compound_id FROM compound
+				LEFT JOIN reactant ON compound_id = reactant_compound
+				WHERE reactant_compound IS NULL
+				AND compound_id IN {products.str_ids}
+			''').fetchall()
+
+			return ids
+
 		recipe = Recipe.from_compounds(compounds=products, amount=amount, permitted_reactions=reactions, pick_cheapest=pick_cheapest)
 
 		return recipe
@@ -193,23 +210,28 @@ class Recipe:
 					continue
 
 				if pick_cheapest_inner_routes:
-					comp_options.append(Recipe.from_reaction(reaction=reaction, amount=a, pick_cheapest=True, debug=debug, permitted_reactions=permitted_reactions, quoted_only=quoted_only, supplier=supplier))
+					sol = Recipe.from_reaction(reaction=reaction, amount=a, pick_cheapest=True, debug=debug, permitted_reactions=permitted_reactions, quoted_only=quoted_only, supplier=supplier)
+					if sol:
+					# assert isinstance(sol, Recipe)
+						comp_options.append(sol)
 				else:
-					comp_options += Recipe.from_reaction(reaction=reaction, amount=a, pick_cheapest=False, debug=debug, permitted_reactions=permitted_reactions, quoted_only=quoted_only, supplier=supplier)	
+					sols = Recipe.from_reaction(reaction=reaction, amount=a, pick_cheapest=False, debug=debug, permitted_reactions=permitted_reactions, quoted_only=quoted_only, supplier=supplier)	
+					assert isinstance(sols, list)
+					comp_options += sols
 
 			if warn_multiple_solutions and len(comp_options) > 1:
 				logger.warning(f'Multiple solutions for compound={comp}')
 
 			if not comp_options:
 				logger.error(f'No solutions for compound={comp}')
+			else:
+				options.append(comp_options)
 
-			options.append(comp_options)
+		assert all(options)
 
 		from itertools import product
 		logger.info('Solving recipe combinations...')
 		combinations = list(product(*options))
-
-		solutions = []
 
 		if not solve_combinations:
 			return combinations
@@ -218,6 +240,8 @@ class Recipe:
 			combinations = [combinations[0]]
 			
 		logger.info('Combining recipes...')
+		
+		solutions = []
 		for combo in tqdm(combinations):
 
 			logger.debug(f'Combination of {len(combo)} recipes')
