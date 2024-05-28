@@ -457,7 +457,6 @@ class CompoundSet:
 
 		display(ui, out)
 
-
 	### OTHER METHODS
 
 	def add(self, compound):

@@ -940,7 +940,8 @@ class HIPPO:
 		self, 
 		path: str | Path, 
 		*, 
-		orig_name_col: str = 'Diamond ID (Molecule Name)'
+		orig_name_col: str = 'Diamond ID (Molecule Name)',
+		entry_col = 'Catalog ID',
 	):
 
 		"""Load an Enamine quote provided as an excel file"""
@@ -948,7 +949,6 @@ class HIPPO:
 		df = pd.read_excel(path)
 
 		smiles_col = 'SMILES'
-		entry_col = 'Catalog ID'
 		purity_col = 'Purity, %'
 		amount_col = 'Amount, mg'
 		catalogue_col = 'Collection'

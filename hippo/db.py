@@ -1199,6 +1199,11 @@ class Database:
 		all_reactants = set()
 		all_reactions = set()
 
+		print(product_ids)
+
+		for product_id in product_ids:
+			all_reactants.add(product_id)
+
 		for i in range(300):
 
 			if debug: 
@@ -1256,6 +1261,35 @@ class Database:
 			logger.var('#all_reactions', len(all_reactions))
 
 		return all_reactants, all_reactions
+
+	def get_reaction_price_estimate(self, *, reaction):
+
+		# get reactants for a given reaction
+
+		logger.warning('Price estimate does not account for branching!')
+		reactants, _ = self.get_unsolved_reaction_tree(product_ids=reaction.reactant_ids)
+
+		# how to make sure that there are no branching reactions?!
+
+		# sum lowest unit price for each reactant
+
+		price, = self.execute(f'''
+		WITH unit_prices AS 
+		(
+		    SELECT quote_compound, MIN(quote_price/quote_amount) AS unit_price FROM quote 
+		    WHERE quote_compound IN {reactants.str_ids}
+		    GROUP BY quote_compound
+		)
+		SELECT SUM(unit_price) FROM unit_prices
+		''').fetchone()
+
+		return price
+
+	def get_preferred_reaction_dict(self, *, compound_ids):
+
+		print(compound_ids)
+
+		raise NotImplementedError
 
 	def get_possible_reaction_product_ids(self, *, reaction_ids):
 		reaction_ids_str = str(tuple(reaction_ids)).replace(',)',')')
