@@ -80,6 +80,10 @@ class Reaction:
 		return set(v for v in self.get_reactant_ids())
 
 	@property
+	def reactant_str_ids(self):
+		return str(tuple(self.reactant_ids)).replace(',)',')')
+
+	@property
 	def product_id(self) -> int:
 		"""Returns the product ID"""
 		return self.product.id
@@ -99,6 +103,10 @@ class Reaction:
 	@property
 	def reactant_mols(self):
 		return [r.mol for r in self.reactants]
+
+	@property
+	def price_estimate(self):
+		return self.db.get_reaction_price_estimate(reaction=self)
 
 	### METHODS
 
@@ -137,21 +145,22 @@ class Reaction:
 	def summary(self, amount=1, draw=True):
 		"""Print a summary of this reaction's information"""
 
-		print(f'{self}.id={self.id}')
-		print(f'{self}.type={self.type}')
-		print(f'{self}.product={self.product}')
-		print(f'{self}.product_yield={self.product_yield}')
+		print(f'id={self.id}')
+		print(f'type={self.type}')
+		print(f'product={self.product}')
+		print(f'product_yield={self.product_yield}')
 
 		reactants = self.get_reactant_amount_pairs()
-		print(f'{self}.reactants={reactants}')
+		print(f'reactants={reactants}')
+		
+		print(f'price_estimate={self.price_estimate}')
 
-
-		print(f'Ingredients for {amount} mg of product:')
-		ingredients = self.get_ingredients(amount=amount)
-		print(ingredients)
+		# print(f'Ingredients for {amount} mg of product:')
+		# ingredients = self.get_ingredients(amount=amount)
+		# print(ingredients)
 
 		if draw:
-			return self.draw()
+			self.draw()
 
 		# return self.get_recipe(amount)
 

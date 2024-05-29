@@ -6,6 +6,8 @@ from .db import Database
 
 from .recipe import Recipe
 
+from numpy import int64
+
 import mcol
 
 import os
@@ -182,7 +184,8 @@ class CompoundTable:
 		
 		match key:
 
-			case int():
+			# case int():
+			case key if isinstance(key, int) or isinstance(key, int64):
 
 				if key == 0:
 					return self.__getitem__(key=1)
@@ -375,6 +378,11 @@ class CompoundSet:
 			ids = [i for i,d in results if d and f'"{key}": {value}' in d and i in self.ids]
 		return CompoundSet(self.db, ids)		
 
+	def get_all_possible_reactants(self, debug=False):
+		"""Recursively searches for all the reactants that could possible be needed to synthesise these compounds."""
+		all_reactants, all_recipes = self.db.get_unsolved_reaction_tree(product_ids=self.ids, debug=debug) 
+		return all_reactants
+
 	### OUTPUT
 
 	def draw(self):
@@ -451,7 +459,6 @@ class CompoundSet:
 		out = interactive_output(widget, {'i': a, 'name': b, 'summary': c, 'draw':d, 'poses':e, 'reactions':f, 'metadata':g})
 
 		display(ui, out)
-
 
 	### OTHER METHODS
 
@@ -552,6 +559,14 @@ class CompoundSet:
 		
 			case CompoundSet():
 				ids = set(self.ids) - set(other.ids)
+				return CompoundSet(self.db, ids)
+
+			case IngredientSet():
+				logger.warning('Subtracting IngredientSet from CompoundSet. Ignoring quote/amount data')
+				ids = set(self.ids) - set([int(i) for i in other.compound_ids])
+				print(self.ids)
+				print(ids)
+				print([int(i) for i in other.compound_ids])
 				return CompoundSet(self.db, ids)
 				
 			case _:
@@ -682,6 +697,10 @@ class IngredientSet:
 	@property
 	def compound_ids(self):
 		return list(self.df['compound_id'].values)
+
+	@property
+	def ids(self):
+		return self.compound_ids
 
 	@property
 	def str_compound_ids(self):

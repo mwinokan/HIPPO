@@ -254,7 +254,7 @@ class ReactionSet:
 				min=0,
 				max=len(self)-1,
 				step=1,
-				description=f'Pose (/{len(self)}):',
+				description=f'Rs (/{len(self)}):',
 				disabled=False,
 			)
 
@@ -262,18 +262,35 @@ class ReactionSet:
 		c = Checkbox(description='Summary', value=False)
 		d = Checkbox(description='Draw', value=True)
 		e = Checkbox(description='Check chemistry', value=False)
+		f = Checkbox(description='Reactant Quotes', value=False)
 
-		ui = GridBox([b, c, d, e], layout=Layout(grid_template_columns="repeat(5, 100px)"))
-		ui = VBox([a, ui])
+		ui1 = GridBox([b, c, d], layout=Layout(grid_template_columns="repeat(5, 100px)"))
+		ui2 = GridBox([e, f], layout=Layout(grid_template_columns="repeat(2, 150px)"))
+		ui = VBox([a, ui1, ui2])
 		
-		def widget(i, name=True, summary=True, draw=True, check_chemistry=True):
+		def widget(i, name=True, summary=True, draw=True, check_chemistry=True, reactants=False):
 			reaction = self[i]
 			if name: print(repr(reaction))
-			if summary: reaction.summary()
-			if draw: display(reaction.draw())
+			if summary: reaction.summary(draw=False)
+			if draw: 
+				reaction.draw()
 			if check_chemistry: reaction.check_chemistry(debug=True)
+			if reactants:
+				for comp in reaction.reactants:
+					# if summary:
+						# comp.summary(draw=False)
+					# elif name:
+					print(repr(comp))
 
-		out = interactive_output(widget, {'i': a, 'name': b, 'summary': c, 'draw':d, 'check_chemistry':e })
+					quotes = comp.get_quotes(df=True)
+					display(quotes)
+
+					# break
+
+					# if draw:
+					# 	comp.draw()
+
+		out = interactive_output(widget, {'i': a, 'name': b, 'summary': c, 'draw':d, 'check_chemistry':e, 'reactants':f })
 
 		display(ui, out)
 	

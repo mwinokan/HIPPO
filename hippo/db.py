@@ -1191,6 +1191,106 @@ class Database:
 
 		return [q for q, in result]
 
+	def get_unsolved_reaction_tree(self, *, product_ids, debug=False):
+
+		from .cset import CompoundSet
+		from .rset import ReactionSet
+
+		all_reactants = set()
+		all_reactions = set()
+
+		print(product_ids)
+
+		for product_id in product_ids:
+			all_reactants.add(product_id)
+
+		for i in range(300):
+
+			if debug: 
+				logger.var('recursive depth',i+1)
+			
+			if debug: 
+				logger.var('#products', len(product_ids))
+
+			product_ids_str = str(tuple(product_ids)).replace(',)',')')
+
+			reaction_ids = self.select_where(table='reaction', query='DISTINCT reaction_id', key=f'reaction_product in {product_ids_str}', multiple=True, none='quiet')
+			
+			reaction_ids = [q for q, in reaction_ids]
+
+			if not reaction_ids:
+				break
+
+			for reaction_id in reaction_ids:
+				all_reactions.add(reaction_id)
+
+			if debug: 
+				logger.var('#reactions', len(reaction_ids))
+
+			reaction_ids_str = str(tuple(reaction_ids)).replace(',)',')')
+
+			reactant_ids = self.select_where(table='reactant', query='DISTINCT reactant_compound', key=f'reactant_reaction in {reaction_ids_str}', multiple=True)
+			
+			if debug: 
+				logger.var('#reactants', len(reactant_ids))
+			
+			reactant_ids = [q for q, in reactant_ids]
+
+			if not reactant_ids:
+				break
+
+			for reactant_id in reactant_ids:
+				all_reactants.add(reactant_id)
+
+			product_ids = reactant_ids
+
+		# all intermediates
+		ids = self.execute('SELECT DISTINCT reaction_product FROM reaction INNER JOIN reactant ON reaction.reaction_product = reactant.reactant_compound').fetchall()
+		ids = [q for q, in ids]
+		intermediates = CompoundSet(self, ids)
+
+		# remove intermediates
+		cset = CompoundSet(self, all_reactants)
+		all_reactants = cset - intermediates
+
+		# reactions
+		all_reactions = ReactionSet(self, all_reactions)
+
+		if debug:
+			logger.var('#all_reactants', len(all_reactants))
+			logger.var('#all_reactions', len(all_reactions))
+
+		return all_reactants, all_reactions
+
+	def get_reaction_price_estimate(self, *, reaction):
+
+		# get reactants for a given reaction
+
+		logger.warning('Price estimate does not account for branching!')
+		reactants, _ = self.get_unsolved_reaction_tree(product_ids=reaction.reactant_ids)
+
+		# how to make sure that there are no branching reactions?!
+
+		# sum lowest unit price for each reactant
+
+		price, = self.execute(f'''
+		WITH unit_prices AS 
+		(
+		    SELECT quote_compound, MIN(quote_price/quote_amount) AS unit_price FROM quote 
+		    WHERE quote_compound IN {reactants.str_ids}
+		    GROUP BY quote_compound
+		)
+		SELECT SUM(unit_price) FROM unit_prices
+		''').fetchone()
+
+		return price
+
+	def get_preferred_reaction_dict(self, *, compound_ids):
+
+		print(compound_ids)
+
+		raise NotImplementedError
+
 	def get_possible_reaction_product_ids(self, *, reaction_ids):
 		reaction_ids_str = str(tuple(reaction_ids)).replace(',)',')')
 		return [q for q, in self.select_where(query='DISTINCT reaction_product', table='reaction', key=f'reaction_id IN {reaction_ids_str}', multiple=True)] 
