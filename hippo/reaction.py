@@ -188,9 +188,6 @@ class Reaction:
 
 	def check_reactant_availability(self, supplier: None | str = None, debug: bool = False):
 
-		if supplier is not None:
-			raise NotImplementedError
-
 		if debug:
 			logger.var('reaction', self.id)
 			logger.var('reactants', self.reactant_ids)
@@ -208,14 +205,19 @@ class Reaction:
 		else:
 
 			triples = self.db.execute(f'''
+				WITH filtered_quotes AS
+				(
+					SELECT * FROM quote
+					WHERE quote_supplier = "{supplier}"
+				)
 				SELECT reactant_compound, quote_id, reaction_id FROM reactant 
-				LEFT JOIN quote ON quote_compound = reactant_compound
+				LEFT JOIN filtered_quotes ON quote_compound = reactant_compound
 				LEFT JOIN reaction ON reaction_product = reactant_compound 
 				WHERE reactant_reaction = {self.id}
-				AND quote_supplier = "{supplier}"
 			''').fetchall()
 
 		for reactant_compound, quote_id, reaction_id in triples:
+
 			if quote_id or reaction_id:
 				continue
 			if debug:
