@@ -142,7 +142,7 @@ def plot_interaction_histogram(animal, poses, feature_metadata, subtitle=None,):
 	return fig
 
 @hippo_graph
-def plot_interaction_punchcard(animal, poses=None, subtitle=None, opacity=1.0, group='pose_id', ignore_chains=False):
+def plot_interaction_punchcard(animal, poses=None, subtitle=None, opacity=1.0, group='pose_name', ignore_chains=False):
 
 	import plotly
 
