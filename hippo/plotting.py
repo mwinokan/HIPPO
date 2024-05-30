@@ -142,7 +142,7 @@ def plot_interaction_histogram(animal, poses, feature_metadata, subtitle=None,):
 	return fig
 
 @hippo_graph
-def plot_interaction_punchcard(animal, poses, subtitle=None, opacity=1.0, group='pose_id', ignore_chains=False):
+def plot_interaction_punchcard(animal, poses=None, subtitle=None, opacity=1.0, group='pose_id', ignore_chains=False):
 
 	import plotly
 
@@ -150,12 +150,15 @@ def plot_interaction_punchcard(animal, poses, subtitle=None, opacity=1.0, group=
 
 	categoryarray = {}
 
-	logger.debug(f'{poses=}')
 
 	if ignore_chains:
 		x = 'chain_res_name_number_str'
 	else:
 		x = 'res_name_number_str'
+
+	poses = poses or animal.poses
+	
+	logger.var('poses', poses)
 
 	for pose in poses:
 
@@ -192,6 +195,10 @@ def plot_interaction_punchcard(animal, poses, subtitle=None, opacity=1.0, group=
 			plot_data.append(data)
 
 	plot_df = pd.DataFrame(plot_data)
+
+	if not len(plot_df):
+		logger.error('Plotting data is empty. Are the poses fingerprinted?')
+		return None
 
 	plot_df = plot_df.sort_values(group)
 

@@ -242,7 +242,9 @@ class HIPPO:
 		generated_tag_cols = ['ConformerSites', 'CanonSites', 'CrystalformSites', 'Quatassemblies', 'Crystalforms']
 		curated_tag_cols = [c for c in meta_df.columns if c not in ['Code', 'Long code', 'Compound code', 'Smiles', 'Downloaded']+generated_tag_cols]
 
-		for path in tqdm(aligned_directory.iterdir()):
+		logger.var('curated_tag_cols',curated_tag_cols)
+
+		for path in tqdm(list(aligned_directory.iterdir())):
 
 			if not path.is_dir():
 				continue
@@ -253,9 +255,19 @@ class HIPPO:
 			count_directories_tried += 1
 
 			sdfs = list(path.glob('*x?????.sdf'))
-			pdbs = list(path.glob('*x?????.pdb'))
 
 			assert len(sdfs) == 1, (path, sdfs)
+			
+			pdbs = list(path.glob('*x?????.pdb'))
+
+			if not pdbs:
+				pdbs = list(path.glob('*.pdb'))
+				pdbs = [p for p in pdbs if '_ligand' not in p.name and '_apo' not in p.name and '_hippo' not in p.name]
+				# observation_longname = pdbs[0].name.removesuffix('.pdb')
+				# logger.var('observation_longname',observation_longname)
+			# else:
+				# observation_longname = None
+
 			assert len(pdbs) == 1, (path, pdbs)
 			
 			# load the SDF
@@ -310,7 +322,15 @@ class HIPPO:
 
 			# metadata
 
+
 			meta_row = meta_df[meta_df['Code']==observation_shortname]
+			if not len(meta_row):
+				assert observation_longname
+				meta_row = meta_df[meta_df['Long code']==observation_longname]
+
+			# logger.var('observation_longname',observation_longname)
+
+			assert len(meta_row)
 
 			tags = ['hits']
 			for tag in curated_tag_cols:
@@ -1531,7 +1551,7 @@ class HIPPO:
 		from .plotting import plot_pose_property
 		return plot_pose_property(self, prop, **kwargs)
 
-	def plot_interaction_punchcard(self, poses, subtitle, opacity=1.0, **kwargs):
+	def plot_interaction_punchcard(self, poses=None, subtitle=None, opacity=1.0, **kwargs):
 		"""Plot an interaction punchcard for a set of poses"""
 		from .plotting import plot_interaction_punchcard
 		return plot_interaction_punchcard(self, poses=poses, subtitle=subtitle, opacity=opacity, **kwargs)
