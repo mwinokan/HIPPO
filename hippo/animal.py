@@ -528,6 +528,7 @@ class HIPPO:
 		tags: None | list[str] = None,
 		reaction_yield_map: dict | None = None,
 		check_chemistry=True,
+		return_reactions=False,
 		debug=False,
 	):
 
@@ -543,6 +544,8 @@ class HIPPO:
 		# print(reaction_cols)
 
 		product_ids = set()
+
+		reactions = []
 
 		# loop over rows
 
@@ -635,6 +638,8 @@ class HIPPO:
 							check_chemistry=check_chemistry,
 						)
 
+						reactions.append(reaction.id)
+
 						if debug:
 							logger.var(str(reaction), reaction.reaction_str)
 
@@ -653,7 +658,10 @@ class HIPPO:
 
 			# break
 
-		return self.compounds[product_ids]
+		if return_reactions:
+			return self.compounds[product_ids], self.reactions[reactions]
+		else:
+			return self.compounds[product_ids]
 
 	def add_syndirella_elabs(self,
 		df_path: str | Path,
