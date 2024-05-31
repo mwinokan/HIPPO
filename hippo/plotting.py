@@ -229,6 +229,7 @@ def plot_interaction_punchcard(animal, poses=None, subtitle=None, opacity=1.0, g
 	categoryarray = [v[0] for v in categoryarray]
 
 	fig.update_xaxes(categoryorder='array', categoryarray=categoryarray)
+	fig.update_yaxes(categoryorder='category descending')
 
 	for trace in fig.data:
 		if type(trace) == plotly.graph_objs._histogram.Histogram:
