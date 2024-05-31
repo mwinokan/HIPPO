@@ -11,15 +11,24 @@ HIPPO Documentation
   :width: 400
   :alt: HIPPO logo
 
-Hit Interaction Profiling for Procurement Optimisation is a chemical database and python toolkit to make informed sampling decisions for efficient SAR exploration.
+Hit Interaction Profiling for Procurement Optimisation is a chemical database and python toolkit to make informed sampling decisions for effective SAR exploration.
 
-HIPPO is still in alpha-development, but it can be obtained from PyPI:
+N.B. HIPPO and this documentation are still in alpha-development.
+
+Installation
+============
+
+On Mac OS and Linux it is recommended to install from PyPI using Conda/Miniconda. 
+
+Chemicalite is not supported on Windows, but there is a workaround described in the :doc:`windows`.
+
+The `hippo` python module can be obtained from PyPI:
 
 ::
    
    $ pip install --upgrade hippo-db
 
-You will also need chemicalite:
+You will also need `chemicalite` which is an extension to SQLite for cheminformatics:
 
 ::
 
@@ -62,8 +71,9 @@ A :class:`.Reaction` is a simplified representation of a synthetic pathway to cr
 
    Quoting with Pycule <pycule_tutorial>
 
-   API Reference <api_reference>
+   Windows installation <windows>
 
+   API Reference <api_reference>
 
 .. Indices and tables
 .. ==================
