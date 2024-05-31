@@ -190,9 +190,9 @@ def plot_interaction_punchcard(animal, poses=None, subtitle=None, opacity=1.0, g
 
 			if data[x] not in categoryarray:
 				if ignore_chains:
-					categoryarray[data[x]] = (data[x], f.chain_name, f.residue_number)
-				else:
 					categoryarray[data[x]] = (data[x], f.residue_number)
+				else:
+					categoryarray[data[x]] = (data[x], f.chain_name, f.residue_number)
 
 			plot_data.append(data)
 
@@ -221,7 +221,11 @@ def plot_interaction_punchcard(animal, poses=None, subtitle=None, opacity=1.0, g
 
 	fig.update_layout(xaxis_title='Residue', yaxis_title='Feature Family')
 
-	categoryarray = sorted([v for v in categoryarray.values()], key=lambda x: (x[1], x[2]))
+	if ignore_chains:
+		categoryarray = sorted([v for v in categoryarray.values()], key=lambda x: x[1])
+	else:
+		categoryarray = sorted([v for v in categoryarray.values()], key=lambda x: (x[1], x[2]))
+		
 	categoryarray = [v[0] for v in categoryarray]
 
 	fig.update_xaxes(categoryorder='array', categoryarray=categoryarray)
