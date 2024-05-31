@@ -246,6 +246,8 @@ def plot_residue_interactions(animal, poses, residue_number, subtitle=None, chai
 
 	categoryarray = {}
 
+	poses = poses or animal.poses
+
 	for pose in poses:
 
 		fingerprint = pose.fingerprint
