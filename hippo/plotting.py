@@ -150,11 +150,10 @@ def plot_interaction_punchcard(animal, poses=None, subtitle=None, opacity=1.0, g
 
 	categoryarray = {}
 
-
 	if ignore_chains:
-		x = 'chain_res_name_number_str'
-	else:
 		x = 'res_name_number_str'
+	else:
+		x = 'chain_res_name_number_str'
 
 	poses = poses or animal.poses
 	
@@ -190,7 +189,10 @@ def plot_interaction_punchcard(animal, poses=None, subtitle=None, opacity=1.0, g
 			data[x] = getattr(f, x)
 
 			if data[x] not in categoryarray:
-				categoryarray[data[x]] = (data[x], f.chain_name, f.residue_number)
+				if ignore_chains:
+					categoryarray[data[x]] = (data[x], f.chain_name, f.residue_number)
+				else:
+					categoryarray[data[x]] = (data[x], f.residue_number)
 
 			plot_data.append(data)
 
@@ -200,7 +202,11 @@ def plot_interaction_punchcard(animal, poses=None, subtitle=None, opacity=1.0, g
 		logger.error('Plotting data is empty. Are the poses fingerprinted?')
 		return None
 
-	plot_df = plot_df.sort_values(group)
+	# plot_df = plot_df.sort_values([group, 'chain_name', 'residue_number'])]
+	if ignore_chains:
+		plot_df = plot_df.sort_values([group, x, 'residue_number'])
+	else:
+		plot_df = plot_df.sort_values([group, x, 'chain_name', 'residue_number'])
 
 	title = 'Interaction Punch-Card'
 
