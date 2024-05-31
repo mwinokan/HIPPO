@@ -1199,7 +1199,7 @@ class Database:
 		all_reactants = set()
 		all_reactions = set()
 
-		print(product_ids)
+		# print(product_ids)
 
 		for product_id in product_ids:
 			all_reactants.add(product_id)

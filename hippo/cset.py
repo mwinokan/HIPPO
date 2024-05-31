@@ -178,7 +178,7 @@ class CompoundTable:
 		elif base:
 			return self.get_by_base(base)
 		else:
-			raise NotImplementedError
+			raise NotImplementedError(f'{type(i)=}')
 
 	def __getitem__(self, key) -> Compound:
 		
@@ -207,7 +207,7 @@ class CompoundTable:
 
 				indices = []
 				for i in key:
-					if isinstance(i,int):
+					if isinstance(i,int) or isinstance(i, int64):
 						index = i
 					elif isinstance(i,str):
 						index = self.db.get_compound_id(name=i)
@@ -380,8 +380,13 @@ class CompoundSet:
 
 	def get_all_possible_reactants(self, debug=False):
 		"""Recursively searches for all the reactants that could possible be needed to synthesise these compounds."""
-		all_reactants, all_recipes = self.db.get_unsolved_reaction_tree(product_ids=self.ids, debug=debug) 
+		all_reactants, all_reactions = self.db.get_unsolved_reaction_tree(product_ids=self.ids, debug=debug) 
 		return all_reactants
+
+	def get_all_possible_reactions(self, debug=False):
+		"""Recursively searches for all the reactants that could possible be needed to synthesise these compounds."""
+		all_reactants, all_reactions = self.db.get_unsolved_reaction_tree(product_ids=self.ids, debug=debug) 
+		return all_reactions
 
 	### OUTPUT
 
@@ -692,6 +697,12 @@ class IngredientSet:
 	def smiles(self):
 		compound_ids = list(self.df['compound_id'])
 		result = self.db.select_where(query='compound_smiles', table='compound', key=f'compound_id in {tuple(compound_ids)}', multiple=True)
+		return [q for q, in result]
+
+	@property
+	def inchikeys(self):
+		compound_ids = list(self.df['compound_id'])
+		result = self.db.select_where(query='compound_inchikey', table='compound', key=f'compound_id in {tuple(compound_ids)}', multiple=True)
 		return [q for q, in result]
 
 	@property

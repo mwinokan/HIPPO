@@ -265,8 +265,8 @@ class Compound:
 		*,
 		purity: float | None = None,
 		entry: str | None = None,
-		location:str | None = None,
-		return_quote = True,
+		location: str | None = None,
+		return_quote: bool = True,
 	) -> int | Quote:
 
 		"""Register a certain quantity of compound stock in the Database."""
@@ -495,6 +495,23 @@ class Compound:
 		
 		else:
 			display(self.mol)
+
+	def classify(self, draw=True):
+		"""Find RDKit Fragments within the compound molecule and draw them (or just return a list of (descriptor, count) tuples)"""
+		from molparse.rdkit import classify_mol
+		return classify_mol(self.mol, draw=draw)
+
+	def murcko_scaffold(self, generic=False):
+		"""Get the rdkit MurckoScaffold for this compound"""
+
+		from rdkit.Chem.Scaffolds import MurckoScaffold
+
+		scaffold = MurckoScaffold.GetScaffoldForMol(self.mol)
+
+		if generic:
+			scaffold = MurckoScaffold.MakeScaffoldGeneric(scaffold)
+
+		return scaffold
 
 	def summary(self, metadata: bool = True, draw: bool = True):
 		"""Print a summary of this compound"""

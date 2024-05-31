@@ -127,11 +127,11 @@ class Recipe:
 					recipe.reactants.add(ingredient)
 
 		if pick_cheapest:
-			priced = [r for r in recipes if r.price]
+			priced = [r for r in recipes if r.get_price(supplier=supplier)]
 			if not priced:
 				logger.error("0 recipes with prices, can't choose cheapest")
 				return recipes
-			return sorted(priced, key=lambda r: r.price)[0]
+			return sorted(priced, key=lambda r: r.get_price(supplier=supplier))[0]
 
 		return recipes
 
@@ -388,6 +388,9 @@ class Recipe:
 	# 	return max([q.lead_time for q in quotes])
 	
 	### METHODS
+
+	def get_price(self, supplier=None):
+		return self.reactants.get_price(supplier=supplier)
 
 	def draw(self, color_mapper = None, node_size=300, graph_only=False):
 
