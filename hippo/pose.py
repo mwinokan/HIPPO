@@ -571,13 +571,17 @@ class Pose:
 
 		self.fingerprint = fingerprint
 
-	def draw(self):
+	def draw(self, inspirations=True, protein=False, **kwargs):
 		"""Render this pose (and its inspirations)"""
 		
+		if protein:
+			from molparse.py3d import render
+			return render(self.complex_system, **kwargs)
+
 		from molparse.rdkit import draw_mols
 		
 		mols = [self.mol]
-		if self.inspirations:
+		if inspirations and self.inspirations:
 			mols += [i.mol for i in self.inspirations]
 		
 		return draw_mols(mols)
