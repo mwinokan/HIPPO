@@ -12,7 +12,7 @@ class Recipe:
 
 	_db = None
 
-	def __init__(self, db, products, reactants, intermediates, reactions):
+	def __init__(self, db, *, products, reactants, intermediates, reactions):
 
 		from .cset import IngredientSet
 		from .rset import ReactionSet
@@ -64,14 +64,15 @@ class Recipe:
 		recipe = cls.__new__(cls)
 		recipe.__init__(db, 
 			products=IngredientSet(db, [reaction.product.as_ingredient(amount=amount)]),
-			reactants=IngredientSet(db, []),
+			reactants=IngredientSet(db, [], supplier=supplier),
 			intermediates=IngredientSet(db, []),
 			reactions=ReactionSet(db, [reaction.id]),
 		)
 
 		recipes = [recipe]
 
-		if quoted_only:
+		if quoted_only or supplier:
+			if debug: logger.debug(f'Checking reactant_availability: {reaction=}')
 			ok = reaction.check_reactant_availability(supplier=supplier)
 			if not ok:
 				logger.error(f'Reactants not available for {reaction=}')
@@ -102,7 +103,7 @@ class Recipe:
 
 				inner_recipes = []
 				for reaction in inner_reactions:
-					reaction_recipes = Recipe.from_reaction(reaction=reaction, amount=reactant_amount, debug=debug, pick_cheapest=False, quoted_only=quoted_only)
+					reaction_recipes = Recipe.from_reaction(reaction=reaction, amount=reactant_amount, debug=debug, pick_cheapest=False, quoted_only=quoted_only, supplier=supplier)
 					inner_recipes += reaction_recipes
 
 				for recipe in recipes:
@@ -114,7 +115,7 @@ class Recipe:
 						combined_recipe.reactants += inner_recipe.reactants
 						combined_recipe.intermediates += inner_recipe.intermediates
 						combined_recipe.reactions += inner_recipe.reactions
-						combined_recipe.intermediates.add(reactant.as_ingredient(reactant_amount))
+						combined_recipe.intermediates.add(reactant.as_ingredient(reactant_amount, supplier=supplier))
 
 						new_recipes.append(combined_recipe)
 					
@@ -122,16 +123,18 @@ class Recipe:
 
 			else:
 
-				ingredient = reactant.as_ingredient(reactant_amount)
+				ingredient = reactant.as_ingredient(reactant_amount, supplier=supplier)
 				for recipe in recipes:
 					recipe.reactants.add(ingredient)
 
 		if pick_cheapest:
 			priced = [r for r in recipes if r.get_price(supplier=supplier)]
+			# priced = [r for r in recipes if r.price]
 			if not priced:
 				logger.error("0 recipes with prices, can't choose cheapest")
 				return recipes
 			return sorted(priced, key=lambda r: r.get_price(supplier=supplier))[0]
+			# return sorted(priced, key=lambda r: r.price)[0]
 
 		return recipes
 
@@ -325,6 +328,48 @@ class Recipe:
 		raise NotImplementedError
 		self = cls.__new__(cls)
 		self.__init__(...)
+		return self
+
+	@classmethod
+	def from_json(cls, db, path, debug=True):
+
+		# imports
+		import json
+		from .cset import IngredientSet
+		from .rset import ReactionSet
+
+		# load JSON
+		logger.reading(path)
+		data = json.load(open(path,'rt'))
+
+		# check metadata
+		assert str(db.path.resolve()) == data['database'], (str(db.path.resolve()), data['database'])
+		logger.info(f'Recipe was generated at: {data["timestamp"]}')
+		price = data["price"]
+
+		# IngredientSets
+		products = IngredientSet.from_ingredient_dicts(db, data["products"])
+		intermediates = IngredientSet.from_ingredient_dicts(db, data["intermediates"])
+		reactants = IngredientSet.from_ingredient_dicts(db, data["reactants"], supplier=data["reactant_supplier"])
+
+		# ReactionSet
+		reactions = ReactionSet(db, data["reaction_ids"])
+
+		if debug:
+			logger.var('reactants', reactants)
+			logger.var('intermediates', intermediates)
+			logger.var('products', products)
+			logger.var('reactions', reactions)
+
+		# Create the object
+		self = cls.__new__(cls)
+		self.__init__(db, 
+			products=products,
+			reactants=reactants,
+			intermediates=intermediates,
+			reactions=reactions,
+		)
+
 		return self
 
 	### PROPERTIES
@@ -655,6 +700,7 @@ class Recipe:
 
 		# Recipe properties
 		data['price'] = self.price
+		data['reactant_supplier'] = self.reactants.supplier
 		# data['lead_time'] = self.lead_time
 
 		# IngredientSets
@@ -671,7 +717,13 @@ class Recipe:
 		json.dump(data, open(file, 'wt'), indent=indent)
 
 	def copy(self):
-		return Recipe(self.db, self.products.copy(), self.reactants.copy(), self.intermediates.copy(), self.reactions.copy())
+		return Recipe(self.db, 
+			products=self.products.copy(), 
+			reactants=self.reactants.copy(), 
+			intermediates=self.intermediates.copy(), 
+			reactions=self.reactions.copy(), 
+			# supplier=self.supplier
+		)
 
 	# def get_reactant_reactions(self, reactant):
 	# 	"""Get reactions that a reactant is involved in"""
