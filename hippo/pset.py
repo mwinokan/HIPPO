@@ -502,9 +502,14 @@ class PoseSet:
 		sort_reverse: bool = False,
 		generate_pdbs: bool = False,
 		ingredients: IngredientSet = None,
+		tags: bool = True,
+		extra_cols: dict[str, list] = None,
+		# exports: bool = False,
 	):
 
-		"""Prepare an SDF for upload to the RHS of Fragalysis"""
+		"""Prepare an SDF for upload to the RHS of Fragalysis. 
+
+		extra_cols should be a dictionary with a key for each column name, and list values where the first element is the field description, and all subsequent elements are values for each pose."""
 
 		from .fragalysis import generate_header
 		from pathlib import Path
@@ -516,7 +521,15 @@ class PoseSet:
 
 		# get the dataframe of poses
 
-		pose_df = self.get_df(mol=True, inspirations='fragalysis', duplicate_name='original ID', reference='name', metadata=metadata)
+		pose_df = self.get_df(
+			mol=True, 
+			inspirations='fragalysis', 
+			duplicate_name='original ID', 
+			reference='name', 
+			metadata=metadata, 
+			tags=tags, 
+			# exports=exports
+		)
 		
 		drops = ['path', 'compound', 'target', 'ref_pdb', 'original SMILES']
 
@@ -536,6 +549,10 @@ class PoseSet:
 			})
 
 		extras={'smiles':'smiles', 'ref_mols':'fragment inspirations', 'original ID':'original ID'}
+	
+		if extra_cols:
+			for key, value in extra_cols.items():
+				extras[key] = value[0]
 
 		if ingredients:
 
@@ -630,6 +647,13 @@ class PoseSet:
 		pose_df['method'] = [None] * len(pose_df)
 		pose_df['submitter_email'] = [None] * len(pose_df)
 		pose_df['ref_url'] = [None] * len(pose_df)
+
+		if extra_cols:
+			for key, value in extra_cols.items():
+				if len(value) != len(pose_df) + 1:
+					logger.error(f'extra_col "{key}" does not have the correct number of values')
+					raise ValueError(f'extra_col "{key}" does not have the correct number of values')
+				pose_df[key] = value[1:]
 
 		if sort_by:
 			pose_df = pose_df.sort_values(by=sort_by, ascending=not sort_reverse)

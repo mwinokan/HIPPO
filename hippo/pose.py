@@ -195,6 +195,8 @@ class Pose:
 
 			if self.path.endswith('.pdb'):
 
+				logger.reading(self.path)
+
 				# logger.reading(self.path)
 				sys = mp.parse(self.path, verbosity=False)
 				
@@ -248,6 +250,8 @@ class Pose:
 				self.mol = mol
 
 			elif self.path.endswith('.mol'):
+
+				logger.reading(self.path)
 
 				# logger.reading(self.path)
 				mol = mp.parse(self.path, verbosity=False)
@@ -449,6 +453,8 @@ class Pose:
 		reference: bool | str = True,
 		metadata: bool = True,
 		duplicate_name: str | bool = False,
+		tags: bool = True,
+		# exports: bool = True,
 	) -> dict:
 
 		"""Returns a dictionary representing this Pose. Arguments:
@@ -478,7 +484,8 @@ class Pose:
 		data['compound'] = self.compound.name
 		data['target'] = self.target.name
 
-		data['tags'] = self.tags
+		if tags:
+			data['tags'] = self.tags
 		
 		if inspirations == 'fragalysis':
 			data['inspirations'] = ','.join([p.name for p in self.inspirations])
@@ -585,6 +592,10 @@ class Pose:
 			mols += [i.mol for i in self.inspirations]
 		
 		return draw_mols(mols)
+
+	def render(self, **kwargs):
+		from molparse.py3d import render
+		return render(self.complex_system, **kwargs)
 
 	def grid(self):
 		"""Draw a grid of this pose with its inspirations"""
