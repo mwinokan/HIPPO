@@ -50,9 +50,9 @@ class Quote:
 
 		from datetime import datetime
 		quote_age = (datetime.today() - datetime.strptime(self.date, '%Y-%m-%d')).days
-		if quote_age > 30:
-			logger.warning(f'Quote is older than {quote_age} days')
-			logger.warning(self)
+		# if quote_age > 30:
+			# logger.warning(f'Quote is {quote_age} days old')
+			# logger.warning(self)
 
 	### FACTORIES
 

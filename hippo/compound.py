@@ -327,15 +327,15 @@ class Compound:
 	def get_quotes(self, min_amount=None, supplier=None, max_lead_time=None, none='quiet', pick_cheapest=False, df=False) -> list[dict]:
 		"""Get all quotes associated to this compound"""
 
-		quote_ids = self.db.select_where(query='quote_id', table='quote', key='compound', value=self.id, multiple=True, none=none)
+		if not supplier:
+			quote_ids = self.db.select_where(query='quote_id', table='quote', key='compound', value=self.id, multiple=True, none=none)
+		else:
+			quote_ids = self.db.select_where(query='quote_id', table='quote', key=f'quote_compound = {self.id} AND quote_supplier = "{supplier}"', multiple=True, none=none)
 
 		if quote_ids:
 			quotes = [self.db.get_quote(id=q[0]) for q in quote_ids]
 		else:
 			return None
-
-		if supplier:
-			quotes = [q for q in quotes if q.supplier == supplier]
 
 		if max_lead_time:
 			quotes = [q for q in quotes if q.lead_time <= max_lead_time]
@@ -344,7 +344,7 @@ class Compound:
 			suitable_quotes = [q for q in quotes if q.amount >= min_amount]
 			
 			if not suitable_quotes:
-				# logger.debug(f'No quote available with amount >= {min_amount} mg')
+				logger.debug(f'No quote available with amount >= {min_amount} mg')
 				quotes = [Quote.combination(min_amount, quotes)]
 
 			else:
@@ -469,7 +469,7 @@ class Compound:
 		# else:
 			# quote = quote.id
 		
-		return Ingredient(self.db, self.id, amount, quote, supplier, max_lead_time)
+		return Ingredient(db=self.db, compound=self.id, amount=amount, quote=quote, supplier=supplier, max_lead_time=max_lead_time)
 
 	def draw(self, align_substructure: bool = False):
 		"""Display this compound (and its base if it has one)"""

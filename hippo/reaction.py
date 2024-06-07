@@ -136,11 +136,12 @@ class Reaction:
 		debug: bool = False,
 		pick_cheapest: bool = False,
 		permitted_reactions = None,
+		supplier: str | None = None,
 	):
 		"""Get a :class:`.Recipe` describing how to make the product"""
 
 		from .recipe import Recipe
-		return Recipe.from_reaction(self, amount=amount, debug=debug, pick_cheapest=pick_cheapest, permitted_reactions=permitted_reactions)
+		return Recipe.from_reaction(self, amount=amount, debug=debug, pick_cheapest=pick_cheapest, permitted_reactions=permitted_reactions, supplier=supplier)
 
 	def summary(self, amount=1, draw=True):
 		"""Print a summary of this reaction's information"""
@@ -196,10 +197,11 @@ class Reaction:
 		if supplier is None:
 
 			triples = self.db.execute(f'''
-				SELECT reactant_compound, quote_id, reaction_id FROM reactant 
+				SELECT reactant_compound, SUM(quote_id), SUM(reaction_id) FROM reactant 
 				LEFT JOIN quote ON quote_compound = reactant_compound
 				LEFT JOIN reaction ON reaction_product = reactant_compound 
 				WHERE reactant_reaction = {self.id}
+				GROUP BY reactant_compound
 			''').fetchall()
 
 		else:
@@ -210,18 +212,27 @@ class Reaction:
 					SELECT * FROM quote
 					WHERE quote_supplier = "{supplier}"
 				)
-				SELECT reactant_compound, quote_id, reaction_id FROM reactant 
+				SELECT reactant_compound, SUM(quote_id), SUM(reaction_id) FROM reactant 
 				LEFT JOIN filtered_quotes ON quote_compound = reactant_compound
 				LEFT JOIN reaction ON reaction_product = reactant_compound 
 				WHERE reactant_reaction = {self.id}
+				GROUP BY reactant_compound
 			''').fetchall()
 
-		for reactant_compound, quote_id, reaction_id in triples:
+		for reactant_compound, has_quote, has_reaction in triples:
 
-			if quote_id or reaction_id:
+			if debug: logger.debug(f'{reactant_compound=}, {bool(has_quote)=}, {bool(has_reaction)=}')
+
+			if has_quote:
+				if debug: logger.debug(f'reactant={reactant_compound} has quote')
 				continue
-			if debug:
-				logger.warning(f'No quote or reaction for reactant={reactant_compound}')
+
+			if has_reaction:
+				if debug: logger.debug(f'reactant={reactant_compound} has reaction')
+				continue
+			
+			if debug: logger.warning(f'No quote or reaction for reactant={reactant_compound}')
+			
 			return False
 
 		return True
