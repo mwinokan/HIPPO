@@ -32,7 +32,9 @@ You will also need `chemicalite` which is an extension to SQLite for cheminforma
 
 ::
 
-   $ conda install -c conda-forge chemicalite
+   $ conda install -c conda-forge chemicalite=2022.04.1
+
+N.B. Compatibility between rdkit and chemicalite versions is quite strict, and database files created with a certain version pair may not be interoperable with others. 
 
 Core concepts
 =============
