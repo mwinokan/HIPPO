@@ -321,6 +321,9 @@ class ReactionSet:
 		from .recipe import Recipe
 		return Recipe.from_reactions(db=self.db, reactions=self, amounts=1)
 
+	def reverse(self):
+		self._indices = list(reversed(self._indices))
+
 	### DUNDERS
 
 	def __repr__(self) -> str:
