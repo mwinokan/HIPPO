@@ -453,6 +453,8 @@ class Pose:
 		reference: bool | str = True,
 		metadata: bool = True,
 		duplicate_name: str | bool = False,
+		tags: bool = True,
+		# exports: bool = True,
 	) -> dict:
 
 		"""Returns a dictionary representing this Pose. Arguments:
@@ -482,7 +484,8 @@ class Pose:
 		data['compound'] = self.compound.name
 		data['target'] = self.target.name
 
-		data['tags'] = self.tags
+		if tags:
+			data['tags'] = self.tags
 		
 		if inspirations == 'fragalysis':
 			data['inspirations'] = ','.join([p.name for p in self.inspirations])
