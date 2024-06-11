@@ -195,6 +195,8 @@ class Pose:
 
 			if self.path.endswith('.pdb'):
 
+				logger.reading(self.path)
+
 				# logger.reading(self.path)
 				sys = mp.parse(self.path, verbosity=False)
 				
@@ -248,6 +250,8 @@ class Pose:
 				self.mol = mol
 
 			elif self.path.endswith('.mol'):
+
+				logger.reading(self.path)
 
 				# logger.reading(self.path)
 				mol = mp.parse(self.path, verbosity=False)
