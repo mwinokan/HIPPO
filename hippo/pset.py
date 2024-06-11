@@ -182,6 +182,8 @@ class PoseSet:
 	def __init__(self,
 		db: Database,
 		indices: list = None,
+		*,
+		sort: bool = True,
 	):
 		self._db = db
 
@@ -192,7 +194,11 @@ class PoseSet:
 
 		assert all(isinstance(i, int) for i in indices)
 
-		self._indices = sorted(list(set(indices)))
+		if sort:
+			self._indices = sorted(list(set(indices)))
+		else:
+			self._indices = list(set(indices))
+
 
 	### PROPERTIES
 

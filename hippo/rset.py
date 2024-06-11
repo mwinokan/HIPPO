@@ -172,6 +172,7 @@ class ReactionSet:
 		indices: list = None,
 		*,
 		table: str = 'reaction',
+		sort: bool = True,
 	):
 		
 		self._db = db
@@ -183,7 +184,11 @@ class ReactionSet:
 
 		assert all(isinstance(i, int) or isinstance(i, int64) for i in indices)
 
-		self._indices = sorted(list(set(indices)))
+
+		if sort:
+			self._indices = sorted(list(set(indices)))
+		else:
+			self._indices = list(set(indices))
 
 	### PROPERTIES
 
@@ -310,10 +315,9 @@ class ReactionSet:
 		return DataFrame(data)
 
 	def copy(self):
-		return ReactionSet(self.db, self.ids)
+		return ReactionSet(self.db, self.ids, sort=False)
 
 	def get_recipes(self, amounts=1):
-
 		from .recipe import Recipe
 		return Recipe.from_reactions(db=self.db, reactions=self, amounts=1)
 
