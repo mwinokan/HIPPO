@@ -36,6 +36,7 @@ class Recipe:
 	def from_reaction(cls, 
 		reaction, 
 		amount=1, 
+		*,
 		debug: bool = False, 
 		pick_cheapest: bool = True,
 		permitted_reactions=None,
@@ -44,6 +45,7 @@ class Recipe:
 		unavailable_reaction = 'error',
 		reaction_checking_cache = None,
 		reaction_reactant_cache = None,
+		inner=False,
 	):
 
 		from .reaction import Reaction
@@ -69,7 +71,7 @@ class Recipe:
 			products=IngredientSet(db, [reaction.product.as_ingredient(amount=amount)]),
 			reactants=IngredientSet(db, [], supplier=supplier),
 			intermediates=IngredientSet(db, []),
-			reactions=ReactionSet(db, [reaction.id]),
+			reactions=ReactionSet(db, [reaction.id], sort=False),
 		)
 
 		recipes = [recipe]
@@ -103,7 +105,6 @@ class Recipe:
 				return pairs
 
 		# logger.debug(f'get_reactant_amount_pairs({reaction.id})')
-		logger.debug(f'get_reactant_amount_pairs({reaction.id})')
 		# pairs = reaction.get_reactant_amount_pairs()
 		pairs = get_reactant_amount_pairs(reaction)
 
@@ -141,6 +142,7 @@ class Recipe:
 						unavailable_reaction=unavailable_reaction,
 						reaction_checking_cache=reaction_checking_cache,
 						reaction_reactant_cache=reaction_reactant_cache,
+						inner=True,
 					)
 					inner_recipes += reaction_recipes
 
@@ -164,6 +166,11 @@ class Recipe:
 				ingredient = reactant.as_ingredient(reactant_amount, supplier=supplier)
 				for recipe in recipes:
 					recipe.reactants.add(ingredient)
+
+		# reverse ReactionSet's
+		if not inner:
+			for recipe in recipes:
+				recipe.reactions.reverse()
 
 		if pick_cheapest:
 			priced = [r for r in recipes if r.get_price(supplier=supplier)]
@@ -424,7 +431,7 @@ class Recipe:
 
 		from .rset import ReactionSet
 
-		rset = ReactionSet(db, possible_reactions)
+		rset = ReactionSet(db, possible_reactions, sort=False)
 
 		recipe = cls.from_reactions(rset, amount=amount, permitted_reactions=rset, pick_cheapest=False, debug=debug, return_products=True)
 
@@ -463,7 +470,7 @@ class Recipe:
 		reactants = IngredientSet.from_ingredient_dicts(db, data["reactants"], supplier=data["reactant_supplier"])
 
 		# ReactionSet
-		reactions = ReactionSet(db, data["reaction_ids"])
+		reactions = ReactionSet(db, data["reaction_ids"], sort=False)
 
 		if debug:
 			logger.var('reactants', reactants)
@@ -765,7 +772,12 @@ class Recipe:
 
 	def get_ingredient(self, id):
 		"""Get an ingredient by its compound ID"""
-		matches = [r for r in self.reactants + self.products + self.intermediates if r.id == id]
+		matches = [r for r in self.reactants if r.id == id]
+		if not matches:
+			matches = [r for r in self.intermediates if r.id == id]
+		if not matches:
+			matches = [r for r in self.products if r.id == id]
+
 		assert len(matches) == 1
 		return matches[0]
 
