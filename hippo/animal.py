@@ -395,7 +395,7 @@ class HIPPO:
 		from pandas import read_pickle
 
 		if sdf_path.name.endswith('.sdf'):
-			df = PandasTools.LoadSDF(sdf_path)
+			df = PandasTools.LoadSDF(str(sdf_path.resolve()))
 		else:
 			df = read_pickle(sdf_path)
 
@@ -419,6 +419,9 @@ class HIPPO:
 
 		output_directory = Path(output_directory)
 
+		n_poses = self.num_poses
+		n_comps = self.num_compounds
+
 		for i,row in tqdm(df.iterrows()):
 
 			name = row[name_col].strip()
@@ -440,7 +443,7 @@ class HIPPO:
 
 			mol_path = output_directory / f'{name}.mol'
 
-			MolToMolFile(mol, mol_path)
+			MolToMolFile(mol, str(mol_path.resolve()))
 
 			smiles = mol_to_smiles(mol)
 
@@ -540,7 +543,19 @@ class HIPPO:
 			if stop_after and i+1 >= stop_after:
 				break
 
-		logger.success(f'Loaded compounds from {sdf_path}')
+		if (n := self.num_compounds - n_comps):
+			f = logger.success
+		else:
+			f = logger.error
+
+		f(f'Loaded {n} compounds from {sdf_path}')
+
+		if (n := self.num_poses - n_poses):
+			f = logger.success
+		else:
+			f = logger.error
+
+		f(f'Loaded {n} poses from {sdf_path}')
 
 	def add_syndirella_bases(self,
 		df_path: str | Path,
