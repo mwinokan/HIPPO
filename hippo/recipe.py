@@ -103,6 +103,7 @@ class Recipe:
 				return pairs
 
 		# logger.debug(f'get_reactant_amount_pairs({reaction.id})')
+		logger.debug(f'get_reactant_amount_pairs({reaction.id})')
 		# pairs = reaction.get_reactant_amount_pairs()
 		pairs = get_reactant_amount_pairs(reaction)
 
