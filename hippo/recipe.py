@@ -876,10 +876,6 @@ class Recipe:
 
 			sub_recipes = prod_cset.get_recipes(permitted_reactions=self.reactions)
 
-			# logger.debug(product)
-			# logger.debug(row)
-			# logger.debug(sub_recipes)
-
 			for sub_recipe in sub_recipes:
 
 				row = {
@@ -910,10 +906,19 @@ class Recipe:
 					row[f'reaction-name-{i}'] = reaction.type
 					row[f'reaction-recipe-{i}'] = None
 					row[f'reaction-groupby-column-{i}'] = None
+					row[f'reaction-id-{i}'] = int(reaction.id)
 
 				rows.append(row)
 
 		df = DataFrame(rows)
+
+		df = df.convert_dtypes()
+
+		for n_steps in set(df['no-steps']):
+			subset = df[df['no-steps'] == n_steps]
+			this_file = file.replace('.csv', f'_{n_steps}steps.csv')
+			logger.writing(this_file)
+			subset.to_csv(this_file)
 
 		logger.writing(file)
 		df.to_csv(file)
