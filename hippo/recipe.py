@@ -879,7 +879,7 @@ class Recipe:
 			for sub_recipe in sub_recipes:
 
 				row = {
-					"target-names": product.compound_id,
+					"target-names": str(product.compound),
 					"no-steps": 0,
 					"concentration-required-mM": None,
 					"amount-required-uL": None,
