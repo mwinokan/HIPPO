@@ -879,7 +879,7 @@ class Recipe:
 			for sub_recipe in sub_recipes:
 
 				row = {
-					"target-name": product.compound_id,
+					"target-names": product.compound_id,
 					"no-steps": 0,
 					"concentration-required-mM": None,
 					"amount-required-uL": None,
@@ -906,7 +906,7 @@ class Recipe:
 					row[f'reaction-name-{i}'] = reaction.type
 					row[f'reaction-recipe-{i}'] = None
 					row[f'reaction-groupby-column-{i}'] = None
-					row[f'reaction-id-{i}'] = int(reaction.id)
+					# row[f'reaction-id-{i}'] = int(reaction.id)
 
 				rows.append(row)
 
@@ -918,10 +918,10 @@ class Recipe:
 			subset = df[df['no-steps'] == n_steps]
 			this_file = file.replace('.csv', f'_{n_steps}steps.csv')
 			logger.writing(this_file)
-			subset.to_csv(this_file)
+			subset.to_csv(this_file, index=False)
 
 		logger.writing(file)
-		df.to_csv(file)
+		df.to_csv(file, index=False)
 
 		return df
 
