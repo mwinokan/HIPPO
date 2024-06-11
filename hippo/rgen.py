@@ -2,14 +2,14 @@
 from .recipe import Recipe
 from .cset import CompoundSet, IngredientSet
 
+from tqdm import tqdm
+
 import logging
 logger = logging.getLogger('HIPPO')
 
 class RandomRecipeGenerator:
 
 	def __init__(self, db, *, 
-		budget: float = 10000,
-		currency: str = 'EUR', 
 		max_lead_time = None,
 		max_reactions = None,
 		suppliers: list | None = None,
@@ -19,34 +19,38 @@ class RandomRecipeGenerator:
 		logger.debug('RandomRecipeGenerator.__init__()')
 
 		self._db = db
-		self._budget = budget
+		# self._budget = budget
 		self._max_lead_time = max_lead_time
 		self._suppliers = suppliers
 		self._max_reactions = max_reactions
 
-		logger.var('budget', budget)
+		# caches
+		self._reaction_checking_cache = {}
+		self._reaction_reactant_cache = {}
+
+		# logger.var('budget', budget)
 		logger.var('max_lead_time', max_lead_time)
 		logger.var('suppliers', suppliers)
 
-		match start_with:
-			case Recipe():
-				logger.debug('Starting with provided Recipe')
-				recipe = start_with.copy()
-				logger.var('starting price', recipe.price[0], dict(unit=recipe.price[1]))
-			case CompoundSet():
-				logger.debug('Starting with provided CompoundSet')
-				raise NotImplementedError
-			case IngredientSet():
-				logger.debug('Starting with provided IngredientSet')
-				raise NotImplementedError
-			case None:
-				logger.debug('Starting with empty Recipe')
-				raise NotImplementedError
-			case _:
-				logger.error(f'Unrecognised {type(start_with)=}. Restart kernel?')
-				raise TypeError
+		# match start_with:
+		# 	case Recipe():
+		# 		logger.debug('Starting with provided Recipe')
+		# 		recipe = start_with.copy()
+		# 		logger.var('starting price', recipe.price[0], dict(unit=recipe.price[1]))
+		# 	case CompoundSet():
+		# 		logger.debug('Starting with provided CompoundSet')
+		# 		raise NotImplementedError
+		# 	case IngredientSet():
+		# 		logger.debug('Starting with provided IngredientSet')
+		# 		raise NotImplementedError
+		# 	case None:
+		# 		logger.debug('Starting with empty Recipe')
+		# 		raise NotImplementedError
+		# 	case _:
+		# 		logger.error(f'Unrecognised {type(start_with)=}. Restart kernel?')
+		# 		raise TypeError
 
-		self._starting_recipe = recipe
+		self._starting_recipe = start_with
 
 		self._reactant_pool = self.get_reactant_pool()
 
@@ -83,12 +87,15 @@ class RandomRecipeGenerator:
 	@property
 	def reactant_pool(self):
 		return self._reactant_pool
+
+	@property
+	def product_pool(self):
+		return self._product_pool
 	
 	### METHODS
 
 	def get_reactant_pool(self):
-
-		# get all quoted compounds with acceptable supplier and leadtime
+		"""Get all purchaseable reactants with acceptable supplier and leadtime"""
 
 		if self.max_lead_time:
 
@@ -99,12 +106,14 @@ class RandomRecipeGenerator:
 			sql = f'''
 			SELECT DISTINCT quote_compound FROM quote
 			WHERE quote_supplier IN {self.suppliers_str} 
+			ORDER BY quote_compound
 			'''
 
 		else:
 
 			sql = f'''
 			SELECT DISTINCT quote_compound FROM quote 
+			ORDER BY quote_compound
 			'''
 
 		compound_ids = self.db.execute(sql).fetchall()
@@ -113,20 +122,89 @@ class RandomRecipeGenerator:
 		return CompoundSet(self.db, compound_ids)
 
 	def get_product_pool(self):
-
-		reactants = self.get_reactant_pool()
-
-		recipe = Recipe.from_reactants(reactants=reactants)
+		"""Get all quoted products that can be made with the reactant pool"""
 		
-		return recipe.products
+		reactants = self.get_reactant_pool()
+		products = Recipe.from_reactants(reactants=reactants, debug=False)
+		return products
 
-	def generate(self, debug=True):
+	def generate(self, 
+		budget: float = 10000,
+		# currency: str = 'EUR', 
+		max_products = 1000,
+		max_reactions = 1000,
+		debug=True, 
+		maxiter=150, 
+		pick_inner_cheapest=True, 
+		add_size=1,
+		shuffle=True,
+	):
+
+		assert pick_inner_cheapest
+		assert add_size == 1
+		assert len(self.suppliers) == 1
+
+		supplier = self.suppliers[0]
 
 		recipe = self.starting_recipe.copy()
 
-		# randomly add products until budget exceeded
+		if shuffle:
+			print('shuffling')
+			pool = self.product_pool.shuffled()
+		else:
+			pool = self.product_pool
 
-		raise NotImplementedError
+		# randomly add products until budget exceeded
+		for i in tqdm(range(maxiter), total=maxiter):
+			# if debug: logger.title(f'Iteration {i}')
+			# if debug: logger.var('price', recipe.price[0], dict(unit=recipe.price[1]))
+
+			c_id = pool.pop_id()
+			candidates = CompoundSet(self.db, [c_id])
+
+			if debug: logger.var('candidates', candidates.ids)
+
+			candidate_recipe = candidates.get_recipes(
+				pick_cheapest=pick_inner_cheapest, 
+				supplier=supplier, 
+				unavailable_reaction='quiet',
+				reaction_checking_cache=self._reaction_checking_cache,
+				reaction_reactant_cache=self._reaction_reactant_cache,
+			)
+
+			# if debug: logger.var('candidate_recipe', candidate_recipe)
+			# if debug: logger.var('candidate_recipe.reactants', candidate_recipe.reactants.ids)
+
+			recipe += candidate_recipe
+
+			new_price = recipe.price
+
+			if debug: logger.var('new price', new_price[0], dict(unit=new_price[1]))
+
+			if not len(pool):
+				logger.info('Product pool depleted')
+				break
+
+			# check breaking conditions
+			if new_price[0] > budget:
+				logger.info('Budget exceeded, choosing new candidates')
+				recipe = old_recipe.copy()
+				continue
+
+			if len(recipe.reactions) > max_reactions:
+				logger.info('Max #reactions exceeded, choosing new candidates')
+				recipe = old_recipe.copy()
+				continue
+
+			if len(recipe.products) > max_products:
+				logger.info('Max #products exceeded, choosing new candidates')
+				recipe = old_recipe.copy()
+				continue
+			
+			# accept change
+			old_recipe = recipe.copy()
+
+		return recipe
 
 	### DUNDERS
 	

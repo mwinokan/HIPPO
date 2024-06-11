@@ -110,17 +110,18 @@ class Reaction:
 
 	### METHODS
 
-	def get_reactant_amount_pairs(self) -> list[Compound]:
+	def get_reactant_amount_pairs(self, compound_object=True) -> list[Compound]:
 		"""Returns pairs of reactants and their amounts"""
 
 		compound_ids = self.db.select_where(query='reactant_compound, reactant_amount', table='reactant', key='reaction', value=self.id, multiple=True)
 
 		if compound_ids:
-			reactants = [(self.db.get_compound(id=id),amount) for id, amount in compound_ids]
+			if compound_object:
+				return [(self.db.get_compound(id=id),amount) for id, amount in compound_ids]
+			else:
+				return compound_ids
 		else:
 			return []
-
-		return reactants
 
 	def get_reactant_ids(self) -> list[Compound]:
 

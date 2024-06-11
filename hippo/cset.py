@@ -6,7 +6,7 @@ from .db import Database
 
 from .recipe import Recipe
 
-from numpy import int64
+from numpy import int64, nan, isnan
 
 import mcol
 
@@ -487,10 +487,39 @@ class CompoundSet:
 	):
 		"""Generate the :class:`.Recipe` to make these compounds."""
 		from .recipe import Recipe
-		return Recipe.from_compounds(self, amount=amount, debug=debug, pick_cheapest=pick_cheapest, permitted_reactions=permitted_reactions, quoted_only=quoted_only, supplier=supplier, **kwargs)
+		return Recipe.from_compounds(self, 
+			amount=amount, 
+			debug=debug, 
+			pick_cheapest=pick_cheapest, 
+			permitted_reactions=permitted_reactions, 
+			quoted_only=quoted_only, 
+			supplier=supplier, 
+			**kwargs
+		)
 
 	def copy(self):
+		"""Returns a copy of this set"""
 		return CompoundSet(self.db, self.ids)
+
+	def shuffled(self):
+		"""Returns a randomised copy of this set"""
+		copy = self.copy()
+		copy.shuffle()
+		return copy
+
+	def pop(self):
+		"""Pop the last compound in this set"""
+		c_id = self.pop_id()
+		return self.db.get_compound(id=c_id)
+
+	def pop_id(self):
+		"""Pop the last compound id in this set"""
+		return self._indices.pop()
+
+	def shuffle(self):
+		"""Randomises the order of compounds in this set"""
+		from random import shuffle
+		shuffle(self._indices)
 	
 	def get_df(self, mol=False, reactions=False, metadata=False, count_by_target=False, poses=False, **kwargs):
 
@@ -642,11 +671,11 @@ class IngredientSet:
 
 	@classmethod
 	def from_ingredient_df(cls, db, df, supplier=None):
-		from numpy import nan
+		# from numpy import nan
 		self = cls.__new__(cls)
 		self._db = db
 		self._data = df.copy()
-		self._data = self._data.replace({nan: None})
+		# self._data = self._data.replace({nan: None})
 		self._supplier = supplier
 		return self
 
@@ -712,7 +741,9 @@ class IngredientSet:
 	def get_price(self, supplier=None):
 		pairs = { i:q for i,q in enumerate(self.df['quote_id'])}
 
-		quote_ids = [q for q in pairs.values() if q is not None]
+		quote_ids = [q for q in pairs.values() if q is not None and not isnan(q)]
+
+		# print(quote_ids)
 
 		if quote_ids:
 
@@ -771,6 +802,7 @@ class IngredientSet:
 		if self._data.empty:
 			addition = DataFrame([dict(compound_id=compound_id, amount=amount, quote_id=quote_id, supplier=supplier, max_lead_time=max_lead_time)])
 			self._data = addition
+			# self._data = self._data.replace({nan: None})
 
 		else:
 
@@ -785,10 +817,10 @@ class IngredientSet:
 					logger.debug(f'{supplier=}')
 
 			else:
-				from numpy import nan
+				# from numpy import nan
 				addition = DataFrame([dict(compound_id=compound_id, amount=amount, quote_id=quote_id, supplier=supplier, max_lead_time=max_lead_time)])
-				self._data = concat([self._data, addition], ignore_index=True)
-				self._data = self._data.replace({nan: None})
+				self._data = concat([self._data, addition], ignore_index=True, join='inner')
+				# self._data = self._data.replace({nan: None})
 
 				if debug:
 					logger.out(addition)
@@ -852,6 +884,7 @@ class IngredientSet:
 				supplier=row.supplier,
 				max_lead_time=row.max_lead_time,
 			)
+		# self._data = self._data.replace({nan: None})
 		return self
 
 	def __getitem__(self, key):

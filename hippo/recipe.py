@@ -41,6 +41,9 @@ class Recipe:
 		permitted_reactions=None,
 		quoted_only: bool = False,
 		supplier: None | str = None,
+		unavailable_reaction = 'error',
+		reaction_checking_cache = None,
+		reaction_reactant_cache = None,
 	):
 
 		from .reaction import Reaction
@@ -73,16 +76,40 @@ class Recipe:
 
 		if quoted_only or supplier:
 			if debug: logger.debug(f'Checking reactant_availability: {reaction=}')
-			ok = reaction.check_reactant_availability(supplier=supplier)
+			if reaction_checking_cache and reaction.id in reaction_checking_cache:
+				ok = reaction_checking_cache[reaction.id]
+				print('reaction_checking_cache used')
+			else:
+				ok = reaction.check_reactant_availability(supplier=supplier)
+				# print('cache not used')
+				if reaction_checking_cache is not None:
+					reaction_checking_cache[reaction.id] = ok
 			if not ok:
-				logger.error(f'Reactants not available for {reaction=}')
+				if unavailable_reaction == 'error':
+					logger.error(f'Reactants not available for {reaction=}')
 				if pick_cheapest:
 					return None
 				else:
 					return []
 		
-		pairs = reaction.get_reactant_amount_pairs()
+		def get_reactant_amount_pairs(reaction):
+			if reaction_reactant_cache and reaction.id in reaction_reactant_cache:
+				print('reaction_reactant_cache used')
+				return reaction_reactant_cache[reaction.id]
+			else:
+				pairs = reaction.get_reactant_amount_pairs(compound_object=False)
+				if reaction_reactant_cache is not None:
+					reaction_reactant_cache[reaction.id] = pairs
+				return pairs
+
+		# logger.debug(f'get_reactant_amount_pairs({reaction.id})')
+		# pairs = reaction.get_reactant_amount_pairs()
+		pairs = get_reactant_amount_pairs(reaction)
+
 		for reactant, reactant_amount in pairs:
+
+			reactant = db.get_compound(id=reactant)
+
 			if debug: logger.debug(f'{reactant.id=}, {reactant_amount=}')
 
 			# scale amount
@@ -103,7 +130,17 @@ class Recipe:
 
 				inner_recipes = []
 				for reaction in inner_reactions:
-					reaction_recipes = Recipe.from_reaction(reaction=reaction, amount=reactant_amount, debug=debug, pick_cheapest=False, quoted_only=quoted_only, supplier=supplier)
+					reaction_recipes = Recipe.from_reaction(
+						reaction=reaction, 
+						amount=reactant_amount, 
+						debug=debug, 
+						pick_cheapest=False, 
+						quoted_only=quoted_only, 
+						supplier=supplier, 
+						unavailable_reaction=unavailable_reaction,
+						reaction_checking_cache=reaction_checking_cache,
+						reaction_reactant_cache=reaction_reactant_cache,
+					)
 					inner_recipes += reaction_recipes
 
 				for recipe in recipes:
@@ -145,18 +182,35 @@ class Recipe:
 		pick_cheapest: bool = True,
 		permitted_reactions=None,
 		final_products_only=True,
+		return_products=False,
+		debug=False,
 	):
 
 		from .rset import ReactionSet
-		from .cset import IngredientSet
+		from .cset import IngredientSet, CompoundSet
 		assert isinstance(reactions, ReactionSet)
+		
+		db = reactions.db
+
+		if debug: 
+			logger.debug('Recipe.from_reactions()')
+			logger.var('reactions', reactions)
+			logger.var('amount', amount)
+			logger.var('final_products_only', final_products_only)
+			logger.var('permitted_reactions', permitted_reactions)
 
 		# get all the products
 		products = reactions.products
 
-		return products
+		if debug: logger.var('products', products)
+
+		# return products
 
 		if final_products_only:
+
+			if debug: logger.var('products.str_ids', products.str_ids)
+
+			# raise NotImplementedError
 			ids = reactions.db.execute(f'''
 				SELECT DISTINCT compound_id FROM compound
 				LEFT JOIN reactant ON compound_id = reactant_compound
@@ -164,7 +218,15 @@ class Recipe:
 				AND compound_id IN {products.str_ids}
 			''').fetchall()
 
-			return ids
+			ids = [i for i, in ids]
+
+			products = CompoundSet(db, ids)
+			if debug: logger.var('final products', products)
+
+			# return ids
+
+			if return_products:
+				return products
 
 		recipe = Recipe.from_compounds(compounds=products, amount=amount, permitted_reactions=reactions, pick_cheapest=pick_cheapest)
 
@@ -183,6 +245,9 @@ class Recipe:
 		pick_first: bool = False,
 		warn_multiple_solutions: bool = True,
 		pick_cheapest_inner_routes: bool = False,
+		unavailable_reaction = 'error',
+		reaction_checking_cache = None,
+		reaction_reactant_cache = None,
 	):
 
 		from tqdm import tqdm
@@ -195,15 +260,23 @@ class Recipe:
 
 		n_comps = len(compounds)
 
+		assert n_comps
+
 		if not hasattr(amount, '__iter__'):
 			amount = [amount] * n_comps
 
 		options = []
 
-		logger.debug(f'{n_comps=}')
+		if debug:
+			logger.var('#compounds', n_comps)
+			logger.info('Solving individual compound recipes...')
 
-		logger.info('Solving individual compound recipes...')
-		for comp, a in tqdm(zip(compounds, amount), total=n_comps):
+		if n_comps > 1:
+			generator = tqdm(zip(compounds, amount), total=n_comps)
+		else:
+			generator = zip(compounds, amount)
+
+		for comp, a in generator:
 
 			comp_options = []
 
@@ -212,15 +285,25 @@ class Recipe:
 				if permitted_reactions and reaction not in permitted_reactions:
 					continue
 
+				sol = Recipe.from_reaction(
+					reaction=reaction, 
+					amount=a, 
+					pick_cheapest=pick_cheapest_inner_routes, 
+					debug=debug, 
+					permitted_reactions=permitted_reactions, 
+					quoted_only=quoted_only, 
+					supplier=supplier,
+					unavailable_reaction=unavailable_reaction,
+					reaction_checking_cache=reaction_checking_cache,
+					reaction_reactant_cache=reaction_reactant_cache,
+				)
+
 				if pick_cheapest_inner_routes:
-					sol = Recipe.from_reaction(reaction=reaction, amount=a, pick_cheapest=True, debug=debug, permitted_reactions=permitted_reactions, quoted_only=quoted_only, supplier=supplier)
 					if sol:
-					# assert isinstance(sol, Recipe)
 						comp_options.append(sol)
 				else:
-					sols = Recipe.from_reaction(reaction=reaction, amount=a, pick_cheapest=False, debug=debug, permitted_reactions=permitted_reactions, quoted_only=quoted_only, supplier=supplier)	
-					assert isinstance(sols, list)
-					comp_options += sols
+					assert isinstance(sol, list)
+					comp_options += sol
 
 			if warn_multiple_solutions and len(comp_options) > 1:
 				logger.warning(f'Multiple solutions for compound={comp}')
@@ -233,7 +316,7 @@ class Recipe:
 		assert all(options)
 
 		from itertools import product
-		logger.info('Solving recipe combinations...')
+		if debug: logger.info('Solving recipe combinations...')
 		combinations = list(product(*options))
 
 		if not solve_combinations:
@@ -242,12 +325,18 @@ class Recipe:
 		if pick_first:
 			combinations = [combinations[0]]
 			
-		logger.info('Combining recipes...')
+		if debug: logger.info('Combining recipes...')
 		
 		solutions = []
-		for combo in tqdm(combinations):
 
-			logger.debug(f'Combination of {len(combo)} recipes')
+		if n_comps > 1:
+			generator = tqdm(combinations)
+		else:
+			generator = combinations
+
+		for combo in generator:
+
+			if debug: logger.debug(f'Combination of {len(combo)} recipes')
 
 			solution = combo[0]
 
@@ -263,7 +352,7 @@ class Recipe:
 			return solutions[0]
 
 		if pick_cheapest:
-			logger.info('Picking cheapest...')
+			if debug: logger.info('Picking cheapest...')
 			priced = [r for r in solutions if r.price]
 			if not priced:
 				logger.error("0 recipes with prices, can't choose cheapest")
@@ -287,32 +376,47 @@ class Recipe:
 
 		db = reactants.db
 
-		compound_ids = reactant_ids
+		# compound_ids = reactant_ids
+
+		all_reactants = set(reactant_ids)
 
 		possible_reactions = []
 
 		# recursively search for possible reactions
 		for i in range(300):
+
+			if debug: logger.debug(i)
 			
-			reaction_ids = db.get_possible_reaction_ids(compound_ids=compound_ids)
+			# reaction_ids = db.get_possible_reaction_ids(compound_ids=compound_ids)
+			reaction_ids = db.get_possible_reaction_ids(compound_ids=all_reactants)
 
 			if not reaction_ids:
+				# if debug: logger.debug(compound_ids)
 				break
+			
+			if debug: logger.debug(f'Adding {len(reaction_ids)} reactions')
 
 			possible_reactions += reaction_ids
 
-			if debug:
-				logger.var('reaction_ids', reaction_ids)
+			if debug: logger.var('reaction_ids', reaction_ids)
 
 			product_ids = db.get_possible_reaction_product_ids(reaction_ids=reaction_ids)
 
-			if debug:
-				logger.var('product_ids', product_ids)
+			if debug: logger.var('product_ids', product_ids)
 
-			compound_ids = product_ids
+			# compound_ids = product_ids
+			
+			n_prev = len(all_reactants)
+
+			all_reactants |= set(product_ids)
+
+			if n_prev == len(all_reactants):
+				break
 
 		else:
 			raise NotImplementedError('Maximum recursion depth exceeded')
+
+		possible_reactions = list(set(possible_reactions))
 
 		if debug:
 			logger.var('all possible reactions', possible_reactions)
@@ -321,7 +425,12 @@ class Recipe:
 
 		rset = ReactionSet(db, possible_reactions)
 
-		return cls.from_reactions(rset, amount=amount, permitted_reactions=rset, pick_cheapest=False)
+		recipe = cls.from_reactions(rset, amount=amount, permitted_reactions=rset, pick_cheapest=False, debug=debug, return_products=True)
+
+		# if debug:
+			# print(recipe)
+
+		return recipe
 
 	@classmethod
 	def from_ingredients(cls, db, ingredients):
@@ -610,6 +719,7 @@ class Recipe:
 			title = f"Recipe<br><sup>price={self.price}</sup>"
 
 		fig.update_layout(title=title)
+
 
 # link = dict(
 #       source = [0, 1, 0, 2, 3, 3], # indices correspond to labels, eg A1, A2, A2, B1, ...
