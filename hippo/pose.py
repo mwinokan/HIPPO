@@ -593,6 +593,10 @@ class Pose:
 		
 		return draw_mols(mols)
 
+	def render(self, **kwargs):
+		from molparse.py3d import render
+		return render(self.complex_system, **kwargs)
+
 	def grid(self):
 		"""Draw a grid of this pose with its inspirations"""
 		from molparse.rdkit import draw_grid
