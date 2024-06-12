@@ -160,3 +160,6 @@ class TagSet(MutableSet):
 	def __add__(self, other):
 		raise NotImplementedError
 		# return TagTable(self.tags+other)
+
+	def __getitem__(self, key):
+		return self._elements[key]
