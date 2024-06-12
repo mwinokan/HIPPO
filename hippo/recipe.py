@@ -102,7 +102,7 @@ class Recipe:
 					reaction_reactant_cache[reaction.id] = pairs
 				return pairs
 
-		logger.debug(f'get_reactant_amount_pairs({reaction.id})')
+		# logger.debug(f'get_reactant_amount_pairs({reaction.id})')
 		# pairs = reaction.get_reactant_amount_pairs()
 		pairs = get_reactant_amount_pairs(reaction)
 
@@ -720,6 +720,7 @@ class Recipe:
 
 		fig.update_layout(title=title)
 
+
 # link = dict(
 #       source = [0, 1, 0, 2, 3, 3], # indices correspond to labels, eg A1, A2, A2, B1, ...
 #       target = [2, 3, 3, 4, 4, 5],
@@ -824,6 +825,87 @@ class Recipe:
 
 		logger.writing(file)
 		json.dump(data, open(file, 'wt'), indent=indent)
+
+	def write_CAR_csv(self, file, return_df=False):
+
+		"""List of reactions for CAR
+
+		Columns:
+
+		* target-name
+		* no-steps
+		* concentration = None
+		* amount-required
+		* batch-tag
+
+		per reaction
+
+		* reactant-1-1
+		* reactant-2-1
+		* reaction-product-smiles-1
+		* reaction-name-1
+		* reaction-recipe-1
+		* reaction-groupby-column-1
+
+		"""
+
+		from .cset import CompoundSet
+		from pandas import DataFrame
+		from tqdm import tqdm
+
+		# solve each product's reaction
+
+		rows = []
+
+		for product in tqdm(self.products):
+
+			prod_cset = CompoundSet(self.db, [product.id])
+
+			sub_recipes = prod_cset.get_recipes(permitted_reactions=self.reactions)
+
+			# logger.debug(product)
+			# logger.debug(row)
+			# logger.debug(sub_recipes)
+
+			for sub_recipe in sub_recipes:
+
+				row = {
+					"target-name": product.compound_id,
+					"no-steps": 0,
+					"concentration-required-mM": None,
+					"amount-required-uL": None,
+					"batch-tag": None,
+				}
+
+				for i,reaction in enumerate(sub_recipe.reactions):
+
+					i = i+1
+
+					row['no-steps'] += 1
+
+					match len(reaction.reactants):
+						case 1:
+							row[f'reactant-1-{i}'] = reaction.reactants[0].smiles
+							row[f'reactant-2-{i}'] = None
+						case 2:
+							row[f'reactant-1-{i}'] = reaction.reactants[0].smiles
+							row[f'reactant-2-{i}'] = reaction.reactants[1].smiles
+						case _:
+							raise NotImplementedError(f'Unsupported number of reactants for {reaction=}: {len(reaction.reactants)}')
+
+					row[f'reaction-product-smiles-{i}'] = reaction.product.smiles
+					row[f'reaction-name-{i}'] = reaction.type
+					row[f'reaction-recipe-{i}'] = None
+					row[f'reaction-groupby-column-{i}'] = None
+
+				rows.append(row)
+
+		df = DataFrame(rows)
+
+		logger.writing(file)
+		df.to_csv(file)
+
+		return df
 
 	def copy(self):
 		return Recipe(self.db, 
