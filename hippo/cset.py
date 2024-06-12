@@ -449,8 +449,10 @@ class CompoundSet:
 			if draw: 
 				comp.draw()
 			
-			if poses and comp.poses: 
-				comp.poses.draw()
+			if poses and (pset := comp.poses): 
+				for p in pset:
+					print(repr(p))
+				pset.draw()
 
 			if reactions and (reactions := comp.reactions):
 				for r in reactions:
@@ -562,6 +564,87 @@ class CompoundSet:
 		smiles = self.smiles
 		df = DataFrame(dict(smiles=smiles))
 		df.to_csv(file)
+
+	def write_postera_csv(self, file, *, supplier='Enamine', prefix='fragment'):
+		from datetime import date as dt
+		from pandas import DataFrame
+		from tqdm import tqdm
+
+		if prefix:
+			prefix = f'{prefix}_'
+
+		data = []
+
+		for c in tqdm(self, total=len(self)):
+			
+			# get props
+			smiles = c.smiles
+			tags = c.tags
+			metadata = c.metadata
+			poses = c.poses
+			base = c.base
+
+			# method
+			assert len(tags) == 1, c
+			method = tags[0]
+
+			# date
+			date = dt.today()
+
+			# author
+			assert 'author' in metadata, c
+			author = metadata['author']
+
+
+			match len(poses):
+				case 1:
+					pose = poses[0]
+				case 0:
+					logger.warning(f'{c} has no poses')
+					assert base
+					pose = base.poses[0]
+				case _:
+					logger.warning(f'{c} has multiple poses')
+					pose = poses[0]
+
+			# extract inspirations
+			inspirations = pose.inspirations
+			inspiration_names = ','.join(inspirations.names)
+			inspiration_smiles = '.'.join(inspirations.smiles)
+
+			# quote info
+			quotes = c.get_quotes(supplier=supplier)
+			assert len(quotes) == 1, c
+			quote = quotes[0]
+			catalog_id = quote.entry
+			catalog_price = quote.price
+			catalog_lead_time = quote.lead_time
+
+			# hippo string
+			hippo_str = f'compound={c.id}, pose={pose.id}'
+
+			# create row
+			data.append({
+				"SMILES":smiles,
+				f"{prefix}HIPPO_IDs":hippo_str,
+				f"{prefix}method":method,
+				f"{prefix}export_date":date,
+				f"{prefix}author":author,
+				f"{prefix}inspiration_names":inspiration_names,
+				f"{prefix}inspiration_SMILES":inspiration_smiles,
+				f"{prefix}supplier":supplier,
+				f"{prefix}supplier_catalogue":quote.catalogue,
+				f"{prefix}supplier_ID":catalog_id,
+				f"{prefix}supplier_price":catalog_price,
+				f"{prefix}supplier_lead_time":catalog_lead_time,
+			})
+
+		df = DataFrame(data)
+
+		logger.writing(file)
+		df.to_csv(file, index=False)
+
+		return df
 
 	### DUNDERS
 
@@ -774,6 +857,8 @@ class IngredientSet:
 
 		return (quoted + sum([p for p in unquoted if p]), currency)
 
+	def interactive(self, **kwargs):
+		return self.compounds.interactive(**kwargs)
 
 	def add(self, ingredient=None, *, compound_id=None, amount=None, quote_id=None, supplier=None, max_lead_time=None, debug=False):
 
