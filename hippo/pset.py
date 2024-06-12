@@ -238,7 +238,17 @@ class PoseSet:
 	@property
 	def smiles(self):
 		"""Returns the smiles of poses in this set"""
-		return [self.db.select_where(table=self.table, query='pose_smiles', key='id', value=i, multiple=False)[0] for i in self.indices]
+		pairs = self.db.select_where(table=self.table, query='pose_id, pose_smiles', key=f'pose_id IN {self.str_ids}', multiple=True)
+
+		results = []
+		for pose_id, smiles in pairs:
+			if smiles is None:
+				pose = self.db.get_pose(id=pose_id)
+				smiles = pose.smiles
+
+			results.append(smiles)
+
+		return results
 
 	@property
 	def tags(self):
