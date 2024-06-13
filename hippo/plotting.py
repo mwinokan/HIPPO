@@ -842,7 +842,7 @@ def plot_pose_property(animal, prop, poses=None, style='scatter', title=None, nu
 @hippo_graph
 def plot_compound_availability(animal, compounds=None, title=None, subtitle=None):
 
-	from .cset import CompoundTable
+	from .cset import CompoundTable, CompoundSet
 	
 	compounds = compounds or animal.compounds
 
@@ -863,6 +863,23 @@ def plot_compound_availability(animal, compounds=None, title=None, subtitle=None
 
 				plot_data.append(dict(supplier=supplier, catalogue=catalogue, count=count))
 				
+		case CompoundSet():
+
+			pairs = animal.db.select(table='quote', query='DISTINCT quote_supplier, quote_catalogue', multiple=True)
+		
+			plot_data = []
+			for supplier, catalogue in pairs:
+		
+				if catalogue is None:
+					catalogue = 'None'
+					cat_str = 'NULL'
+				else:
+					cat_str = f'"{catalogue}"'
+
+				count, = animal.db.select_where(table='quote', query='COUNT(DISTINCT quote_compound)', key=f'quote_supplier IS "{supplier}" AND quote_catalogue IS {cat_str} AND quote_compound IN {compounds.str_ids}')
+
+				plot_data.append(dict(supplier=supplier, catalogue=catalogue, count=count))
+
 		case _:
 			raise NotImplementedError
 		
@@ -882,7 +899,7 @@ def plot_compound_availability(animal, compounds=None, title=None, subtitle=None
 @hippo_graph
 def plot_compound_price(animal, compounds=None, min_amount=1, subtitle=None, title=None, style='histogram', **kwargs):
 
-	from .cset import CompoundTable
+	from .cset import CompoundTable, CompoundSet
 	import numpy as np
 	
 	compounds = compounds or animal.compounds
@@ -911,6 +928,37 @@ def plot_compound_price(animal, compounds=None, min_amount=1, subtitle=None, tit
 
 			else:
 				data = animal.db.select_where(table='quote', query='quote_amount, MIN(quote_price)', key=f'quote_amount >= {min_amount} GROUP BY quote_compound', multiple=True)
+
+				n_compounds = len(data)
+
+				plot_data = []
+				for amount, price in data:
+					plot_data.append(dict(min_price=price, quoted_amount=amount))
+
+		case CompoundSet():
+
+			if style=='scatter':
+
+				sql = '''
+				SELECT quote_compound, quote_amount, MIN(quote_price), quote_lead_time, compound_smiles, COUNT(DISTINCT reactant_reaction)
+				FROM quote 
+				INNER JOIN compound ON quote.quote_compound = compound.compound_id
+				INNER JOIN reactant ON quote.quote_compound = reactant.reactant_compound
+				WHERE quote_amount >= {min_amount}
+				AND quote_compound IN {str_ids}
+				GROUP BY quote_compound
+				'''.format(min_amount=min_amount, str_ids=compounds.str_ids)
+
+				results = animal.db.execute(sql).fetchall()
+
+				n_compounds = len(results)
+
+				plot_data = []
+				for compound_id, amount, price, lead_time, smiles, num_reactions in results:
+					plot_data.append(dict(compound_id=compound_id, min_price=price, quoted_amount=amount, lead_time=lead_time, smiles=smiles, num_reactions=num_reactions, log_price_per_reaction=np.log(price/num_reactions), price_per_reaction=price/num_reactions))
+
+			else:
+				data = animal.db.select_where(table='quote', query='quote_amount, MIN(quote_price)', key=f'quote_amount >= {min_amount} AND quote_compound IN {compounds.str_ids} GROUP BY quote_compound', multiple=True)
 
 				n_compounds = len(data)
 

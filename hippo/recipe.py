@@ -372,9 +372,6 @@ class Recipe:
 	@classmethod
 	def from_reactants(cls, reactants, amount=1, debug=False):
 
-		# print(reactants.ids)
-
-
 		from .cset import IngredientSet
 
 		if isinstance(reactants, IngredientSet):
@@ -383,8 +380,6 @@ class Recipe:
 			reactant_ids = reactants.ids
 
 		db = reactants.db
-
-		# compound_ids = reactant_ids
 
 		all_reactants = set(reactant_ids)
 
@@ -399,7 +394,6 @@ class Recipe:
 			reaction_ids = db.get_possible_reaction_ids(compound_ids=all_reactants)
 
 			if not reaction_ids:
-				# if debug: logger.debug(compound_ids)
 				break
 			
 			if debug: logger.debug(f'Adding {len(reaction_ids)} reactions')
@@ -411,8 +405,6 @@ class Recipe:
 			product_ids = db.get_possible_reaction_product_ids(reaction_ids=reaction_ids)
 
 			if debug: logger.var('product_ids', product_ids)
-
-			# compound_ids = product_ids
 			
 			n_prev = len(all_reactants)
 
@@ -435,9 +427,6 @@ class Recipe:
 
 		recipe = cls.from_reactions(rset, amount=amount, permitted_reactions=rset, pick_cheapest=False, debug=debug, return_products=True)
 
-		# if debug:
-			# print(recipe)
-
 		return recipe
 
 	@classmethod
@@ -448,7 +437,7 @@ class Recipe:
 		return self
 
 	@classmethod
-	def from_json(cls, db, path, debug=True):
+	def from_json(cls, db, path, debug=True, allow_db_mismatch=False):
 
 		# imports
 		import json
@@ -460,7 +449,14 @@ class Recipe:
 		data = json.load(open(path,'rt'))
 
 		# check metadata
-		assert str(db.path.resolve()) == data['database'], (str(db.path.resolve()), data['database'])
+		if str(db.path.resolve()) != data['database']:
+			logger.var("session", str(db.path.resolve()))
+			logger.var("in file", data['database'])
+			if allow_db_mismatch:
+				logger.warning('Database path mismatch')
+			else:
+				logger.error('Database path mismatch, set allow_db_mismatch=True to ignore')
+				return None
 		logger.info(f'Recipe was generated at: {data["timestamp"]}')
 		price = data["price"]
 
@@ -499,6 +495,11 @@ class Recipe:
 	def products(self):
 		return self._products
 
+	@property
+	def product(self):
+		assert len(self.products) == 1
+		return self.products[0]
+	
 	@products.setter
 	def products(self, a):
 		self._products = a
@@ -741,17 +742,18 @@ class Recipe:
 
 		return fig
 
-	def summary(self):
+	def summary(self, price: bool = True):
 		"""Print a summary of this recipe"""
 
 		import mcol
 		
 		logger.header('Recipe')
 
-		price = self.price
 		if price:
-			logger.var('\nprice', price[0], dict(unit=price[1]))
-			# logger.var('lead-time', self.lead_time, dict(unit='working days'))
+			price = self.price
+			if price:
+				logger.var('\nprice', price[0], dict(unit=price[1]))
+				# logger.var('lead-time', self.lead_time, dict(unit='working days'))
 
 		logger.var('\n#products', len(self.products))
 		for product in self.products:
@@ -794,9 +796,23 @@ class Recipe:
 
 	# 	return quotes
 
-	def write_json(self, file, indent=4):
+	def write_json(self, file, *, indent=4, **kwargs):
+		"""Serialise this recipe object and write it to disk"""
+		data = self.get_dict(**kwargs)
+		logger.writing(file)
+		json.dump(data, open(file, 'wt'), indent=indent)
 
-		"""Serialise this recipe object and write it to disk
+	def get_dict(self,
+		*,
+		price: bool = True,
+		reactant_supplier: bool = True,
+		database: bool = True,
+		timestamp: bool = True,
+		compound_ids_only: bool = False,
+		products: bool = True,
+	):
+
+		"""Serialise this recipe object
 
 		Store
 		=====
@@ -818,26 +834,29 @@ class Recipe:
 		data = {}
 
 		# Database
-		data['database'] = str(self.db.path.resolve())
-		data['timestamp'] = str(datetime.now())
+		if database: data['database'] = str(self.db.path.resolve())
+		if timestamp: data['timestamp'] = str(datetime.now())
 
 		# Recipe properties
-		data['price'] = self.price
-		data['reactant_supplier'] = self.reactants.supplier
+		if price: data['price'] = self.price
+		if reactant_supplier: data['reactant_supplier'] = self.reactants.supplier
 		# data['lead_time'] = self.lead_time
 
 		# IngredientSets
-		data['reactants'] = self.reactants.df.to_dict(orient='records')
-		data['intermediates'] = self.intermediates.df.to_dict(orient='records')
-		data['products'] = self.products.df.to_dict(orient='records')
-		
+		if compound_ids_only:
+			data['reactant_ids'] = self.reactants.compound_ids
+			data['intermediate_ids'] = self.intermediates.compound_ids
+			if products: data['products_ids'] = self.products.compound_ids
+
+		else:
+			data['reactants'] = self.reactants.df.to_dict(orient='records')
+			data['intermediates'] = self.intermediates.df.to_dict(orient='records')
+			if products: data['products'] = self.products.df.to_dict(orient='records')
+			
 		# ReactionSet
 		data['reaction_ids'] = self.reactions.ids
 
-		# return data
-
-		logger.writing(file)
-		json.dump(data, open(file, 'wt'), indent=indent)
+		return data
 
 	def write_CAR_csv(self, file, return_df=False):
 

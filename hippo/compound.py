@@ -205,6 +205,20 @@ class Compound:
 		return self.get_reactions(none=False)
 
 	@property
+	def reaction(self):
+		reactions = self.reactions
+		match len(reactions):
+			case 0:
+				logger.warning(f'{self} has no reactions')
+				return None
+			case 1:
+				logger.warning(f'{self} has multiple reactions, returning first')
+			case _:
+				pass
+
+		return reactions[0]
+
+	@property
 	def dict(self) -> dict:
 		"""Returns a dictionary of this compound"""
 		return self.get_dict()
@@ -794,6 +808,9 @@ class Ingredient:
 		
 		else:
 			return None
+
+	def get_quotes(self, **kwargs):
+		return self.compound.get_quotes(**kwargs)
 
 	### DUNDERS
 

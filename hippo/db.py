@@ -13,7 +13,7 @@ from .quote import Quote
 from .metadata import MetaData
 from .target import Target
 from .feature import Feature
-
+from .recipe import Recipe
 from .tools import inchikey_from_smiles
 
 from pathlib import Path
@@ -152,6 +152,8 @@ class Database:
 		self.create_table_target()
 		self.create_table_pattern_bfp()
 		self.create_table_feature()
+		self.create_table_route()
+		self.create_table_component()
 		# self.create_table_morgan_bfp()
 
 	def create_table_compound(self):
@@ -326,6 +328,31 @@ class Database:
 			feature_residue_number INTEGER,
 			feature_atom_names TEXT,
 			CONSTRAINT UC_feature UNIQUE (feature_family, feature_target, feature_chain_name, feature_residue_number, feature_residue_name, feature_atom_names)
+		);
+		"""
+
+		self.execute(sql)
+
+	def create_table_route(self):
+		"""Create the route table"""
+		logger.debug('HIPPO.Database.create_table_route()')
+		sql = """CREATE TABLE route(
+			route_id INTEGER PRIMARY KEY,
+			route_product INTEGER
+		);
+		"""
+
+		self.execute(sql)
+
+	def create_table_component(self):
+		"""Create the component table"""
+		logger.debug('HIPPO.Database.create_table_component()')
+		sql = """CREATE TABLE component(
+			component_id INTEGER PRIMARY KEY,
+			component_route INTEGER,
+			component_type INTEGER,
+			component_ref INTEGER,
+			CONSTRAINT UC_component UNIQUE (component_route, component_ref, component_type)
 		);
 		"""
 
@@ -834,6 +861,82 @@ class Database:
 
 		self.update(table=table, id=id, key=f'{table}_metadata', value=payload, commit=commit)
 
+	def insert_route(self,
+		*,
+		product_id: int,
+		commit: bool = True,
+	) -> None:
+
+		sql = """
+		INSERT INTO route(route_product)
+		VALUES(?1)
+		"""
+
+		product_id = int(product_id)
+
+		try:
+			self.execute(sql, (product_id,))
+
+		# except sqlite3.IntegrityError as e:
+		# 	return None
+
+		except Exception as e:
+			logger.exception(e)
+
+		route_id = self.cursor.lastrowid
+
+		if commit:
+			self.commit()
+
+		return route_id
+
+	def insert_component(self,
+		*,
+		route: int,
+		ref: int,
+		component_type: int,
+		commit: bool = True,
+	) -> None:
+
+		"""
+		----------------------------------------
+		component_type | table    | detail
+		----------------------------------------
+		1 			   | reaction | reaction
+		2 			   | compound | reactant
+		3 			   | compound | intermediate
+		"""
+
+		sql = """
+		INSERT INTO component(component_route, component_type, component_ref)
+		VALUES(?1, ?2, ?3)
+		"""
+
+		route = int(route)
+		ref = int(ref)
+		component_type = int(component_type)
+
+		try:
+			self.execute(sql, (route, component_type, ref))
+
+		except sqlite3.IntegrityError as e:
+
+			if 'UNIQUE constraint failed: component' in str(e):
+				logger.warning(f'Did not add existing component={ref} (type={component_type}) to {route=}')
+				return None
+			else:
+				raise
+
+		except Exception as e:
+			logger.exception(e)
+
+		component_id = self.cursor.lastrowid
+		
+		if commit:
+			self.commit()
+
+		return component_id
+
 	### SELECTION
 
 	def select(self, query, table, multiple=False):
@@ -1164,11 +1267,64 @@ class Database:
 
 	def get_feature(self, 
 		*,
-		id=int
+		id:int,
 	) -> Feature:
 		"""Get feature"""
 		entry = self.select_all_where(table='feature', key='id', value=id)
 		return Feature(*entry)
+
+	def get_route(self,
+		*,
+		id: int,
+		debug: bool = False,
+	) -> Recipe:
+
+		from .cset import CompoundSet, IngredientSet
+		from .rset import ReactionSet
+
+		product_id, = self.select_where(table='route', query='route_product', key='id', value=id)
+
+		if debug: logger.var('product_id',product_id)
+		
+		pairs = self.select_where(table='component', query='component_ref, component_type', key=f'component_route IS {id} ORDER BY component_id', multiple=True)
+
+		reaction_ids = []
+		reactant_ids = []
+		intermediate_ids = []
+
+		for ref, c_type in pairs:
+			match c_type:
+				case 1:
+					reaction_ids.append(ref)
+				case 2:
+					reactant_ids.append(ref)
+				case 3:
+					intermediate_ids.append(ref)
+				case _:
+					raise ValueError(f'Unknown component type {c_type}')
+		
+		if debug: logger.var('pairs',pairs)
+
+		products = CompoundSet(self, [product_id])
+		reactants = CompoundSet(self, reactant_ids)
+		intermediates = CompoundSet(self, intermediate_ids)
+
+		products = IngredientSet.from_compounds(compounds=products, amount=1)
+		reactants = IngredientSet.from_compounds(compounds=reactants, amount=1)
+		intermediates = IngredientSet.from_compounds(compounds=intermediates, amount=1)
+
+		reactions = ReactionSet(self, reaction_ids)
+
+		recipe = Recipe(self,
+			products=products,
+			reactants=reactants,
+			intermediates=intermediates,
+			reactions=reactions,
+		)
+
+		if debug: logger.var('recipe', recipe)
+
+		return recipe
 
 	def get_possible_reaction_ids(self, *, compound_ids):
 

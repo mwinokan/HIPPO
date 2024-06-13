@@ -983,8 +983,11 @@ class HIPPO:
 		self, 
 		path: str | Path, 
 		*, 
-		orig_name_col: str = 'Diamond ID (Molecule Name)',
+		orig_name_col: str = 'Customer Code',
+		# orig_name_col: str = 'Diamond ID (Molecule Name)',
 		entry_col = 'Catalog ID',
+		stop_after=None,
+		orig_name_is_hippo_id: bool = False,
 	):
 
 		"""Load an Enamine quote provided as an excel file"""
@@ -1012,8 +1015,13 @@ class HIPPO:
 		currency = price_col.split(', ')[-1]
 
 		ingredients = IngredientSet(self.db)
+
+		if len(df) > 100:
+			generator = tqdm(df.iterrows(), total=len(df))
+		else:
+			generator = df.iterrows()
 	
-		for i,row in df.iterrows():
+		for i,row in generator:
 			smiles = row[smiles_col]
 
 			if not isinstance(smiles, str):
@@ -1021,6 +1029,19 @@ class HIPPO:
 
 			compound = self.register_compound(smiles=smiles)
 
+			if orig_name_is_hippo_id:
+				try:
+					expected_id = int(row[orig_name_col])
+
+					if expected_id != compound.id:
+						logger.error('Compound registration mismatch:')
+						logger.var('expected_id', expected_id)
+						logger.var('new_id', compound.id)
+						logger.var('original_smiles', self.compounds[expected_id].smiles)
+						logger.var('new_smiles', smiles)
+
+				except ValueError:
+					pass
 
 			if (catalogue := row[catalogue_col]) == 'No starting material':
 				continue
@@ -1058,6 +1079,9 @@ class HIPPO:
 				supplier='Enamine',
 				max_lead_time=None,
 			)
+
+			if stop_after and stop_after == i:
+				break
 
 		return ingredients
 
@@ -1520,6 +1544,30 @@ class HIPPO:
 			self.db.insert_inspiration(original=inspiration, derivative=pose, warn_duplicate=False, commit=commit)
 
 		return pose
+
+	def register_route(self, *, recipe, commit=True):
+
+		# register the route
+		route_id = self.db.insert_route(product_id=recipe.product.id, commit=False)
+		
+		assert route_id
+
+		# reactions
+		for ref in recipe.reactions.ids:
+			self.db.insert_component(component_type=1, ref=ref, route=route_id, commit=False)
+
+		# reactants
+		for ref in recipe.reactants.compound_ids:
+			self.db.insert_component(component_type=2, ref=ref, route=route_id, commit=False)
+
+		# intermediates
+		for ref in recipe.intermediates.compound_ids:
+			self.db.insert_component(component_type=3, ref=ref, route=route_id, commit=False)
+
+		if commit:
+			self.db.commit()
+
+		return route_id
 
 	### QUOTING
 
