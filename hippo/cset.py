@@ -681,9 +681,9 @@ class CompoundSet:
 			case IngredientSet():
 				logger.warning('Subtracting IngredientSet from CompoundSet. Ignoring quote/amount data')
 				ids = set(self.ids) - set([int(i) for i in other.compound_ids])
-				print(self.ids)
-				print(ids)
-				print([int(i) for i in other.compound_ids])
+				# print(self.ids)
+				# print(ids)
+				# print([int(i) for i in other.compound_ids])
 				return CompoundSet(self.db, ids)
 				
 			case _:
@@ -724,6 +724,16 @@ class CompoundSet:
 	def __repr__(self) -> str:
 		return f'{mcol.bold}{mcol.underline}''{'f'C x {len(self)}''}'f'{mcol.unbold}{mcol.ununderline}'
 
+	def __contains__(self, other):
+		match other:
+			case Compound():
+				id = other.id
+			case Ingredient():
+				id = other.compound_id
+			case int():
+				id = other
+
+		return id in set(self.ids)
 
 class IngredientSet:
 
@@ -766,6 +776,17 @@ class IngredientSet:
 	def from_ingredient_dicts(cls, db, dicts, supplier=None):
 		from pandas import DataFrame
 		return cls.from_ingredient_df(db=db, df=DataFrame(dicts), supplier=supplier)
+
+	@classmethod
+	def from_compounds(cls, compounds, amount=1):
+
+		from pandas import DataFrame
+
+		ids = compounds.ids
+
+		df = DataFrame(dict(compound_id=ids, amount=amount, quote_id=None, supplier=None, max_lead_time=None))
+
+		return cls.from_ingredient_df(compounds.db, df)
 
 	### PROPERTIES
 
