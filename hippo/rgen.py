@@ -56,7 +56,11 @@ class RandomRecipeGenerator:
 
 		logger.var('reactant_pool', self.reactant_pool)
 
+		logger.debug('Solving product pool...')
 		self._product_pool = self.get_product_pool()
+
+		if start_with:
+			self._product_pool -= start_with.products.compounds
 		
 		logger.var('product_pool', self.product_pool)
 		
@@ -123,10 +127,42 @@ class RandomRecipeGenerator:
 
 	def get_product_pool(self):
 		"""Get all quoted products that can be made with the reactant pool"""
-		
 		reactants = self.get_reactant_pool()
 		products = Recipe.from_reactants(reactants=reactants, debug=False)
 		return products
+
+	# def generate_subrecipes(self):
+
+	# 	from .cset import CompoundSet
+	# 	import json
+
+	# 	for compound in self.product_pool:
+
+	# 		recipes = CompoundSet(self.db, [compound.id]).get_recipes(
+	# 			pick_cheapest=False, 
+	# 			warn_multiple_solutions=False,
+	# 		)
+
+	# 		for recipe in recipes:
+
+	# 			data = recipe.get_dict(
+	# 				price=False,
+	# 				reactant_supplier=False,
+	# 				database=False,
+	# 				timestamp=False,
+	# 				compound_ids_only=True,
+	# 				products=False,
+	# 			)
+
+	# 			return data
+
+	# 			str_payload = json.dumps(data)
+
+	# 			self.db.insert_recipe(product_id=compound.id, str_payload=str_payload, commit=False)
+
+	# 		break
+
+	# 	raise NotImplementedError
 
 	def generate(self, 
 		budget: float = 10000,
