@@ -431,7 +431,7 @@ class Pose:
 		
 		from .sucos import SuCOS_score
 
-		multi_sucos = SuCOS_score(self.inspirations.mols, self.mol, print_scores=True)
+		multi_sucos = SuCOS_score(self.inspirations.mols, self.mol, print_scores=debug)
 		
 		if debug:
 			logger.var('energy_score', self.energy_score)
