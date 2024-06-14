@@ -427,11 +427,11 @@ class Pose:
 
 	### METHODS
 	
-	def score_fragment_inspiration(self, debug=False):
+	def score_inspiration(self, debug=False, draw=False):
 		
-		from .sucos import SuCOS_score
+		from molparse.rdkit import SuCOS_score
 
-		multi_sucos = SuCOS_score(self.inspirations.mols, self.mol, print_scores=debug)
+		multi_sucos = SuCOS_score(self.inspirations.mols, self.mol, print_scores=debug, draw=draw)
 		
 		if debug:
 			logger.var('energy_score', self.energy_score)
