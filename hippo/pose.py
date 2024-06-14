@@ -426,6 +426,23 @@ class Pose:
 		return self._distance_score
 
 	### METHODS
+	
+	def score_fragment_inspiration(self, debug=False):
+		
+		from .sucos import SuCOS_score
+
+		multi_sucos = SuCOS_score(self.inspirations.mols, self.mol, print_scores=True)
+		
+		if debug:
+			logger.var('energy_score', self.energy_score)
+			logger.var('distance_score', self.distance_score)
+
+			for inspiration in self.inspirations:
+				logger.var(f'{inspiration} SuCOS', SuCOS_score(inspiration.mol, self.mol, print_scores=True))
+
+			logger.var(f'multi SuCOS', multi_sucos)
+
+		raise multi_sucos
 
 	def get_compound(self):
 		return self.db.get_compound(id=self._compound_id)
