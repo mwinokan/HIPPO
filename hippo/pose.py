@@ -438,11 +438,11 @@ class Pose:
 			logger.var('distance_score', self.distance_score)
 
 			for inspiration in self.inspirations:
-				logger.var(f'{inspiration} SuCOS', SuCOS_score(inspiration.mol, self.mol, print_scores=True))
+				logger.var(f'{inspiration} SuCOS', SuCOS_score(inspiration.mol, self.mol, print_scores=debug))
 
 			logger.var(f'multi SuCOS', multi_sucos)
 
-		raise multi_sucos
+		return multi_sucos
 
 	def get_compound(self):
 		return self.db.get_compound(id=self._compound_id)
