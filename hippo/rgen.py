@@ -63,6 +63,9 @@ class RandomRecipeGenerator:
 			self._product_pool -= start_with.products.compounds
 		
 		logger.var('product_pool', self.product_pool)
+
+		logger.debug('Solving route pool...')
+		self._route_pool = self.get_route_pool()
 		
 	### FACTORIES
 
@@ -95,6 +98,11 @@ class RandomRecipeGenerator:
 	@property
 	def product_pool(self):
 		return self._product_pool
+
+	@property
+	def route_pool(self):
+		return self._route_pool
+		
 	
 	### METHODS
 
@@ -130,6 +138,37 @@ class RandomRecipeGenerator:
 		reactants = self.get_reactant_pool()
 		products = Recipe.from_reactants(reactants=reactants, debug=False)
 		return products
+
+	def get_route_pool(self):
+
+		# logger.debug("Fetching route ID's from database...")
+		pairs = self.db.select_where(table='route', query='route_id, route_product', key=f'route_product IN {self.product_pool.str_ids}', multiple=True)
+
+		route_pool = {}
+		for route_id, route_product in pairs:
+			if route_product not in route_pool:
+				route_pool[route_product] = []
+			# else:
+
+			route_pool[route_product].append(route_id)
+
+		logger.debug("Constructing Recipe objects...")
+		for route_product_id, route_ids in tqdm(route_pool.items()):
+
+			recipes = []
+			
+			if len(route_ids) > 1:
+				logger.warning(f'{route_product_id} has multiple routes!')
+
+			for route_id in route_ids:
+
+				recipe = self.db.get_route(id=route_id)
+
+				recipes.append(recipe)
+
+			route_pool[route_product_id] = recipe
+
+		return route_pool
 
 	# def generate_subrecipes(self):
 
