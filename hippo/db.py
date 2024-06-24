@@ -13,7 +13,7 @@ from .quote import Quote
 from .metadata import MetaData
 from .target import Target
 from .feature import Feature
-from .recipe import Recipe
+from .recipe import Recipe, Route
 from .tools import inchikey_from_smiles
 
 from pathlib import Path
@@ -1277,7 +1277,7 @@ class Database:
 		*,
 		id: int,
 		debug: bool = False,
-	) -> Recipe:
+	) -> Route:
 
 		from .cset import CompoundSet, IngredientSet
 		from .rset import ReactionSet
@@ -1315,8 +1315,9 @@ class Database:
 
 		reactions = ReactionSet(self, reaction_ids)
 
-		recipe = Recipe(self,
-			products=products,
+		recipe = Route(self,
+			route_id=id,
+			product=products,
 			reactants=reactants,
 			intermediates=intermediates,
 			reactions=reactions,

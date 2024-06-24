@@ -735,6 +735,7 @@ class CompoundSet:
 
 		return id in set(self.ids)
 
+
 class IngredientSet:
 
 	"""Refactor as a wrapper to a dataframe???"""
@@ -745,6 +746,7 @@ class IngredientSet:
 		'quote_id',
 		'supplier',
 		'max_lead_time',
+		'quoted_amount',
 	]
 	
 	def __init__(self, db, ingredients=None, supplier=None):
@@ -755,7 +757,7 @@ class IngredientSet:
 
 		self._db = db
 		
-		self._data = DataFrame(columns=self._columns)
+		self._data = DataFrame(columns=self._columns, dtype=object)
 
 		self._supplier = supplier
 		
@@ -766,16 +768,26 @@ class IngredientSet:
 	def from_ingredient_df(cls, db, df, supplier=None):
 		# from numpy import nan
 		self = cls.__new__(cls)
+
+		for col in cls._columns:
+			if col not in df.columns:
+				logger.debug(f'Adding column {col}')
+				df[col] = None				
+		
 		self._db = db
 		self._data = df.copy()
-		# self._data = self._data.replace({nan: None})
 		self._supplier = supplier
+
 		return self
 
 	@classmethod
 	def from_ingredient_dicts(cls, db, dicts, supplier=None):
 		from pandas import DataFrame
-		return cls.from_ingredient_df(db=db, df=DataFrame(dicts), supplier=supplier)
+		df = DataFrame(dicts, dtype=object)
+		# for col in cls._columns:
+		# 	if col not in df.columns:
+		# 		df[col] = None
+		return cls.from_ingredient_df(db=db, df=df, supplier=supplier)
 
 	@classmethod
 	def from_compounds(cls, compounds, amount=1):
@@ -784,7 +796,7 @@ class IngredientSet:
 
 		ids = compounds.ids
 
-		df = DataFrame(dict(compound_id=ids, amount=amount, quote_id=None, supplier=None, max_lead_time=None))
+		df = DataFrame(dict(compound_id=ids, amount=amount, quote_id=None, supplier=None, max_lead_time=None, quoted_amount=None), dtype=object)
 
 		return cls.from_ingredient_df(compounds.db, df)
 
@@ -811,6 +823,18 @@ class IngredientSet:
 	@property
 	def supplier(self):
 		return self._supplier
+
+	@supplier.setter
+	def supplier(self, s):
+		
+		if isinstance(s, list) or isinstance(s, tuple):
+			for x in s:
+				assert isinstance(x, str)
+		else:
+			assert isinstance(s, str)
+
+		self._supplier = s
+		self.df['supplier'] = [s] * len(self)
 
 	@property
 	def smiles(self):
@@ -843,11 +867,12 @@ class IngredientSet:
 	### METHODS
 
 	def get_price(self, supplier=None):
+
+		from .price import Price
+
 		pairs = { i:q for i,q in enumerate(self.df['quote_id'])}
 
 		quote_ids = [q for q in pairs.values() if q is not None and not isnan(q)]
-
-		# print(quote_ids)
 
 		if quote_ids:
 
@@ -858,30 +883,32 @@ class IngredientSet:
 			else:
 				result = self.db.select_where(query='quote_price, quote_currency', table='quote', key=f'quote_id in {quote_id_str}', multiple=True)
 
-			prices = [a for a,b in result]
-			quoted = sum(prices)
+			prices = [Price(a,b) for a,b in result]
+			quoted = sum(prices, Price.null())
 			
-			currencies = list(set([b for a,b in result]))
-			assert len(currencies) == 1
-
-			currency = currencies[0]
-
 		else:
 
-			quoted = 0
-			currency = None
+			quoted = Price.null()
 
-		unquoted = [i for i,q in pairs.items() if q is None]
-		unquoted = [self[i].price for i in unquoted]
+		unquoted = [i for i,q in pairs.items() if q is None or isnan(q)]
 
-		# logger.warning(f"{len([p for p in unquoted if p is None])} ingredients don't have a price")
-
-		return (quoted + sum([p for p in unquoted if p]), currency)
+		unquoted_price = Price.null()
+		for i in unquoted:
+			ingredient = self[i]
+			p = ingredient.price
+			unquoted_price += p
+			
+			quote = ingredient.quote
+			self.df.loc[i, 'quote_id'] = quote.id
+			assert quote.amount
+			self.df.loc[i, 'quoted_amount'] = quote.amount
+		
+		return quoted + unquoted_price
 
 	def interactive(self, **kwargs):
 		return self.compounds.interactive(**kwargs)
 
-	def add(self, ingredient=None, *, compound_id=None, amount=None, quote_id=None, supplier=None, max_lead_time=None, debug=False):
+	def add(self, ingredient=None, *, compound_id=None, amount=None, quote_id=None, supplier=None, max_lead_time=None, quoted_amount=None, debug=False):
 
 		from pandas import DataFrame, concat
 
@@ -890,23 +917,29 @@ class IngredientSet:
 			compound_id = ingredient.compound_id
 			amount = ingredient.amount
 
-			if ingredient.quote and not ingredient.quote_id:
+			if (q := ingredient.quote) and not ingredient.quote_id:
 				logger.warning(f'Losing quote! {ingredient.quote=}')
-
-			quote_id = ingredient.quote_id
 			
 			supplier = ingredient.supplier
 			max_lead_time = ingredient.max_lead_time
+
+			quote_id = q.id
+			quoted_amount = q.amount
 			
 		else:
 			assert compound_id
 			assert amount
 
-		if self.supplier:
-			assert supplier == self.supplier
+		if quote_id:
+			assert quoted_amount
+
+		# if self.supplier:
+			# assert supplier == self.supplier, f'current: {self.supplier=}, adding: {supplier=}'
+
+		supplier = self.supplier
 
 		if self._data.empty:
-			addition = DataFrame([dict(compound_id=compound_id, amount=amount, quote_id=quote_id, supplier=supplier, max_lead_time=max_lead_time)])
+			addition = DataFrame([dict(compound_id=compound_id, amount=amount, quote_id=quote_id, supplier=supplier, max_lead_time=max_lead_time)], dtype=object)
 			self._data = addition
 			# self._data = self._data.replace({nan: None})
 
@@ -915,7 +948,11 @@ class IngredientSet:
 			if compound_id in self._data['compound_id'].values:
 				index = self._data.index[self._data['compound_id'] == compound_id].tolist()[0]
 				self._data.loc[index, 'amount'] += amount
-				self._data.loc[index, 'quote_id'] = None
+
+				# discard if the quote is no longer valid
+				if (a := self.df.loc[index, 'quoted_amount']) and a < self.df.loc[index, 'amount']:
+					self._data.loc[index, 'quote_id'] = None
+					self._data.loc[index, 'quoted_amount'] = None
 
 				if debug and supplier:
 					logger.debug('Adding to existing ingredient')
@@ -924,7 +961,12 @@ class IngredientSet:
 
 			else:
 				# from numpy import nan
-				addition = DataFrame([dict(compound_id=compound_id, amount=amount, quote_id=quote_id, supplier=supplier, max_lead_time=max_lead_time)])
+				addition = DataFrame([dict(compound_id=compound_id, amount=amount, quote_id=quote_id, supplier=supplier, max_lead_time=max_lead_time, quoted_amount=quoted_amount)], dtype=object)
+				# print(self._data)
+				# print(addition)
+				# print(self._data.dtypes)
+				# print(addition.dtypes)
+
 				self._data = concat([self._data, addition], ignore_index=True, join='inner')
 				# self._data = self._data.replace({nan: None})
 
@@ -932,11 +974,17 @@ class IngredientSet:
 					logger.out(addition)
 
 	def get_ingredient(self, series):
+		
+		q_id = series['quote_id']
+
+		if isinstance(q_id, float) and isnan(q_id):
+			q_id = None
+
 		return Ingredient(
 			db=self._db,
 			compound=series['compound_id'],
 			amount=series['amount'],
-			quote=series['quote_id'],
+			quote=q_id,
 			supplier=series['supplier'],
 			max_lead_time=series['max_lead_time'],
 		)

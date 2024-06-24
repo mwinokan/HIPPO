@@ -3,8 +3,11 @@ from dataclasses import dataclass, field
 
 from .compound import Ingredient
 
+import mcol
+
 import logging
 logger = logging.getLogger('HIPPO')
+
 
 # @dataclass
 class Recipe:
@@ -437,7 +440,7 @@ class Recipe:
 		return self
 
 	@classmethod
-	def from_json(cls, db, path, debug=True, allow_db_mismatch=False):
+	def from_json(cls, db, path, debug=True, allow_db_mismatch=False, clear_quotes=False):
 
 		# imports
 		import json
@@ -464,6 +467,10 @@ class Recipe:
 		products = IngredientSet.from_ingredient_dicts(db, data["products"])
 		intermediates = IngredientSet.from_ingredient_dicts(db, data["intermediates"])
 		reactants = IngredientSet.from_ingredient_dicts(db, data["reactants"], supplier=data["reactant_supplier"])
+
+		if clear_quotes:
+			reactants.df['quote_id'] = None
+			reactants.df['quoted_amount'] = None
 
 		# ReactionSet
 		reactions = ReactionSet(db, data["reaction_ids"], sort=False)
@@ -527,10 +534,6 @@ class Recipe:
 	@reactions.setter
 	def reactions(self, a):
 		self._reactions = a
-
-	# @property
-	# def quotes(self):
-		# return self.get_quotes()
 
 	@property
 	def price(self):
@@ -729,16 +732,15 @@ class Recipe:
 
 		fig.update_layout(title=title)
 
-
-# link = dict(
-#       source = [0, 1, 0, 2, 3, 3], # indices correspond to labels, eg A1, A2, A2, B1, ...
-#       target = [2, 3, 3, 4, 4, 5],
-#       value = [8, 4, 2, 8, 4, 2],
-#       customdata = ["q","r","s","t","u","v"],
-#       hovertemplate='Link from node %{source.customdata}<br />'+
-#         'to node%{target.customdata}<br />has value %{value}'+
-#         '<br />and data %{customdata}<extra></extra>',
-#   )
+		# link = dict(
+		#       source = [0, 1, 0, 2, 3, 3], # indices correspond to labels, eg A1, A2, A2, B1, ...
+		#       target = [2, 3, 3, 4, 4, 5],
+		#       value = [8, 4, 2, 8, 4, 2],
+		#       customdata = ["q","r","s","t","u","v"],
+		#       hovertemplate='Link from node %{source.customdata}<br />'+
+		#         'to node%{target.customdata}<br />has value %{value}'+
+		#         '<br />and data %{customdata}<extra></extra>',
+		#   )
 
 		return fig
 
@@ -785,16 +787,6 @@ class Recipe:
 
 	def add_to_all_reactants(self, amount=20):
 		self.reactants.df['amount'] += amount
-
-	# def get_quotes(self, df=False):
-
-	# 	quotes = [quote for i in self.reactants if (quote := i.quote)]
-
-	# 	if df:
-	# 		from pandas import DataFrame
-	# 		return DataFrame([q.dict for q in quotes])
-
-	# 	return quotes
 
 	def write_json(self, file, *, indent=4, **kwargs):
 		"""Serialise this recipe object and write it to disk"""
@@ -953,14 +945,6 @@ class Recipe:
 			# supplier=self.supplier
 		)
 
-	# def get_reactant_reactions(self, reactant):
-	# 	"""Get reactions that a reactant is involved in"""
-	# 	return [r for r in self.reactions if reactant in r.reactants]
-
-	# def get_reactant_reaction_string(self, reactant):
-	# 	reactions = self.get_reactant_reactions(reactant)
-	# 	return ' '.join([str(r) for r in reactions])
-
 	### DUNDERS
 
 	def __repr__(self):
@@ -976,3 +960,88 @@ class Recipe:
 		return result
 
 
+class Route(Recipe):
+
+	"""A recipe with a single product, that is stored in the database"""
+
+	def __init__(self, db, *, route_id, product, reactants, intermediates, reactions):
+
+		from .cset import IngredientSet
+		from .rset import ReactionSet
+		
+		# check typing
+		assert isinstance(product, IngredientSet)
+		assert isinstance(reactants, IngredientSet)
+		assert isinstance(intermediates, IngredientSet)
+		assert isinstance(reactions, ReactionSet)
+
+		assert len(product) == 1
+		assert isinstance(route_id, int)
+		assert route_id
+		
+		self._id = route_id
+		self._products = product
+		self._product_id = product.ids[0]
+		self._reactants = reactants
+		self._intermediates = intermediates
+		self._reactions = reactions
+		self._db = db
+
+	@property
+	def product(self):
+		return self._products[0]
+
+	@property
+	def product_compound(self):
+		return self.product.compound
+
+	@property
+	def id(self):
+		return self._id
+
+	def __repr__(self):
+		return f'{mcol.bold}{mcol.underline}Route #{self.id}: {repr(self.product_compound)}'#' {self.reactants} --> {self.intermediates} --> {self.product_compound} via {self.reactions})'
+		# return f'Recipe()'
+
+class RouteSet:
+
+	def __init__(self, db, routes):
+
+		data = {}
+		for route in routes:
+			assert isinstance(route, Route)
+			data[route.id] = route
+
+		self._data = data
+		self._db = db
+
+	@property
+	def data(self):
+		return self._data
+
+	@property
+	def db(self):
+		return self._db
+
+	@property
+	def routes(self):
+		return self.data.values()
+	
+	def copy(self):
+		return RouteSet(self.db, self.data.values())
+
+
+	def __len__(self):
+		return len(self.data)
+
+	def pop_id(self):
+
+		route_id, route = self.data.popitem()
+
+		return route_id
+
+	def pop(self):
+
+		route_id, route = self.data.popitem()
+
+		return route

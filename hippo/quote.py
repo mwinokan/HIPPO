@@ -2,6 +2,8 @@
 import mcol
 # from dataclasses import dataclass, field, asdict
 
+from .price import Price
+
 import logging
 logger = logging.getLogger('HIPPO')
 
@@ -33,6 +35,8 @@ class Quote:
 		type: str | None = None,
 	):
 
+		price = Price(price, currency)
+
 		self._db = db
 		self._id = id
 		self._compound = compound
@@ -42,7 +46,7 @@ class Quote:
 		self._entry = entry
 		self._amount = amount
 		self._price = price
-		self._currency = currency
+		# self._currency = currency
 		self._purity = purity
 		self._lead_time = lead_time
 		self._date = date
@@ -138,7 +142,7 @@ class Quote:
 
 	@property
 	def currency(self):
-		return self._currency
+		return self.price.currency
 
 	@property
 	def purity(self):
@@ -167,7 +171,7 @@ class Quote:
 			entry=self.entry,
 			amount=self.amount,
 			price=self.price,
-			currency=self.currency,
+			# currency=self.currency,
 			purity=self.purity,
 			lead_time=self.lead_time,
 			date=self.date,
@@ -176,7 +180,7 @@ class Quote:
 
 	@property
 	def currency_symbol(self):
-		return {'USD':'$', 'EUR':'€', 'GBP':'£'}[self.currency]
+		return self.price.symbol
 	
 	### METHODS
 
@@ -193,6 +197,6 @@ class Quote:
 			return f'{mcol.bold}{mcol.underline}C{self.compound} In Stock: {self.amount:}mg{purity}{mcol.unbold}{mcol.ununderline}'
 
 		if self.type:
-			return f'{mcol.bold}{mcol.underline}C{self.compound} {self.entry_str} {self.amount:}mg{purity} = {self.price:} {self.currency} ({self.lead_time} days) {self.smiles} [{self.type}]{mcol.unbold}{mcol.ununderline}'
+			return f'{mcol.bold}{mcol.underline}C{self.compound} {self.entry_str} {self.amount:}mg{purity} = {self.price:} ({self.lead_time} days) {self.smiles} [{self.type}]{mcol.unbold}{mcol.ununderline}'
 		else:
-			return f'{mcol.bold}{mcol.underline}C{self.compound} {self.entry_str} {self.amount:}mg{purity} = {self.price:} {self.currency} ({self.lead_time} days) {self.smiles}{mcol.unbold}{mcol.ununderline}'
+			return f'{mcol.bold}{mcol.underline}C{self.compound} {self.entry_str} {self.amount:}mg{purity} = {self.price:} ({self.lead_time} days) {self.smiles}{mcol.unbold}{mcol.ununderline}'

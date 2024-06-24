@@ -36,7 +36,7 @@ class RandomRecipeGenerator:
 		# 	case Recipe():
 		# 		logger.debug('Starting with provided Recipe')
 		# 		recipe = start_with.copy()
-		# 		logger.var('starting price', recipe.price[0], dict(unit=recipe.price[1]))
+		# 		logger.var('starting price', recipe.price[0])
 		# 	case CompoundSet():
 		# 		logger.debug('Starting with provided CompoundSet')
 		# 		raise NotImplementedError
@@ -66,7 +66,7 @@ class RandomRecipeGenerator:
 
 		logger.debug('Solving route pool...')
 		self._route_pool = self.get_route_pool()
-		
+
 	### FACTORIES
 
 	### PROPERTIES
@@ -142,33 +142,47 @@ class RandomRecipeGenerator:
 	def get_route_pool(self):
 
 		# logger.debug("Fetching route ID's from database...")
-		pairs = self.db.select_where(table='route', query='route_id, route_product', key=f'route_product IN {self.product_pool.str_ids}', multiple=True)
+		route_ids = self.db.select_where(table='route', query='route_id', key=f'route_product IN {self.product_pool.str_ids}', multiple=True)
 
-		route_pool = {}
-		for route_id, route_product in pairs:
-			if route_product not in route_pool:
-				route_pool[route_product] = []
-			# else:
+		# routes = []
+		# for route_id, in tqdm(route_ids):
+		# 	route = self.db.get_route(id=route_id)
+		# 	routes.append(route)
 
-			route_pool[route_product].append(route_id)
+		routes = [self.db.get_route(id=route_id) for route_id, in tqdm(route_ids)]
 
-		logger.debug("Constructing Recipe objects...")
-		for route_product_id, route_ids in tqdm(route_pool.items()):
+		from .recipe import RouteSet
+		return RouteSet(self.db, routes)
 
-			recipes = []
+		# route_pool = {}
+		# for route_id, route_product in pairs:
+		# 	if route_product not in route_pool:
+		# 		route_pool[route_product] = []
+		# 	# else:
+
+		# 	route_pool[route_product].append(route_id)
+
+		# logger.debug("Constructing Route objects...")
+		# for route_product_id, route_ids in tqdm(route_pool.items()):
+
+		# 	recipes = []
 			
-			if len(route_ids) > 1:
-				logger.warning(f'{route_product_id} has multiple routes!')
+		# 	# if len(route_ids) > 1:
+		# 		# logger.warning(f'{route_product_id} has multiple routes!')
 
-			for route_id in route_ids:
+		# 	for route_id in route_ids:
 
-				recipe = self.db.get_route(id=route_id)
+		# 		recipe = self.db.get_route(id=route_id)
 
-				recipes.append(recipe)
+		# 		recipes.append(recipe)
 
-			route_pool[route_product_id] = recipe
+		# 	route_pool[route_product_id] = recipes
 
-		return route_pool
+		# if flatten:
+		# 	from itertools import chain
+		# 	route_pool = list(chain.from_iterable(route_pool.values()))
+
+		# return route_pool
 
 	# def generate_subrecipes(self):
 
@@ -205,79 +219,104 @@ class RandomRecipeGenerator:
 
 	def generate(self, 
 		budget: float = 10000,
-		# currency: str = 'EUR', 
+		currency: str = 'EUR', 
 		max_products = 1000,
 		max_reactions = 1000,
 		debug=True, 
-		maxiter=150, 
-		pick_inner_cheapest=True, 
-		add_size=1,
+		max_iter=150, 
+		# pick_inner_cheapest=True, 
+		# add_size=1,
 		shuffle=True,
 	):
 
-		assert pick_inner_cheapest
-		assert add_size == 1
-		assert len(self.suppliers) == 1
+		from .price import Price
 
-		supplier = self.suppliers[0]
+		budget = Price(budget, currency)
+
+		# logger.warning('Something went wrong')
+
+		# raise NotImplementedError
+
+
+		# assert pick_inner_cheapest
+		# assert add_size == 1
+		
+		# assert len(self.suppliers) == 1
+
+		# supplier = self.suppliers[0]
 
 		recipe = self.starting_recipe.copy()
 
+		recipe.reactants._supplier = self.suppliers
+
+		pool = self.route_pool.copy()
+
+		# return pool
+
+		# pool = list(chain.from_iterable(pool.values()))
+
 		if shuffle:
-			print('shuffling')
-			pool = self.product_pool.shuffled()
-		else:
-			pool = self.product_pool
+			from random import shuffle
+			logger.debug('Shuffling Route pool')
+			shuffle(pool)
+
+		logger.var('route pool', len(pool))
 
 		# randomly add products until budget exceeded
-		for i in tqdm(range(maxiter), total=maxiter):
-			# if debug: logger.title(f'Iteration {i}')
-			# if debug: logger.var('price', recipe.price[0], dict(unit=recipe.price[1]))
-
-			c_id = pool.pop_id()
-			candidates = CompoundSet(self.db, [c_id])
-
-			if debug: logger.var('candidates', candidates.ids)
-
-			candidate_recipe = candidates.get_recipes(
-				pick_cheapest=pick_inner_cheapest, 
-				supplier=supplier, 
-				unavailable_reaction='quiet',
-				reaction_checking_cache=self._reaction_checking_cache,
-				reaction_reactant_cache=self._reaction_reactant_cache,
-			)
-
-			# if debug: logger.var('candidate_recipe', candidate_recipe)
-			# if debug: logger.var('candidate_recipe.reactants', candidate_recipe.reactants.ids)
-
-			recipe += candidate_recipe
-
-			new_price = recipe.price
-
-			if debug: logger.var('new price', new_price[0], dict(unit=new_price[1]))
-
-			if not len(pool):
-				logger.info('Product pool depleted')
-				break
-
-			# check breaking conditions
-			if new_price[0] > budget:
-				logger.info('Budget exceeded, choosing new candidates')
-				recipe = old_recipe.copy()
-				continue
-
-			if len(recipe.reactions) > max_reactions:
-				logger.info('Max #reactions exceeded, choosing new candidates')
-				recipe = old_recipe.copy()
-				continue
-
-			if len(recipe.products) > max_products:
-				logger.info('Max #products exceeded, choosing new candidates')
-				recipe = old_recipe.copy()
-				continue
+		with tqdm(total=max_iter) as pbar:
 			
-			# accept change
-			old_recipe = recipe.copy()
+			# for i in tqdm(range(max_iter), total=max_iter):
+			for i in range(max_iter):
+
+				if debug: logger.title(f'Iteration {i}')
+				price = recipe.price
+
+				pbar.update(i)
+				pbar.set_postfix(dict(price=str(price)))
+
+				if debug: logger.var('price', price)
+
+				# pop a route
+				candidate_route = pool.pop()
+
+				if debug: logger.var('candidate_route', candidate_route)
+				if debug: logger.var('candidate_route.reactants', candidate_route.reactants.ids)
+
+				# add the route to the recipe
+				if debug: logger.var('#recipe.reactants', len(recipe.reactants))
+				recipe += candidate_route
+				if debug: logger.var('#recipe.reactants', len(recipe.reactants))
+				
+				# calculate the new price
+				new_price = price
+
+				if debug: logger.var('new price', new_price)
+
+				if not len(pool):
+					logger.info('Product pool depleted')
+					break
+
+				# check breaking conditions
+				if new_price > budget:
+					logger.info('Budget exceeded, choosing new candidates')
+					recipe = old_recipe.copy()
+					continue
+
+				if len(recipe.reactions) > max_reactions:
+					logger.info('Max #reactions exceeded, choosing new candidates')
+					recipe = old_recipe.copy()
+					continue
+
+				if len(recipe.products) > max_products:
+					logger.info('Max #products exceeded, choosing new candidates')
+					recipe = old_recipe.copy()
+					continue
+				
+				# accept change
+				old_recipe = recipe.copy()
+
+				pbar.update(i)
+				pbar.set_postfix(dict(price=str(price)))
 
 		return recipe
 
