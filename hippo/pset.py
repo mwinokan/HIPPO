@@ -875,3 +875,13 @@ class PoseSet:
 			case _:
 				raise NotImplementedError
 
+
+
+	def __add__(self, other):
+
+		assert isinstance(other, PoseSet)
+
+		print(self.ids)
+		print(other.ids)
+
+		return PoseSet(self.db, self.ids + other.ids, sort=False)
