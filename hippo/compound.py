@@ -91,9 +91,7 @@ class Compound:
 	@alias.setter
 	def alias(self, alias: str) -> None:
 		"""Set the compound's alias"""
-		assert isinstance(alias, str)
-		self._alias = alias
-		self.db.update(table='compound', id=self.id, key='compound_alias', value=alias, commit=commit)
+		self.set_alias(alias)
 	
 	@property
 	def mol(self) -> Chem.Mol:
@@ -465,6 +463,11 @@ class Compound:
 			base = base.id
 		self._base_id = base
 		self.db.update(table='compound', id=self.id, key='compound_base', value=base, commit=commit)
+
+	def set_alias(self, alias, commit=True):
+		assert isinstance(alias, str)
+		self._alias = alias
+		self.db.update(table='compound', id=self.id, key='compound_alias', value=alias, commit=commit)
 
 	def as_ingredient(self, amount, max_lead_time=None, supplier=None):
 		"""Convert this compound into an Ingredient object"""
