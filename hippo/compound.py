@@ -341,8 +341,10 @@ class Compound:
 
 		if not supplier:
 			quote_ids = self.db.select_where(query='quote_id', table='quote', key='compound', value=self.id, multiple=True, none=none)
-		else:
+		elif isinstance(supplier, str):
 			quote_ids = self.db.select_where(query='quote_id', table='quote', key=f'quote_compound = {self.id} AND quote_supplier = "{supplier}"', multiple=True, none=none)
+		else:
+			quote_ids = self.db.select_where(query='quote_id', table='quote', key=f'quote_compound = {self.id} AND quote_supplier IN {str(tuple(supplier)).replace(",)",")")}' , multiple=True, none=none)
 
 		if quote_ids:
 			quotes = [self.db.get_quote(id=q[0]) for q in quote_ids]
@@ -761,13 +763,20 @@ class Ingredient:
 				self._quote = self.db.get_quote(id=self.quote_id)
 			
 			else:
-				self._quote = self.compound.get_quotes(
+				# logger.debug(f'Getting quotes for {self}')
+				q = self.compound.get_quotes(
 					pick_cheapest=True, 
 					min_amount=self.amount, 
 					max_lead_time=self.max_lead_time, 
 					supplier=self.supplier,
-					none='quiet',
+					none='error',
 				)
+
+				if not q:
+					return None
+					
+				self._quote = q
+				self._quote_id = q.id
 
 		return self._quote
 
