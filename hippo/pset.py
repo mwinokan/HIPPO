@@ -260,7 +260,7 @@ class PoseSet:
 	def compounds(self):
 		"""Get the compounds associated to this set of poses"""
 		from .cset import CompoundSet
-		ids = self.db.select_where(table='pose', query='DISTINCT pose_compound', key=f'pose_id in {tuple(self.ids)}', multiple=True)
+		ids = self.db.select_where(table='pose', query='DISTINCT pose_compound', key=f'pose_id in {self.str_ids}', multiple=True)
 		ids = [v for v, in ids]
 		return CompoundSet(self.db, ids)
 
@@ -329,6 +329,22 @@ class PoseSet:
 		query = f'pose_id, MIN(pose_distance_score)'
 		query = self.db.select_where(table='pose', query=query, key=f'pose_id in {self.str_ids}', multiple=False)
 		return query[0]
+
+	@property
+	def fingerprint(self):
+		"""Combined fingerprint of all member poses"""
+
+		import pickle
+		import collections, functools, operator
+
+		fps = self.db.select_where(query='pose_fingerprint', table='pose', key=f'pose_id IN {self.str_ids}', multiple=True)
+
+		fps = [pickle.loads(s) for s, in fps] 
+ 
+		# sum the values with same keys
+		combined = dict(functools.reduce(operator.add, map(collections.Counter, fps)))
+
+		return combined	
 
 	### FILTERING
 
@@ -486,12 +502,12 @@ class PoseSet:
 
 	### EXPORTING
 
-	def write_sdf(self, out_path, name_col='name'):
+	def write_sdf(self, out_path, name_col='name', inspirations='fragalysis'):
 		"""Write an SDF"""
 
 		from pathlib import Path
 
-		df = self.get_df(mol=True, inspirations='fragalysis')
+		df = self.get_df(mol=True, inspirations=inspirations)
 
 		df.rename(inplace=True, columns={name_col:'_Name', 'mol':'ROMol'})
 
@@ -880,8 +896,4 @@ class PoseSet:
 	def __add__(self, other):
 
 		assert isinstance(other, PoseSet)
-
-		print(self.ids)
-		print(other.ids)
-
 		return PoseSet(self.db, self.ids + other.ids, sort=False)
