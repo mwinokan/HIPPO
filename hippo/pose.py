@@ -579,9 +579,11 @@ class Pose:
 				logger.warning(f'Feature {repr(prot_feature)}')
 				continue
 
-			prot_atoms = [prot_residue.get_atom(a).np_pos for a in prot_feature.atom_names.split(' ')]
+			prot_atoms = [prot_residue.get_atom(a) for a in prot_feature.atom_names.split(' ')]
 			
-			prot_coord = np.array(np.sum(prot_atoms,axis=0)/len(prot_atoms))
+			prot_coords = [a.np_pos for a in prot_atoms if a is not None]
+			
+			prot_coord = np.array(np.sum(prot_coords,axis=0)/len(prot_atoms))
 
 			complementary_family = COMPLEMENTARY_FEATURES[prot_family]
 

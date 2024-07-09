@@ -32,3 +32,8 @@ class Feature:
 	def res_name_number_str(self):
 		"""Return a string representation of the feature"""
 		return f'{self.residue_name} {self.residue_number}'
+
+	@property
+	def res_name_number_family_str(self):
+		return f'{self.residue_name} {self.residue_number} {self.family}'
+	
