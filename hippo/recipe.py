@@ -1030,6 +1030,15 @@ class RouteSet:
 	def copy(self):
 		return RouteSet(self.db, self.data.values())
 
+	def set_db_pointers(self, db):
+		self._db = db
+		for route in self.data.values():
+			route._db = db
+
+	def clear_db_pointers(self):
+		self._db = None
+		for route in self.data.values():
+			route._db = None
 
 	def __len__(self):
 		return len(self.data)

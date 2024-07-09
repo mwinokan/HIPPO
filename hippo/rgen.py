@@ -4,6 +4,9 @@ from .cset import CompoundSet, IngredientSet
 
 from tqdm import tqdm
 
+from pathlib import Path
+import pickle
+
 import logging
 logger = logging.getLogger('HIPPO')
 
@@ -19,6 +22,9 @@ class RandomRecipeGenerator:
 		logger.debug('RandomRecipeGenerator.__init__()')
 
 		self._db = db
+
+		self._pickle_path = Path(str(self.db.path).replace('.sqlite','_rgen.pickle'))
+
 		# self._budget = budget
 		self._max_lead_time = max_lead_time
 		self._suppliers = suppliers
@@ -31,24 +37,6 @@ class RandomRecipeGenerator:
 		# logger.var('budget', budget)
 		logger.var('max_lead_time', max_lead_time)
 		logger.var('suppliers', suppliers)
-
-		# match start_with:
-		# 	case Recipe():
-		# 		logger.debug('Starting with provided Recipe')
-		# 		recipe = start_with.copy()
-		# 		logger.var('starting price', recipe.price[0])
-		# 	case CompoundSet():
-		# 		logger.debug('Starting with provided CompoundSet')
-		# 		raise NotImplementedError
-		# 	case IngredientSet():
-		# 		logger.debug('Starting with provided IngredientSet')
-		# 		raise NotImplementedError
-		# 	case None:
-		# 		logger.debug('Starting with empty Recipe')
-		# 		raise NotImplementedError
-		# 	case _:
-		# 		logger.error(f'Unrecognised {type(start_with)=}. Restart kernel?')
-		# 		raise TypeError
 
 		self._starting_recipe = start_with
 
@@ -64,8 +52,18 @@ class RandomRecipeGenerator:
 		
 		logger.var('product_pool', self.product_pool)
 
-		logger.debug('Solving route pool...')
-		self._route_pool = self.get_route_pool()
+		if self.pickle_path.exists():
+
+			logger.debug('Gettng route pool from file...')
+
+			self.load_pickle()
+
+		else:
+
+			logger.debug('Solving route pool...')
+			self._route_pool = self.get_route_pool()
+
+			self.dump_pickle()
 
 	### FACTORIES
 
@@ -103,7 +101,10 @@ class RandomRecipeGenerator:
 	def route_pool(self):
 		return self._route_pool
 		
-	
+	@property
+	def pickle_path(self):
+		return self._pickle_path
+
 	### METHODS
 
 	def get_reactant_pool(self):
@@ -183,6 +184,21 @@ class RandomRecipeGenerator:
 		# 	route_pool = list(chain.from_iterable(route_pool.values()))
 
 		# return route_pool
+
+	def dump_pickle(self):
+		logger.debug('Clearing route_pool database pointers... ')
+		self.route_pool.clear_db_pointers()
+		logger.writing(self.pickle_path)
+		pickle.dump(self.route_pool, open(self.pickle_path, 'wb'))
+		self.route_pool.clear_db_pointers()
+		logger.debug('Reinstating route_pool database pointers... ')
+		self.route_pool.set_db_pointers(self.db)
+
+	def load_pickle(self):
+		logger.reading(self.pickle_path)
+		self._route_pool = pickle.load(open(self.pickle_path, 'rb'))
+		logger.debug('Reinstating route_pool database pointers... ')
+		self.route_pool.set_db_pointers(self.db)
 
 	# def generate_subrecipes(self):
 

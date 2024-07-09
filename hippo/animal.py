@@ -1075,6 +1075,7 @@ class HIPPO:
 			ingredients.add(
 				compound_id=compound.id,
 				amount=row[amount_col],
+				quoted_amount=row[amount_col],
 				quote_id=q_id,
 				supplier='Enamine',
 				max_lead_time=None,
@@ -1194,6 +1195,7 @@ class HIPPO:
 		return_duplicate: bool = False,
 		register_base_if_duplicate: bool = True,
 		radical: str = 'warning',
+		debug: bool = False,
 	) -> Compound:
 
 		"""Use a smiles string to add a compound to the database. If it already exists return the compound"""
@@ -1202,7 +1204,7 @@ class HIPPO:
 		assert isinstance(smiles, str), f'Non-string {smiles=}'
 		
 		try:
-			smiles = sanitise_smiles(smiles, sanitisation_failed='error', radical=radical)
+			smiles = sanitise_smiles(smiles, sanitisation_failed='error', radical=radical, verbosity=debug)
 		except SanitisationError as e:
 			logger.error(f'Could not sanitise {smiles=}')
 			logger.error(str(e))
@@ -1215,6 +1217,9 @@ class HIPPO:
 			base = base.id
 
 		inchikey = inchikey_from_smiles(smiles)
+
+		if debug:
+			logger.var('inchikey', inchikey)
 
 		compound_id = self.db.insert_compound(
 			smiles=smiles, base=base, inchikey=inchikey, tags=tags, 
@@ -1230,9 +1235,19 @@ class HIPPO:
 			else:
 				return compound
 
+		def check_smiles(compound_id, smiles):
+			assert compound_id
+			db_smiles = self.db.select_where(table='compound', query='compound_smiles', key='id', value=compound_id)
+			db_smiles, = db_smiles
+			if db_smiles != smiles:
+				logger.warning(f'SMILES changed during compound registration: {smiles} --> {db_smiles}')
+
 		if return_compound or metadata or alias or tags:
 			if not compound_id:
 				compound = self.compounds[inchikey]
+
+				check_smiles(compound.id, smiles)
+
 			else:
 				compound = self.compounds[compound_id]
 
@@ -1259,6 +1274,8 @@ class HIPPO:
 		else:
 			if not compound_id:
 				compound_id = self.db.get_compound_id(inchikey=inchikey)
+
+				check_smiles(compound_id, smiles)
 
 				if base and not (register_base_if_duplicate and duplicate):
 					self.db.update(table='compound', id=compound_id, key='compound_base', value=base, commit=commit)
