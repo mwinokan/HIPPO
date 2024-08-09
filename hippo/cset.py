@@ -256,12 +256,7 @@ class CompoundSet:
 		if not isinstance(indices, list):
 			indices = list(indices)
 
-		# print(indices)
-		# print([type(i) for i in indices])
-
 		indices = [int(i) for i in indices]
-
-		# assert all(isinstance(i, int) for i in indices), indices
 
 		if sort:
 			self._indices = sorted(list(set(indices)))
@@ -388,7 +383,7 @@ class CompoundSet:
 		all_reactants, all_reactions = self.db.get_unsolved_reaction_tree(product_ids=self.ids, debug=debug) 
 		return all_reactions
 
-	### OUTPUT
+	### CONSOLE / NOTEBOOK OUTPUT
 
 	def draw(self):
 		"""Draw a grid of all contained molecules"""
@@ -465,7 +460,7 @@ class CompoundSet:
 
 		out = interactive_output(widget, {'i': a, 'name': b, 'summary': c, 'draw':d, 'poses':e, 'reactions':f, 'metadata':g})
 
-		display(ui, out)
+		display(ui, out)		
 
 	### OTHER METHODS
 
@@ -558,6 +553,10 @@ class CompoundSet:
 		"""Get all member compounds that do not have a quote from given supplier"""
 		quoted = self.get_quoted(supplier=supplier)
 		return self - quoted
+
+	def get_dict(self):
+		"""Get a dictionary object with all serialisable data needed to reconstruct this set"""
+		return dict(db=str(self.db.path.resolve()), indices=self.indices)
 
 	def write_smiles_csv(self, file):
 		from pandas import DataFrame
@@ -781,6 +780,21 @@ class IngredientSet:
 		return self
 
 	@classmethod
+	def from_json(cls, db, path, supplier, data=None):
+
+		if not data:
+			import json
+			data = json.load(open(path,'rt'))
+
+		from pandas import DataFrame
+		df = DataFrame(columns=cls._columns, dtype=object)
+
+		for col in cls._columns:
+			df[col] = data[col]
+		
+		return cls.from_ingredient_df(db=db, df=df, supplier=supplier)
+
+	@classmethod
 	def from_ingredient_dicts(cls, db, dicts, supplier=None):
 		from pandas import DataFrame
 		df = DataFrame(dicts, dtype=object)
@@ -790,15 +804,19 @@ class IngredientSet:
 		return cls.from_ingredient_df(db=db, df=df, supplier=supplier)
 
 	@classmethod
-	def from_compounds(cls, compounds, amount=1):
+	def from_compounds(cls, compounds, ids=None, db=None, amount=1):
 
 		from pandas import DataFrame
 
-		ids = compounds.ids
+		if not ids:
+			ids = compounds.ids
+
+		if not db:
+			db = compounds.db
 
 		df = DataFrame(dict(compound_id=ids, amount=amount, quote_id=None, supplier=None, max_lead_time=None, quoted_amount=None), dtype=object)
 
-		return cls.from_ingredient_df(compounds.db, df)
+		return cls.from_ingredient_df(db, df)
 
 	### PROPERTIES
 
@@ -1020,6 +1038,10 @@ class IngredientSet:
 		for compound_id, quote_id in pairs:
 			match = self.df.index[self.df['compound_id'] == compound_id][0]
 			self.df.loc[match, 'quote_id'] = quote_id
+
+	def get_dict(self, data_orient='list'):
+		"""Get serialisable dictionary"""
+		return dict(db=str(self.db), supplier=self.supplier, data=self.df.to_dict(orient=data_orient))
 
 	### DUNDERS
 

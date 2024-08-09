@@ -5,7 +5,7 @@ from .cset import CompoundSet, IngredientSet
 from tqdm import tqdm
 
 from pathlib import Path
-import pickle
+import json
 
 import logging
 logger = logging.getLogger('HIPPO')
@@ -21,51 +21,90 @@ class RandomRecipeGenerator:
 
 		logger.debug('RandomRecipeGenerator.__init__()')
 
-		self._db = db
-
-		self._pickle_path = Path(str(self.db.path).replace('.sqlite','_rgen.pickle'))
-
-		# self._budget = budget
+		# Static parameters
+		self._db_path = db.path
 		self._max_lead_time = max_lead_time
 		self._suppliers = suppliers
-		self._max_reactions = max_reactions
+		self._starting_recipe = start_with
+
+		logger.var('database', self.db_path)
+		logger.var('max_lead_time', self.max_lead_time)
+		logger.var('suppliers', self.suppliers)
+
+		# Database set up
+		self._db = db
+
+		# JSON I/O set up
+		self._data_path = Path(str(self.db_path).replace('.sqlite','_rgen.json'))
+		if self.data_path.exists():
+			logger.warning(f'Will overwrite existing rgen data file: {self.data_path}')
 
 		# caches
 		self._reaction_checking_cache = {}
 		self._reaction_reactant_cache = {}
 
-		# logger.var('budget', budget)
-		logger.var('max_lead_time', max_lead_time)
-		logger.var('suppliers', suppliers)
-
-		self._starting_recipe = start_with
-
+		# Reactant pool
 		self._reactant_pool = self.get_reactant_pool()
-
 		logger.var('reactant_pool', self.reactant_pool)
 
+		# Product pool
 		logger.debug('Solving product pool...')
 		self._product_pool = self.get_product_pool()
 
+		# Remove starting recipe products
 		if start_with:
 			self._product_pool -= start_with.products.compounds
 		
 		logger.var('product_pool', self.product_pool)
 
-		if self.pickle_path.exists():
+		# Route pool
+		logger.debug('Solving route pool...')
+		self._route_pool = self.get_route_pool()
 
-			logger.debug('Gettng route pool from file...')
-
-			self.load_pickle()
-
-		else:
-
-			logger.debug('Solving route pool...')
-			self._route_pool = self.get_route_pool()
-
-			self.dump_pickle()
+		# dump data
+		self.dump_data()
 
 	### FACTORIES
+
+	@classmethod
+	def from_json(cls, db, path):
+
+		data = json.load(open(path, 'rt'))
+
+		self = cls.__new__(cls)
+
+		self._db_path = data['db_path']
+		self._max_lead_time = data['max_lead_time']
+		self._suppliers = data['suppliers']
+
+		self._starting_recipe = Recipe.from_json(db=db, path=None, data=data['starting_recipe'])
+
+		logger.var('database', self.db_path)
+		logger.var('max_lead_time', self.max_lead_time)
+		logger.var('suppliers', self.suppliers)
+
+		self._db = db
+
+		# JSON I/O set up
+		self._data_path = Path(path)
+
+		# caches
+		self._reaction_checking_cache = {}
+		self._reaction_reactant_cache = {}
+
+		# Reactant pool
+		self._reactant_pool = CompoundSet(db=db, indices=data['reactant_pool']['indices'], sort=False)
+		logger.var('reactant_pool', self.reactant_pool)
+		
+		# Product pool
+		self._product_pool = CompoundSet(db=db, indices=data['product_pool']['indices'], sort=False)
+		logger.var('product_pool', self.product_pool)
+				
+		# Route pool
+		from .recipe import RouteSet
+		self._route_pool = RouteSet.from_json(path=None, data=data['route_pool'], db=db)
+		
+		return self
 
 	### PROPERTIES
 
@@ -76,6 +115,10 @@ class RandomRecipeGenerator:
 	@property
 	def db(self):
 		return self._db
+
+	@property
+	def db_path(self):
+		return self._db_path
 
 	@property
 	def suppliers_str(self):
@@ -102,10 +145,10 @@ class RandomRecipeGenerator:
 		return self._route_pool
 		
 	@property
-	def pickle_path(self):
-		return self._pickle_path
+	def data_path(self):
+		return self._data_path
 
-	### METHODS
+	### POOL METHODS
 
 	def get_reactant_pool(self):
 		"""Get all purchaseable reactants with acceptable supplier and leadtime"""
@@ -137,101 +180,54 @@ class RandomRecipeGenerator:
 	def get_product_pool(self):
 		"""Get all quoted products that can be made with the reactant pool"""
 		reactants = self.get_reactant_pool()
-		products = Recipe.from_reactants(reactants=reactants, debug=False)
+		products = Recipe.from_reactants(reactants=reactants, debug=False, return_products=True)
 		return products
 
-	def get_route_pool(self):
+	def get_route_pool(self, mini_test=False):
 
-		# logger.debug("Fetching route ID's from database...")
 		route_ids = self.db.select_where(table='route', query='route_id', key=f'route_product IN {self.product_pool.str_ids}', multiple=True)
 
-		# routes = []
-		# for route_id, in tqdm(route_ids):
-		# 	route = self.db.get_route(id=route_id)
-		# 	routes.append(route)
+		if mini_test:
+			route_ids = route_ids[:100]
 
 		routes = [self.db.get_route(id=route_id) for route_id, in tqdm(route_ids)]
 
 		from .recipe import RouteSet
 		return RouteSet(self.db, routes)
 
-		# route_pool = {}
-		# for route_id, route_product in pairs:
-		# 	if route_product not in route_pool:
-		# 		route_pool[route_product] = []
-		# 	# else:
+	### FILE I/O METHODS
 
-		# 	route_pool[route_product].append(route_id)
+	def dump_data(self):
 
-		# logger.debug("Constructing Route objects...")
-		# for route_product_id, route_ids in tqdm(route_pool.items()):
+		data = {}
 
-		# 	recipes = []
-			
-		# 	# if len(route_ids) > 1:
-		# 		# logger.warning(f'{route_product_id} has multiple routes!')
+		data['db_path'] = str(self.db_path.resolve())
+		data['max_lead_time'] = self.max_lead_time
+		data['suppliers'] = self.suppliers
+		# data['max_reactions'] = self.max_reactions
+		data['starting_recipe'] = self.starting_recipe.get_dict(serialise_price=True)
 
-		# 	for route_id in route_ids:
+		data['reactant_pool'] = self.reactant_pool.get_dict()
+		data['product_pool'] = self.product_pool.get_dict()
+		data['route_pool'] = self.route_pool.get_dict()
 
-		# 		recipe = self.db.get_route(id=route_id)
+		logger.writing(self.data_path)
+		json.dump(data, open(self.data_path, 'wt'), indent=4)
 
-		# 		recipes.append(recipe)
+		# logger.debug('Clearing route_pool database pointers... ')
+		# self.route_pool.clear_db_pointers()
+		# logger.writing(self.data_path)
+		# pickle.dump(self.route_pool, open(self.data_path, 'wb'))
+		# self.route_pool.clear_db_pointers()
+		# logger.debug('Reinstating route_pool database pointers... ')
+		# self.route_pool.set_db_pointers(self.db)
 
-		# 	route_pool[route_product_id] = recipes
-
-		# if flatten:
-		# 	from itertools import chain
-		# 	route_pool = list(chain.from_iterable(route_pool.values()))
-
-		# return route_pool
-
-	def dump_pickle(self):
-		logger.debug('Clearing route_pool database pointers... ')
-		self.route_pool.clear_db_pointers()
-		logger.writing(self.pickle_path)
-		pickle.dump(self.route_pool, open(self.pickle_path, 'wb'))
-		self.route_pool.clear_db_pointers()
-		logger.debug('Reinstating route_pool database pointers... ')
-		self.route_pool.set_db_pointers(self.db)
-
-	def load_pickle(self):
-		logger.reading(self.pickle_path)
-		self._route_pool = pickle.load(open(self.pickle_path, 'rb'))
-		logger.debug('Reinstating route_pool database pointers... ')
-		self.route_pool.set_db_pointers(self.db)
-
-	# def generate_subrecipes(self):
-
-	# 	from .cset import CompoundSet
-	# 	import json
-
-	# 	for compound in self.product_pool:
-
-	# 		recipes = CompoundSet(self.db, [compound.id]).get_recipes(
-	# 			pick_cheapest=False, 
-	# 			warn_multiple_solutions=False,
-	# 		)
-
-	# 		for recipe in recipes:
-
-	# 			data = recipe.get_dict(
-	# 				price=False,
-	# 				reactant_supplier=False,
-	# 				database=False,
-	# 				timestamp=False,
-	# 				compound_ids_only=True,
-	# 				products=False,
-	# 			)
-
-	# 			return data
-
-	# 			str_payload = json.dumps(data)
-
-	# 			self.db.insert_recipe(product_id=compound.id, str_payload=str_payload, commit=False)
-
-	# 		break
-
-	# 	raise NotImplementedError
+	def load_data(self):
+		# logger.reading(self.data_path)
+		# self._route_pool = pickle.load(open(self.data_path, 'rb'))
+		# logger.debug('Reinstating route_pool database pointers... ')
+		# self.route_pool.set_db_pointers(self.db)
+		raise NotImplementedError
 
 	def generate(self, 
 		budget: float = 10000,
@@ -277,62 +273,84 @@ class RandomRecipeGenerator:
 			shuffle(pool)
 
 		logger.var('route pool', len(pool))
+		logger.var('max_iter', max_iter)
 
 		# randomly add products until budget exceeded
-		with tqdm(total=max_iter) as pbar:
+		pbar = tqdm()
+		# with tqdm() as pbar:
+		# with tqdm(total=max_iter) as pbar:
+		
+		# for i in tqdm(range(max_iter), total=max_iter):
+		for i in range(max_iter):
+
+			# logger.title(f'Iteration {i}')
 			
-			# for i in tqdm(range(max_iter), total=max_iter):
-			for i in range(max_iter):
+			if debug: logger.title(f'Iteration {i}')
+			
+			price = recipe.price
 
-				if debug: logger.title(f'Iteration {i}')
-				price = recipe.price
+			if debug: logger.var('price', price)
 
-				pbar.update(i)
-				pbar.set_postfix(dict(price=str(price)))
+			# pop a route
+			candidate_route = pool.pop()
 
-				if debug: logger.var('price', price)
+			if debug: logger.var('candidate_route', candidate_route)
+			if debug: logger.var('candidate_route.reactants', candidate_route.reactants.ids)
 
-				# pop a route
-				candidate_route = pool.pop()
+			# add the route to the recipe
+			if debug: logger.var('#recipe.reactants', len(recipe.reactants))
+			recipe += candidate_route
+			if debug: logger.var('#recipe.reactants', len(recipe.reactants))
+			
+			# calculate the new price
+			new_price = price
 
-				if debug: logger.var('candidate_route', candidate_route)
-				if debug: logger.var('candidate_route.reactants', candidate_route.reactants.ids)
+			if debug: logger.var('new price', new_price)
 
-				# add the route to the recipe
-				if debug: logger.var('#recipe.reactants', len(recipe.reactants))
-				recipe += candidate_route
-				if debug: logger.var('#recipe.reactants', len(recipe.reactants))
-				
-				# calculate the new price
-				new_price = price
+			if not len(pool):
+				logger.info('Product pool depleted')
+				break
 
-				if debug: logger.var('new price', new_price)
+			# check breaking conditions
+			if new_price > budget:
+				logger.info('Budget exceeded')
+				recipe = old_recipe.copy()
+				continue
 
-				if not len(pool):
-					logger.info('Product pool depleted')
-					break
+			if len(recipe.reactions) > max_reactions:
+				pbar.close()
+				logger.info('Max #reactions exceeded')
+				# recipe = old_recipe.copy()
+				break
 
-				# check breaking conditions
-				if new_price > budget:
-					logger.info('Budget exceeded, choosing new candidates')
-					recipe = old_recipe.copy()
-					continue
+			if len(recipe.products) > max_products:
+				pbar.close()
+				logger.info('Max #products exceeded')
+				# recipe = old_recipe.copy()
+				break
+			
+			# accept change
+			old_recipe = recipe.copy()
 
-				if len(recipe.reactions) > max_reactions:
-					logger.info('Max #reactions exceeded, choosing new candidates')
-					recipe = old_recipe.copy()
-					continue
+			pbar.update(1)
+			pbar.set_postfix(dict(price=str(price)))
 
-				if len(recipe.products) > max_products:
-					logger.info('Max #products exceeded, choosing new candidates')
-					recipe = old_recipe.copy()
-					continue
-				
-				# accept change
-				old_recipe = recipe.copy()
+		else:
+			pbar.close()
 
-				pbar.update(i)
-				pbar.set_postfix(dict(price=str(price)))
+		### recalculate the products to see if any extra can be had for free?
+
+		# print(recipe)
+		# print(recipe.price)
+
+		# new_recipe = Recipe.from_reactants(reactants=recipe.reactants)
+
+		# # calculate fingerprint?
+
+		# print(new_recipe)
+		# print(new_recipe.price)
+
+		logger.success(f'Completed after {i} iterations')
 
 		return recipe
 

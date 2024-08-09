@@ -32,6 +32,12 @@ class Price:
 		self.__init__(None, None)
 		return self
 
+	@classmethod
+	def from_dict(cls, d):
+		self = cls.__new__(cls)
+		self.__init__(d['amount'], d['currency'])
+		return self
+
 	### PROPERTIES
 
 	@property
@@ -51,6 +57,9 @@ class Price:
 		return self.amount is None
 
 	### METHODS
+
+	def get_dict(self):
+		return dict(amount=self.amount, currency=self.currency)
 
 	### DUNDERS
 
