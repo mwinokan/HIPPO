@@ -167,16 +167,16 @@ class ReactionTable:
 class ReactionSet:
 	"""Object representing a subset of the 'reaction' table in the :class:`.Database`."""
 	
+	_table = 'reaction'
+
 	def __init__(self,
 		db: Database,
 		indices: list = None,
 		*,
-		table: str = 'reaction',
 		sort: bool = True,
 	):
 		
 		self._db = db
-		self._table = table
 		indices = indices or []
 
 		if not isinstance(indices, list):
@@ -323,6 +323,10 @@ class ReactionSet:
 
 	def reverse(self):
 		self._indices = list(reversed(self._indices))
+
+	def get_dict(self):
+		"""Serializable dictionary"""
+		return dict(db=str(self.db), indices=self.indices)
 
 	### DUNDERS
 

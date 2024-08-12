@@ -5,6 +5,8 @@ from .compound import Ingredient
 
 import mcol
 
+from tqdm import tqdm
+
 import logging
 logger = logging.getLogger('HIPPO')
 
@@ -373,7 +375,7 @@ class Recipe:
 		return solutions
 
 	@classmethod
-	def from_reactants(cls, reactants, amount=1, debug=False):
+	def from_reactants(cls, reactants, amount=1, debug=False, return_products=False):
 
 		from .cset import IngredientSet
 
@@ -428,7 +430,7 @@ class Recipe:
 
 		rset = ReactionSet(db, possible_reactions, sort=False)
 
-		recipe = cls.from_reactions(rset, amount=amount, permitted_reactions=rset, pick_cheapest=False, debug=debug, return_products=True)
+		recipe = cls.from_reactions(rset, amount=amount, permitted_reactions=rset, pick_cheapest=False, debug=debug, return_products=return_products)
 
 		return recipe
 
@@ -440,7 +442,7 @@ class Recipe:
 		return self
 
 	@classmethod
-	def from_json(cls, db, path, debug=True, allow_db_mismatch=False, clear_quotes=False):
+	def from_json(cls, db, path, debug=True, allow_db_mismatch=False, clear_quotes=False, data=None):
 
 		# imports
 		import json
@@ -448,8 +450,9 @@ class Recipe:
 		from .rset import ReactionSet
 
 		# load JSON
-		logger.reading(path)
-		data = json.load(open(path,'rt'))
+		if not data:
+			logger.reading(path)
+			data = json.load(open(path,'rt'))
 
 		# check metadata
 		if str(db.path.resolve()) != data['database']:
@@ -788,9 +791,10 @@ class Recipe:
 	def add_to_all_reactants(self, amount=20):
 		self.reactants.df['amount'] += amount
 
-	def write_json(self, file, *, indent=4, **kwargs):
+	def write_json(self, file, *, indent='\t', **kwargs):
 		"""Serialise this recipe object and write it to disk"""
-		data = self.get_dict(**kwargs)
+		import json
+		data = self.get_dict(serialise_price=True, **kwargs)
 		logger.writing(file)
 		json.dump(data, open(file, 'wt'), indent=indent)
 
@@ -802,6 +806,8 @@ class Recipe:
 		timestamp: bool = True,
 		compound_ids_only: bool = False,
 		products: bool = True,
+		serialise_price: bool = False,
+		fingerprint: bool = False,
 	):
 
 		"""Serialise this recipe object
@@ -830,7 +836,11 @@ class Recipe:
 		if timestamp: data['timestamp'] = str(datetime.now())
 
 		# Recipe properties
-		if price: data['price'] = self.price
+		if price and serialise_price: 
+			data['price'] = self.price.get_dict()
+		elif price: 
+			data['price'] = self.price
+
 		if reactant_supplier: data['reactant_supplier'] = self.reactants.supplier
 		# data['lead_time'] = self.lead_time
 
@@ -841,9 +851,15 @@ class Recipe:
 			if products: data['products_ids'] = self.products.compound_ids
 
 		else:
-			data['reactants'] = self.reactants.df.to_dict(orient='records')
-			data['intermediates'] = self.intermediates.df.to_dict(orient='records')
-			if products: data['products'] = self.products.df.to_dict(orient='records')
+			data['reactants'] = self.reactants.df.to_dict(orient='list')
+			data['intermediates'] = self.intermediates.df.to_dict(orient='list')
+			if products: data['products'] = self.products.df.to_dict(orient='list')
+			# data['reactants'] = self.reactants.df.to_dict(orient='records')
+			# data['intermediates'] = self.intermediates.df.to_dict(orient='records')
+			# if products: data['products'] = self.products.df.to_dict(orient='records')
+
+		if fingerprint:
+			data['fingerprint'] = self.get_product_fingerprint()
 			
 		# ReactionSet
 		data['reaction_ids'] = self.reactions.ids
@@ -945,6 +961,18 @@ class Recipe:
 			# supplier=self.supplier
 		)
 
+	def get_product_fingerprint(self):
+		"""Calculate the combined fingerprint of all product poses in this set"""
+
+		poses = self.products.compounds.poses
+
+		null_count = self.db.count_where(table='pose', key=f'pose_id IN {poses.str_ids} AND pose_fingerprint IS NULL')
+
+		if null_count:
+			logger.warning(f'{null_count} poses have no fingerprint')
+
+		return poses.fingerprint
+
 	### DUNDERS
 
 	def __repr__(self):
@@ -987,6 +1015,34 @@ class Route(Recipe):
 		self._reactions = reactions
 		self._db = db
 
+	### FACTORIES
+
+	@classmethod
+	def from_json(cls, db, path, data=None):
+
+		import json
+		from .cset import IngredientSet
+		from .rset import ReactionSet
+
+		if data is None:
+			data = json.load(open(path, 'rt'))
+
+		self = cls.__new__(cls)
+
+		self._db = db
+		self._id = data['id']
+		
+		self._product_id = data['product_id']
+		self._products = IngredientSet.from_compounds(compounds=None, ids=[self._product_id], db=db) # IngredientSet
+		
+		self._reactants = IngredientSet.from_json(db=db, path=None, data=data['reactants']['data'], supplier=data['reactants']['supplier'])
+		self._intermediates = IngredientSet.from_json(db=db, path=None, data=data['intermediates']['data'], supplier=data['intermediates']['supplier'])
+		self._reactions = ReactionSet(db=db, indices=data['reactions']['indices']) # ReactionSet
+		
+		return self
+
+	### PROPERTIES
+
 	@property
 	def product(self):
 		return self._products[0]
@@ -999,11 +1055,28 @@ class Route(Recipe):
 	def id(self):
 		return self._id
 
+	### METHODS
+
+	def get_dict(self):
+		"""Serialisable dictionary"""
+		data = {}
+
+		data['id'] = self.id
+		data['product_id'] = self.product.id
+		data['reactants'] = self.reactants.get_dict()
+		data['intermediates'] = self.intermediates.get_dict()
+		data['reactions'] = self.reactions.get_dict()
+
+		return data
+	
+	### DUNDERS
+
 	def __repr__(self):
 		return f'{mcol.bold}{mcol.underline}Route #{self.id}: {repr(self.product_compound)}'#' {self.reactants} --> {self.intermediates} --> {self.product_compound} via {self.reactions})'
-		# return f'Recipe()'
 
 class RouteSet:
+
+	"""A set of Route objects"""
 
 	def __init__(self, db, routes):
 
@@ -1014,6 +1087,29 @@ class RouteSet:
 
 		self._data = data
 		self._db = db
+
+	### FACTORIES
+
+	@classmethod
+	def from_json(cls, db, path, data=None):
+
+		self = cls.__new__(cls)
+
+		if data is None:
+			import json
+			data = json.load(open(path,'rt'))
+
+		new_data = {}
+		for d in tqdm(data['routes'].values()):
+			route_id = d['id']
+			new_data[route_id] = Route.from_json(db=db, path=None, data=d)
+
+		self._data = new_data
+		self._db = db
+
+		return self
+
+	### PROPERTIES
 
 	@property
 	def data(self):
@@ -1026,10 +1122,34 @@ class RouteSet:
 	@property
 	def routes(self):
 		return self.data.values()
+
+	### METHODS
 	
 	def copy(self):
 		return RouteSet(self.db, self.data.values())
 
+	def set_db_pointers(self, db):
+		self._db = db
+		for route in self.data.values():
+			route._db = db
+
+	def clear_db_pointers(self):
+		self._db = None
+		for route in self.data.values():
+			route._db = None
+
+	def get_dict(self):
+		"""Get serialisable dictionary"""
+
+		data = dict(db=str(self.db), routes={})
+
+		# populate with routes
+		for route_id, route in self.data.items():
+			data['routes'][route_id] = route.get_dict()
+
+		return data
+
+	### DUNDERS
 
 	def __len__(self):
 		return len(self.data)

@@ -533,13 +533,13 @@ class Pose:
 
 		elif self.path.endswith('.mol') and self.reference:
 
-			logger.debug('fingerprint from .mol and reference pose')
+			# logger.debug('fingerprint from .mol and reference pose')
 			protein_system = self.reference.protein_system
 
 		else:
 
-			logger.debug('calculate_fingerprint()')
-			raise NotImplementedError
+			logger.debug('Unsupported: Pose.calculate_fingerprint()')
+			raise NotImplementedError(f'{self.reference=}, {self.path=}')
 
 		assert protein_system
 

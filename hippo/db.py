@@ -1654,6 +1654,9 @@ class Database:
 
 	### DUNDERS
 
+	def __str__(self):
+		return str(self.path.resolve())
+
 CHEMICALITE_COMPOUND_PROPERTY_MAP = {
 	'num_heavy_atoms':'mol_num_hvyatms',
 	'formula':'mol_formula',
