@@ -6,11 +6,12 @@ import numpy as np
 from .cset import CompoundTable, IngredientSet, CompoundSet
 from .pset import PoseTable, PoseSet
 from .tags import TagTable
-from .rset import ReactionTable
+from .rset import ReactionTable, ReactionSet
 from .compound import Compound
 from .reaction import Reaction
 from .target import Target
 from .pose import Pose
+from .pycule import Quoter
 
 from .db import Database
 from pathlib import Path
@@ -32,11 +33,16 @@ class HIPPO:
 		
 		from hippo import HIPPO
 		animal = HIPPO(project_name, db_path)
+	
+	:param project_name: give this hippo a name
+	:param db_path: path where the database will be stored
+	:returns: HIPPO object
 
-	* *project_name* give this hippo a name
-	* *db_path* path where the database will be stored
+	Concepts:
 
+		Registering:
 
+			- If an identical entry exists return that entry, else add it to the Database
 	"""
 		
 	def __init__(self, 
@@ -80,7 +86,10 @@ class HIPPO:
 
 	@property
 	def name(self) -> str:
-		"""Returns the project name"""
+		"""Returns the project name
+
+		:returns: project name
+		"""
 		return self._name
 
 	@property
@@ -89,114 +98,114 @@ class HIPPO:
 		return self._db_path
 
 	@property
-	def db(self):
+	def db(self) -> Database:
 		"""Returns the Database object"""
 		return self._db
 
 	@property
-	def compounds(self):
-		"""Returns a :doc:`CompoundTable <compounds>` object, which interfaces to the compound table in the database"""
+	def compounds(self) -> CompoundTable:
+		"""Access compounds in the Database"""
 		return self._compounds
 
 	@property
-	def poses(self):
-		"""Returns a :doc:`PoseTable <poses>` object, which interfaces to the pose table in the database"""
+	def poses(self) -> PoseTable:
+		"""Access Poses in the Database"""
 		return self._poses
 
 	@property
-	def reactions(self):
-		"""Returns a :doc:`ReactionSet <reactions>` object, which interfaces to the reaction table in the database"""
+	def reactions(self) -> ReactionTable:
+		"""Access Reactions in the Database"""
 		return self._reactions
 
 	@property
-	def tags(self):
-		"""Returns a :doc:`TagTable <metadata>` object, which interfaces to the tag table in the database"""
+	def tags(self) -> TagTable:
+		"""Access Tags in the Database"""
 		return self._tags
 	
 	@property
-	def num_compounds(self):
-		"""Returns the number of compounds"""
+	def num_compounds(self) -> int:
+		"""Total number of Compounds in the Database"""
 		return len(self.compounds)
 
 	@property
-	def num_poses(self):
-		"""Returns the number of poses"""
+	def num_poses(self) -> int:
+		"""Total number of Poses in the Database"""
 		return len(self.poses)
 
 	@property
-	def num_reactions(self):
-		"""Returns the number of reactions"""
+	def num_reactions(self) -> int:
+		"""Total number of Reactions in the Database"""
 		return len(self.reactions)
 
 	@property
-	def num_tags(self):
-		"""Returns the number of tags"""
+	def num_tags(self) -> int:
+		"""Number of unique Tags in the Database"""
 		return len(self.tags.unique)
 
 	@property
-	def targets(self):
-		"""Returns the targets registered in the DB"""
+	def targets(self) -> list[Target]:
+		"""Access Targets in the Database"""
 		target_ids = self.db.select(table='target', query='target_id', multiple=True)
 		return [self.db.get_target(id=q) for q, in target_ids]
 
 	@property
-	def reactants(self):
-		"""Returns a CompoundSet of all compounds that are used as a reactants"""
+	def reactants(self) -> CompoundSet:
+		"""Returns all compounds that are reactants for at least one :class:`hippo.reaction.Reaction` (and not products of others)"""
 		if self._reactants is None or self._reactants['total_changes'] != self.db.total_changes:
 			self._reactants = dict(set=self.compounds.reactants, total_changes=self.db.total_changes)
 		return self._reactants['set']
 
 	@property
-	def products(self):
-		"""Returns a CompoundSet of all compounds that are a product of a reaction but not a reactant"""
+	def products(self) -> CompoundSet:
+		"""Returns all compounds that are products of at least one :class:`hippo.reaction.Reaction` (and not reactants of others)"""
 		if self._products is None or self._products['total_changes'] != self.db.total_changes:
 			self._products = dict(set=self.compounds.products, total_changes=self.db.total_changes)
 		return self._products['set']
 
 	@property
-	def intermediates(self):
-		"""Returns a CompoundSet of all compounds that are products and reactants"""
+	def intermediates(self) -> CompoundSet:
+		"""Returns all compounds that are products and reactants of :class:`hippo.reaction.Reaction`"""
 		if self._intermediates is None or self._intermediates['total_changes'] != self.db.total_changes:
 			self._intermediates = dict(set=self.compounds.intermediates, total_changes=self.db.total_changes)
 		return self._intermediates['set']
 
 	@property
-	def num_reactants(self):
-		"""Returns the number of reactants (see HIPPO.reactants)"""
+	def num_reactants(self) -> int:
+		"""Returns the number of reactants (see :meth:`reactants`)"""
 		return len(self.reactants)
 
 	@property
-	def num_intermediates(self):
-		"""Returns the number of intermediates (see HIPPO.intermediates)"""
+	def num_intermediates(self) -> int:
+		"""Returns the number of intermediates (see :meth:`intermediates`)"""
 		return len(self.intermediates)
 	
 	@property
-	def num_products(self):
-		"""Returns the number of products (see HIPPO.products)"""
+	def num_products(self) -> int:
+		"""Returns the number of products (see :meth:`products`)"""
 		return len(self.products)
 
 	@property
-	def elabs(self):
-		"""Returns a CompoundSet of all compounds that are a an elaboration of an existing base"""
+	def elabs(self) -> CompoundSet:
+		"""Returns compounds that are an based on another"""
 		if self._elabs is None or self._elabs['total_changes'] != self.db.total_changes:
 			self._elabs = dict(set=self.compounds.elabs, total_changes=self.db.total_changes)
 		return self._elabs['set']
 
 	@property
-	def bases(self):
-		"""Returns a CompoundSet of all compounds that are the basis for a set of elaborations"""
+	def bases(self) -> CompoundSet:
+		"""Returns compounds that are the basis for one or more elaborations"""
 		if self._bases is None or self._bases['total_changes'] != self.db.total_changes:
 			self._bases = dict(set=self.compounds.bases, total_changes=self.db.total_changes)
 		return self._bases['set']
 
 	@property
-	def num_elabs(self):
-		"""Returns the number of compounds that are a an elaboration of an existing base"""
+	def num_elabs(self) -> int:
+		"""Number of compounds that are an elaboration of an existing base"""
 		return len(self.elabs)
 
 	@property
-	def num_bases(self):
-		"""Returns the number of compounds that are the basis for a set of elaborations"""
+	def num_bases(self) -> int:
+		"""Number of compounds that are the basis for elaborations"""
 		return len(self.bases)
 
 	### BULK INSERTION
@@ -208,16 +217,13 @@ class HIPPO:
 		skip: list | None = None, 
 		debug: bool = False, 
 	) -> pd.DataFrame:
-
 		"""Load in crystallographic hits downloaded from Fragalysis.
 
-		* *target_name* Name of this protein target
-		* *metadata_csv* Path to the metadata.csv from the Fragalysis download
-		* *aligned_directory* Path to the aligned_files directory from the Fragalysis download
-		* *skip* optional list of observation names to skip
-
-		Returns: a DataFrame of metadata
-
+		:param target_name: Name of this protein :class:`hippo.target.Target`
+		:param metadata_csv: Path to the metadata.csv from the Fragalysis download
+		:param aligned_directory: Path to the aligned_files directory from the Fragalysis download
+		:param skip: optional list of observation names to skip
+		:returns: a DataFrame of metadata
 		"""
 
 		import molparse as mp
@@ -362,24 +368,41 @@ class HIPPO:
 		sdf_path: str | Path, 
 		*,
 		reference: int | Pose | None = None,
-		tags: None | list = None,
+		tags: None | list[str] = None,
 		output_directory: str | Path | None = None,
-		mol_col='ROMol',
-		name_col='ID',
-		inspiration_col = 'ref_mols',
+		mol_col: str = 'ROMol',
+		name_col: str = 'ID',
+		inspiration_col: str = 'ref_mols',
 		inspiration_map: None | dict = None,
-		skip_first=False,
-		convert_floats=True,
+		skip_first: bool = False,
+		convert_floats: bool = True,
 		stop_after: int | None = None,
 		skip_equal_dict: dict | None = None,
 		skip_not_equal_dict: dict | None = None,
 		check_pose_RMSD: bool = False,
 		pose_RMSD_tolerance: float = 1.0,
-	):
+	) -> None:
 
-		"""Add virtual hits from an SDF into the database.
+		"""Add posed virtual hits from an SDF into the database.
 
-		All columns except those specified via arguments mol_col and name_col are added to the Pose metadata.
+		:param target: Name of the protein :class:`hippo.target.Target`
+		:param sdf_path: Path to the SDF
+		:param reference: Reference :class:`hippo.pose.Pose` to use as the protein conformation for all poses, defaults to ``None``
+		:param tags: Tags to assign to all created compounds and poses, defaults to ``None``
+		:param output_directory: Specify the path where individual ligand .mol files will be created, defaults to ``None`` where the name of the SDF is used.
+		:param mol_col: Name of the column containing the ``rdkit.ROMol`` ligands, defaults to ``"ROMol"``
+		:param name_col: Name of the column containing the ligand name/alias, defaults to ``"ID"``
+		:param inspiration_col: Name of the column containing the list of inspiration pose names, defaults to ``"ref_mols"``
+		:param inspiration_map: Dictionary or callable mapping between inspiration strings found in ``inspiration_col`` and :class:`hippo.pose.Pose` ids, defaults to None
+		:param skip_first: Skip first row, defaults to ``False``
+		:param convert_floats: Try to convert all values to ``float``, defaults to ``True``
+		:param stop_after: Stop after given number of rows, defaults to ``None``
+		:param skip_equal_dict: Skip rows where ``any(row[key] == value for key, value in skip_equal_dict.items())``, defaults to ``None``
+		:param skip_not_equal_dict: Skip rows where ``any(row[key] != value for key, value in skip_not_equal_dict.items())``, defaults to ``None``
+		:param check_pose_RMSD: Check :class:`hippo.pose.Pose` to previously registered poses and skip if below ``pose_RMSD_tolerance``, defaults to ``False``
+		:param pose_RMSD_tolerance: Tolerance for ``check_pose_RMSD`` in Angstrom, defaults to ``1.0``
+		
+		All non-name columns added to the Pose metadata.
 		"""
 
 		if not isinstance(sdf_path, Path):
@@ -414,10 +437,11 @@ class HIPPO:
 		if not output_directory:
 			import os
 			output_directory = str(sdf_path.name).removesuffix('.sdf')
-			logger.writing(f'Creating output directory {output_directory}')
-			os.system(f'mkdir -p {output_directory}')
 
 		output_directory = Path(output_directory)
+		if not output_directory.exists:
+			logger.writing(f'Creating output directory {output_directory}')
+			os.system(f'mkdir -p {output_directory}')
 
 		n_poses = self.num_poses
 		n_comps = self.num_compounds
@@ -562,10 +586,22 @@ class HIPPO:
 		*,
 		tags: None | list[str] = None,
 		reaction_yield_map: dict | None = None,
-		check_chemistry=True,
-		return_reactions=False,
-		debug=False,
-	):
+		check_chemistry: bool = True,
+		return_reactions: bool = False,
+		debug: bool = False,
+	) -> CompoundSet | tuple[CompoundSet, ReactionSet]:
+
+		"""
+		Load Syndirella base compounds and poses from a pickled DataFrame
+		
+		:param df_path: Path to the pickled DataFrame
+		:param tags: list of tags to assign to compounds and poses, defaults to ``None``
+		:param reaction_yield_map: dictionary mapping reaction type strings to their yield ratio, defaults to ``None``
+		:param check_chemistry: check the reaction chemistry, defaults to ``True``
+		:param return_reactions: Return :class:`hippo.rset.ReactionSet` of reactions, defaults to ``False``
+		:param debug: Increase verbosity of output, defaults to ``False``
+		:returns: :class:`hippo.cset.CompoundSet` of compounds if ``return_reactions = False``, else returns a tuple: ``(compounds, reactions)``
+		"""
 
 		from .chem import check_reaction_types, InvalidChemistryError
 
@@ -576,7 +612,6 @@ class HIPPO:
 		df = pd.read_pickle(df_path)
 
 		reaction_cols = [c for c in df.columns if '_reaction' in c]
-		# print(reaction_cols)
 
 		product_ids = set()
 
@@ -587,7 +622,6 @@ class HIPPO:
 		for i,row in tqdm(df.iterrows()):
 
 			# determine number of steps
-
 
 			reaction_types = [r for c in reaction_cols if isinstance((r:=row[c]), str)]
 			check_reaction_types(reaction_types)
@@ -618,9 +652,7 @@ class HIPPO:
 							raise InvalidRowError(f'non-string {j}_r1_smiles')
 													
 						reactant1_id, duplicate = self.register_compound(smiles=smiles, commit=False, return_compound=False, tags=tags, base=None, register_base_if_duplicate=False, return_duplicate=True)
-						
-						# logger.var(f'reactant {j} 1', reactant1_id)
-						
+												
 						reactants.append(reactant1_id)
 				
 					# reactant 2
@@ -633,9 +665,7 @@ class HIPPO:
 							raise InvalidRowError(f'non-string {j}_r2_smiles')
 
 						reactant2_id, duplicate = self.register_compound(smiles=smiles, commit=False, return_compound=False, tags=tags, base=None, register_base_if_duplicate=False, return_duplicate=True)
-						
-						# logger.var(f'reactant {j} 2', reactant2_id)
-							
+													
 						reactants.append(reactant2_id)
 				
 					# product
@@ -644,17 +674,15 @@ class HIPPO:
 							raise InvalidRowError(f'non-string {j}_product_smiles')
 	
 						if j != n_steps:
-							this_tags = tags #+ ['intermediate']
+							this_tags = tags
 	
 						else:
-							this_tags = ['Syndirella base'] + tags #+ ['Syndirella elaboration']
+							this_tags = ['Syndirella base'] + tags
 						
 						product_id, duplicate = self.register_compound(smiles=smiles, tags=this_tags, commit=False, return_compound=False, base=None, register_base_if_duplicate=False, return_duplicate=True)
 	
 						if j == n_steps:
 							product_ids.add(product_id)
-
-						# logger.var(f'product {j}', product_id)
 
 					# register the reaction
 					if reaction_yield_map:
@@ -682,16 +710,8 @@ class HIPPO:
 						skipped_reactions += 1
 			
 			except InvalidRowError as e:
-				# logger.error(f'Skipping invalid row {i=}: {e}')
 				skipped_invalid_smiles += 1
 				continue
-
-			# chemistries = set(sum([df[df[f'{j+1}_reaction'].notnull()][f'{j+1}_reaction'].tolist() for j in range(n_steps)], []))
-			# logger.var('Present reactions', str(reaction_types))
-
-			# break
-
-			# break
 
 		if return_reactions:
 			return self.compounds[product_ids], self.reactions[reactions]
@@ -710,7 +730,22 @@ class HIPPO:
 		require_nonzero_truthy_bases: None | list[str] = None,
 		stop_after=None,
 		check_chemistry=True,
-	):
+	) -> None:
+
+		"""
+		Load Syndirella elaboration compounds and poses from a pickled DataFrame
+
+		:param df_path: Path to the pickled DataFrame
+		:param inspiration_map: Dictionary or callable mapping between inspiration strings found in ``inspiration_col`` and :class:`hippo.pose.Pose` ids, defaults to None
+		:param base_only: Only load the base compound, defaults to ``False``
+		:param tags: list of tags to assign to compounds and poses, defaults to ``None``
+		:param reaction_yield_map: dictionary mapping reaction type strings to their yield ratio, defaults to ``None``
+		:param require_truthy_bases: List of columns that should be truthy to load the given base, defaults to ``['path_to_mol', 'intra_geometry_pass']``
+		:param require_truthy_elabs: List of columns that should be truthy to load the given elaboration, defaults to ``['path_to_mol', 'intra_geometry_pass']``
+		:param require_nonzero_truthy_bases: List of columns that should have a truthy value for at least one of the base molecules, defaults to ``['path_to_mol', 'intra_geometry_pass']``
+		:param stop_after: Stop after given number of rows, defaults to ``None``
+		:param check_chemistry: check the reaction chemistry, defaults to ``True``
+		"""
 
 		from .chem import check_reaction_types, InvalidChemistryError
 
@@ -990,7 +1025,16 @@ class HIPPO:
 		orig_name_is_hippo_id: bool = False,
 	):
 
-		"""Load an Enamine quote provided as an excel file"""
+		"""
+		Load an Enamine quote provided as an excel file
+		
+		:param path: Path to the excel file
+		:param orig_name_col: Column name of the original alias, defaults to 'Customer Code'
+		:param entry_col: Column name of the catalogue ID/entry, defaults to 'Catalog ID'
+		:param stop_after: Stop after given number of rows, defaults to ``None``
+		:param orig_name_is_hippo_id: Set to ``True`` if ``orig_name_col`` is the original HIPPO :class:``hippo.compound.Compound`` ID, defaults to ``False``
+		:returns: An :class:`hippo.cset.IngredientSet` of the quoted molecules
+		"""
 
 		df = pd.read_excel(path)
 
@@ -1090,6 +1134,13 @@ class HIPPO:
 		self,
 		path: str | Path,
 	):
+
+		"""
+		Load an MCule quote provided as an excel file
+		
+		:param path: Path to the excel file
+		:returns: An :class:`hippo.cset.IngredientSet` of the quoted molecules
+		"""
 
 		### get lead time from suppliers sheet
 
@@ -1198,7 +1249,21 @@ class HIPPO:
 		debug: bool = False,
 	) -> Compound:
 
-		"""Use a smiles string to add a compound to the database. If it already exists return the compound"""
+		"""Use a smiles string to add a compound to the database. If it already exists return the compound
+		
+		:param smiles: The SMILES string of the compound
+		:param base: The :class:`hippo.compound.Compound` object or ID that this compound is based on, defaults to ``None``
+		:param tags: A list of tags to assign to this compound, defaults to ``None``
+		:param metadata: A dictionary of metadata to assign to this compound, defaults to ``None``
+		:param return_compound: return the :class:`hippo.compound.Compound` object instead of the integer ID, defaults to ``True``
+		:param commit: Commit the changes to the :class:`hippo.db.Database`, defaults to ``True``
+		:param alias: The string alias of this compound, defaults to ``None``
+		:param return_duplicate: If ``True`` returns a boolean indicating if this compound previously existed, defaults to ``False``
+		:param register_base_if_duplicate: If this compound exists in the :class:`hippo.db.Database` modify it's ``base`` property, defaults to ``True``
+		:param radical: Define the behaviour for dealing with radical atoms in the SMILES. See :class:`hippo.tools.sanitise_smiles`. Defaults to ``'warning'``
+		:param debug: Increase verbosity of output, defaults to ``False``
+		:returns: The registered/existing :class:`hippo.compound.Compound` object or its ID (depending on ``return_compound``), and optionally a boolean to indicate duplication see ``return_duplicate``
+		"""
 
 		assert smiles
 		assert isinstance(smiles, str), f'Non-string {smiles=}'
@@ -1292,6 +1357,17 @@ class HIPPO:
 		check_chemistry: bool = False,
 	) -> Reaction:
 
+		"""Add a :class:`hippo.reaction.Reaction` to the :class:`hippo.db.Database`. If it already exists return the existing one
+		
+		:param type: string indicating the type of reaction
+		:param product: The :class:`hippo.compound.Compound` object or ID of the product
+		:param reactants: A list of :class:`hippo.compound.Compound` objects or IDs of the reactants
+		:param commit: Commit the changes to the :class:`hippo.db.Database`, defaults to ``True``
+		:param product_yield: The fraction of product yielded from this reaction ``0 < product_yield <= 1.0``, defaults to ``1.0``
+		:param check_chemistry: check the reaction chemistry, defaults to ``True``
+		:returns: The registered :class:`hippo.reaction.Reaction`
+		"""
+
 		### CHECK REACTION VALIDITY
 
 		if check_chemistry:
@@ -1343,6 +1419,15 @@ class HIPPO:
 	def register_target(self,
 		name: str,
 	) -> Target:
+
+		"""
+		Register a new protein :class:`hippo.Target` to the Database
+		
+		:param param1: this is a first param
+		:param param2: this is a second param
+		:returns: this is a description of what is returned
+		:raises keyError: raises an exception
+		"""
 		
 		target_id = self.db.insert_target(name=name)
 
@@ -1361,7 +1446,7 @@ class HIPPO:
 		reference: int | None = None,
 		tags: None | list = None,
 		metadata: None | dict = None,
-		inspirations: None | list = None,
+		inspirations: None | list[int | Pose] = None,
 		return_pose: bool = True,
 		energy_score: float | None = None,
 		distance_score: float | None = None,
@@ -1371,9 +1456,30 @@ class HIPPO:
 		check_RMSD: bool = False,
 		RMSD_tolerance: float = 1.0,
 		split_PDB: bool = False,
-		template_mol: str | Mol | None = None,
 		duplicate_alias: str = 'modify',
 	) -> Pose:
+
+		"""Add a :class:`hippo.pose.Pose` to the :class:`hippo.db.Database`. If it already exists return the pose
+		
+		:param compound: The :class:`hippo.compound.Compound` object or ID that this :class:`hippo.pose.Pose` is a conformer of
+		:param target: The :class:`hippo.target.Target` name or ID
+		:param path: Path to the :class:`hippo.pose.Pose`'s conformer file (.pdb or .mol)
+		:param alias: The string alias of this :class:`hippo.pose.Pose`, defaults to ``None``
+		:param reference: Reference :class:`hippo.pose.Pose` to use as the protein conformation for all poses, defaults to ``None``
+		:param tags: A list of tags to assign to this compound, defaults to ``None``
+		:param metadata: A dictionary of metadata to assign to this compound, defaults to ``None``
+		:param inspirations: a list of inspiration :class:`hippo.pose.Pose` objects or ID's, defaults to ``None``
+		:param energy_score: assign an energy score to this :class:`hippo.pose.Pose`, defaults to ``None``
+		:param distance_score: assign a distance score to this :class:`hippo.pose.Pose`, defaults to ``None``
+		:param commit: Commit the changes to the :class:`hippo.db.Database`, defaults to ``True``
+		:param overwrite_metadata: If a duplicate is found, overwrite its metadata, defaults to ``True``
+		:param warn_duplicate: Warn if a duplicate :class:`hippo.pose.Pose` exists, defaults to ``True``
+		:param check_RMSD: Check the RMSD against existing :class:`hippo.pose.Pose`, defaults to ``False``
+		:param RMSD_tolerance: Tolerance for ``check_RMSD`` in Angstrom, defaults to ``1.0``
+		:param split_PDB: Register a :class:`hippo.pose.Pose` for every ligand residue in the PDB, defaults to ``False``
+		:param duplicate_alias: In the case of a duplicate, define the behaviour for the ``alias`` property, defaults to ``'modify'`` which appends ``_copy`` to the alias. Set to ``error`` to raise an Exception.
+		:returns: The registered/existing :class:`hippo.pose.Pose` object or its ID (depending on ``return_compound``)
+		"""
 
 		assert duplicate_alias in ['error', 'modify']
 
@@ -1424,15 +1530,11 @@ class HIPPO:
 						check_RMSD = check_RMSD,
 						RMSD_tolerance = RMSD_tolerance,
 						split_PDB = False,
-						template_mol = template_mol,
 					)
 
 					results.append(result)
 
 				return results
-
-		if template_mol:
-			raise NotImplementedError
 
 		if isinstance(compound, int):
 			compound_id = compound
@@ -1562,23 +1664,36 @@ class HIPPO:
 
 		return pose
 
-	def register_route(self, *, recipe, commit=True):
+	def register_route(self, 
+		*, 
+		route, 
+		commit=True,
+	) -> int:
+
+		"""
+		Insert a :class:`hippo.recipe.Route` (single-product :class:`hippo.recipe.Recipe`) into the :class:`hippo.db.Database`.
+		
+		:param route: The :class:`hippo.recipe.Route` object to be registered
+		:param commit: Commit the changes to the :class:`hippo.db.Database`, defaults to ``True``
+		:returns: The :class:`hippo.recipe.Route` ID
+		"""
+
 
 		# register the route
-		route_id = self.db.insert_route(product_id=recipe.product.id, commit=False)
+		route_id = self.db.insert_route(product_id=route.product.id, commit=False)
 		
 		assert route_id
 
 		# reactions
-		for ref in recipe.reactions.ids:
+		for ref in route.reactions.ids:
 			self.db.insert_component(component_type=1, ref=ref, route=route_id, commit=False)
 
 		# reactants
-		for ref in recipe.reactants.compound_ids:
+		for ref in route.reactants.compound_ids:
 			self.db.insert_component(component_type=2, ref=ref, route=route_id, commit=False)
 
 		# intermediates
-		for ref in recipe.intermediates.compound_ids:
+		for ref in route.intermediates.compound_ids:
 			self.db.insert_component(component_type=3, ref=ref, route=route_id, commit=False)
 
 		if commit:
@@ -1588,8 +1703,16 @@ class HIPPO:
 
 	### QUOTING
 
-	def quote_compounds(self, quoter, compounds):
-		"""Get batch quotes using the hippo.Quoter object supplied and add the quotes to the database"""
+	def quote_compounds(self,
+	 	quoter: Quoter, 
+		compounds: CompoundSet,
+	) -> None:
+		"""Get batch quotes using the hippo.Quoter object supplied and add the quotes to the database
+
+		:param quoter: The :class:`hippo.pycule.Quoter` object to use
+		:param compounds: A :class:`hippo.cset.CompoundSet` containing the compounds to be quoted
+		"""
+		
 		logger.header(f'Getting {quoter.supplier} quotes for {len(compounds)} compounds')
 		batch_size = quoter.batch_size
 		for i in range(0, len(compounds), batch_size):
@@ -1597,8 +1720,17 @@ class HIPPO:
 			batch = compounds[i:i+batch_size]
 			quoter.get_batch_quote(batch)
 
-	def quote_reactants(self, quoter, *, unquoted_only=False):
-		"""Get batch quotes for all reactants in the database"""
+	def quote_reactants(self, 
+	 	quoter: Quoter, 
+		*, 
+		unquoted_only: bool = False,
+	) -> None:
+
+		"""Get batch quotes for all reactants in the database
+
+		:param quoter: The :class:`hippo.pycule.Quoter` object to use
+		:param unquoted_only: Only request quotes for unquoted compouds, defaults to ``False``
+		"""
 
 		if unquoted_only:
 			compounds = self.reactants.get_unquoted(supplier=quoter.supplier)
@@ -1607,14 +1739,23 @@ class HIPPO:
 
 		self.quote_compounds(quoter=quoter, compounds=compounds)
 	
-	def quote_intermediates(self, quoter):
-		"""Get batch quotes for all reactants in the database"""
+	def quote_intermediates(self, 
+	 	quoter: Quoter, 
+	) -> None:
+
+		"""Get batch quotes for all reactants in the database		
+
+		:param quoter: The :class:`hippo.pycule.Quoter` object to use
+		:param unquoted_only: Only request quotes for unquoted compouds, defaults to ``False``
+		"""
+	
 		self.quote_compounds(quoter=quoter, compounds=self.intermediates)
 
 	### PLOTTING
 
 	def plot_tag_statistics(self, *args, **kwargs):
-		"""Plot an overview of the number of compounds and poses for each tag"""
+		"""Plot an overview of the number of compounds and poses for each tag, see :func:`hippo.plotting.plot_tag_statistics`"""
+		
 		if not self.num_tags:
 			logger.error('No tagged compounds or poses')
 			return
@@ -1622,43 +1763,44 @@ class HIPPO:
 		return plot_tag_statistics(self, *args, **kwargs)
 
 	def plot_compound_property(self, prop, **kwargs): 
-		"""Plot an arbitrary compound property across the whole dataset"""
+		"""Plot an arbitrary compound property across the whole dataset, see :func:`hippo.plotting.plot_compound_property`"""
 		from .plotting import plot_compound_property
 		return plot_compound_property(self, prop, **kwargs)
 
 	def plot_pose_property(self, prop, **kwargs): 
-		"""Plot an arbitrary pose property across the whole dataset"""
+		"""Plot an arbitrary pose property across the whole dataset, see :func:`hippo.plotting.plot_pose_property`"""
 		from .plotting import plot_pose_property
 		return plot_pose_property(self, prop, **kwargs)
 
 	def plot_interaction_punchcard(self, poses=None, subtitle=None, opacity=1.0, **kwargs):
-		"""Plot an interaction punchcard for a set of poses"""
+		"""Plot an interaction punchcard for a set of poses, see :func:`hippo.plotting.plot_interaction_punchcard`"""
 		from .plotting import plot_interaction_punchcard
 		return plot_interaction_punchcard(self, poses=poses, subtitle=subtitle, opacity=opacity, **kwargs)
 
 	def plot_residue_interactions(self, poses, residue_number, **kwargs):
-		"""Plot an interaction punchcard for a set of poses"""
+		"""Plot an interaction punchcard for a set of poses, see :func:`hippo.plotting.plot_residue_interactions`"""
 		from .plotting import plot_residue_interactions
 		return plot_residue_interactions(self, poses=poses, residue_number=residue_number, **kwargs)
 
 	def plot_compound_availability(self, compounds=None, **kwargs):
-		"""Plot a bar chart of compound availability by supplier/catalogue"""
+		"""Plot a bar chart of compound availability by supplier/catalogue, see :func:`hippo.plotting.plot_compound_availability`"""
 		from .plotting import plot_compound_availability
 		return plot_compound_availability(self, compounds=compounds, **kwargs)
 
 	def plot_compound_price(self, min_amount, compounds=None, plot_lead_time=False, style='histogram', **kwargs):
-		"""Plot a bar chart of minimum compound price for a given minimum amount"""
+		"""Plot a bar chart of minimum compound price for a given minimum amount, see :func:`hippo.plotting.plot_compound_price`"""
 		from .plotting import plot_compound_price
 		return plot_compound_price(self, min_amount=min_amount, compounds=compounds, style=style, **kwargs)
 
 	def plot_reaction_funnel(self, **kwargs):
+		"""Plot a funnel chart of the reactants, intermediates, and products across the whole dataset, see :func:`hippo.plotting.plot_reaction_funnel`"""
 		from .plotting import plot_reaction_funnel
 		return plot_reaction_funnel(self, **kwargs)
 	
 	### OTHER
 
-	def summary(self):
-		"""Print a summary of this HIPPO"""
+	def summary(self) -> None:
+		"""Print a text summary of this HIPPO"""
 		logger.header(self)
 		logger.var('db_path', self.db_path)
 		logger.var('#compounds', self.num_compounds)
@@ -1668,12 +1810,10 @@ class HIPPO:
 		logger.var('tags', self.tags.unique)
 		# logger.var('#products', len(self.products))
 
-		
-
 	### DUNDERS
 
 	def __repr__(self) -> str:
-		"""Returns a command line representation"""
+		"""Returns a command line representation of this HIPPO"""
 		return f'HIPPO("{self.name}")'
 
 class InvalidRowError(Exception):

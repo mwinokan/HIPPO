@@ -37,6 +37,9 @@ exclude_patterns = []
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
 
+html_logo = '../../logos/hippo_logo_tightcrop.png'
+html_favicon = '../../logos/hippo_assets-02.gif'
+
 source_suffix = '.rst'
 master_doc = 'index'
 # project = 'ASE'
