@@ -17,13 +17,16 @@ logger = logging.getLogger('HIPPO')
 class Compound:
 
 	"""A :class:`.Compound` represents a ligand/small molecule with stereochemistry removed and no atomic coordinates. I.e. it represents the chemical structure. It's name is always an InChiKey. If a compound is an elaboration it can have a :meth:`.Compound.base` property which is another :class:`.Compound`. :class:`.Compound` objects are target-agnostic and can be linked to any number of catalogue entries (:class:`.Quote`) or synthetic pathways (:class:`.Reaction`).
+	
+	.. attention::
+	
+		:class:`.Compound` objects should not be created directly. Instead use :meth:`.HIPPO.register_compound` or :meth:`.HIPPO.compounds`. See :doc:`getting_started` and :doc:`insert_elaborations`.
 
-	:class:`.Compound` objects should not be created directly. Instead use :meth:`.HIPPO.register_compound` or :meth:`.HIPPO.compounds`
 	"""
 
 	def __init__(self,
-			animal,
-			db,
+			animal: 'HIPPO',
+			db: 'Database',
 			id: int,
 			inchikey: str,
 			alias: str,
@@ -102,40 +105,41 @@ class Compound:
 		return self._mol
 
 	@property
-	def num_heavy_atoms(self):
+	def num_heavy_atoms(self) -> int:
 		"""Get the number of heavy atoms"""
 		if self._num_heavy_atoms is None:
 			self._num_heavy_atoms = self.db.get_compound_computed_property('num_heavy_atoms', self.id)
 		return self._num_heavy_atoms
 
 	@property
-	def molecular_weight(self):
+	def molecular_weight(self) -> float:
 		"""Get the molecular weight"""
 		if self._molecular_weight is None:
 			self._molecular_weight = self.db.get_compound_computed_property('molecular_weight', self.id)
 		return self._molecular_weight
 
 	@property
-	def num_rings(self):
+	def num_rings(self) -> int:
 		"""Get the number of rings"""
 		if self._num_rings is None:
 			self._num_rings = self.db.get_compound_computed_property('num_rings', self.id)
 		return self._num_rings
 
 	@property
-	def formula(self):
+	def formula(self) -> str:
 		"""Get the chemical formula"""
 		if self._formula is None:
 			self._formula = self.db.get_compound_computed_property('formula', self.id)
 		return self._formula
 
 	@property
-	def atomtype_dict(self):
+	def atomtype_dict(self) -> dict[str,int]:
+		"""Get a dictionary with atomtypes as keys and corresponding quantities/counts as values."""
 		from .tools import formula_to_atomtype_dict
 		return formula_to_atomtype_dict(self.formula)
 
 	@property
-	def num_atoms_added(self):
+	def num_atoms_added(self) -> int:
 		"""Calculate the number of atoms added relative to the base compound"""
 		assert (b_id := self._base_id), f'{self} has no base defined'
 		n_e = self.num_heavy_atoms
@@ -150,7 +154,7 @@ class Compound:
 		return self._metadata
 
 	@property
-	def db(self):
+	def db(self) -> 'Database':
 		"""Returns a pointer to the parent database"""
 		return self._db
 
@@ -162,12 +166,13 @@ class Compound:
 		return self._tags
 
 	@property
-	def poses(self):
+	def poses(self) -> 'PoseSet':
 		"""Returns the compound's poses"""
 		return self.get_poses()
 
 	@property
-	def best_placed_pose(self):
+	def best_placed_pose(self) -> Pose:
+		"""Returns the compound's pose with the lowest distance score"""
 		return self.poses.best_placed_pose
 
 	@property
@@ -198,12 +203,13 @@ class Compound:
 		self.set_base(b)
 
 	@property
-	def reactions(self):
+	def reactions(self) -> 'ReactionSet':
 		"""Returns the reactions resulting in this compound"""
 		return self.get_reactions(none=False)
 
 	@property
-	def reaction(self):
+	def reaction(self) -> 'Reaction':
+		"""Returns the reaction resulting in this compound (will return first if multiple, with a warning)"""
 		reactions = self.reactions
 		match len(reactions):
 			case 0:
@@ -218,15 +224,11 @@ class Compound:
 
 	@property
 	def dict(self) -> dict:
-		"""Returns a dictionary of this compound"""
+		"""Returns a dictionary of this compound. See :meth:`.Compound.get_dict`"""
 		return self.get_dict()
 
 	@property
-	def table(self):
-		return self._table
-
-	@property
-	def elabs(self):
+	def elabs(self) -> 'CompoundSet':
 		"""Return the set of elaborations based on this compound"""
 		ids = self.db.select_where(query='compound_id', table='compound', key='base', value=self.id, multiple=True)
 		ids = [q for q, in ids]
@@ -234,43 +236,22 @@ class Compound:
 		return CompoundSet(self.db, ids)
 
 	@property
-	def is_base(self):
+	def is_base(self) -> bool:
 		"""Is this Compound the basis for any elaborations?"""
 		return bool(self.db.select_where(query='compound_id', table='compound', key='base', value=self.id, multiple=False, none='quiet'))
 
 	@property
-	def is_elab(self):
+	def is_elab(self) -> bool:
 		"""Is this Compound the based on any other compound?"""
 		return bool(self.base)
 
 	@property
-	def is_product(self):
+	def is_product(self) -> bool:
 		"""Is this Compound a product of at least one reaction"""
 		return bool(self.get_reactions(none=False))
 	
 	
 	### METHODS
-
-	# def get_dict(self, mol=False):
-	# 	"""Returns a dictionary of this compound"""
-
-	# 	serialisable_fields = ['id','inchikey','alias','smiles']
-
-	# 	if mol:
-	# 		serialisable_fields.append('mol')
-
-	# 	data = {}
-	# 	for key in serialisable_fields:
-	# 		data[key] = getattr(self, key)
-
-	# 	if base := self.base:
-	# 		data['base'] = base.inchikey
-
-	# 	if metadata := self.metadata:
-	# 		for key in metadata:
-	# 			data[key] = metadata[key]
-
-	# 	return data
 
 	def add_stock(self, 
 		amount: float,
@@ -281,7 +262,14 @@ class Compound:
 		return_quote: bool = True,
 	) -> int | Quote:
 
-		"""Register a certain quantity of compound stock in the Database."""
+		"""Register a certain quantity of compound stock in the Database.
+		
+		:param amount: Amount in ``mg``
+		:param purity: Purity fraction ``0 < purity <= 1``, defaults to ``None``
+		:param location: String describing where this stock is located, defaults to ``None``
+		:param return_quote: If ``True`` a :class:`.Quote` object is returned instead of its ID, defaults to ``True``
+		:returns: The inserted :class:`.Quote` object or ID (see ``return_quote``)
+		"""
 
 		assert amount
 
@@ -332,12 +320,31 @@ class Compound:
 		else:
 			return quote_id
 
-	def get_tags(self) -> set:
+	def get_tags(self) -> 'TagSet':
+		"""Get the tags assigned to this compound"""
 		tags = self.db.select_where(query='tag_name', table='tag', key='compound', value=self.id, multiple=True, none='quiet')
 		return TagSet(self, {t[0] for t in tags}, commit=False)
 
-	def get_quotes(self, min_amount=None, supplier=None, max_lead_time=None, none='quiet', pick_cheapest=False, df=False) -> list[dict]:
-		"""Get all quotes associated to this compound"""
+	def get_quotes(self, 
+		min_amount: float | None = None, 
+		supplier: str | None = None, 
+		max_lead_time: float | None = None, 
+		none: str = 'quiet', 
+		pick_cheapest: bool = False, 
+		df: bool = False
+	) -> list['Quote']:
+
+		"""Get all quotes associated to this compound
+
+		:param min_amount: Only return quotes with amounts greater than this, defaults to ``None``
+		:param supplier: Only return quotes with the given supplier, defaults to ``None``
+		:param max_lead_time: Only return quotes with lead times less than this (in days), defaults to ``None``
+		:param none: Define the behaviour when no quotes are found. Choose `error` to raise print an error.
+		:param pick_cheapest: If ``True`` only the cheapest :class:`.Quote` is returned, defaults to ``False``
+		:param df: Returns a ``DataFrame`` of the quoting data, defaults to ``False`` 
+		:returns: List of :class:`.Quote` objects, ``DataFrame``, or single :class:`.Quote`. See ``pick_cheapest`` and ``df`` parameters
+
+		"""
 
 		if not supplier:
 			quote_ids = self.db.select_where(query='quote_id', table='quote', key='compound', value=self.id, multiple=True, none=none)
@@ -373,8 +380,18 @@ class Compound:
 		
 		return quotes
 
-	def get_reactions(self, none='error', as_reactant=False, permitted_reactions=None) -> list:
-		"""Get the associated reactions as product, unless as_reactant is True."""
+	def get_reactions(self, 
+		as_reactant: bool = False, 
+		permitted_reactions: 'ReactionSet' = None,
+		none: str = 'error', 
+	) -> 'ReactionSet':
+
+		"""Get the associated :class:`.Reaction` objects. By default this function returns all reaction resulting in this :class:`.Compound` as a product, unless ``as_reactant`` is set to ``True``.
+
+		:param as_reactant: Search for :class:`.Reaction` objects using this :class:`.Compound` as a reactant instead of a product, defaults to ``False``
+		:param permitted_reactions: Provide a :class:`.ReactionSet` by which to filter the results
+		:param none: Define the behaviour when no quotes are found. Choose `error` to raise print an error, defaults to ``'error'``
+		"""
 
 		from .rset import ReactionSet
 
@@ -390,33 +407,32 @@ class Compound:
 
 		return ReactionSet(self.db, reaction_ids)
 
-	def get_poses(self, 
-		target: str = None
-	) -> list[Pose]:
+	def get_poses(self) -> 'PoseSet':
+		"""Get the associated :class:`.Pose` objects."""
 
 		pose_ids = self.db.select_where(query='pose_id', table='pose', key='compound', value=self.id, multiple=True, none=False)
 
-		# if not pose_ids:
-			# return None
-
-		# poses = [self.db.get_pose(id=q[0]) for q in pose_ids]
-
 		from .pset import PoseSet
-
 		return PoseSet(self.db, [q[0] for q in pose_ids])
 
-	def get_dict(self, mol=True, reactions=False, metadata=True, count_by_target=False, poses=True):
+	def get_dict(self, 
+		*,
+		mol: bool = True, 
+		metadata: bool = True, 
+		poses: bool = True,
+		count_by_target: bool = False, 
+	) -> 'dict':
 		
-		"""Returns a dictionary representing this Compound"""
+		"""Returns a dictionary representing this :class:`.Compound`
 
-		# serialisable_fields = ['id','alias', 'inchikey', 'smiles', 'num_poses', 'num_reactant', 'num_reactions']
+		:param mol: Include a ``rdkit.Chem.Mol object``, defaults to ``True``
+		:param metadata: Include metadata, defaults to ``True``
+		:param poses: Include dictionaries of associated :class:`.Pose` objects, defaults to ``True``
+		:param count_by_target: Include counts by protein :class:`.Target`, defaults to ``False``. Only applicable when ``count_by_target = True``.
+		:returns: A dictionary
+		"""
+
 		serialisable_fields = ['id','alias', 'inchikey', 'smiles', 'num_reactant', 'num_reactions']
-
-		# poses
-		# reactions
-		# poses.targets
-
-		# assert not reactions
 
 		data = {}
 		for key in serialisable_fields:
@@ -441,8 +457,6 @@ class Compound:
 			
 			if poses:
 
-				# data['poses'] = [a if a else i for a,i in zip(poses.aliases, poses.inchikeys)]
-				# data['poses'] = self.poses.names
 				data['poses'] = poses.ids
 				data['targets'] = poses.target_names
 			
@@ -459,20 +473,52 @@ class Compound:
 
 		return data
 
-	def set_base(self, base, commit=True):
+	def set_base(self, 
+		base: 'Compound | int', 
+		commit: bool = True
+	) -> None:
+
+		"""
+		Set the single base :class:`.Compound` this molecule is derived from.
+		
+		:param base: The base :class:`.Compound` or its ID.
+		:param commit: Commit the changes to the :class:`.Database`, defaults to ``True``
+		"""
+
 		if not isinstance(base, int):
 			assert base._table == 'compound'
 			base = base.id
 		self._base_id = base
 		self.db.update(table='compound', id=self.id, key='compound_base', value=base, commit=commit)
 
-	def set_alias(self, alias, commit=True):
+	def set_alias(self, 
+		alias: str, 
+		commit=True
+	) -> None:
+
+		"""
+		Set this :class:`.Compound`'s alias.
+		
+		:param alias: The alias
+		:param commit: Commit the changes to the :class:`.Database`, defaults to ``True``
+		"""
+
 		assert isinstance(alias, str)
 		self._alias = alias
 		self.db.update(table='compound', id=self.id, key='compound_alias', value=alias, commit=commit)
 
-	def as_ingredient(self, amount, max_lead_time=None, supplier=None):
-		"""Convert this compound into an Ingredient object"""
+	def as_ingredient(self, 
+		amount: float, 
+		max_lead_time: float = None, 
+		supplier: str = None,
+	) -> 'Ingredient':
+
+		"""Convert this compound into an :class:`.Ingredient` object with an associated amount (in ``mg``) and :class:`.Quote` if available.
+
+		:param amount: Amount in ``mg``
+		:param supplier: Only search for quotes with the given supplier, defaults to ``None``
+		:param max_lead_time: Only search for quotes with lead times less than this (in days), defaults to ``None``
+		"""
 		
 		quote = self.get_quotes(
 			pick_cheapest=True, 
@@ -484,26 +530,28 @@ class Compound:
 
 		if not quote:
 			quote = None
-
-		# else:
-			# quote = quote.id
 		
 		return Ingredient(db=self.db, compound=self.id, amount=amount, quote=quote, supplier=supplier, max_lead_time=max_lead_time)
 
-	def draw(self, align_substructure: bool = False):
-		"""Display this compound (and its base if it has one)"""
+	def draw(self, 
+		align_substructure: bool = False
+	) -> None:
+		"""Display this compound (and its base if it has one)
+
+		.. attention::
+
+			This method is only intended for use within a Jupyter Notebook.
+
+		:param align_substructure: Align the two drawing by their common substructure, defaults to ``False``
+		"""
 
 		if (base := self.base):
-
-			# print(self.base)
 
 			from molparse.rdkit import draw_mcs
 
 			data = {self.base.smiles:f'{base} (base)', self.smiles:str(self)}
 
 			if len(data) == 2:
-
-				# print(data)
 
 				drawing = draw_mcs(data, align_substructure=align_substructure, show_mcs=False, highlight_common=False)
 				display(drawing)
@@ -515,12 +563,23 @@ class Compound:
 		else:
 			display(self.mol)
 
-	def classify(self, draw=True):
-		"""Find RDKit Fragments within the compound molecule and draw them (or just return a list of (descriptor, count) tuples)"""
+	def classify(self, 
+		draw: bool = True,
+	) -> list[tuple[str,int]]:
+
+		"""
+		Find RDKit Fragments within the compound molecule and draw them
+
+		:param draw: Draw the annotated molecule, defaults to ``True``
+		:returns: A list of tuples containing a descriptor (``str``) and count (``int``) pair
+		"""
 		from molparse.rdkit import classify_mol
 		return classify_mol(self.mol, draw=draw)
 
-	def murcko_scaffold(self, generic=False):
+	def murcko_scaffold(self, 
+		generic: bool = False, 
+	):
+	
 		"""Get the rdkit MurckoScaffold for this compound"""
 
 		from rdkit.Chem.Scaffolds import MurckoScaffold
@@ -532,8 +591,18 @@ class Compound:
 
 		return scaffold
 
-	def summary(self, metadata: bool = True, draw: bool = True):
-		"""Print a summary of this compound"""
+	def summary(self, 
+		metadata: bool = True, 
+		draw: bool = True
+	) -> None:
+
+		"""
+		Print a summary of this compound
+
+		:param metadata: Include metadata, defaults to ``True``	
+		:param draw: Include a 2D molecule drawing, defaults to ``True``	
+		"""
+
 		logger.header(repr(self))
 
 		logger.var('inchikey', self.inchikey)
@@ -560,7 +629,7 @@ class Compound:
 			logger.var('metadata', str(self.metadata))
 		
 		if draw:
-			return self.draw()
+			self.draw()
 
 	def place(self,
 		*,
@@ -574,7 +643,10 @@ class Compound:
 		metadata = None,
 		overwrite = False,
 	) -> Pose:
-		"""Generate a new pose for this compound using Fragmenstein."""
+
+		"""
+		Generate a new pose for this compound using Fragmenstein.
+		"""
 		
 		from fragmenstein import Monster, Wictor
 		from pathlib import Path

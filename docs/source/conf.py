@@ -39,6 +39,12 @@ html_static_path = ['_static']
 html_logo = '../../logos/hippo_logo_tightcrop.png'
 html_favicon = '../../logos/hippo_assets-02.gif'
 
+html_theme_options = {
+    'navigation_depth': -1,
+    'logo_only': True,
+    'prev_next_buttons_location': 'both',
+}
+
 html_css_files = [
     'css/custom.css'
 ]
