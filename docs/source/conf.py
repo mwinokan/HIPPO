@@ -24,12 +24,11 @@ extensions = [
               'sphinx.ext.mathjax',
               'sphinx.ext.viewcode',
               'sphinx.ext.napoleon',
-              'sphinx.ext.intersphinx']
+              'sphinx.ext.intersphinx',
+              ]
 
 templates_path = ['_templates']
 exclude_patterns = []
-
-
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
@@ -39,6 +38,10 @@ html_static_path = ['_static']
 
 html_logo = '../../logos/hippo_logo_tightcrop.png'
 html_favicon = '../../logos/hippo_assets-02.gif'
+
+html_css_files = [
+    'css/custom.css'
+]
 
 source_suffix = '.rst'
 master_doc = 'index'

@@ -27,22 +27,18 @@ from rdkit.Chem import Mol
 
 class HIPPO:
 
-	"""The HIPPO 'animal' class. Instantiating a HIPPO object will create or link a HIPPO database.
+	"""The :class:`.HIPPO` `animal` class. Instantiating a :class:`.HIPPO` object will create or link a :class:`.HIPPO` :class:`.Database`.
 
 	::
 		
 		from hippo import HIPPO
 		animal = HIPPO(project_name, db_path)
-	
-	:param project_name: give this hippo a name
-	:param db_path: path where the database will be stored
-	:returns: HIPPO object
 
-	Concepts:
+	See :doc:`getting_started` and :doc:`insert_elaborations`.
 
-		Registering:
-
-			- If an identical entry exists return that entry, else add it to the Database
+	:param project_name: give this :class:`.HIPPO` a name
+	:param db_path: path where the :class:`.Database` will be stored
+	:returns: :class:`.HIPPO` object
 	"""
 		
 	def __init__(self, 
@@ -150,21 +146,21 @@ class HIPPO:
 
 	@property
 	def reactants(self) -> CompoundSet:
-		"""Returns all compounds that are reactants for at least one :class:`hippo.reaction.Reaction` (and not products of others)"""
+		"""Returns all compounds that are reactants for at least one :class:`.Reaction` (and not products of others)"""
 		if self._reactants is None or self._reactants['total_changes'] != self.db.total_changes:
 			self._reactants = dict(set=self.compounds.reactants, total_changes=self.db.total_changes)
 		return self._reactants['set']
 
 	@property
 	def products(self) -> CompoundSet:
-		"""Returns all compounds that are products of at least one :class:`hippo.reaction.Reaction` (and not reactants of others)"""
+		"""Returns all compounds that are products of at least one :class:`.Reaction` (and not reactants of others)"""
 		if self._products is None or self._products['total_changes'] != self.db.total_changes:
 			self._products = dict(set=self.compounds.products, total_changes=self.db.total_changes)
 		return self._products['set']
 
 	@property
 	def intermediates(self) -> CompoundSet:
-		"""Returns all compounds that are products and reactants of :class:`hippo.reaction.Reaction`"""
+		"""Returns all compounds that are products and reactants of :class:`.Reaction`"""
 		if self._intermediates is None or self._intermediates['total_changes'] != self.db.total_changes:
 			self._intermediates = dict(set=self.compounds.intermediates, total_changes=self.db.total_changes)
 		return self._intermediates['set']
@@ -219,7 +215,7 @@ class HIPPO:
 	) -> pd.DataFrame:
 		"""Load in crystallographic hits downloaded from Fragalysis.
 
-		:param target_name: Name of this protein :class:`hippo.target.Target`
+		:param target_name: Name of this protein :class:`.Target`
 		:param metadata_csv: Path to the metadata.csv from the Fragalysis download
 		:param aligned_directory: Path to the aligned_files directory from the Fragalysis download
 		:param skip: optional list of observation names to skip
@@ -385,21 +381,21 @@ class HIPPO:
 
 		"""Add posed virtual hits from an SDF into the database.
 
-		:param target: Name of the protein :class:`hippo.target.Target`
+		:param target: Name of the protein :class:`.Target`
 		:param sdf_path: Path to the SDF
-		:param reference: Reference :class:`hippo.pose.Pose` to use as the protein conformation for all poses, defaults to ``None``
+		:param reference: Reference :class:`.Pose` to use as the protein conformation for all poses, defaults to ``None``
 		:param tags: Tags to assign to all created compounds and poses, defaults to ``None``
 		:param output_directory: Specify the path where individual ligand .mol files will be created, defaults to ``None`` where the name of the SDF is used.
 		:param mol_col: Name of the column containing the ``rdkit.ROMol`` ligands, defaults to ``"ROMol"``
 		:param name_col: Name of the column containing the ligand name/alias, defaults to ``"ID"``
 		:param inspiration_col: Name of the column containing the list of inspiration pose names, defaults to ``"ref_mols"``
-		:param inspiration_map: Dictionary or callable mapping between inspiration strings found in ``inspiration_col`` and :class:`hippo.pose.Pose` ids, defaults to None
+		:param inspiration_map: Dictionary or callable mapping between inspiration strings found in ``inspiration_col`` and :class:`.Pose` ids, defaults to None
 		:param skip_first: Skip first row, defaults to ``False``
 		:param convert_floats: Try to convert all values to ``float``, defaults to ``True``
 		:param stop_after: Stop after given number of rows, defaults to ``None``
 		:param skip_equal_dict: Skip rows where ``any(row[key] == value for key, value in skip_equal_dict.items())``, defaults to ``None``
 		:param skip_not_equal_dict: Skip rows where ``any(row[key] != value for key, value in skip_not_equal_dict.items())``, defaults to ``None``
-		:param check_pose_RMSD: Check :class:`hippo.pose.Pose` to previously registered poses and skip if below ``pose_RMSD_tolerance``, defaults to ``False``
+		:param check_pose_RMSD: Check :class:`.Pose` to previously registered poses and skip if below ``pose_RMSD_tolerance``, defaults to ``False``
 		:param pose_RMSD_tolerance: Tolerance for ``check_pose_RMSD`` in Angstrom, defaults to ``1.0``
 		
 		All non-name columns added to the Pose metadata.
@@ -598,9 +594,9 @@ class HIPPO:
 		:param tags: list of tags to assign to compounds and poses, defaults to ``None``
 		:param reaction_yield_map: dictionary mapping reaction type strings to their yield ratio, defaults to ``None``
 		:param check_chemistry: check the reaction chemistry, defaults to ``True``
-		:param return_reactions: Return :class:`hippo.rset.ReactionSet` of reactions, defaults to ``False``
+		:param return_reactions: Return :class:`.ReactionSet` of reactions, defaults to ``False``
 		:param debug: Increase verbosity of output, defaults to ``False``
-		:returns: :class:`hippo.cset.CompoundSet` of compounds if ``return_reactions = False``, else returns a tuple: ``(compounds, reactions)``
+		:returns: :class:`.CompoundSet` of compounds if ``return_reactions = False``, else returns a tuple: ``(compounds, reactions)``
 		"""
 
 		from .chem import check_reaction_types, InvalidChemistryError
@@ -736,7 +732,7 @@ class HIPPO:
 		Load Syndirella elaboration compounds and poses from a pickled DataFrame
 
 		:param df_path: Path to the pickled DataFrame
-		:param inspiration_map: Dictionary or callable mapping between inspiration strings found in ``inspiration_col`` and :class:`hippo.pose.Pose` ids, defaults to None
+		:param inspiration_map: Dictionary or callable mapping between inspiration strings found in ``inspiration_col`` and :class:`.Pose` ids, defaults to None
 		:param base_only: Only load the base compound, defaults to ``False``
 		:param tags: list of tags to assign to compounds and poses, defaults to ``None``
 		:param reaction_yield_map: dictionary mapping reaction type strings to their yield ratio, defaults to ``None``
@@ -1033,7 +1029,7 @@ class HIPPO:
 		:param entry_col: Column name of the catalogue ID/entry, defaults to 'Catalog ID'
 		:param stop_after: Stop after given number of rows, defaults to ``None``
 		:param orig_name_is_hippo_id: Set to ``True`` if ``orig_name_col`` is the original HIPPO :class:``hippo.compound.Compound`` ID, defaults to ``False``
-		:returns: An :class:`hippo.cset.IngredientSet` of the quoted molecules
+		:returns: An :class:`.IngredientSet` of the quoted molecules
 		"""
 
 		df = pd.read_excel(path)
@@ -1139,7 +1135,7 @@ class HIPPO:
 		Load an MCule quote provided as an excel file
 		
 		:param path: Path to the excel file
-		:returns: An :class:`hippo.cset.IngredientSet` of the quoted molecules
+		:returns: An :class:`.IngredientSet` of the quoted molecules
 		"""
 
 		### get lead time from suppliers sheet
@@ -1252,17 +1248,17 @@ class HIPPO:
 		"""Use a smiles string to add a compound to the database. If it already exists return the compound
 		
 		:param smiles: The SMILES string of the compound
-		:param base: The :class:`hippo.compound.Compound` object or ID that this compound is based on, defaults to ``None``
+		:param base: The :class:`.Compound` object or ID that this compound is based on, defaults to ``None``
 		:param tags: A list of tags to assign to this compound, defaults to ``None``
 		:param metadata: A dictionary of metadata to assign to this compound, defaults to ``None``
-		:param return_compound: return the :class:`hippo.compound.Compound` object instead of the integer ID, defaults to ``True``
-		:param commit: Commit the changes to the :class:`hippo.db.Database`, defaults to ``True``
+		:param return_compound: return the :class:`.Compound` object instead of the integer ID, defaults to ``True``
+		:param commit: Commit the changes to the :class:`.Database`, defaults to ``True``
 		:param alias: The string alias of this compound, defaults to ``None``
 		:param return_duplicate: If ``True`` returns a boolean indicating if this compound previously existed, defaults to ``False``
-		:param register_base_if_duplicate: If this compound exists in the :class:`hippo.db.Database` modify it's ``base`` property, defaults to ``True``
-		:param radical: Define the behaviour for dealing with radical atoms in the SMILES. See :class:`hippo.tools.sanitise_smiles`. Defaults to ``'warning'``
+		:param register_base_if_duplicate: If this compound exists in the :class:`.Database` modify it's ``base`` property, defaults to ``True``
+		:param radical: Define the behaviour for dealing with radical atoms in the SMILES. See :class:`.sanitise_smiles`. Defaults to ``'warning'``
 		:param debug: Increase verbosity of output, defaults to ``False``
-		:returns: The registered/existing :class:`hippo.compound.Compound` object or its ID (depending on ``return_compound``), and optionally a boolean to indicate duplication see ``return_duplicate``
+		:returns: The registered/existing :class:`.Compound` object or its ID (depending on ``return_compound``), and optionally a boolean to indicate duplication see ``return_duplicate``
 		"""
 
 		assert smiles
@@ -1357,15 +1353,15 @@ class HIPPO:
 		check_chemistry: bool = False,
 	) -> Reaction:
 
-		"""Add a :class:`hippo.reaction.Reaction` to the :class:`hippo.db.Database`. If it already exists return the existing one
+		"""Add a :class:`.Reaction` to the :class:`.Database`. If it already exists return the existing one
 		
 		:param type: string indicating the type of reaction
-		:param product: The :class:`hippo.compound.Compound` object or ID of the product
-		:param reactants: A list of :class:`hippo.compound.Compound` objects or IDs of the reactants
-		:param commit: Commit the changes to the :class:`hippo.db.Database`, defaults to ``True``
+		:param product: The :class:`.Compound` object or ID of the product
+		:param reactants: A list of :class:`.Compound` objects or IDs of the reactants
+		:param commit: Commit the changes to the :class:`.Database`, defaults to ``True``
 		:param product_yield: The fraction of product yielded from this reaction ``0 < product_yield <= 1.0``, defaults to ``1.0``
 		:param check_chemistry: check the reaction chemistry, defaults to ``True``
-		:returns: The registered :class:`hippo.reaction.Reaction`
+		:returns: The registered :class:`.Reaction`
 		"""
 
 		### CHECK REACTION VALIDITY
@@ -1421,7 +1417,7 @@ class HIPPO:
 	) -> Target:
 
 		"""
-		Register a new protein :class:`hippo.Target` to the Database
+		Register a new protein :class:`` to the Database
 		
 		:param param1: this is a first param
 		:param param2: this is a second param
@@ -1459,26 +1455,26 @@ class HIPPO:
 		duplicate_alias: str = 'modify',
 	) -> Pose:
 
-		"""Add a :class:`hippo.pose.Pose` to the :class:`hippo.db.Database`. If it already exists return the pose
+		"""Add a :class:`.Pose` to the :class:`.Database`. If it already exists return the pose
 		
-		:param compound: The :class:`hippo.compound.Compound` object or ID that this :class:`hippo.pose.Pose` is a conformer of
-		:param target: The :class:`hippo.target.Target` name or ID
-		:param path: Path to the :class:`hippo.pose.Pose`'s conformer file (.pdb or .mol)
-		:param alias: The string alias of this :class:`hippo.pose.Pose`, defaults to ``None``
-		:param reference: Reference :class:`hippo.pose.Pose` to use as the protein conformation for all poses, defaults to ``None``
+		:param compound: The :class:`.Compound` object or ID that this :class:`.Pose` is a conformer of
+		:param target: The :class:`.Target` name or ID
+		:param path: Path to the :class:`.Pose`'s conformer file (.pdb or .mol)
+		:param alias: The string alias of this :class:`.Pose`, defaults to ``None``
+		:param reference: Reference :class:`.Pose` to use as the protein conformation for all poses, defaults to ``None``
 		:param tags: A list of tags to assign to this compound, defaults to ``None``
 		:param metadata: A dictionary of metadata to assign to this compound, defaults to ``None``
-		:param inspirations: a list of inspiration :class:`hippo.pose.Pose` objects or ID's, defaults to ``None``
-		:param energy_score: assign an energy score to this :class:`hippo.pose.Pose`, defaults to ``None``
-		:param distance_score: assign a distance score to this :class:`hippo.pose.Pose`, defaults to ``None``
-		:param commit: Commit the changes to the :class:`hippo.db.Database`, defaults to ``True``
+		:param inspirations: a list of inspiration :class:`.Pose` objects or ID's, defaults to ``None``
+		:param energy_score: assign an energy score to this :class:`.Pose`, defaults to ``None``
+		:param distance_score: assign a distance score to this :class:`.Pose`, defaults to ``None``
+		:param commit: Commit the changes to the :class:`.Database`, defaults to ``True``
 		:param overwrite_metadata: If a duplicate is found, overwrite its metadata, defaults to ``True``
-		:param warn_duplicate: Warn if a duplicate :class:`hippo.pose.Pose` exists, defaults to ``True``
-		:param check_RMSD: Check the RMSD against existing :class:`hippo.pose.Pose`, defaults to ``False``
+		:param warn_duplicate: Warn if a duplicate :class:`.Pose` exists, defaults to ``True``
+		:param check_RMSD: Check the RMSD against existing :class:`.Pose`, defaults to ``False``
 		:param RMSD_tolerance: Tolerance for ``check_RMSD`` in Angstrom, defaults to ``1.0``
-		:param split_PDB: Register a :class:`hippo.pose.Pose` for every ligand residue in the PDB, defaults to ``False``
+		:param split_PDB: Register a :class:`.Pose` for every ligand residue in the PDB, defaults to ``False``
 		:param duplicate_alias: In the case of a duplicate, define the behaviour for the ``alias`` property, defaults to ``'modify'`` which appends ``_copy`` to the alias. Set to ``error`` to raise an Exception.
-		:returns: The registered/existing :class:`hippo.pose.Pose` object or its ID (depending on ``return_compound``)
+		:returns: The registered/existing :class:`.Pose` object or its ID (depending on ``return_compound``)
 		"""
 
 		assert duplicate_alias in ['error', 'modify']
@@ -1671,11 +1667,11 @@ class HIPPO:
 	) -> int:
 
 		"""
-		Insert a :class:`hippo.recipe.Route` (single-product :class:`hippo.recipe.Recipe`) into the :class:`hippo.db.Database`.
+		Insert a :class:`.Route` (single-product :class:`.Recipe`) into the :class:`.Database`.
 		
-		:param route: The :class:`hippo.recipe.Route` object to be registered
-		:param commit: Commit the changes to the :class:`hippo.db.Database`, defaults to ``True``
-		:returns: The :class:`hippo.recipe.Route` ID
+		:param route: The :class:`.Route` object to be registered
+		:param commit: Commit the changes to the :class:`.Database`, defaults to ``True``
+		:returns: The :class:`.Route` ID
 		"""
 
 
@@ -1709,8 +1705,8 @@ class HIPPO:
 	) -> None:
 		"""Get batch quotes using the hippo.Quoter object supplied and add the quotes to the database
 
-		:param quoter: The :class:`hippo.pycule.Quoter` object to use
-		:param compounds: A :class:`hippo.cset.CompoundSet` containing the compounds to be quoted
+		:param quoter: The :class:`.Quoter` object to use
+		:param compounds: A :class:`.CompoundSet` containing the compounds to be quoted
 		"""
 		
 		logger.header(f'Getting {quoter.supplier} quotes for {len(compounds)} compounds')
@@ -1728,7 +1724,7 @@ class HIPPO:
 
 		"""Get batch quotes for all reactants in the database
 
-		:param quoter: The :class:`hippo.pycule.Quoter` object to use
+		:param quoter: The :class:`.Quoter` object to use
 		:param unquoted_only: Only request quotes for unquoted compouds, defaults to ``False``
 		"""
 
@@ -1745,7 +1741,7 @@ class HIPPO:
 
 		"""Get batch quotes for all reactants in the database		
 
-		:param quoter: The :class:`hippo.pycule.Quoter` object to use
+		:param quoter: The :class:`.Quoter` object to use
 		:param unquoted_only: Only request quotes for unquoted compouds, defaults to ``False``
 		"""
 	

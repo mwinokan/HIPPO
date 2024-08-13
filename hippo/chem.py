@@ -89,7 +89,13 @@ SUPPORTED_CHEMISTRY = {
 
 }
 
-def check_reaction_types(types):
+def check_reaction_types(types: list[str]) -> None:
+	"""
+	Prints a warning if any of the reaction type strings in ``types`` are not in ``SUPPORTED_CHEMISTRY``
+	
+	:param types: A list of reaction type strings to check
+	"""
+
 	for reaction_type in types:
 		if reaction_type not in SUPPORTED_CHEMISTRY:
 			logger.warning(f"Can't check chemistry of unsupported {reaction_type=}")
