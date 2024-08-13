@@ -1,6 +1,7 @@
 
 # from .db import Database
 from collections.abc import MutableSet
+import mcol
 
 class TagTable:
 	"""Object representing the 'tag' table in the :class:`.Database`."""
@@ -39,6 +40,8 @@ class TagTable:
 	def __getitem__(self, key):
 		raise NotImplementedError
 
+	def __repr__(self):
+		return f'{mcol.bold}{mcol.underline}Tags {self.unique}{mcol.clear}'
 
 
 class TagSet(MutableSet):

@@ -1149,11 +1149,6 @@ class RouteSet:
 
 		return data
 
-	### DUNDERS
-
-	def __len__(self):
-		return len(self.data)
-
 	def pop_id(self):
 
 		route_id, route = self.data.popitem()
@@ -1165,3 +1160,16 @@ class RouteSet:
 		route_id, route = self.data.popitem()
 
 		return route
+
+	def shuffle(self):
+		"""Randomly shuffle the routes in this set"""
+		import random
+		items = list(self.data.items())
+		random.shuffle(items)
+		self._data = dict(items)
+
+	### DUNDERS
+
+	def __len__(self):
+		return len(self.data)
+

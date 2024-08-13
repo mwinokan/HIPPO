@@ -14,7 +14,7 @@ class RandomRecipeGenerator:
 
 	def __init__(self, db, *, 
 		max_lead_time = None,
-		max_reactions = None,
+		# max_reactions = None,
 		suppliers: list | None = None,
 		start_with: Recipe | CompoundSet | IngredientSet = None,
 	):
@@ -185,7 +185,37 @@ class RandomRecipeGenerator:
 
 	def get_route_pool(self, mini_test=False):
 
-		route_ids = self.db.select_where(table='route', query='route_id', key=f'route_product IN {self.product_pool.str_ids}', multiple=True)
+		"""Construct the pool of routes that will be randomly sampled from"""
+
+		"""
+			Explainer for SQL query:
+
+			- get table of quoted compounds with a count of the valid suppliers
+			- join routes, components, and the new table together and grouped by route count the unavailable reactants
+			- return route ids where no reactants are unavailable
+
+		"""
+
+		assert self.suppliers_str
+
+		route_ids = self.db.execute(
+		f"""
+		WITH possible_reactants AS (
+		    SELECT quote_compound, COUNT(CASE WHEN quote_supplier IN {self.suppliers_str} THEN 1 END) AS [count_valid] FROM quote
+		    GROUP BY quote_compound
+		),
+
+		route_reactants AS (
+		    SELECT route_id, COUNT(CASE WHEN count_valid = 0 THEN 1 END) AS [count_unavailable] FROM route
+		    INNER JOIN component ON component_route = route_id
+		    LEFT JOIN possible_reactants ON quote_compound = component_ref
+		    WHERE component_type = 2
+		    GROUP BY route_id
+		)
+
+		SELECT route_id FROM route_reactants
+		WHERE count_unavailable = 0
+		""").fetchall()
 
 		if mini_test:
 			route_ids = route_ids[:100]
@@ -235,13 +265,16 @@ class RandomRecipeGenerator:
 		max_products = 1000,
 		max_reactions = 1000,
 		debug=True, 
-		max_iter=150, 
+		max_iter=None, 
 		# pick_inner_cheapest=True, 
 		# add_size=1,
 		shuffle=True,
 	):
 
 		from .price import Price
+
+		if not max_iter:
+			max_iter = max_products + max_reactions
 
 		budget = Price(budget, currency)
 
@@ -268,9 +301,10 @@ class RandomRecipeGenerator:
 		# pool = list(chain.from_iterable(pool.values()))
 
 		if shuffle:
-			from random import shuffle
+			# from random import shuffle
 			logger.debug('Shuffling Route pool')
-			shuffle(pool)
+			# shuffle(pool)
+			pool.shuffle()
 
 		logger.var('route pool', len(pool))
 		logger.var('max_iter', max_iter)
