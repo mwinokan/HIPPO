@@ -34,7 +34,9 @@ class HIPPO:
 		from hippo import HIPPO
 		animal = HIPPO(project_name, db_path)
 
-	See :doc:`getting_started` and :doc:`insert_elaborations`.
+	.. attention::
+
+		In addition to this API reference please see the tutorial pages :doc:`getting_started` and :doc:`insert_elaborations`.
 
 	:param project_name: give this :class:`.HIPPO` a name
 	:param db_path: path where the :class:`.Database` will be stored
