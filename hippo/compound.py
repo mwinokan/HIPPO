@@ -633,19 +633,27 @@ class Compound:
 
 	def place(self,
 		*,
-		target: str | int | Target | None = None,
+		reference: Pose,
 		inspirations: list[Pose] | None = None,
-		reference: Pose | None = None,
 		max_ddG: float = 0.0,
 		max_RMSD: float = 2.0,
 		output_dir: str = 'wictor_place',
-		tags = None,
-		metadata = None,
-		overwrite = False,
+		tags: list[str] = None,
+		metadata: dict = None,
+		overwrite: bool = False,
 	) -> Pose:
 
 		"""
 		Generate a new pose for this compound using Fragmenstein.
+
+		:param reference: Choose the :class:`.Pose` to use as the reference protein conformation
+		:param inspirations: Choose the (virtual) hits to to define the ligand reference, defaults to the ``reference``'s inspirations
+		:param max_ddG: Maximum ``ddG`` value permitted for a valid ligand conformation, defaults to ``0.0``
+		:param max_RMSD: Maximum ``RMSD`` value permitted for a valid ligand conformation, defaults to ``2.0``
+		:param output_dir: Output directory for Fragmenstein files, defaults to ``wictor_place``
+		:param tags: Tags to assign to the created pose, defaults to ``[]``
+		:param metadata: A dictionary of metadata to assign to this compound, defaults to ``{}``
+		:param overwrite: Delete old poses, defaults to ``False``
 		"""
 		
 		from fragmenstein import Monster, Wictor
@@ -657,9 +665,8 @@ class Compound:
 		# get required data
 		smiles = self.smiles
 
-		inspirations = inspirations or self.poses[0].inspirations
-		target = target or self.poses[0].target.name
-		reference = reference or self.poses[0].reference
+		inspirations = inspirations or reference.inspirations
+		target = reference.target.name
 
 		inspiration_mols = [c.mol for c in inspirations]
 		protein_pdb_block = reference.protein_system.pdb_block_with_alt_sites
@@ -675,8 +682,6 @@ class Compound:
 		# metadata
 		metadata['ddG'] = victor.energy_score['bound']['total_score'] - victor.energy_score['unbound']['total_score']
 		metadata['RMSD'] = victor.mrmsd.mrmsd
-
-		# print(victor.energy_score)
 
 		if metadata['ddG'] > max_ddG:
 			return None
@@ -720,11 +725,25 @@ class Ingredient:
 
 	"""An ingredient is a :class:`.Compound` with a fixed quanitity and an attached quote.
 
-	Create one from a :meth:`.Compound.as_ingredient`"""
+	.. image:: ../images/ingredient.png
+		  :width: 450
+		  :alt: Ingredient schema
+
+	.. attention::
+	
+		:class:`.Ingredient` objects should not be created directly. Instead use :meth:`.Compound.as_ingredient`.
+	"""
 
 	_table = 'ingredient'
 
-	def __init__(self, db, compound, amount, quote, max_lead_time=None, supplier=None):
+	def __init__(self, 
+		db, 
+		compound, 
+		amount, 
+		quote, 
+		max_lead_time=None, 
+		supplier=None
+	) -> 'Ingredient':
 
 		assert compound
 
@@ -746,7 +765,6 @@ class Ingredient:
 				self._quote = None
 
 			else:
-				# logger.debug('Initialising Ingredient with estimated quote')
 				self._quote_id = None
 				self._quote = quote
 
@@ -757,15 +775,7 @@ class Ingredient:
 		else:
 			self._quote_id = int(quote)
 			self._quote = None
-		
-		# self._id = inherit.id
-		# self._inchikey = inherit.inchikey
-		# self._alias = inherit.alias
-		# self._smiles = inherit.smiles
-		# self._base = inherit.base			
-		# self._mol = inherit.mol
-		# self._db = inherit.db
-		
+				
 		self._amount = amount
 		self._max_lead_time = max_lead_time
 		self._supplier = supplier
@@ -773,41 +783,44 @@ class Ingredient:
 	### PROPERTIES
 
 	@property
-	def db(self):
+	def db(self) -> 'Database':
+		"""Returns the parent :class:`.Database`"""
 		return self._db
 	
 	@property
 	def amount(self) -> float:
-		"""Returns the amount"""
+		"""Returns the amount (in ``mg``)"""
 		return self._amount
 
 	@property
-	def id(self):
+	def id(self) -> int:
+		"""Returns the ID of the associated :class:`.Compound`"""
 		return self._compound_id
 
 	@property
-	def compound_id(self):
-		"""Returns the ID of the associated compound"""
+	def compound_id(self) -> int:
+		"""Returns the ID of the associated :class:`.Compound`"""
 		return self._compound_id
 
 	@property
-	def quote_id(self):
-		"""Returns the ID of the associated quote"""
+	def quote_id(self) -> int:
+		"""Returns the ID of the associated :class:`.Quote`"""
 		return self._quote_id
 
 	@property
 	def max_lead_time(self) -> float:
-		"""Returns the max_lead_time from the original quote query"""
+		"""Returns the max_lead_time (in days) from the original quote query"""
 		return self._max_lead_time
 
 	@property
-	def supplier(self) -> float:
+	def supplier(self) -> str:
 		"""Returns the supplier from the original quote query"""
 		return self._supplier
 
 	@amount.setter
-	def amount(self, a):
-		"""Set the amount and update quotes"""
+	def amount(self, a) -> None:
+		
+		"""Set the amount and fetch updated :class:`.Quote`s"""
 
 		quote_id = self.get_cheapest_quote_id( 
 			min_amount=a, 
@@ -821,21 +834,24 @@ class Ingredient:
 		self._amount = a
 
 	@property
-	def compound(self):
-		"""Returns the associated :class:`Compound`"""
+	def compound(self) -> Compound:
+		
+		"""Returns the associated :class:`.Compound`"""
+		
 		if not self._compound:
 			self._compound = self.db.get_compound(id=self.compound_id)
 		return self._compound
 		
 	@property
-	def quote(self):
-		"""Returns the associated :class:`Quote`"""
+	def quote(self) -> Quote:
+		
+		"""Returns the associated :class:`.Quote`"""
+
 		if not self._quote:
 			if (q_id := self.quote_id):
 				self._quote = self.db.get_quote(id=self.quote_id)
 			
 			else:
-				# logger.debug(f'Getting quotes for {self}')
 				q = self.compound.get_quotes(
 					pick_cheapest=True, 
 					min_amount=self.amount, 
@@ -853,23 +869,26 @@ class Ingredient:
 		return self._quote
 
 	@property
-	def compound_price_amount_str(self):
-		# return f'{self} {self.quote.currency_symbol}{self.quote.price} ({self.amount})'
+	def compound_price_amount_str(self) -> str:
+		"""String representation including :class:`.Compound`, :class:`.Price`, and amount."""
 		return f'{self} ({self.amount})'
 
 	@property
-	def smiles(self):
+	def smiles(self) -> str:
+		"""Returns the SMILES of the associated :class:`.Compound`"""
 		return self.compound.smiles
 
 	@property
-	def price(self):
+	def price(self) -> 'Price | None':
+		"""Returns the :class:`.Price` of the associated :class:`.Quote`"""
 		if self.quote:
 			return self.quote.price
 		else:
 			return None
 
 	@property
-	def lead_time(self):
+	def lead_time(self) -> float | None:
+		"""Returns the lead time (in days) of the associated :class:`.Quote`"""
 		if self.quote:
 			return self.quote.lead_time
 		else:
@@ -877,8 +896,21 @@ class Ingredient:
 
 	### METHODS
 
-	def get_cheapest_quote_id(self, min_amount=None, supplier=None, max_lead_time=None, none='quiet') -> list[dict]:
-		"""Query quotes associated to this ingredient"""
+	def get_cheapest_quote_id(self, 
+		min_amount: float | None = None, 
+		supplier: str | None = None, 
+		max_lead_time: float | None = None, 
+		none: str = 'quiet'
+	) -> int | None:
+
+		"""
+		Query quotes associated to this ingredient, and return the cheapest
+		
+		:param min_amount: Only return quotes with amounts greater than this, defaults to ``None``
+		:param supplier: Only return quotes with the given supplier, defaults to ``None``
+		:param max_lead_time: Only return quotes with lead times less than this (in days), defaults to ``None``
+		:param none: Define the behaviour when no quotes are found. Choose `error` to raise print an error.
+		"""
 
 		supplier_str = f' AND quote_supplier IS "{supplier}"' if supplier else ""
 		lead_time_str = f' AND quote_lead_time <= {max_lead_time}' if max_lead_time else ""
@@ -893,18 +925,22 @@ class Ingredient:
 		else:
 			return None
 
-	def get_quotes(self, **kwargs):
+	def get_quotes(self, **kwargs) -> list['Quote']:
+		"""Wrapper for :meth:`.Compound.get_quotes()`"""
 		return self.compound.get_quotes(**kwargs)
 
 	### DUNDERS
 
-	def __str__(self):
+	def __str__(self) -> str:
+		"""Plain string representation"""
 		return f'{self.amount:.2f}mg of C{self._compound_id}'
 	
-	def __repr__(self):
+	def __repr__(self) -> str:
+		"""Formatted string representation"""
 		return f'{mcol.bold}{mcol.underline}{str(self)}{mcol.unbold}{mcol.ununderline}'
 
-	def __eq__(self, other):
+	def __eq__(self, other) -> bool:
+		"""Equality operator"""
 
 		if self.compound_id != other.compound_id:
 			return False
