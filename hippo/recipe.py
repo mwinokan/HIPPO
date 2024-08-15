@@ -1123,6 +1123,22 @@ class RouteSet:
 	def routes(self):
 		return self.data.values()
 
+	@property
+	def product_ids(self):
+		"""Get the :class:`.Compound` ID's of the products"""
+		ids = self.db.select_where(table='route', query='route_product', key=f'route_id IN {self.str_ids}', multiple=True)
+		return [i for i, in ids]
+
+	@property
+	def str_ids(self):
+		"""Return an SQL formatted tuple string of the :class:`.Route` ID's"""
+		return str(tuple(self.ids)).replace(',)',')')
+
+	@property
+	def ids(self):
+		"""Return the :class:`.Route` IDs"""
+		return self.data.keys()
+	
 	### METHODS
 	
 	def copy(self):
