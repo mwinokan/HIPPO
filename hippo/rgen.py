@@ -12,6 +12,8 @@ logger = logging.getLogger('HIPPO')
 
 class RandomRecipeGenerator:
 
+	"""Class to create randomly sampled Recipe from a HIPPO Database"""
+
 	def __init__(self, db, *, 
 		max_lead_time = None,
 		# max_reactions = None,
@@ -39,28 +41,10 @@ class RandomRecipeGenerator:
 		if self.data_path.exists():
 			logger.warning(f'Will overwrite existing rgen data file: {self.data_path}')
 
-		# caches
-		self._reaction_checking_cache = {}
-		self._reaction_reactant_cache = {}
-
-		# Reactant pool
-		self._reactant_pool = self.get_reactant_pool()
-		logger.var('reactant_pool', self.reactant_pool)
-
-		# Product pool
-		logger.debug('Solving product pool...')
-		self._product_pool = self.get_product_pool()
-
-		# Remove starting recipe products
-		if start_with:
-			self._product_pool -= start_with.products.compounds
-		
-		logger.var('product_pool', self.product_pool)
-
 		# Route pool
 		logger.debug('Solving route pool...')
 		self._route_pool = self.get_route_pool()
-
+		
 		# dump data
 		self.dump_data()
 
@@ -68,6 +52,7 @@ class RandomRecipeGenerator:
 
 	@classmethod
 	def from_json(cls, db, path):
+		"""Construct the RandomRecipeGenerator from a JSON file"""
 
 		data = json.load(open(path, 'rt'))
 
@@ -87,18 +72,6 @@ class RandomRecipeGenerator:
 
 		# JSON I/O set up
 		self._data_path = Path(path)
-
-		# caches
-		self._reaction_checking_cache = {}
-		self._reaction_reactant_cache = {}
-
-		# Reactant pool
-		self._reactant_pool = CompoundSet(db=db, indices=data['reactant_pool']['indices'], sort=False)
-		logger.var('reactant_pool', self.reactant_pool)
-		
-		# Product pool
-		self._product_pool = CompoundSet(db=db, indices=data['product_pool']['indices'], sort=False)
-		logger.var('product_pool', self.product_pool)
 				
 		# Route pool
 		from .recipe import RouteSet
@@ -110,78 +83,45 @@ class RandomRecipeGenerator:
 
 	@property
 	def starting_recipe(self):
+		"""Get the starting recipe used in all generations"""
 		return self._starting_recipe
 
 	@property
 	def db(self):
+		"""Get the linked HIPPO Database object"""
 		return self._db
 
 	@property
 	def db_path(self):
+		"""Get the path of the linked Database"""
 		return self._db_path
 
 	@property
 	def suppliers_str(self):
+		"""SQL formatted tuple of suppliers"""
 		return str(tuple(self.suppliers)).replace(',)',')')
 	
 	@property
-	def suppliers(self):
+	def suppliers(self) -> list[str]:
+		"""List of suppliers"""
 		return self._suppliers
 	
 	@property
 	def max_lead_time(self):
+		"""Maximum lead-time constraint"""
 		return self._max_lead_time
-	
-	@property
-	def reactant_pool(self):
-		return self._reactant_pool
-
-	@property
-	def product_pool(self):
-		return self._product_pool
 
 	@property
 	def route_pool(self):
+		"""Get the RouteSet of all product reaction routes considered by this generator"""
 		return self._route_pool
 		
 	@property
 	def data_path(self):
+		"""File path for the JSON data export"""
 		return self._data_path
 
 	### POOL METHODS
-
-	def get_reactant_pool(self):
-		"""Get all purchaseable reactants with acceptable supplier and leadtime"""
-
-		if self.max_lead_time:
-
-			raise NotImplementedError
-
-		elif self.suppliers:
-
-			sql = f'''
-			SELECT DISTINCT quote_compound FROM quote
-			WHERE quote_supplier IN {self.suppliers_str} 
-			ORDER BY quote_compound
-			'''
-
-		else:
-
-			sql = f'''
-			SELECT DISTINCT quote_compound FROM quote 
-			ORDER BY quote_compound
-			'''
-
-		compound_ids = self.db.execute(sql).fetchall()
-		compound_ids = [c for c, in compound_ids]
-
-		return CompoundSet(self.db, compound_ids)
-
-	def get_product_pool(self):
-		"""Get all quoted products that can be made with the reactant pool"""
-		reactants = self.get_reactant_pool()
-		products = Recipe.from_reactants(reactants=reactants, debug=False, return_products=True)
-		return products
 
 	def get_route_pool(self, mini_test=False):
 
@@ -197,6 +137,10 @@ class RandomRecipeGenerator:
 		"""
 
 		assert self.suppliers_str
+		if self.max_lead_time:
+			raise NotImplementedError
+
+		### EXCLUDE PRODUCTS OF ROUTES IN STARTING RECIPE!!!
 
 		route_ids = self.db.execute(
 		f"""
@@ -206,7 +150,7 @@ class RandomRecipeGenerator:
 		),
 
 		route_reactants AS (
-		    SELECT route_id, COUNT(CASE WHEN count_valid = 0 THEN 1 END) AS [count_unavailable] FROM route
+		    SELECT route_id, route_product, COUNT(CASE WHEN count_valid = 0 THEN 1 END) AS [count_unavailable] FROM route
 		    INNER JOIN component ON component_route = route_id
 		    LEFT JOIN possible_reactants ON quote_compound = component_ref
 		    WHERE component_type = 2
@@ -214,7 +158,7 @@ class RandomRecipeGenerator:
 		)
 
 		SELECT route_id FROM route_reactants
-		WHERE count_unavailable = 0
+		WHERE count_unavailable = 0 AND route_product NOT IN {self.starting_recipe.products.str_compound_ids}
 		""").fetchall()
 
 		if mini_test:
@@ -234,30 +178,11 @@ class RandomRecipeGenerator:
 		data['db_path'] = str(self.db_path.resolve())
 		data['max_lead_time'] = self.max_lead_time
 		data['suppliers'] = self.suppliers
-		# data['max_reactions'] = self.max_reactions
 		data['starting_recipe'] = self.starting_recipe.get_dict(serialise_price=True)
-
-		data['reactant_pool'] = self.reactant_pool.get_dict()
-		data['product_pool'] = self.product_pool.get_dict()
 		data['route_pool'] = self.route_pool.get_dict()
 
 		logger.writing(self.data_path)
 		json.dump(data, open(self.data_path, 'wt'), indent=4)
-
-		# logger.debug('Clearing route_pool database pointers... ')
-		# self.route_pool.clear_db_pointers()
-		# logger.writing(self.data_path)
-		# pickle.dump(self.route_pool, open(self.data_path, 'wb'))
-		# self.route_pool.clear_db_pointers()
-		# logger.debug('Reinstating route_pool database pointers... ')
-		# self.route_pool.set_db_pointers(self.db)
-
-	def load_data(self):
-		# logger.reading(self.data_path)
-		# self._route_pool = pickle.load(open(self.data_path, 'rb'))
-		# logger.debug('Reinstating route_pool database pointers... ')
-		# self.route_pool.set_db_pointers(self.db)
-		raise NotImplementedError
 
 	def generate(self, 
 		budget: float = 10000,
@@ -266,8 +191,6 @@ class RandomRecipeGenerator:
 		max_reactions = 1000,
 		debug=True, 
 		max_iter=None, 
-		# pick_inner_cheapest=True, 
-		# add_size=1,
 		shuffle=True,
 	):
 
@@ -278,50 +201,28 @@ class RandomRecipeGenerator:
 
 		budget = Price(budget, currency)
 
-		# logger.warning('Something went wrong')
-
-		# raise NotImplementedError
-
-
-		# assert pick_inner_cheapest
-		# assert add_size == 1
-		
-		# assert len(self.suppliers) == 1
-
-		# supplier = self.suppliers[0]
-
 		recipe = self.starting_recipe.copy()
 
 		recipe.reactants._supplier = self.suppliers
 
+		# get the RouteSet
 		pool = self.route_pool.copy()
 
-		# return pool
-
-		# pool = list(chain.from_iterable(pool.values()))
-
 		if shuffle:
-			# from random import shuffle
 			logger.debug('Shuffling Route pool')
-			# shuffle(pool)
 			pool.shuffle()
 
 		logger.var('route pool', len(pool))
 		logger.var('max_iter', max_iter)
 
-		# randomly add products until budget exceeded
 		pbar = tqdm()
-		# with tqdm() as pbar:
-		# with tqdm(total=max_iter) as pbar:
 		
-		# for i in tqdm(range(max_iter), total=max_iter):
 		for i in range(max_iter):
 
-			# logger.title(f'Iteration {i}')
-			
 			if debug: logger.title(f'Iteration {i}')
 			
 			price = recipe.price
+			pbar.set_postfix(dict(price=str(price)))
 
 			if debug: logger.var('price', price)
 
@@ -341,13 +242,16 @@ class RandomRecipeGenerator:
 
 			if debug: logger.var('new price', new_price)
 
+			# Break if product pool depleted
 			if not len(pool):
+				pbar.update(1)
 				logger.info('Product pool depleted')
+				pbar.close()
 				break
 
 			# check breaking conditions
 			if new_price > budget:
-				logger.info('Budget exceeded')
+				pbar.update(1)
 				recipe = old_recipe.copy()
 				continue
 
@@ -367,22 +271,13 @@ class RandomRecipeGenerator:
 			old_recipe = recipe.copy()
 
 			pbar.update(1)
-			pbar.set_postfix(dict(price=str(price)))
+			# pbar.set_postfix(dict(price=str(price)))
 
 		else:
+			logger.warning('Max #iterations reached')
 			pbar.close()
 
 		### recalculate the products to see if any extra can be had for free?
-
-		# print(recipe)
-		# print(recipe.price)
-
-		# new_recipe = Recipe.from_reactants(reactants=recipe.reactants)
-
-		# # calculate fingerprint?
-
-		# print(new_recipe)
-		# print(new_recipe.price)
 
 		logger.success(f'Completed after {i} iterations')
 
