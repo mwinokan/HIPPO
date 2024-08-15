@@ -108,7 +108,11 @@ class PoseTable:
 
 	### DUNDERS
 
-	def __call__(self, tag=None, target=None):
+	def __call__(self, *, 
+		tag=None, 
+		target=None
+	) -> 'PoseSet':
+	
 		if tag:
 			return self.get_by_tag(tag)
 		elif target:
