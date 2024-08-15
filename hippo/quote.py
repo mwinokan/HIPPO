@@ -69,6 +69,9 @@ class Quote:
 		* Estimate by scaling linearly with unit price
 		* Use MCule confirmed stock amount
 
+		:param required_amount: 
+		:param quotes: 
+
 		"""
 
 		biggest_pack = sorted(quotes, key=lambda x: x.amount)[-1]
@@ -99,6 +102,7 @@ class Quote:
 
 	@property
 	def entry_str(self):
+		""" """
 		if self.catalogue:
 			return f'{self.supplier}:{self.catalogue}:{self.entry}'
 		else:
@@ -106,62 +110,77 @@ class Quote:
 
 	@property
 	def db(self):
+		""" """
 		return self._db
 
 	@property
 	def id(self):
+		""" """
 		return self._id
 
 	@property
 	def compound(self):
+		""" """
 		return self._compound
 
 	@property
 	def smiles(self):
+		""" """
 		return self._smiles
 
 	@property
 	def supplier(self):
+		""" """
 		return self._supplier
 
 	@property
 	def catalogue(self):
+		""" """
 		return self._catalogue
 
 	@property
 	def entry(self):
+		""" """
 		return self._entry
 
 	@property
 	def amount(self):
+		""" """
 		return self._amount
 
 	@property
 	def price(self):
+		""" """
 		return self._price
 
 	@property
 	def currency(self):
+		""" """
 		return self.price.currency
 
 	@property
 	def purity(self):
+		""" """
 		return self._purity
 
 	@property
 	def lead_time(self):
+		""" """
 		return self._lead_time
 
 	@property
 	def date(self):
+		""" """
 		return self._date
 
 	@property
 	def type(self):
+		""" """
 		return self._type
 
 	@property
 	def dict(self):
+		""" """
 		return dict(
 			id=self.id,
 			compound=self.compound,
@@ -180,6 +199,7 @@ class Quote:
 
 	@property
 	def currency_symbol(self):
+		""" """
 		return self.price.symbol
 	
 	### METHODS

@@ -25,6 +25,7 @@ class TagTable:
 	
 	@property
 	def table(self) -> str:
+		""" """
 		return self._table
 
 	@property
@@ -77,6 +78,11 @@ class TagSet(MutableSet):
 	
 	@immutable.setter
 	def immutable(self,b):
+		"""
+
+		:param b: 
+
+		"""
 		self._immutable = b
 
 	@property
@@ -94,14 +100,30 @@ class TagSet(MutableSet):
 	### DATABASE
 
 	def _remove_tag_from_db(self, tag):
+		"""
+
+		:param tag: 
+
+		"""
 		sql = f'DELETE FROM tag WHERE tag_name="{tag}" AND tag_{self.parent.table}={self.parent.id}'
 		self.db.execute(sql)
 
 	def _clear_tags_from_db(self, tag):
+		"""
+
+		:param tag: 
+
+		"""
 		sql = f'DELETE FROM tag WHERE tag_{self.parent.table}={self.parent.id}'
 		self.db.execute(sql)
 
 	def _add_tag_to_db(self, tag, commit=True):
+		"""
+
+		:param tag: 
+		:param commit:  (Default value = True)
+
+		"""
 		payload = { 'name':tag, self.parent.table:self.parent.id }
 		self.db.insert_tag(**payload, commit=commit)
 			
@@ -114,7 +136,11 @@ class TagSet(MutableSet):
 		return self._elements.pop()
 
 	def discard(self, tag):
-		"""Discard an element"""
+		"""Discard an element
+
+		:param tag: 
+
+		"""
 		return self.discard(tag)
 
 	def clear(self):
@@ -123,7 +149,11 @@ class TagSet(MutableSet):
 		self._clear_tags_from_db(self)
 
 	def remove(self, tag):
-		"""Remove an element"""
+		"""Remove an element
+
+		:param tag: 
+
+		"""
 		assert not self.immutable
 		if tag in self:
 			i = self._elements.index(tag)
@@ -133,13 +163,23 @@ class TagSet(MutableSet):
 			raise ValueError(f'{tag} not in {self}')
 
 	def add(self, tag, commit=True):
-		"""Add an element"""
+		"""Add an element
+
+		:param tag: 
+		:param commit:  (Default value = True)
+
+		"""
 		assert not self.immutable
 		if tag not in self._elements:
 			self._elements.append(tag)
 			self._add_tag_to_db(tag, commit=commit)
 
 	def glob(self, pattern):
+		"""
+
+		:param pattern: 
+
+		"""
 		import fnmatch
 		return fnmatch.filter(self.tags, pattern)
 

@@ -89,11 +89,19 @@ class Quoter:
 
 
 	def get_quote(self, compound, **kwargs):
-		"""Get quotes for a compound"""
+		"""Get quotes for a compound
+
+		:param compound: 
+
+		"""
 		return self._get_quote(compound, **kwargs)
 
 	def get_batch_quote(self, compounds, **kwargs):
-		"""Get quotes for a compound set"""
+		"""Get quotes for a compound set
+
+		:param compounds: 
+
+		"""
 		return self._get_batch_quote(compounds, **kwargs)
 
 	def __call__(self, compound):
@@ -103,6 +111,17 @@ class Quoter:
 	### ENAMINE
 
 	def get_enamine_batch_quote(self, compounds, currency="USD", catalogues=None, exact=False, forms=False, analogues=False, equivalents=False):
+		"""
+
+		:param compounds: 
+		:param currency:  (Default value = "USD")
+		:param catalogues:  (Default value = None)
+		:param exact:  (Default value = False)
+		:param forms:  (Default value = False)
+		:param analogues:  (Default value = False)
+		:param equivalents:  (Default value = False)
+
+		"""
 
 		import time
 		from .cset import CompoundSet
@@ -182,6 +201,12 @@ class Quoter:
 		return dict(matched=matched, unmatched=unmatched, errors=errors)
 
 	def parse_enamine_bulk_products(self, db, products):
+		"""
+
+		:param db: 
+		:param products: 
+
+		"""
 
 		from .tools import flat_inchikey
 		from .cset import CompoundSet
@@ -254,6 +279,12 @@ class Quoter:
 		return matched
 
 	def get_enamine_quote(self, compound, currency="USD"):
+		"""
+
+		:param compound: 
+		:param currency:  (Default value = "USD")
+
+		"""
 
 		assert compound._table == 'compound'
 
@@ -327,6 +358,12 @@ class Quoter:
 			logger.warning('Interrupted quoting')
 
 	def pick_enamine_exact_data(self, smiles, data):
+		"""
+
+		:param smiles: 
+		:param data: 
+
+		"""
 	
 		if len(data) == 1:
 			return data[0]['Id']
@@ -340,6 +377,13 @@ class Quoter:
 		return data[0]['Id']
 
 	def parse_enamine_response(self, result, compound, catalogue):
+		"""
+
+		:param result: 
+		:param compound: 
+		:param catalogue: 
+
+		"""
 
 		quotes = []
 
@@ -396,6 +440,12 @@ class Quoter:
 					self.parse_enamine_pack(compound, entry, purity, catalogue, pack, lead_time, smiles)
 
 	def pick_enamine_data(self, comp_id,data):
+		"""
+
+		:param comp_id: 
+		:param data: 
+
+		"""
 		
 		data = [d for d in data if d['Id'] == comp_id]
 		
@@ -412,6 +462,11 @@ class Quoter:
 		return data[0]
 
 	def parse_enamine_delivery_string(self, string):
+		"""
+
+		:param string: 
+
+		"""
 
 		if string.startswith('regular delivery, ') and string.endswith('days'):
 			return int(string.removeprefix('regular delivery, ').removesuffix(' days'))
@@ -425,6 +480,17 @@ class Quoter:
 		raise Exception(f'Unexpected delivery string: {string}')
 
 	def parse_enamine_pack(self,compound, entry, purity, catalogue, pack, lead_time, smiles):
+		"""
+
+		:param compound: 
+		:param entry: 
+		:param purity: 
+		:param catalogue: 
+		:param pack: 
+		:param lead_time: 
+		:param smiles: 
+
+		"""
 
 		supplier = 'Enamine'
 
@@ -463,6 +529,12 @@ class Quoter:
 	### MCULE
 
 	def get_mcule_quote(self, compound, exact=False):
+		"""
+
+		:param compound: 
+		:param exact:  (Default value = False)
+
+		"""
 
 		try:
 
@@ -505,6 +577,11 @@ class Quoter:
 			logger.warning('Interrupted quoting')
 
 	def get_mcule_batch_quote(self, compounds):
+		"""
+
+		:param compounds: 
+
+		"""
 
 		import time
 		from .cset import CompoundSet
@@ -577,6 +654,16 @@ class Quoter:
 		return dict(matched=matched, unmatched=unmatched)
 	
 	def parse_mcule_pack(self, db, compound, entry, pack, smiles, commit=True):
+		"""
+
+		:param db: 
+		:param compound: 
+		:param entry: 
+		:param pack: 
+		:param smiles: 
+		:param commit:  (Default value = True)
+
+		"""
 
 		supplier = 'MCule'
 
@@ -613,7 +700,9 @@ class Quoter:
 		)
 
 class NoDataInReponse(Exception):
+	""" """
 	...
 
 class NotInCatalogues(Exception):
+	""" """
 	...

@@ -11,6 +11,7 @@ CURRENCIES = {
 }
 
 class Price:
+	""" """
 
 	def __init__(self, amount, currency):
 
@@ -28,12 +29,18 @@ class Price:
 
 	@classmethod
 	def null(cls):
+		""" """
 		self = cls.__new__(cls)
 		self.__init__(None, None)
 		return self
 
 	@classmethod
 	def from_dict(cls, d):
+		"""
+
+		:param d: 
+
+		"""
 		self = cls.__new__(cls)
 		self.__init__(d['amount'], d['currency'])
 		return self
@@ -42,23 +49,28 @@ class Price:
 
 	@property
 	def symbol(self):
+		""" """
 		return CURRENCIES[self.currency]
 	
 	@property
 	def currency(self):
+		""" """
 		return self._currency
 	
 	@property
 	def amount(self):
+		""" """
 		return self._amount
 
 	@property
 	def is_null(self):
+		""" """
 		return self.amount is None
 
 	### METHODS
 
 	def get_dict(self):
+		""" """
 		return dict(amount=self.amount, currency=self.currency)
 
 	### DUNDERS

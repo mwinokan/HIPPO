@@ -33,8 +33,11 @@ FEATURE_PAIR_CUTOFFS = {
 class Pose:
 
 	"""A :class:`.Pose` is a particular conformer of a :class:`.Compound` within a protein environment. A pose will have its own (stereochemical) smiles string, and must have a path to a coordinate file. Poses can have *inspirations* that can be used to trace fragment-derived scaffolds in merges and expansions.
+	
+	.. attention::
 
-	:class:`.Pose` objects should not be created directly. Instead use :meth:`.HIPPO.register_pose` or :meth:`.HIPPO.poses`
+		:class:`.Pose` objects should not be created directly. Instead use :meth:`.HIPPO.register_pose` or :meth:`.HIPPO.poses`
+
 	"""
 
 	_table = 'pose'
@@ -321,6 +324,7 @@ class Pose:
 
 	@property
 	def has_complex_pdb_path(self):
+		""" """
 		return self.path.endswith('.pdb')
 
 	@property
@@ -372,6 +376,7 @@ class Pose:
 
 	@property
 	def table(self):
+		""" """
 		return self._table
 
 	@property
@@ -415,19 +420,28 @@ class Pose:
 
 	@property
 	def fields(self):
+		""" """
 		return [p for p in dir(self) if not p.startswith('_')]
-    
+	
 	@property
 	def energy_score(self):
+		""" """
 		return self._energy_score
 
 	@property
 	def distance_score(self):
+		""" """
 		return self._distance_score
 
 	### METHODS
 	
 	def score_inspiration(self, debug=False, draw=False):
+		"""
+
+		:param debug:  (Default value = False)
+		:param draw:  (Default value = False)
+
+		"""
 		
 		from molparse.rdkit import SuCOS_score
 
@@ -445,19 +459,23 @@ class Pose:
 		return multi_sucos
 
 	def get_compound(self):
+		""" """
 		return self.db.get_compound(id=self._compound_id)
 
 	def get_tags(self):
+		""" """
 		tags = self.db.select_where(query='tag_name', table='tag', key='pose', value=self.id, multiple=True, none='quiet')
 		return TagSet(self, {t[0] for t in tags})
 	
 	def get_inspiration_ids(self):
+		""" """
 		inspirations = self.db.select_where(query='inspiration_original', table='inspiration', key='derivative', value=self.id, multiple=True, none='quiet')
 		if not inspirations:
 			return None
 		return set([v for v, in inspirations])
 
 	def get_inspirations(self):	
+		""" """
 		if not (inspirations := self.get_inspiration_ids()):
 			return None
 
@@ -471,15 +489,17 @@ class Pose:
 		metadata: bool = True,
 		duplicate_name: str | bool = False,
 		tags: bool = True,
-		# exports: bool = True,
 	) -> dict:
 
 		"""Returns a dictionary representing this Pose. Arguments:
 
-		mol (bool): [True, False]
-		inspirations (bool): [True, False, 'fragalysis']
-		reference (bool): [True, False, 'name']
-
+		:param mol: bool: [True, False] (Default value = False)
+		:param inspirations: bool | str: [True, False, 'fragalysis'] (Default value = True)
+		:param reference: bool | str: [True, False, 'name'] (Default value = True)
+		:param metadata: bool:  (Default value = True)
+		:param duplicate_name: str | bool:  (Default value = False)
+		:param tags: bool:  (Default value = True)
+		
 		"""
 
 		serialisable_fields = ['id','inchikey', 'alias', 'name', 'smiles', 'path']
@@ -598,7 +618,12 @@ class Pose:
 		self.fingerprint = fingerprint
 
 	def draw(self, inspirations=True, protein=False, **kwargs):
-		"""Render this pose (and its inspirations)"""
+		"""Render this pose (and its inspirations)
+
+		:param inspirations:  (Default value = True)
+		:param protein:  (Default value = False)
+
+		"""
 		
 		if protein:
 			from molparse.py3d import render
@@ -613,6 +638,9 @@ class Pose:
 		return draw_mols(mols)
 
 	def render(self, **kwargs):
+		"""
+
+		"""
 		from molparse.py3d import render
 		return render(self.complex_system, **kwargs)
 
@@ -630,7 +658,11 @@ class Pose:
 		display(draw_grid(mols, labels=labels))
 
 	def summary(self, metadata:bool = True):
-		"""Print a summary of this pose"""
+		"""Print a summary of this pose
+
+		:param metadata:bool:  (Default value = True)
+
+		"""
 		if self.alias:
 			logger.header(f'{str(self)}: {self.alias}')
 		else:
@@ -651,6 +683,7 @@ class Pose:
 			logger.var('metadata', str(self.metadata))
 
 	def showcase(self):
+		""" """
 		self.summary(metadata=False)
 		self.grid()
 		self.draw()
@@ -682,4 +715,5 @@ class Pose:
 
 
 class InvalidMolError(Exception):
+	""" """
 	...

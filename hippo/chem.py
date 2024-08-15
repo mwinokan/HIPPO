@@ -135,6 +135,15 @@ def check_chemistry(reaction_type, reactants, product, debug=False):
 	return True
 
 def check_count_diff(check_type, reaction_type, reactants, product, debug=False):
+    """
+
+    :param check_type: 
+    :param reaction_type: 
+    :param reactants: 
+    :param product: 
+    :param debug:  (Default value = False)
+
+    """
 
 	# get target value
 	diff = SUPPORTED_CHEMISTRY[reaction_type][f'{check_type}_diff']
@@ -159,6 +168,14 @@ def check_count_diff(check_type, reaction_type, reactants, product, debug=False)
 	return True
 
 def check_atomtype_diff(reaction_type, reactants, product, debug=False):
+    """
+
+    :param reaction_type: 
+    :param reactants: 
+    :param product: 
+    :param debug:  (Default value = False)
+
+    """
 
 	check_type = 'atomtype'
 
@@ -188,6 +205,15 @@ def check_atomtype_diff(reaction_type, reactants, product, debug=False):
 	return True
 
 def check_specific_atomtype_diff(reaction_type, prod, reac, removal=False, debug=False):
+    """
+
+    :param reaction_type: 
+    :param prod: 
+    :param reac: 
+    :param removal:  (Default value = False)
+    :param debug:  (Default value = False)
+
+    """
 	
 	if removal:
 		add_str = 'removed'
@@ -227,6 +253,11 @@ def check_specific_atomtype_diff(reaction_type, prod, reac, removal=False, debug
 	return True
 
 def halogen_count(atomtype_dict):
+    """
+
+    :param atomtype_dict: 
+
+    """
 	count = 0
 	symbols = ['F', 'Cl', 'Br', 'I']
 	for symbol in symbols:
@@ -235,7 +266,9 @@ def halogen_count(atomtype_dict):
 	return count
 
 class InvalidChemistryError(Exception):
+    """ """
 	pass
 
 class UnsupportedChemistryError(Exception):
+    """ """
 	pass

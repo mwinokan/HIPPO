@@ -13,7 +13,7 @@ logger = logging.getLogger('HIPPO')
 
 # @dataclass
 class Recipe:
-	""" A Recipe stores data corresponding to a specific synthetic recipe involving several products, reactants, intermediates, and reactions."""
+	"""A Recipe stores data corresponding to a specific synthetic recipe involving several products, reactants, intermediates, and reactions."""
 
 	_db = None
 
@@ -52,6 +52,22 @@ class Recipe:
 		reaction_reactant_cache = None,
 		inner=False,
 	):
+		"""
+
+		:param reaction: 
+		:param amount:  (Default value = 1)
+		:param *: 
+		:param debug: bool:  (Default value = False)
+		:param pick_cheapest: bool:  (Default value = True)
+		:param permitted_reactions:  (Default value = None)
+		:param quoted_only: bool:  (Default value = False)
+		:param supplier: None | str:  (Default value = None)
+		:param unavailable_reaction:  (Default value = 'error')
+		:param reaction_checking_cache:  (Default value = None)
+		:param reaction_reactant_cache:  (Default value = None)
+		:param inner:  (Default value = False)
+
+		"""
 
 		from .reaction import Reaction
 		assert isinstance(reaction, Reaction)
@@ -100,6 +116,11 @@ class Recipe:
 					return []
 		
 		def get_reactant_amount_pairs(reaction):
+			"""
+
+			:param reaction: 
+
+			"""
 			if reaction_reactant_cache and reaction.id in reaction_reactant_cache:
 				print('reaction_reactant_cache used')
 				return reaction_reactant_cache[reaction.id]
@@ -198,6 +219,17 @@ class Recipe:
 		return_products=False,
 		debug=False,
 	):
+		"""
+
+		:param reactions: 
+		:param amount:  (Default value = 1)
+		:param pick_cheapest: bool:  (Default value = True)
+		:param permitted_reactions:  (Default value = None)
+		:param final_products_only:  (Default value = True)
+		:param return_products:  (Default value = False)
+		:param debug:  (Default value = False)
+
+		"""
 
 		from .rset import ReactionSet
 		from .cset import IngredientSet, CompoundSet
@@ -262,6 +294,24 @@ class Recipe:
 		reaction_checking_cache = None,
 		reaction_reactant_cache = None,
 	):
+		"""
+
+		:param compounds: 
+		:param amount: float:  (Default value = 1)
+		:param debug: bool:  (Default value = False)
+		:param pick_cheapest: bool:  (Default value = True)
+		:param permitted_reactions:  (Default value = None)
+		:param quoted_only: bool:  (Default value = False)
+		:param supplier: None | str:  (Default value = None)
+		:param solve_combinations: bool:  (Default value = True)
+		:param pick_first: bool:  (Default value = False)
+		:param warn_multiple_solutions: bool:  (Default value = True)
+		:param pick_cheapest_inner_routes: bool:  (Default value = False)
+		:param unavailable_reaction:  (Default value = 'error')
+		:param reaction_checking_cache:  (Default value = None)
+		:param reaction_reactant_cache:  (Default value = None)
+
+		"""
 
 		from tqdm import tqdm
 
@@ -376,6 +426,14 @@ class Recipe:
 
 	@classmethod
 	def from_reactants(cls, reactants, amount=1, debug=False, return_products=False):
+		"""
+
+		:param reactants: 
+		:param amount:  (Default value = 1)
+		:param debug:  (Default value = False)
+		:param return_products:  (Default value = False)
+
+		"""
 
 		from .cset import IngredientSet
 
@@ -436,6 +494,12 @@ class Recipe:
 
 	@classmethod
 	def from_ingredients(cls, db, ingredients):
+		"""
+
+		:param db: 
+		:param ingredients: 
+
+		"""
 		raise NotImplementedError
 		self = cls.__new__(cls)
 		self.__init__(...)
@@ -443,6 +507,16 @@ class Recipe:
 
 	@classmethod
 	def from_json(cls, db, path, debug=True, allow_db_mismatch=False, clear_quotes=False, data=None):
+		"""
+
+		:param db: 
+		:param path: 
+		:param debug:  (Default value = True)
+		:param allow_db_mismatch:  (Default value = False)
+		:param clear_quotes:  (Default value = False)
+		:param data:  (Default value = None)
+
+		"""
 
 		# imports
 		import json
@@ -499,47 +573,74 @@ class Recipe:
 
 	@property
 	def db(self):
+		""" """
 		return self._db
 
 	@property
 	def products(self):
+		""" """
 		return self._products
 
 	@property
 	def product(self):
+		""" """
 		assert len(self.products) == 1
 		return self.products[0]
 	
 	@products.setter
 	def products(self, a):
+		"""
+
+		:param a: 
+
+		"""
 		self._products = a
 
 	@property
 	def reactants(self):
+		""" """
 		return self._reactants
 
 	@reactants.setter
 	def reactants(self, a):
+		"""
+
+		:param a: 
+
+		"""
 		self._reactants = a
 
 	@property
 	def intermediates(self):
+		""" """
 		return self._intermediates
 
 	@intermediates.setter
 	def intermediates(self, a):
+		"""
+
+		:param a: 
+
+		"""
 		self._intermediates = a
 
 	@property
 	def reactions(self):
+		""" """
 		return self._reactions
 
 	@reactions.setter
 	def reactions(self, a):
+		"""
+
+		:param a: 
+
+		"""
 		self._reactions = a
 
 	@property
 	def price(self):
+		""" """
 		# total = 0
 		# quotes = self.quotes
 		# if not quotes:
@@ -559,11 +660,22 @@ class Recipe:
 	### METHODS
 
 	def get_price(self, supplier=None):
+		"""
+
+		:param supplier:  (Default value = None)
+
+		"""
 		return self.reactants.get_price(supplier=supplier)
 
 	def draw(self, color_mapper = None, node_size=300, graph_only=False):
 
-		"""draw graph of the reaction network"""
+		"""draw graph of the reaction network
+
+		:param color_mapper:  (Default value = None)
+		:param node_size:  (Default value = 300)
+		:param graph_only:  (Default value = False)
+
+		"""
 
 		import networkx as nx
 
@@ -619,7 +731,11 @@ class Recipe:
 			return nx.draw(graph, pos=pos, with_labels=True, font_weight='bold', node_color=list(colors.values()), node_size=sizes)
 
 	def sankey(self, title=None):
-		"""draw a plotly Sankey diagram"""
+		"""draw a plotly Sankey diagram
+
+		:param title:  (Default value = None)
+
+		"""
 
 		graph = self.draw(graph_only=True)
 
@@ -748,7 +864,11 @@ class Recipe:
 		return fig
 
 	def summary(self, price: bool = True):
-		"""Print a summary of this recipe"""
+		"""Print a summary of this recipe
+
+		:param price: bool:  (Default value = True)
+
+		"""
 
 		import mcol
 		
@@ -778,7 +898,11 @@ class Recipe:
 			logger.var(str(reaction), reaction.reaction_str, dict(unit=reaction.type))
 
 	def get_ingredient(self, id):
-		"""Get an ingredient by its compound ID"""
+		"""Get an ingredient by its compound ID
+
+		:param id: 
+
+		"""
 		matches = [r for r in self.reactants if r.id == id]
 		if not matches:
 			matches = [r for r in self.intermediates if r.id == id]
@@ -789,10 +913,20 @@ class Recipe:
 		return matches[0]
 
 	def add_to_all_reactants(self, amount=20):
+		"""
+
+		:param amount:  (Default value = 20)
+
+		"""
 		self.reactants.df['amount'] += amount
 
 	def write_json(self, file, *, indent='\t', **kwargs):
-		"""Serialise this recipe object and write it to disk"""
+		r"""Serialise this recipe object and write it to disk
+
+		:param file: 
+		:param indent:  (Default value = '\t')
+
+		"""
 		import json
 		data = self.get_dict(serialise_price=True, **kwargs)
 		logger.writing(file)
@@ -811,10 +945,10 @@ class Recipe:
 	):
 
 		"""Serialise this recipe object
-
+		
 		Store
 		=====
-
+		
 		- Path to database
 		- Timestamp
 		- Reactants (& their quotes, amounts)
@@ -823,6 +957,16 @@ class Recipe:
 		- Reactions
 		- Total Price
 		- Lead time
+
+		:param *: 
+		:param price: bool:  (Default value = True)
+		:param reactant_supplier: bool:  (Default value = True)
+		:param database: bool:  (Default value = True)
+		:param timestamp: bool:  (Default value = True)
+		:param compound_ids_only: bool:  (Default value = False)
+		:param products: bool:  (Default value = True)
+		:param serialise_price: bool:  (Default value = False)
+		:param fingerprint: bool:  (Default value = False)
 
 		"""
 
@@ -869,23 +1013,26 @@ class Recipe:
 	def write_CAR_csv(self, file, return_df=False):
 
 		"""List of reactions for CAR
-
+		
 		Columns:
-
+		
 		* target-name
 		* no-steps
 		* concentration = None
 		* amount-required
 		* batch-tag
-
+		
 		per reaction
-
+		
 		* reactant-1-1
 		* reactant-2-1
 		* reaction-product-smiles-1
 		* reaction-name-1
 		* reaction-recipe-1
 		* reaction-groupby-column-1
+
+		:param file: 
+		:param return_df:  (Default value = False)
 
 		"""
 
@@ -953,6 +1100,7 @@ class Recipe:
 		return df
 
 	def copy(self):
+		""" """
 		return Recipe(self.db, 
 			products=self.products.copy(), 
 			reactants=self.reactants.copy(), 
@@ -1019,6 +1167,13 @@ class Route(Recipe):
 
 	@classmethod
 	def from_json(cls, db, path, data=None):
+		"""
+
+		:param db: 
+		:param path: 
+		:param data:  (Default value = None)
+
+		"""
 
 		import json
 		from .cset import IngredientSet
@@ -1045,14 +1200,17 @@ class Route(Recipe):
 
 	@property
 	def product(self):
+		""" """
 		return self._products[0]
 
 	@property
 	def product_compound(self):
+		""" """
 		return self.product.compound
 
 	@property
 	def id(self):
+		""" """
 		return self._id
 
 	### METHODS
@@ -1092,6 +1250,13 @@ class RouteSet:
 
 	@classmethod
 	def from_json(cls, db, path, data=None):
+		"""
+
+		:param db: 
+		:param path: 
+		:param data:  (Default value = None)
+
+		"""
 
 		self = cls.__new__(cls)
 
@@ -1113,27 +1278,37 @@ class RouteSet:
 
 	@property
 	def data(self):
+		""" """
 		return self._data
 
 	@property
 	def db(self):
+		""" """
 		return self._db
 
 	@property
 	def routes(self):
+		""" """
 		return self.data.values()
 
 	### METHODS
 	
 	def copy(self):
+		""" """
 		return RouteSet(self.db, self.data.values())
 
 	def set_db_pointers(self, db):
+		"""
+
+		:param db: 
+
+		"""
 		self._db = db
 		for route in self.data.values():
 			route._db = db
 
 	def clear_db_pointers(self):
+		""" """
 		self._db = None
 		for route in self.data.values():
 			route._db = None
@@ -1150,12 +1325,14 @@ class RouteSet:
 		return data
 
 	def pop_id(self):
+		""" """
 
 		route_id, route = self.data.popitem()
 
 		return route_id
 
 	def pop(self):
+		""" """
 
 		route_id, route = self.data.popitem()
 

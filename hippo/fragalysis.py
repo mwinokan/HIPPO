@@ -11,6 +11,20 @@ def generate_header(
 	extras=None,
 	metadata: bool = True,
 ):
+    """
+
+    :param pose: 
+    :param # metadata: 
+    :param method: 
+    :param ref_url: 
+    :param submitter_name: 
+    :param submitter_email: 
+    :param submitter_institution: 
+    :param generation_date: str | None:  (Default value = None)
+    :param extras:  (Default value = None)
+    :param metadata: bool:  (Default value = True)
+
+    """
 
 	extras = extras or {}
 

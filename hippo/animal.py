@@ -221,7 +221,9 @@ class HIPPO:
 		:param metadata_csv: Path to the metadata.csv from the Fragalysis download
 		:param aligned_directory: Path to the aligned_files directory from the Fragalysis download
 		:param skip: optional list of observation names to skip
+		:param debug: bool:  (Default value = False)
 		:returns: a DataFrame of metadata
+
 		"""
 
 		import molparse as mp

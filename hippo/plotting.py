@@ -22,9 +22,22 @@ import functools
 
 # hippo_graph decorator
 def hippo_graph(func):
+	"""
+
+	:param func: 
+
+	"""
 
 	@functools.wraps(func)
 	def wrapper(animal, *args, logo='top right', **kwargs):
+		"""
+
+		:param animal: 
+		:param *args: 
+		:param logo:  (Default value = 'top right')
+		:param **kwargs: 
+
+		"""
 
 		wrapper_kwargs = {}
 		wrapper_keys = ['show', 'html', 'pdf', 'png']
@@ -66,6 +79,16 @@ def hippo_graph(func):
 
 @hippo_graph
 def plot_tag_statistics(animal, color='type', subtitle=None, log_y=False, compounds=True, poses=True):
+	"""
+
+	:param animal: 
+	:param color:  (Default value = 'type')
+	:param subtitle:  (Default value = None)
+	:param log_y:  (Default value = False)
+	:param compounds:  (Default value = True)
+	:param poses:  (Default value = True)
+
+	"""
 
 	plot_data = []
 
@@ -98,6 +121,14 @@ def plot_tag_statistics(animal, color='type', subtitle=None, log_y=False, compou
 
 @hippo_graph
 def plot_interaction_histogram(animal, poses, feature_metadata, subtitle=None,):
+	"""
+
+	:param animal: 
+	:param poses: 
+	:param feature_metadata: 
+	:param subtitle:  (Default value = None)
+
+	"""
 
 	df = animal._fingerprint_df(poses)
 
@@ -143,6 +174,16 @@ def plot_interaction_histogram(animal, poses, feature_metadata, subtitle=None,):
 
 @hippo_graph
 def plot_interaction_punchcard(animal, poses=None, subtitle=None, opacity=1.0, group='pose_name', ignore_chains=False):
+	"""
+
+	:param animal: 
+	:param poses:  (Default value = None)
+	:param subtitle:  (Default value = None)
+	:param opacity:  (Default value = 1.0)
+	:param group:  (Default value = 'pose_name')
+	:param ignore_chains:  (Default value = False)
+
+	"""
 
 	import plotly
 
@@ -247,6 +288,15 @@ def plot_interaction_punchcard(animal, poses=None, subtitle=None, opacity=1.0, g
 
 @hippo_graph
 def plot_residue_interactions(animal, poses, residue_number, subtitle=None, chain=None):
+	"""
+
+	:param animal: 
+	:param poses: 
+	:param residue_number: 
+	:param subtitle:  (Default value = None)
+	:param chain:  (Default value = None)
+
+	"""
 
 	assert not chain
 
@@ -326,6 +376,15 @@ def plot_residue_interactions(animal, poses, residue_number, subtitle=None, chai
 @hippo_graph
 # def plot_building_blocks(animal, subtitle=None, cset='elabs', color='name_is_smiles'):
 def plot_reactant_amounts(animal, subtitle=None, color='has_price_picker', named_only=False, most_common=None):
+	"""
+
+	:param animal: 
+	:param subtitle:  (Default value = None)
+	:param color:  (Default value = 'has_price_picker')
+	:param named_only:  (Default value = False)
+	:param most_common:  (Default value = None)
+
+	"""
 
 	# cset = animal.compound_sets[cset]
 
@@ -366,6 +425,13 @@ def plot_reactant_amounts(animal, subtitle=None, color='has_price_picker', named
 @hippo_graph
 # def plot_building_blocks(animal, subtitle=None, cset='elabs', color='name_is_smiles'):
 def plot_reactant_price(animal, subtitle=None, amount=20):
+	"""
+
+	:param animal: 
+	:param subtitle:  (Default value = None)
+	:param amount:  (Default value = 20)
+
+	"""
 
 	# cset = animal.compound_sets[cset]
 
@@ -405,6 +471,13 @@ def plot_reactant_price(animal, subtitle=None, amount=20):
 @hippo_graph
 # def plot_building_blocks(animal, subtitle=None, cset='elabs', color='name_is_smiles'):
 def plot_reactants_2d(animal, subtitle=None, amount=20):
+	"""
+
+	:param animal: 
+	:param subtitle:  (Default value = None)
+	:param amount:  (Default value = 20)
+
+	"""
 
 	# cset = animal.compound_sets[cset]
 
@@ -445,6 +518,13 @@ def plot_reactants_2d(animal, subtitle=None, amount=20):
 @hippo_graph
 # def plot_building_blocks(animal, subtitle=None, cset='elabs', color='name_is_smiles'):
 def plot_building_blocks(animal, subtitle=None, color='name_is_smiles'):
+	"""
+
+	:param animal: 
+	:param subtitle:  (Default value = None)
+	:param color:  (Default value = 'name_is_smiles')
+
+	"""
 
 	# cset = animal.compound_sets[cset]
 
@@ -475,6 +555,14 @@ def plot_building_blocks(animal, subtitle=None, color='name_is_smiles'):
 
 @hippo_graph
 def plot_synthetic_routes(animal, subtitle=None, cset='elabs', color='num_reactants'):
+	"""
+
+	:param animal: 
+	:param subtitle:  (Default value = None)
+	:param cset:  (Default value = 'elabs')
+	:param color:  (Default value = 'num_reactants')
+
+	"""
 
 	cset = animal.compound_sets[cset]
 
@@ -501,7 +589,7 @@ def plot_synthetic_routes(animal, subtitle=None, cset='elabs', color='num_reacta
 @hippo_graph
 def plot_numbers(animal, subtitle=None):
 
-	'''
+	"""
 		- y-axis: numbers
 		- x-categories
 			* hits
@@ -512,7 +600,11 @@ def plot_numbers(animal, subtitle=None):
 			* elab poses
 			* BBs (total)
 			* BBs (in enamine)
-	'''
+	
+	:param animal: 
+	:param subtitle:  (Default value = None)
+
+	"""
 
 	# cset = animal.compound_sets[cset]
 
@@ -541,11 +633,16 @@ def plot_numbers(animal, subtitle=None):
 @hippo_graph
 def plot_compound_property(animal, prop, compounds=None, style='bar', null=None):
 
-	"""
-	Get an arbitrary property from all the compounds in animal.compounds
+	"""Get an arbitrary property from all the compounds in animal.compounds
 	
-	If one property, plot a 1D histogram
-	If 2D plot a bar/scatter
+		If one property, plot a 1D histogram
+		If 2D plot a bar/scatter
+
+	:param animal: 
+	:param prop: 
+	:param compounds:  (Default value = None)
+	:param style:  (Default value = 'bar')
+	:param null:  (Default value = None)
 
 	"""
 
@@ -575,7 +672,7 @@ def plot_compound_property(animal, prop, compounds=None, style='bar', null=None)
 					v = getattr(comp,p)
 					
 				elif p in (m := comp.metadata):
-				    v = m[p]
+					v = m[p]
 					
 				else:
 					v = null
@@ -615,11 +712,22 @@ def plot_compound_property(animal, prop, compounds=None, style='bar', null=None)
 @hippo_graph
 def plot_pose_property(animal, prop, poses=None, style='scatter', title=None, null=None, color=None, log_y=False, subtitle=None, data_only=False, **kwargs):
 
-	"""
-	Get an arbitrary property from all the poses in animal.poses
+	"""Get an arbitrary property from all the poses in animal.poses
 	
-	If one property, plot a 1D histogram
-	If 2D plot a scatter plot
+		If one property, plot a 1D histogram
+		If 2D plot a scatter plot
+
+	:param animal: 
+	:param prop: 
+	:param poses:  (Default value = None)
+	:param style:  (Default value = 'scatter')
+	:param title:  (Default value = None)
+	:param null:  (Default value = None)
+	:param color:  (Default value = None)
+	:param log_y:  (Default value = False)
+	:param subtitle:  (Default value = None)
+	:param data_only:  (Default value = False)
+	:param **kwargs: 
 
 	"""
 
@@ -841,6 +949,14 @@ def plot_pose_property(animal, prop, poses=None, style='scatter', title=None, nu
 
 @hippo_graph
 def plot_compound_availability(animal, compounds=None, title=None, subtitle=None):
+	"""
+
+	:param animal: 
+	:param compounds:  (Default value = None)
+	:param title:  (Default value = None)
+	:param subtitle:  (Default value = None)
+
+	"""
 
 	from .cset import CompoundTable, CompoundSet
 	
@@ -898,6 +1014,17 @@ def plot_compound_availability(animal, compounds=None, title=None, subtitle=None
 
 @hippo_graph
 def plot_compound_price(animal, compounds=None, min_amount=1, subtitle=None, title=None, style='histogram', **kwargs):
+	"""
+
+	:param animal: 
+	:param compounds:  (Default value = None)
+	:param min_amount:  (Default value = 1)
+	:param subtitle:  (Default value = None)
+	:param title:  (Default value = None)
+	:param style:  (Default value = 'histogram')
+	:param **kwargs: 
+
+	"""
 
 	from .cset import CompoundTable, CompoundSet
 	import numpy as np
@@ -998,6 +1125,13 @@ def plot_compound_price(animal, compounds=None, min_amount=1, subtitle=None, tit
 
 @hippo_graph
 def plot_reaction_funnel(animal, title=None, subtitle=None):
+	"""
+
+	:param animal: 
+	:param title:  (Default value = None)
+	:param subtitle:  (Default value = None)
+
+	"""
 
 	compounds = animal.compounds
 
@@ -1021,6 +1155,13 @@ HIPPO_LOGO_URL = 'https://raw.githubusercontent.com/mwinokan/HIPPO/main/logos/hi
 HIPPO_HEAD_URL = 'https://raw.githubusercontent.com/mwinokan/HIPPO/main/logos/hippo_assets-02.png'
 
 def add_hippo_logo(fig, in_plot=True, position='top right'):
+	"""
+
+	:param fig: 
+	:param in_plot:  (Default value = True)
+	:param position:  (Default value = 'top right')
+
+	"""
 
 	assert fig.layout.title.text, 'Figure must have a title to add the HIPPO logo'
 
@@ -1088,6 +1229,11 @@ def add_hippo_logo(fig, in_plot=True, position='top right'):
 	return fig
 
 def add_punchcard_logo(fig):
+	"""
+
+	:param fig: 
+
+	"""
 
 	fig.add_layout_image(dict(
 		source=HIPPO_HEAD_URL,
