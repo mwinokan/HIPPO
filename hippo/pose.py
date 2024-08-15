@@ -593,7 +593,8 @@ class Pose:
 
 			valid_features = [f for f in complementary_comp_features if np.linalg.norm(f - prot_coord) <= cutoff]
 
-			fingerprint[prot_feature.id] = len(valid_features)
+			if valid_features:
+				fingerprint[prot_feature.id] = len(valid_features)
 
 		self.fingerprint = fingerprint
 
