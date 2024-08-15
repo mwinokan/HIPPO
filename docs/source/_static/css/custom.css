@@ -31,3 +31,7 @@ dl.class em:not([class]):last-of-type::after {
 dl.class > dt:first-of-type {
     display: block !important;
 }
+
+.wy-nav-content {
+    max-width: none;
+}
