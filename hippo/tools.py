@@ -6,6 +6,8 @@ from rdkit.Chem.inchi import MolToInchiKey
 from rdkit.Chem import MolFromSmiles, MolToSmiles, AddHs, RemoveHs
 import mcol
 import mout
+from datetime import datetime
+from string import ascii_uppercase
 
 from mlog import setup_logger
 logger = setup_logger('HIPPO')
@@ -309,6 +311,23 @@ def atomtype_dict_to_formula(atomtype_dict):
 			symbols.append(key)
 
 	return ''.join(symbols)
+
+ALPHANUMERIC_CHARS = '0123456789' + ascii_uppercase
+
+def numberToBase(n, b):
+    if n == 0:
+        return [0]
+    digits = []
+    while n:
+        digits.append(int(n % b))
+        n //= b
+    return digits[::-1]
+
+def dt_hash():
+    dt = datetime.now()
+    x = int(dt.hour*36000 + dt.minute*600 + dt.second*10 + dt.microsecond/10000)
+    timehash = ''.join([ALPHANUMERIC_CHARS[v] for v in numberToBase(x,36)])
+    return f'{dt.strftime("%b%d")}_{timehash}'
 
 class SanitisationError(Exception):
 	""" """

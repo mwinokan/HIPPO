@@ -7,6 +7,8 @@ from tqdm import tqdm
 from pathlib import Path
 import json
 
+from .tools import dt_hash
+
 import logging
 logger = logging.getLogger('HIPPO')
 
@@ -42,6 +44,12 @@ class RandomRecipeGenerator:
 		if self.data_path.exists():
 			logger.warning(f'Will overwrite existing rgen data file: {self.data_path}')
 
+		# Recipe I/O set up
+		path = Path(str(self.db_path).replace('.sqlite','_recipes'))
+		logger.writing(f'{path}/')
+		path.mkdir(exist_ok=True)
+		self._recipe_dir = path
+
 		# Route pool
 		logger.debug('Solving route pool...')
 		self._route_pool = self.get_route_pool()
@@ -64,7 +72,8 @@ class RandomRecipeGenerator:
 
 		self = cls.__new__(cls)
 
-		self._db_path = data['db_path']
+		self._db_path = Path(data['db_path'])
+		self._recipe_dir = Path(data['recipe_dir'])
 		self._max_lead_time = data['max_lead_time']
 		self._suppliers = data['suppliers']
 
@@ -127,6 +136,11 @@ class RandomRecipeGenerator:
 		"""File path for the JSON data export"""
 		return self._data_path
 
+	@property
+	def recipe_dir(self):
+		"""File path for the JSON recipe export"""
+		return self._recipe_dir
+
 	### POOL METHODS
 
 	def get_route_pool(self, mini_test=False):
@@ -160,7 +174,7 @@ class RandomRecipeGenerator:
 		),
 
 		route_reactants AS (
-			SELECT route_id, COUNT(CASE WHEN count_valid = 0 THEN 1 END) AS [count_unavailable] FROM route
+			SELECT route_id, route_product, COUNT(CASE WHEN count_valid = 0 THEN 1 END) AS [count_unavailable] FROM route
 			INNER JOIN component ON component_route = route_id
 			LEFT JOIN possible_reactants ON quote_compound = component_ref
 			WHERE component_type = 2
@@ -187,6 +201,7 @@ class RandomRecipeGenerator:
 		data = {}
 
 		data['db_path'] = str(self.db_path.resolve())
+		data['recipe_dir'] = str(self.recipe_dir.resolve())
 		data['max_lead_time'] = self.max_lead_time
 		data['suppliers'] = self.suppliers
 		data['starting_recipe'] = self.starting_recipe.get_dict(serialise_price=True)
@@ -217,6 +232,10 @@ class RandomRecipeGenerator:
 		:param shuffle:  (Default value = True)
 
 		"""
+
+		# construct filename
+
+		out_file = self.recipe_dir / f'Recipe_{dt_hash()}.json'
 
 		from .price import Price
 
@@ -262,7 +281,7 @@ class RandomRecipeGenerator:
 			if debug: logger.var('#recipe.reactants', len(recipe.reactants))
 			
 			# calculate the new price
-			new_price = price
+			new_price = recipe.price
 
 			if debug: logger.var('new price', new_price)
 
@@ -304,6 +323,8 @@ class RandomRecipeGenerator:
 		### recalculate the products to see if any extra can be had for free?
 
 		logger.success(f'Completed after {i} iterations')
+
+		logger.writing(out_file)
 
 		return recipe
 
