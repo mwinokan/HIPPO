@@ -15,6 +15,11 @@ chemical_symbols = chemical_symbols[1:]
 chemical_symbols = sorted(chemical_symbols, key=lambda x: len(x), reverse=True)
 
 def df_row_to_dict(df_row):
+	"""
+
+	:param df_row: 
+
+	"""
 
 	assert len(df_row) == 1, f'{len(df_row)=}'
 
@@ -35,6 +40,13 @@ def df_row_to_dict(df_row):
 	return data
 
 def remove_other_ligands(sys, residue_number, chain):
+	"""
+
+	:param sys: 
+	:param residue_number: 
+	:param chain: 
+
+	"""
 	
 	ligand_residues = [r.number for r in sys['rLIG'] if r.number != residue_number]
 	
@@ -52,14 +64,29 @@ def remove_other_ligands(sys, residue_number, chain):
 	return sys
 
 def inchikey_from_smiles(smiles):
+	"""
+
+	:param smiles: 
+
+	"""
 	mol = mol_from_smiles(smiles)
 	return MolToInchiKey(mol)
 
 def flat_inchikey(smiles):
+	"""
+
+	:param smiles: 
+
+	"""
 	smiles = sanitise_smiles(smiles)
 	return inchikey_from_smiles(smiles)
 
 def remove_isotopes_from_smiles(smiles):
+	"""
+
+	:param smiles: 
+
+	"""
 
 	mol = MolFromSmiles(smiles)
 
@@ -72,6 +99,12 @@ def remove_isotopes_from_smiles(smiles):
 	return MolToSmiles(mol)
 
 def smiles_has_isotope(smiles, regex=True):
+	"""
+
+	:param smiles: 
+	:param regex:  (Default value = True)
+
+	"""
 	if regex:
 		return re.search(r'([\[][0-9]+[A-Z]+\])',smiles)
 	else:
@@ -79,6 +112,14 @@ def smiles_has_isotope(smiles, regex=True):
 		return any(atom.GetIsotope() for atom in mol.GetAtoms())
 
 def sanitise_smiles(s, verbosity=False, sanitisation_failed='error', radical='error'):
+	"""
+
+	:param s: 
+	:param verbosity:  (Default value = False)
+	:param sanitisation_failed:  (Default value = 'error')
+	:param radical:  (Default value = 'error')
+
+	"""
 
 	assert isinstance(s, str), f'non-string smiles={s}'
 
@@ -145,10 +186,21 @@ def sanitise_smiles(s, verbosity=False, sanitisation_failed='error', radical='er
 	return smiles
 
 def sanitise_mol(m):
+	"""
+
+	:param m: 
+
+	"""
 	from rdkit.Chem import MolToMolBlock, MolFromMolBlock
 	return MolFromMolBlock(MolToMolBlock(m))
 
 def pose_gap(a, b):
+	"""
+
+	:param a: 
+	:param b: 
+
+	"""
 
 	from numpy.linalg import norm
 	from molparse.rdkit import mol_to_AtomGroup
@@ -167,6 +219,11 @@ def pose_gap(a, b):
 	return min_dist
 
 def formula_to_atomtype_dict(formula):
+	"""
+
+	:param formula: 
+
+	"""
 
 	import re
 
@@ -196,6 +253,11 @@ def formula_to_atomtype_dict(formula):
 	return atomtype_dict
 
 def combine_atomtype_dicts(atomtype_dicts):
+	"""
+
+	:param atomtype_dicts: 
+
+	"""
 
 	merged = {}
 	for atomtype_dict in atomtype_dicts:
@@ -208,6 +270,11 @@ def combine_atomtype_dicts(atomtype_dicts):
 	return merged
 
 def atomtype_dict_to_formula(atomtype_dict):
+	"""
+
+	:param atomtype_dict: 
+
+	"""
 	
 	symbols = []
 
@@ -244,4 +311,5 @@ def atomtype_dict_to_formula(atomtype_dict):
 	return ''.join(symbols)
 
 class SanitisationError(Exception):
+	""" """
 	...

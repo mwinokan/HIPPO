@@ -9,9 +9,13 @@ logger = setup_logger('HIPPO')
 
 class Reaction:
 
-	"""A :class:`.Reaction` is a simplified representation of a synthetic pathway to create a product :class:`.Compound`. Reactants (also :class:`.Compound` objects) as well as a reaction type are required.
+	"""
+	A :class:`.Reaction` is a simplified representation of a synthetic pathway to create a product :class:`.Compound`. Reactants (also :class:`.Compound` objects) as well as a reaction type are required.
+	
+	.. attention::
 
-	:class:`.Reaction` objects should not be created directly. Instead use :meth:`.HIPPO.register_reaction` or :meth:`.HIPPO.reactions`
+		:class:`.Reaction` objects should not be created directly. Instead use :meth:`.HIPPO.register_reaction` or :meth:`.HIPPO.reactions`
+
 	"""
 
 	_table = 'reaction'
@@ -81,6 +85,7 @@ class Reaction:
 
 	@property
 	def reactant_str_ids(self):
+		""" """
 		return str(tuple(self.reactant_ids)).replace(',)',')')
 
 	@property
@@ -90,28 +95,37 @@ class Reaction:
 	
 	@property
 	def product_smiles(self):
+		""" """
 		return self.product.smiles
 
 	@property
 	def reactant_smiles(self):
+		""" """
 		return [r.smiles for r in self.reactants]
 
 	@property
 	def product_mol(self):
+		""" """
 		return self.product.mol
 
 	@property
 	def reactant_mols(self):
+		""" """
 		return [r.mol for r in self.reactants]
 
 	@property
 	def price_estimate(self):
+		""" """
 		return self.db.get_reaction_price_estimate(reaction=self)
 
 	### METHODS
 
 	def get_reactant_amount_pairs(self, compound_object=True) -> list[Compound]:
-		"""Returns pairs of reactants and their amounts"""
+		"""Returns pairs of reactants and their amounts
+
+		:param compound_object:  (Default value = True)
+
+		"""
 
 		compound_ids = self.db.select_where(query='reactant_compound, reactant_amount', table='reactant', key='reaction', value=self.id, multiple=True)
 
@@ -124,6 +138,7 @@ class Reaction:
 			return []
 
 	def get_reactant_ids(self) -> list[Compound]:
+		""" """
 
 		compound_ids = self.db.select_where(query='reactant_compound', table='reactant', key='reaction', value=self.id, multiple=True)
 
@@ -139,13 +154,26 @@ class Reaction:
 		permitted_reactions = None,
 		supplier: str | None = None,
 	):
-		"""Get a :class:`.Recipe` describing how to make the product"""
+		"""Get a :class:`.Recipe` describing how to make the product
+
+		:param amount: float:  (Default value = 1)
+		:param debug: bool:  (Default value = False)
+		:param pick_cheapest: bool:  (Default value = False)
+		:param permitted_reactions:  (Default value = None)
+		:param supplier: str | None:  (Default value = None)
+
+		"""
 
 		from .recipe import Recipe
 		return Recipe.from_reaction(self, amount=amount, debug=debug, pick_cheapest=pick_cheapest, permitted_reactions=permitted_reactions, supplier=supplier)
 
 	def summary(self, amount=1, draw=True):
-		"""Print a summary of this reaction's information"""
+		"""Print a summary of this reaction's information
+
+		:param amount:  (Default value = 1)
+		:param draw:  (Default value = True)
+
+		"""
 
 		print(f'id={self.id}')
 		print(f'type={self.type}')
@@ -185,10 +213,21 @@ class Reaction:
 		display(drawing)
 
 	def check_chemistry(self, debug=False):
+		"""
+
+		:param debug:  (Default value = False)
+
+		"""
 		from .chem import check_chemistry
 		return check_chemistry(self.type, self.reactants, self.product, debug=debug)
 
 	def check_reactant_availability(self, supplier: None | str = None, debug: bool = False):
+		"""
+
+		:param supplier: None | str:  (Default value = None)
+		:param debug: bool:  (Default value = False)
+
+		"""
 
 		if debug:
 			logger.var('reaction', self.id)
@@ -240,7 +279,12 @@ class Reaction:
 
 	def get_dict(self, smiles=True, mols=True):
 
-		"""Returns a dictionary representing this Reaction"""
+		"""Returns a dictionary representing this Reaction
+
+		:param smiles:  (Default value = True)
+		:param mols:  (Default value = True)
+
+		"""
 
 		serialisable_fields = ['id','type', 'product_id', 'reactant_ids']
 

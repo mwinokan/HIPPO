@@ -34,6 +34,7 @@ class PoseTable:
 	
 	@property
 	def table(self) -> str:
+		""" """
 		return self._table
 
 	@property
@@ -68,20 +69,35 @@ class PoseTable:
 	### METHODS
 
 	def get_by_tag(self, tag):
-		"""Get all child poses with a certain tag"""
+		"""Get all child poses with a certain tag
+
+		:param tag: 
+
+		"""
 		values = self.db.select_where(query='tag_pose', table='tag', key='name', value=tag, multiple=True)
 		ids = [v for v, in values if v]
 		# print(values)
 		return self[ids]
 
 	def get_by_target(self, *, id):
+		"""
+
+		:param *: 
+		:param id: 
+
+		"""
 		assert isinstance(id, int)
 		values = self.db.select_where(query='pose_id', table='pose', key='target', value=id, multiple=True)
 		ids = [v for v, in values if v]
 		return self[ids]
 
 	def get_by_metadata(self, key: str, value: str | None = None):
-		"""Get all child podrd with by their metadata. If no value is passed, then simply containing the key in the metadata dictionary is sufficient"""
+		"""Get all child podrd with by their metadata. If no value is passed, then simply containing the key in the metadata dictionary is sufficient
+
+		:param key: str: 
+		:param value: str | None:  (Default value = None)
+
+		"""
 		results = self.db.select(query='pose_id, pose_metadata', table='pose', multiple=True)
 		if value is None:
 			ids = [i for i,d in results if d and f'"{key}":' in d]
@@ -92,6 +108,11 @@ class PoseTable:
 		return self[ids]	
 
 	def draw(self, max_draw=100):
+		"""
+
+		:param max_draw:  (Default value = 100)
+
+		"""
 		if len(self) <= max_draw:
 			self[:].draw()
 		else:
@@ -104,6 +125,7 @@ class PoseTable:
 		logger.var('tags', self.tags)
 
 	def interactive(self):
+		""" """
 		return self[self.ids].interactive()
 
 	### DUNDERS
@@ -208,10 +230,12 @@ class PoseSet:
 
 	@property
 	def db(self):
+		""" """
 		return self._db
 
 	@property
 	def table(self):
+		""" """
 		return self._table
 
 	@property
@@ -285,6 +309,7 @@ class PoseSet:
 
 	@property
 	def reference_ids(self):
+		""" """
 		values = self.db.select_where(table='pose', query='DISTINCT pose_reference', key=f'pose_reference IS NOT NULL and pose_id in {tuple(self.ids)}', value=None, multiple=True)
 		return set(v for v, in values)
 
@@ -294,6 +319,7 @@ class PoseSet:
 
 	@property
 	def inspiration_sets(self):
+		""" """
 		sets = []
 		for id in self.ids:
 			insp_ids = self.db.select_where(query='inspiration_original', table='inspiration', key='derivative', value=id, multiple=True, sort='inspiration_original')
@@ -305,6 +331,7 @@ class PoseSet:
 
 	@property
 	def str_ids(self):
+		""" """
 		return str(tuple(self.ids)).replace(',)',')')
 
 	@property
@@ -330,6 +357,7 @@ class PoseSet:
 
 	@property
 	def best_placed_pose_id(self):
+		""" """
 		query = f'pose_id, MIN(pose_distance_score)'
 		query = self.db.select_where(table='pose', query=query, key=f'pose_id in {self.str_ids}', multiple=False)
 		return query[0]
@@ -353,7 +381,12 @@ class PoseSet:
 	### FILTERING
 
 	def get_by_tag(self, tag, inverse=False):
-		"""Get all child poses with a certain tag"""
+		"""Get all child poses with a certain tag
+
+		:param tag: 
+		:param inverse:  (Default value = False)
+
+		"""
 		values = self.db.select_where(query='tag_pose', table='tag', key='name', value=tag, multiple=True)
 		if inverse:
 			matches = [v for v, in values if v]
@@ -363,7 +396,12 @@ class PoseSet:
 		return PoseSet(self.db, ids)
 
 	def get_by_metadata(self, key: str, value: str | None = None):
-		"""Get all child poses with by their metadata. If no value is passed, then simply containing the key in the metadata dictionary is sufficient"""
+		"""Get all child poses with by their metadata. If no value is passed, then simply containing the key in the metadata dictionary is sufficient
+
+		:param key: str: 
+		:param value: str | None:  (Default value = None)
+
+		"""
 		results = self.db.select(query='pose_id, pose_metadata', table='pose', multiple=True)
 		if value is None:
 			ids = [i for i,d in results if d and f'"{key}":' in d and i in self.ids]
@@ -374,7 +412,12 @@ class PoseSet:
 		return PoseSet(self.db, ids)		
 
 	def get_by_inspiration(self, inspiration: int | Pose, inverse=False):
-		"""Get all child poses with with this inspiration."""
+		"""Get all child poses with with this inspiration.
+
+		:param inspiration: int | Pose: 
+		:param inverse:  (Default value = False)
+
+		"""
 
 		ids = set()
 
@@ -395,7 +438,11 @@ class PoseSet:
 		return PoseSet(self.db, ids)
 
 	def get_df(self, skip_no_mol=True, **kwargs):
-		"""Get a DataFrame of the poses in this set"""
+		"""Get a DataFrame of the poses in this set
+
+		:param skip_no_mol:  (Default value = True)
+
+		"""
 		
 		from pandas import DataFrame
 
@@ -412,13 +459,23 @@ class PoseSet:
 		return DataFrame(data)
 
 	def get_by_reference(self, ref_id):
-		"""Get poses with a certain reference id"""
+		"""Get poses with a certain reference id
+
+		:param ref_id: 
+
+		"""
 		values = self.db.select_where(table='pose', query='pose_id', key='reference', value=ref_id, multiple=True)
 		if not values:
 			return None
 		return PoseSet(self.db, [v for v, in values])
 
 	def get_by_target(self, *, id):
+		"""
+
+		:param *: 
+		:param id: 
+
+		"""
 		assert isinstance(id, int)
 		values = self.db.select_where(query='pose_id', table='pose', key=f'pose_target is {id} AND pose_id in {self.str_ids}', multiple=True, none='quiet')
 		ids = [v for v, in values if v]
@@ -427,7 +484,12 @@ class PoseSet:
 		return PoseSet(self.db, ids)
 
 	def filter(self, function, inverse=False):
-		"""Filter this poseset by selecting members where function(pose) is truthy"""
+		"""Filter this poseset by selecting members where function(pose) is truthy
+
+		:param function: 
+		:param inverse:  (Default value = False)
+
+		"""
 		
 		ids = set()
 		for pose in self:
@@ -444,11 +506,16 @@ class PoseSet:
 
 	@property
 	def reference(self):
+		""" """
 		raise NotImplementedError
 	
 	@reference.setter
 	def reference(self, r):
-		"""Bulk set the references for poses in this set"""
+		"""Bulk set the references for poses in this set
+
+		:param r: 
+
+		"""
 		if not isinstance(r, int):
 			assert r._table == 'pose'
 			r = r.id
@@ -459,7 +526,11 @@ class PoseSet:
 		self.db.commit()
 	
 	def add_tag(self, t):
-		"""Add this tag to every member of the set"""
+		"""Add this tag to every member of the set
+
+		:param t: 
+
+		"""
 
 		assert isinstance(t, str)
 
@@ -471,7 +542,12 @@ class PoseSet:
 		self.db.commit()
 
 	def append_to_metadata(self, key, value):
-		"""Create or append to a list-like value with given key for each pose in this set"""
+		"""Create or append to a list-like value with given key for each pose in this set
+
+		:param key: 
+		:param value: 
+
+		"""
 		for id in self.indices:
 			metadata = self.db.get_metadata(table='pose', id=id)
 			metadata.append(key, value)
@@ -479,12 +555,18 @@ class PoseSet:
 	### SPLITTING
 
 	def split_by_reference(self):
+		""" """
 		sets = {}
 		for ref_id in self.reference_ids:
 			sets[ref_id] = self.get_by_reference(ref_id)
 		return sets
 
 	def split_by_inspirations(self, single_set=False):
+		"""
+
+		:param single_set:  (Default value = False)
+
+		"""
 		
 		sets = {}
 
@@ -507,7 +589,13 @@ class PoseSet:
 	### EXPORTING
 
 	def write_sdf(self, out_path, name_col='name', inspirations='fragalysis'):
-		"""Write an SDF"""
+		"""Write an SDF
+
+		:param out_path: 
+		:param name_col:  (Default value = 'name')
+		:param inspirations:  (Default value = 'fragalysis')
+
+		"""
 
 		from pathlib import Path
 
@@ -543,9 +631,28 @@ class PoseSet:
 		# exports: bool = False,
 	):
 
-		"""Prepare an SDF for upload to the RHS of Fragalysis. 
+		"""Prepare an SDF for upload to the RHS of Fragalysis.
+		
+		extra_cols should be a dictionary with a key for each column name, and list values where the first element is the field description, and all subsequent elements are values for each pose.
 
-		extra_cols should be a dictionary with a key for each column name, and list values where the first element is the field description, and all subsequent elements are values for each pose."""
+		:param out_path: 
+		:param *: 
+		:param method: 
+		:param ref_url: 
+		:param submitter_name: 
+		:param submitter_email: 
+		:param submitter_institution: 
+		:param metadata: bool:  (Default value = True)
+		:param sort_by: str | None:  (Default value = None)
+		:param sort_reverse: bool:  (Default value = False)
+		:param generate_pdbs: bool:  (Default value = False)
+		:param ingredients: IngredientSet:  (Default value = None)
+		:param tags: bool:  (Default value = True)
+		:param extra_cols: dict[str: 
+		:param list]:  (Default value = None)
+		:param # exports: bool:  (Default value = False)
+
+		"""
 
 		from .fragalysis import generate_header
 		from pathlib import Path
@@ -711,7 +818,11 @@ class PoseSet:
 		return pose_df
 
 	def to_pymol(self, prefix=None):
-		"""Group the poses by reference protein and inspirations and output relevant PDBs and SDFs."""
+		"""Group the poses by reference protein and inspirations and output relevant PDBs and SDFs.
+
+		:param prefix:  (Default value = None)
+
+		"""
 
 		commands = []
 
@@ -777,7 +888,12 @@ class PoseSet:
 	### OUTPUT
 
 	def interactive(self, method=None, print_name=True, **kwargs):
-		"""Creates a ipywidget to interactively navigate this PoseSet."""
+		"""Creates a ipywidget to interactively navigate this PoseSet.
+
+		:param method:  (Default value = None)
+		:param print_name:  (Default value = True)
+
+		"""
 
 		from ipywidgets import interactive, BoundedIntText, Checkbox, interactive_output, HBox, GridBox, Layout, VBox
 		from IPython.display import display
@@ -785,6 +901,11 @@ class PoseSet:
 
 		if method:
 			def widget(i):
+				"""
+
+				:param i: 
+
+				"""
 				pose = self[i]
 				if print_name:
 					print(repr(pose))
@@ -823,6 +944,16 @@ class PoseSet:
 			ui = VBox([a, ui])
 			
 			def widget(i, name=True, summary=True, grid=True, draw=True, metadata=True):
+				"""
+
+				:param i: 
+				:param name:  (Default value = True)
+				:param summary:  (Default value = True)
+				:param grid:  (Default value = True)
+				:param draw:  (Default value = True)
+				:param metadata:  (Default value = True)
+
+				"""
 				pose = self[i]
 				if name:
 					print(repr(pose))

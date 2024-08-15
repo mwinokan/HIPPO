@@ -12,6 +12,7 @@ class Target:
 
 	@property
 	def db(self):
+		""" """
 		return self._db
 
 	@property
@@ -56,7 +57,11 @@ class Target:
 		return f'{mcol.bold}{mcol.underline}{self} "{self.name}"{mcol.unbold}{mcol.ununderline}'
 
 	def calculate_features(self, protein):
-		"""Calculate features from a protein system"""
+		"""Calculate features from a protein system
+
+		:param protein: 
+
+		"""
 
 		features = protein.get_protein_features()
 

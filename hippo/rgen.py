@@ -11,6 +11,7 @@ import logging
 logger = logging.getLogger('HIPPO')
 
 class RandomRecipeGenerator:
+	""" """
 
 	"""Class to create randomly sampled Recipe from a HIPPO Database"""
 
@@ -52,7 +53,12 @@ class RandomRecipeGenerator:
 
 	@classmethod
 	def from_json(cls, db, path):
-		"""Construct the RandomRecipeGenerator from a JSON file"""
+		"""Construct the RandomRecipeGenerator from a JSON file
+
+		:param db: 
+		:param path: 
+
+		"""
 
 		data = json.load(open(path, 'rt'))
 
@@ -87,17 +93,17 @@ class RandomRecipeGenerator:
 		return self._starting_recipe
 
 	@property
-	def db(self):
+	def db(self) -> 'Database':
 		"""Get the linked HIPPO Database object"""
 		return self._db
 
 	@property
-	def db_path(self):
+	def db_path(self) -> str:
 		"""Get the path of the linked Database"""
 		return self._db_path
 
 	@property
-	def suppliers_str(self):
+	def suppliers_str(self) -> str:
 		"""SQL formatted tuple of suppliers"""
 		return str(tuple(self.suppliers)).replace(',)',')')
 	
@@ -107,7 +113,7 @@ class RandomRecipeGenerator:
 		return self._suppliers
 	
 	@property
-	def max_lead_time(self):
+	def max_lead_time(self) -> float:
 		"""Maximum lead-time constraint"""
 		return self._max_lead_time
 
@@ -125,7 +131,11 @@ class RandomRecipeGenerator:
 
 	def get_route_pool(self, mini_test=False):
 
-		"""Construct the pool of routes that will be randomly sampled from"""
+		"""Construct the pool of routes that will be randomly sampled from
+
+		:param mini_test:  (Default value = False)
+
+		"""
 
 		"""
 			Explainer for SQL query:
@@ -145,16 +155,16 @@ class RandomRecipeGenerator:
 		route_ids = self.db.execute(
 		f"""
 		WITH possible_reactants AS (
-		    SELECT quote_compound, COUNT(CASE WHEN quote_supplier IN {self.suppliers_str} THEN 1 END) AS [count_valid] FROM quote
-		    GROUP BY quote_compound
+			SELECT quote_compound, COUNT(CASE WHEN quote_supplier IN {self.suppliers_str} THEN 1 END) AS [count_valid] FROM quote
+			GROUP BY quote_compound
 		),
 
 		route_reactants AS (
-		    SELECT route_id, route_product, COUNT(CASE WHEN count_valid = 0 THEN 1 END) AS [count_unavailable] FROM route
-		    INNER JOIN component ON component_route = route_id
-		    LEFT JOIN possible_reactants ON quote_compound = component_ref
-		    WHERE component_type = 2
-		    GROUP BY route_id
+			SELECT route_id, COUNT(CASE WHEN count_valid = 0 THEN 1 END) AS [count_unavailable] FROM route
+			INNER JOIN component ON component_route = route_id
+			LEFT JOIN possible_reactants ON quote_compound = component_ref
+			WHERE component_type = 2
+			GROUP BY route_id
 		)
 
 		SELECT route_id FROM route_reactants
@@ -172,6 +182,7 @@ class RandomRecipeGenerator:
 	### FILE I/O METHODS
 
 	def dump_data(self):
+		""" """
 
 		data = {}
 
@@ -193,6 +204,19 @@ class RandomRecipeGenerator:
 		max_iter=None, 
 		shuffle=True,
 	):
+		"""
+
+		:param budget: float:  (Default value = 10000)
+		:param currency: str:  (Default value = 'EUR')
+		:param max_products:  (Default value = 1000)
+		:param max_reactions:  (Default value = 1000)
+		:param debug:  (Default value = True)
+		:param max_iter:  (Default value = None)
+		:param # pick_inner_cheapest:  (Default value = True)
+		:param # add_size:  (Default value = 1)
+		:param shuffle:  (Default value = True)
+
+		"""
 
 		from .price import Price
 

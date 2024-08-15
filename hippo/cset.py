@@ -37,6 +37,7 @@ class CompoundTable:
 	
 	@property
 	def table(self) -> str:
+		""" """
 		return self._table
 
 	@property
@@ -126,13 +127,24 @@ class CompoundTable:
 	### METHODS
 
 	def get_by_tag(self,tag):
-		"""Get all child compounds with a certain tag"""
+		"""Get all child compounds with a certain tag
+
+		:param tag: 
+
+		"""
 		values = self.db.select_where(query='tag_compound', table='tag', key='name', value=tag, multiple=True)
 		ids = [v for v, in values if v]
 		return self[ids]
 
 	def get_by_metadata(self, key: str, value: str | None = None):
-		"""Get all child compounds with by their metadata. If no value is passed, then simply containing the key in the metadata dictionary is sufficient"""
+		"""Get all child compounds with by their metadata. If no value is passed, then simply containing the key in the metadata dictionary is sufficient
+
+		:param key: str:
+		:param value: str | None:  (Default value = None)
+		:param key: str: 
+		:param value: str | None:  (Default value = None)
+
+		"""
 		results = self.db.select(query='compound_id, compound_metadata', table='compound', multiple=True)
 		if value is None:
 			ids = [i for i,d in results if d and f'"{key}":' in d]
@@ -143,6 +155,11 @@ class CompoundTable:
 		return self[ids]		
 
 	def get_by_base(self,base):
+		"""
+
+		:param base: 
+
+		"""
 
 		if not isinstance(base, int):
 			assert base._table == 'compound'
@@ -165,9 +182,11 @@ class CompoundTable:
 		logger.var('#products', self.num_products)
 
 	def draw(self):
+		""" """
 		return self[self.ids].draw()
 
 	def interactive(self):
+		""" """
 		return self[self.ids].interactive()
 
 	### DUNDERS
@@ -267,10 +286,12 @@ class CompoundSet:
 
 	@property
 	def db(self):
+		""" """
 		return self._db
 
 	@property
 	def table(self):
+		""" """
 		return self._table
 
 	@property
@@ -333,23 +354,28 @@ class CompoundSet:
 
 	@property
 	def str_ids(self):
+		""" """
 		return str(tuple(self.ids)).replace(',)',')')
 
 	@property
 	def num_heavy_atoms(self):
+		""" """
 		return sum([c.num_heavy_atoms for c in self])
 
 	@property
 	def num_rings(self):
+		""" """
 		return sum([c.num_rings for c in self])
 
 	@property
 	def formula(self):
+		""" """
 		from .tools import atomtype_dict_to_formula
 		return atomtype_dict_to_formula(self.atomtype_dict)
 
 	@property
 	def atomtype_dict(self):
+		""" """
 		from .tools import formula_to_atomtype_dict, combine_atomtype_dicts
 		atomtype_dicts = [c.atomtype_dict for c in self]
 		return combine_atomtype_dicts(atomtype_dicts)
@@ -357,13 +383,24 @@ class CompoundSet:
 	### FILTERING
 
 	def get_by_tag(self,tag):
-		"""Get all child compounds with a certain tag"""
+		"""Get all child compounds with a certain tag
+
+		:param tag: 
+
+		"""
 		values = self.db.select_where(query='tag_compound', table='tag', key='name', value=tag, multiple=True)
 		ids = [v for v, in values if v and v in self.ids]
 		return CompoundSet(self.db, ids)
 
 	def get_by_metadata(self, key: str, value: str | None = None):
-		"""Get all child compounds with by their metadata. If no value is passed, then simply containing the key in the metadata dictionary is sufficient"""
+		"""Get all child compounds with by their metadata. If no value is passed, then simply containing the key in the metadata dictionary is sufficient
+
+		:param key: str:
+		:param value: str | None:  (Default value = None)
+		:param key: str: 
+		:param value: str | None:  (Default value = None)
+
+		"""
 		results = self.db.select(query='compound_id, compound_metadata', table='compound', multiple=True)
 		if value is None:
 			ids = [i for i,d in results if d and f'"{key}":' in d and i in self.ids]
@@ -374,12 +411,20 @@ class CompoundSet:
 		return CompoundSet(self.db, ids)		
 
 	def get_all_possible_reactants(self, debug=False):
-		"""Recursively searches for all the reactants that could possible be needed to synthesise these compounds."""
+		"""Recursively searches for all the reactants that could possible be needed to synthesise these compounds.
+
+		:param debug: Default value = False)
+
+		"""
 		all_reactants, all_reactions = self.db.get_unsolved_reaction_tree(product_ids=self.ids, debug=debug) 
 		return all_reactants
 
 	def get_all_possible_reactions(self, debug=False):
-		"""Recursively searches for all the reactants that could possible be needed to synthesise these compounds."""
+		"""Recursively searches for all the reactants that could possible be needed to synthesise these compounds.
+
+		:param debug: Default value = False)
+
+		"""
 		all_reactants, all_reactions = self.db.get_unsolved_reaction_tree(product_ids=self.ids, debug=debug) 
 		return all_reactions
 
@@ -397,6 +442,7 @@ class CompoundSet:
 		display(draw_grid(mols, labels=labels))
 
 	def grid(self):
+		""" """
 		self.draw()
 
 	def summary(self):
@@ -433,6 +479,17 @@ class CompoundSet:
 		ui = VBox([a, ui])
 		
 		def widget(i, name=True, summary=True, draw=True, poses=True, reactions=True, metadata=True):
+			"""
+
+			:param i: param name:  (Default value = True)
+			:param summary: Default value = True)
+			:param draw: Default value = True)
+			:param poses: Default value = True)
+			:param reactions: Default value = True)
+			:param metadata: Default value = True)
+			:param name:  (Default value = True)
+
+			"""
 			comp = self[i]
 			
 			if name and not summary:
@@ -465,7 +522,11 @@ class CompoundSet:
 	### OTHER METHODS
 
 	def add(self, compound):
-		"""Add a compound to this set"""
+		"""Add a compound to this set
+
+		:param compound: 
+
+		"""
 		if isinstance(compound, Compound):
 			compound = compound.id
 
@@ -482,7 +543,20 @@ class CompoundSet:
 		supplier: None | str = None,
 		**kwargs,
 	):
-		"""Generate the :class:`.Recipe` to make these compounds."""
+		"""Generate the :class:`.Recipe` to make these compounds.
+
+		:param amount: float:  (Default value = 1)
+		:param debug: Default value = False)
+		:param pick_cheapest: bool:  (Default value = False)
+		:param permitted_reactions: Default value = None)
+		:param quoted_only: bool:  (Default value = False)
+		:param supplier: None | str:  (Default value = None)
+		:param amount: float:  (Default value = 1)
+		:param pick_cheapest: bool:  (Default value = False)
+		:param quoted_only: bool:  (Default value = False)
+		:param supplier: None | str:  (Default value = None)
+
+		"""
 		from .recipe import Recipe
 		return Recipe.from_compounds(self, 
 			amount=amount, 
@@ -519,6 +593,15 @@ class CompoundSet:
 		shuffle(self._indices)
 	
 	def get_df(self, mol=False, reactions=False, metadata=False, count_by_target=False, poses=False, **kwargs):
+		"""
+
+		:param mol: Default value = False)
+		:param reactions: Default value = False)
+		:param metadata: Default value = False)
+		:param count_by_target: Default value = False)
+		:param poses: Default value = False)
+
+		"""
 
 		from tqdm import tqdm
 		from pandas import DataFrame
@@ -532,7 +615,12 @@ class CompoundSet:
 		return DataFrame(data)
 
 	def get_quoted(self, *, supplier='any'):
-		"""Get all member compounds that have a quote from given supplier"""
+		"""Get all member compounds that have a quote from given supplier
+
+		:param *: 
+		:param supplier:  (Default value = 'any')
+
+		"""
 
 		if supplier != 'any':
 			key = f'quote_compound IN {self.str_ids} AND quote_supplier = "{supplier}"'
@@ -550,7 +638,12 @@ class CompoundSet:
 		return CompoundSet(self.db, ids)
 
 	def get_unquoted(self, *, supplier='any'):
-		"""Get all member compounds that do not have a quote from given supplier"""
+		"""Get all member compounds that do not have a quote from given supplier
+
+		:param *: 
+		:param supplier:  (Default value = 'any')
+
+		"""
 		quoted = self.get_quoted(supplier=supplier)
 		return self - quoted
 
@@ -559,12 +652,24 @@ class CompoundSet:
 		return dict(db=str(self.db.path.resolve()), indices=self.indices)
 
 	def write_smiles_csv(self, file):
+		"""
+
+		:param file: 
+
+		"""
 		from pandas import DataFrame
 		smiles = self.smiles
 		df = DataFrame(dict(smiles=smiles))
 		df.to_csv(file)
 
 	def write_postera_csv(self, file, *, supplier='Enamine', prefix='fragment'):
+		"""
+
+		:param file:
+		:param supplier: Default value = 'Enamine')
+		:param prefix: Default value = 'fragment')
+
+		"""
 		from datetime import date as dt
 		from pandas import DataFrame
 		from tqdm import tqdm
@@ -765,6 +870,13 @@ class IngredientSet:
 
 	@classmethod
 	def from_ingredient_df(cls, db, df, supplier=None):
+		"""
+
+		:param db: param df:
+		:param supplier: Default value = None)
+		:param df: 
+
+		"""
 		# from numpy import nan
 		self = cls.__new__(cls)
 
@@ -781,6 +893,14 @@ class IngredientSet:
 
 	@classmethod
 	def from_json(cls, db, path, supplier, data=None):
+		"""
+
+		:param db: param path:
+		:param supplier: param data:  (Default value = None)
+		:param path: 
+		:param data:  (Default value = None)
+
+		"""
 
 		if not data:
 			import json
@@ -796,6 +916,13 @@ class IngredientSet:
 
 	@classmethod
 	def from_ingredient_dicts(cls, db, dicts, supplier=None):
+		"""
+
+		:param db: param dicts:
+		:param supplier: Default value = None)
+		:param dicts: 
+
+		"""
 		from pandas import DataFrame
 		df = DataFrame(dicts, dtype=object)
 		# for col in cls._columns:
@@ -805,6 +932,14 @@ class IngredientSet:
 
 	@classmethod
 	def from_compounds(cls, compounds, ids=None, db=None, amount=1):
+		"""
+
+		:param compounds: param ids:  (Default value = None)
+		:param db: Default value = None)
+		:param amount: Default value = 1)
+		:param ids:  (Default value = None)
+
+		"""
 
 		from pandas import DataFrame
 
@@ -822,28 +957,38 @@ class IngredientSet:
 
 	@property
 	def df(self):
+		""" """
 		return self._data
 
 	@property
 	def db(self):
+		""" """
 		return self._db
 
 	@property
 	def price_df(self):
+		""" """
 		df = self.df.copy()
 		df['price'] = [i.price for i in self]
 		return df
 
 	@property
 	def price(self):
+		""" """
 		return self.get_price()
 
 	@property
 	def supplier(self):
+		""" """
 		return self._supplier
 
 	@supplier.setter
 	def supplier(self, s):
+		"""
+
+		:param s: 
+
+		"""
 		
 		if isinstance(s, list) or isinstance(s, tuple):
 			for x in s:
@@ -856,35 +1001,46 @@ class IngredientSet:
 
 	@property
 	def smiles(self):
+		""" """
 		compound_ids = list(self.df['compound_id'])
 		result = self.db.select_where(query='compound_smiles', table='compound', key=f'compound_id in {tuple(compound_ids)}', multiple=True)
 		return [q for q, in result]
 
 	@property
 	def inchikeys(self):
+		""" """
 		compound_ids = list(self.df['compound_id'])
 		result = self.db.select_where(query='compound_inchikey', table='compound', key=f'compound_id in {tuple(compound_ids)}', multiple=True)
 		return [q for q, in result]
 
 	@property
 	def compound_ids(self):
+		""" """
 		return list(self.df['compound_id'].values)
 
 	@property
 	def ids(self):
+		""" """
 		return self.compound_ids
 
 	@property
 	def str_compound_ids(self):
+		""" """
 		return str(tuple(self.df['compound_id'].values)).replace(',)',')')
 
 	@property
 	def compounds(self):
+		""" """
 		return CompoundSet(self.db, self.compound_ids)
 
 	### METHODS
 
 	def get_price(self, supplier=None):
+		"""
+
+		:param supplier: Default value = None)
+
+		"""
 
 		from .price import Price
 
@@ -924,9 +1080,23 @@ class IngredientSet:
 		return quoted + unquoted_price
 
 	def interactive(self, **kwargs):
+		"""Wrapper for :meth:`.CompoundSet.interactive`"""
 		return self.compounds.interactive(**kwargs)
 
 	def add(self, ingredient=None, *, compound_id=None, amount=None, quote_id=None, supplier=None, max_lead_time=None, quoted_amount=None, debug=False):
+		"""
+
+		:param ingredient: Default value = None)
+		:param *: 
+		:param compound_id:  (Default value = None)
+		:param amount:  (Default value = None)
+		:param quote_id:  (Default value = None)
+		:param supplier:  (Default value = None)
+		:param max_lead_time:  (Default value = None)
+		:param quoted_amount:  (Default value = None)
+		:param debug:  (Default value = False)
+
+		"""
 
 		from pandas import DataFrame, concat
 
@@ -992,6 +1162,11 @@ class IngredientSet:
 					logger.out(addition)
 
 	def get_ingredient(self, series):
+		"""
+
+		:param series: 
+
+		"""
 		
 		q_id = series['quote_id']
 
@@ -1008,12 +1183,19 @@ class IngredientSet:
 		)
 
 	def copy(self):
+		""" """
 		return IngredientSet.from_ingredient_df(self.db, self.df, supplier=self.supplier)
 
 	def draw(self):
+		""" """
 		self.compounds.draw()
 
 	def set_amounts(self, amount):
+		"""
+
+		:param amount: 
+
+		"""
 
 		self.df['amount'] = amount
 
@@ -1040,7 +1222,11 @@ class IngredientSet:
 			self.df.loc[match, 'quote_id'] = quote_id
 
 	def get_dict(self, data_orient='list'):
-		"""Get serialisable dictionary"""
+		"""Get serialisable dictionary
+
+		:param data_orient: Default value = 'list')
+
+		"""
 		return dict(db=str(self.db), supplier=self.supplier, data=self.df.to_dict(orient=data_orient))
 
 	### DUNDERS

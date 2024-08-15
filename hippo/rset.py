@@ -31,10 +31,12 @@ class ReactionTable:
 
 	@property
 	def table(self):
+		""" """
 		return self._table
 
 	@property
 	def types(self):
+		""" """
 		result = self.db.select(table=self.table, query='DISTINCT reaction_type', multiple=True)
 		return [q for q, in result]
 
@@ -47,14 +49,25 @@ class ReactionTable:
 	### METHODS
 
 	def interactive(self):
+		""" """
 		return self[self.ids].interactive()
 
 	def get_by_type(self, reaction_type: str):
+		"""
+
+		:param reaction_type: str: 
+
+		"""
 		result = self.db.select_where(table=self.table, query='reaction_id', key='type', value=reaction_type, multiple=True)
 		return self[[q for q, in result]]
 
 	def get_df(self, smiles=True, mols=True, **kwargs):
-		"""Construct a pandas.DataFrame of all reactions in the database"""
+		"""Construct a pandas.DataFrame of all reactions in the database
+
+		:param smiles:  (Default value = True)
+		:param mols:  (Default value = True)
+
+		"""
 
 		from rdkit.Chem import Mol
 		from pandas import DataFrame
@@ -85,13 +98,13 @@ class ReactionTable:
 			FROM reaction 
 
 			INNER JOIN reactant 
-			    ON reaction.reaction_id = reactant.reactant_reaction
+				ON reaction.reaction_id = reactant.reactant_reaction
 
 			INNER JOIN compound c_r
-			    ON c_r.compound_id = reactant.reactant_compound
+				ON c_r.compound_id = reactant.reactant_compound
 
 			INNER JOIN compound c_p
-			    ON c_p.compound_id = reaction.reaction_product
+				ON c_p.compound_id = reaction.reaction_product
 			'''
 
 			if not mols:
@@ -199,18 +212,22 @@ class ReactionSet:
 
 	@property
 	def table(self):
+		""" """
 		return self._table
 
 	@property
 	def indices(self):
+		""" """
 		return self._indices
 
 	@property
 	def ids(self):
+		""" """
 		return self._indices
 
 	@property
 	def str_ids(self):
+		""" """
 		return str(tuple(self.ids)).replace(',)',')')
 
 	@property
@@ -243,6 +260,11 @@ class ReactionSet:
 	### METHODS
 
 	def add(self, r):
+		"""
+
+		:param r: 
+
+		"""
 		assert r._table == 'reaction'
 		if (id := r.id) not in self._indices:
 			self._indices.append(id)
@@ -274,6 +296,16 @@ class ReactionSet:
 		ui = VBox([a, ui1, ui2])
 		
 		def widget(i, name=True, summary=True, draw=True, check_chemistry=True, reactants=False):
+			"""
+
+			:param i: 
+			:param name:  (Default value = True)
+			:param summary:  (Default value = True)
+			:param draw:  (Default value = True)
+			:param check_chemistry:  (Default value = True)
+			:param reactants:  (Default value = False)
+
+			"""
 			reaction = self[i]
 			if name: print(repr(reaction))
 			if summary: reaction.summary(draw=False)
@@ -300,7 +332,12 @@ class ReactionSet:
 		display(ui, out)
 	
 	def get_df(self, smiles=True, mols=True, **kwargs):
-		"""Construct a pandas.DataFrame of this ReactionSet"""
+		"""Construct a pandas.DataFrame of this ReactionSet
+
+		:param smiles:  (Default value = True)
+		:param mols:  (Default value = True)
+
+		"""
 
 		from pandas import DataFrame
 		from tqdm import tqdm
@@ -315,13 +352,20 @@ class ReactionSet:
 		return DataFrame(data)
 
 	def copy(self):
+		""" """
 		return ReactionSet(self.db, self.ids, sort=False)
 
 	def get_recipes(self, amounts=1):
+		"""
+
+		:param amounts:  (Default value = 1)
+
+		"""
 		from .recipe import Recipe
 		return Recipe.from_reactions(db=self.db, reactions=self, amounts=1)
 
 	def reverse(self):
+		""" """
 		self._indices = list(reversed(self._indices))
 
 	def get_dict(self):

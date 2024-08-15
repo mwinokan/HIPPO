@@ -120,7 +120,12 @@ class Database:
 		self._cursor = conn.cursor()
 
 	def execute(self, sql, payload=None):
-		"""Execute arbitrary SQL"""
+		"""Execute arbitrary SQL
+
+		:param sql: 
+		:param payload:  (Default value = None)
+
+		"""
 		try:
 			if payload:
 				return self.cursor.execute(sql, payload)
@@ -387,7 +392,19 @@ class Database:
 		metadata=None,
 		inchikey: str = None, 
 	) -> int:
-		"""Insert a compound"""
+		"""Insert a compound
+
+		:param *: 
+		:param smiles: str: 
+		:param base: Compound | int | None:  (Default value = None)
+		:param alias: str | None:  (Default value = None)
+		:param tags: None | list:  (Default value = None)
+		:param warn_duplicate:  (Default value = True)
+		:param commit:  (Default value = True)
+		:param metadata:  (Default value = None)
+		:param inchikey: str:  (Default value = None)
+
+		"""
 
 		# process the base
 		assert isinstance(base, int) or isinstance(base, Compound) or base is None, f'incompatible base={base}'
@@ -463,7 +480,12 @@ class Database:
 		return compound_id
 
 	def insert_compound_pattern_bfp(self, compound_id, commit=True):
-		"""Insert a compound_pattern_bfp"""
+		"""Insert a compound_pattern_bfp
+
+		:param compound_id: 
+		:param commit:  (Default value = True)
+
+		"""
 
 		sql = """
 		INSERT INTO compound_pattern_bfp(compound_id, fp)
@@ -485,7 +507,11 @@ class Database:
 		return bfp_id
 
 	def insert_compound_morgan_bfp(self, compound_id):
-		"""Insert a compound_morgan_bfp"""
+		"""Insert a compound_morgan_bfp
+
+		:param compound_id: 
+
+		"""
 
 
 		sql = """
@@ -523,7 +549,25 @@ class Database:
 		warn_duplicate: bool = True,
 		resolve_path: bool = True,
 	):
-		"""Insert a pose"""
+		"""Insert a pose
+
+		:param *: 
+		:param compound: Compound | int: 
+		:param target: int | str: 
+		:param path: str: 
+		:param inchikey: str | None:  (Default value = None)
+		:param alias: str | None:  (Default value = None)
+		:param reference: int | Pose | None:  (Default value = None)
+		:param tags: None | list:  (Default value = None)
+		:param energy_score: float | None:  (Default value = None)
+		:param distance_score: float | None:  (Default value = None)
+		:param metadata: None | dict:  (Default value = None)
+		:param commit: bool:  (Default value = True)
+		:param longname: str:  (Default value = None)
+		:param warn_duplicate: bool:  (Default value = True)
+		:param resolve_path: bool:  (Default value = True)
+
+		"""
 
 		if isinstance(compound, Compound):
 			compound = compound.id
@@ -593,7 +637,15 @@ class Database:
 		pose: int = None,
 		commit: bool = True,
 	):
-		"""Insert a tag"""
+		"""Insert a tag
+
+		:param *: 
+		:param name: 
+		:param compound: int:  (Default value = None)
+		:param pose: int:  (Default value = None)
+		:param commit: bool:  (Default value = True)
+
+		"""
 
 		assert compound or pose
 
@@ -623,7 +675,15 @@ class Database:
 		warn_duplicate: bool = True,
 		commit: bool = True,
 	) -> int:
-		"""Insert an inspiration"""
+		"""Insert an inspiration
+
+		:param *: 
+		:param original: Pose | int: 
+		:param derivative: Pose | int: 
+		:param warn_duplicate: bool:  (Default value = True)
+		:param commit: bool:  (Default value = True)
+
+		"""
 
 		if isinstance(original, Pose):
 			original = original.id
@@ -662,7 +722,15 @@ class Database:
 		product_yield: float = 1.0,
 		commit: bool = True,
 	) -> int:
-		"""Insert a reaction"""
+		"""Insert a reaction
+
+		:param *: 
+		:param type: str: 
+		:param product: Compound | int: 
+		:param product_yield: float:  (Default value = 1.0)
+		:param commit: bool:  (Default value = True)
+
+		"""
 
 		if isinstance(product, Compound):
 			product = product.id
@@ -693,7 +761,15 @@ class Database:
 		amount: float = 1.0,
 		commit: bool = True,
 	) -> int:
-		"""Insert a reactant"""
+		"""Insert a reactant
+
+		:param *: 
+		:param compound: Compound: 
+		:param reaction: Reaction: 
+		:param amount: float:  (Default value = 1.0)
+		:param commit: bool:  (Default value = True)
+
+		"""
 
 		if isinstance(reaction, int):
 			reaction = self.get_reaction(id=reaction)
@@ -737,7 +813,22 @@ class Database:
 		smiles: str | None = None,
 		commit: bool = True,
 	) -> int | None:
-		"""Insert a quote"""
+		"""Insert a quote
+
+		:param *: 
+		:param compound: Compound | int: 
+		:param supplier: str: 
+		:param catalogue: str | None: 
+		:param entry: str | None: 
+		:param amount: float: 
+		:param price: float: 
+		:param currency: str | None: 
+		:param purity: float | None: 
+		:param lead_time: int: 
+		:param smiles: str | None:  (Default value = None)
+		:param commit: bool:  (Default value = True)
+
+		"""
 
 		if not isinstance(compound, int):
 			assert isinstance(compound, Compound), f'incompatible {compound=}'
@@ -787,7 +878,12 @@ class Database:
 		*,
 		name: str
 	) -> int:
-		"""Insert a target"""
+		"""Insert a target
+
+		:param *: 
+		:param name: str: 
+
+		"""
 
 		sql = """
 		INSERT INTO target(target_name)
@@ -817,7 +913,17 @@ class Database:
 		residue_number: int,
 		atom_names: list,
 	) -> int:
-		"""Insert a feature"""
+		"""Insert a feature
+
+		:param *: 
+		:param family: str: 
+		:param target: int: 
+		:param chain_name: str: 
+		:param residue_name: str: 
+		:param residue_number: int: 
+		:param atom_names: list: 
+
+		"""
 
 		assert len(chain_name) == 1
 		assert len(residue_name) <= 4
@@ -855,7 +961,15 @@ class Database:
 		payload: dict,
 		commit: bool = True,
 	) -> None:
-		"""Insert metadata"""
+		"""Insert metadata
+
+		:param *: 
+		:param table: str: 
+		:param id: int: 
+		:param payload: dict: 
+		:param commit: bool:  (Default value = True)
+
+		"""
 
 		payload = json.dumps(payload)
 
@@ -867,6 +981,14 @@ class Database:
 		commit: bool = True,
 	) -> None:
 
+		"""
+		
+		:param *: 
+		:param product_id: int: 
+		:param commit: bool:  (Default value = True)
+		
+		"""
+
 		sql = """
 		INSERT INTO route(route_product)
 		VALUES(?1)
@@ -876,9 +998,6 @@ class Database:
 
 		try:
 			self.execute(sql, (product_id,))
-
-		# except sqlite3.IntegrityError as e:
-		# 	return None
 
 		except Exception as e:
 			logger.exception(e)
@@ -898,13 +1017,19 @@ class Database:
 		commit: bool = True,
 	) -> None:
 
-		"""
-		----------------------------------------
+		"""----------------------------------------
 		component_type | table    | detail
 		----------------------------------------
 		1 			   | reaction | reaction
 		2 			   | compound | reactant
 		3 			   | compound | intermediate
+
+		:param *: 
+		:param route: int: 
+		:param ref: int: 
+		:param component_type: int: 
+		:param commit: bool:  (Default value = True)
+
 		"""
 
 		sql = """
@@ -940,7 +1065,13 @@ class Database:
 	### SELECTION
 
 	def select(self, query, table, multiple=False):
-		"""Select entries"""
+		"""Select entries
+
+		:param query: 
+		:param table: 
+		:param multiple:  (Default value = False)
+
+		"""
 
 		sql = f'SELECT {query} FROM {table}'
 
@@ -958,7 +1089,17 @@ class Database:
 		return result
 
 	def select_where(self, query, table, key, value=None, multiple=False, none='error', sort=None):
-		"""Select entries where key==value"""
+		"""Select entries where key==value
+
+		:param query: 
+		:param table: 
+		:param key: 
+		:param value:  (Default value = None)
+		:param multiple:  (Default value = False)
+		:param none:  (Default value = 'error')
+		:param sort:  (Default value = None)
+
+		"""
 
 		if isinstance(value, str):
 			value = f"'{value}'"
@@ -991,17 +1132,39 @@ class Database:
 		return result
 
 	def select_id_where(self, table, key, value, multiple=False, none='error'):
-		"""Select ID's where key==value"""
+		"""Select ID's where key==value
+
+		:param table: 
+		:param key: 
+		:param value: 
+		:param multiple:  (Default value = False)
+		:param none:  (Default value = 'error')
+
+		"""
 		return self.select_where(query=f'{table}_id', table=table, key=key, value=value, multiple=multiple, none=none)
 
 	def select_all_where(self, table, key, value, multiple=False, none='error'):
-		"""Select * where key==value"""
+		"""Select * where key==value
+
+		:param table: 
+		:param key: 
+		:param value: 
+		:param multiple:  (Default value = False)
+		:param none:  (Default value = 'error')
+
+		"""
 		return self.select_where(query='*', table=table, key=key, value=value, multiple=multiple, none=none)
 
 	### DELETION
 
 	def delete_where(self, table, key, value=None):
-		"""Delete where key==value"""
+		"""Delete where key==value
+
+		:param table: 
+		:param key: 
+		:param value:  (Default value = None)
+
+		"""
 
 		if value is not None:
 
@@ -1025,6 +1188,11 @@ class Database:
 		return None
 
 	def delete_tag(self, tag):
+		"""
+
+		:param tag: 
+
+		"""
 		self.delete_where(table='tag', key='name', value=tag)
 
 	### UPDATE
@@ -1036,7 +1204,16 @@ class Database:
 		value, 
 		commit: bool = True,
 	):
-		"""Update a database entry where key==value"""
+		"""Update a database entry where key==value
+
+		:param *: 
+		:param table: str: 
+		:param id: int: 
+		:param key: str: 
+		:param value: 
+		:param commit: bool:  (Default value = True)
+
+		"""
 
 		# sql = f"""
 		# UPDATE ?1
@@ -1072,7 +1249,16 @@ class Database:
 		alias: str | None = None,
 		smiles: str | None = None,
 	) -> Compound:
-		"""Get a compound"""
+		"""Get a compound
+
+		:param *: 
+		:param table: str:  (Default value = 'compound')
+		:param id: int | None:  (Default value = None)
+		:param inchikey: str | None:  (Default value = None)
+		:param alias: str | None:  (Default value = None)
+		:param smiles: str | None:  (Default value = None)
+
+		"""
 		
 		if id is None:
 			id = self.get_compound_id(inchikey=inchikey, smiles=smiles, alias=alias)
@@ -1093,7 +1279,15 @@ class Database:
 		alias: str | None = None, 
 		smiles: str | None = None, 
 	) -> int:
-		"""Get a compound ID"""
+		"""Get a compound ID
+
+		:param *: 
+		:param table: str:  (Default value = 'compound')
+		:param inchikey: str | None:  (Default value = None)
+		:param alias: str | None:  (Default value = None)
+		:param smiles: str | None:  (Default value = None)
+
+		"""
 
 		if inchikey:
 			entry = self.select_id_where(table=table, key='inchikey', value=inchikey)
@@ -1113,7 +1307,12 @@ class Database:
 		return None
 
 	def get_compound_computed_property(self, prop, compound_id):
-		"""Use chemicalite to calculate a property from the stored binary molecule"""
+		"""Use chemicalite to calculate a property from the stored binary molecule
+
+		:param prop: 
+		:param compound_id: 
+
+		"""
 		function = CHEMICALITE_COMPOUND_PROPERTY_MAP[prop]
 		val, = self.select_where(query=f'{function}(compound_mol)', table='compound', key='id', value=compound_id, multiple=False)
 		return val
@@ -1125,7 +1324,15 @@ class Database:
 		inchikey: str = None,
 		alias: str = None,
 	) -> Pose:
-		"""Get a pose"""
+		"""Get a pose
+
+		:param *: 
+		:param table: str:  (Default value = 'pose')
+		:param id: int | None:  (Default value = None)
+		:param inchikey: str:  (Default value = None)
+		:param alias: str:  (Default value = None)
+
+		"""
 		
 		if id is None:
 			id = self.get_pose_id(inchikey=inchikey, alias=alias)
@@ -1145,7 +1352,14 @@ class Database:
 		inchikey: str | None = None, 
 		alias: str | None = None, 
 	) -> int:
-		"""Get a pose ID"""
+		"""Get a pose ID
+
+		:param *: 
+		:param table: str:  (Default value = 'pose')
+		:param inchikey: str | None:  (Default value = None)
+		:param alias: str | None:  (Default value = None)
+
+		"""
 
 		if inchikey:
 			# inchikey might not be unique
@@ -1173,7 +1387,14 @@ class Database:
 		id: int | None = None,
 		none: str | None = None,
 	) -> Reaction:
-		"""Get a reaction"""
+		"""Get a reaction
+
+		:param *: 
+		:param table: str:  (Default value = 'reaction')
+		:param id: int | None:  (Default value = None)
+		:param none: str | None:  (Default value = None)
+
+		"""
 		
 		if not id:
 			logger.error(f'Invalid {id=}')
@@ -1190,7 +1411,14 @@ class Database:
 		id: int | None = None,
 		none: str | None = None,
 	) -> list[dict]:
-		"""Get a quote"""
+		"""Get a quote
+
+		:param *: 
+		:param table: str:  (Default value = 'quote')
+		:param id: int | None:  (Default value = None)
+		:param none: str | None:  (Default value = None)
+
+		"""
 		
 		query = 'quote_compound, quote_supplier, quote_catalogue, quote_entry, quote_amount, quote_price, quote_currency, quote_lead_time, quote_purity, quote_date, quote_smiles, quote_id '
 		entry = self.select_where(query=query, table=table, key='id', value=id, none=none)
@@ -1216,7 +1444,13 @@ class Database:
 		table: str, 
 		id: int
 	) -> dict:
-		"""Get metadata"""
+		"""Get metadata
+
+		:param *: 
+		:param table: str: 
+		:param id: int: 
+
+		"""
 
 		payload, = self.select_where(query=f'{table}_metadata', table=table, key=f'id', value=id)
 
@@ -1238,14 +1472,24 @@ class Database:
 		*,
 		id=int
 	) -> Target:
-		"""Get target"""
+		"""Get target
+
+		:param *: 
+		:param id:  (Default value = int)
+
+		"""
 		return Target(db=self,id=id,name=self.get_target_name(id=id))
 
 	def get_target_name(self,
 		*,
 		id:int,
 	) -> str:
-		"""Get target name"""
+		"""Get target name
+
+		:param *: 
+		:param id:int: 
+
+		"""
 
 		table = 'target'
 		payload, = self.select_where(query=f'{table}_name', table=table, key='id', value=id)
@@ -1255,7 +1499,12 @@ class Database:
 		*,
 		name: str, 
 	) -> int:
-		"""Get target ID"""
+		"""Get target ID
+
+		:param *: 
+		:param name: str: 
+
+		"""
 			
 		table = 'target'
 		entry = self.select_id_where(table=table, key='name', value=name)
@@ -1269,7 +1518,12 @@ class Database:
 		*,
 		id:int,
 	) -> Feature:
-		"""Get feature"""
+		"""Get feature
+
+		:param *: 
+		:param id:int: 
+
+		"""
 		entry = self.select_all_where(table='feature', key='id', value=id)
 		return Feature(*entry)
 
@@ -1278,6 +1532,13 @@ class Database:
 		id: int,
 		debug: bool = False,
 	) -> Route:
+		"""
+
+		:param *: 
+		:param id: int: 
+		:param debug: bool:  (Default value = False)
+
+		"""
 
 		from .cset import CompoundSet, IngredientSet
 		from .rset import ReactionSet
@@ -1328,6 +1589,12 @@ class Database:
 		return recipe
 
 	def get_possible_reaction_ids(self, *, compound_ids):
+		"""
+
+		:param *: 
+		:param compound_ids: 
+
+		"""
 
 		compound_ids_str = str(tuple(compound_ids)).replace(',)',')')
 
@@ -1349,6 +1616,13 @@ class Database:
 		return [q for q, in result]
 
 	def get_unsolved_reaction_tree(self, *, product_ids, debug=False):
+		"""
+
+		:param *: 
+		:param product_ids: 
+		:param debug:  (Default value = False)
+
+		"""
 
 		from .cset import CompoundSet
 		from .rset import ReactionSet
@@ -1420,6 +1694,12 @@ class Database:
 		return all_reactants, all_reactions
 
 	def get_reaction_price_estimate(self, *, reaction):
+		"""
+
+		:param *: 
+		:param reaction: 
+
+		"""
 
 		# get reactants for a given reaction
 
@@ -1433,9 +1713,9 @@ class Database:
 		price, = self.execute(f'''
 		WITH unit_prices AS 
 		(
-		    SELECT quote_compound, MIN(quote_price/quote_amount) AS unit_price FROM quote 
-		    WHERE quote_compound IN {reactants.str_ids}
-		    GROUP BY quote_compound
+			SELECT quote_compound, MIN(quote_price/quote_amount) AS unit_price FROM quote 
+			WHERE quote_compound IN {reactants.str_ids}
+			GROUP BY quote_compound
 		)
 		SELECT SUM(unit_price) FROM unit_prices
 		''').fetchone()
@@ -1443,19 +1723,37 @@ class Database:
 		return price
 
 	def get_preferred_reaction_dict(self, *, compound_ids):
+		"""
+
+		:param *: 
+		:param compound_ids: 
+
+		"""
 
 		print(compound_ids)
 
 		raise NotImplementedError
 
 	def get_possible_reaction_product_ids(self, *, reaction_ids):
+		"""
+
+		:param *: 
+		:param reaction_ids: 
+
+		"""
 		reaction_ids_str = str(tuple(reaction_ids)).replace(',)',')')
 		return [q for q, in self.select_where(query='DISTINCT reaction_product', table='reaction', key=f'reaction_id IN {reaction_ids_str}', multiple=True)] 
 
 	### COMPOUND QUERY
 
 	def query_substructure(self, query, fast=True, none='error'):
-		"""Search compounds by substructure"""
+		"""Search compounds by substructure
+
+		:param query: 
+		:param fast:  (Default value = True)
+		:param none:  (Default value = 'error')
+
+		"""
 
 		# smiles
 		if isinstance(query, str):
@@ -1488,7 +1786,14 @@ class Database:
 		return compounds
 
 	def query_similarity(self, query, threshold, return_similarity=False, none='error'):
-		"""Search compounds by similarity"""
+		"""Search compounds by similarity
+
+		:param query: 
+		:param threshold: 
+		:param return_similarity:  (Default value = False)
+		:param none:  (Default value = 'error')
+
+		"""
 
 		from .cset import CompoundSet
 
@@ -1528,20 +1833,34 @@ class Database:
 		return cset
 
 	def query_exact(self, query):
-		"""Search for exact match compounds"""
+		"""Search for exact match compounds
+
+		:param query: 
+
+		"""
 		return self.query_similarity(query, 0.989, return_similarity=False)
 
 	### COUNTING
 
 	def count(self, table):
-		"""Count all entries in a table"""
+		"""Count all entries in a table
+
+		:param table: 
+
+		"""
 
 		sql = f"""SELECT COUNT(1) FROM {table}; """
 		self.execute(sql)
 		return self.cursor.fetchone()[0]
 
 	def count_where(self, table, key, value=None):
-		"""Count all entries in a table where key==value"""
+		"""Count all entries in a table where key==value
+
+		:param table: 
+		:param key: 
+		:param value:  (Default value = None)
+
+		"""
 		if value is not None:
 			where_str = f'{table}_{key} is {value}'
 		else:
@@ -1554,17 +1873,33 @@ class Database:
 	### ID SELECTION
 
 	def min_id(self, table):
-		"""Return the smallest ID in the given table"""
+		"""
+
+		:param table: 
+
+		"""
 		id, = self.select(table=table, query=f'MIN({table}_id)')
 		return id
 
 	def max_id(self, table):
-		"""Return the largest ID in the given table"""
+		"""
+
+		:param table: 
+
+		"""
 		id, = self.select(table=table, query=f'MAX({table}_id)')
 		return id
 
 	def slice_ids(self, *, table, start, stop, step=1):
-		"""Return a list of indices in the given slice"""
+		"""
+
+		:param *: 
+		:param table: 
+		:param start: 
+		:param stop: 
+		:param step:  (Default value = 1)
+
+		"""
 
 		min_id = self.min_id(table)
 		max_id = self.max_id(table)
@@ -1590,7 +1925,12 @@ class Database:
 	### PRUNING
 
 	def prune_reactions(self, compound, reactions):
-		"""Remove duplicate reactions for a given compound"""
+		"""Remove duplicate reactions for a given compound
+
+		:param compound: 
+		:param reactions: 
+
+		"""
 
 		pruned = []
 		del_list = []
@@ -1612,7 +1952,15 @@ class Database:
 		return pruned
 
 	def remove_metadata_list_item(self, *, table, key, value, remove_empty=True):
-		"""Remove a specific item from list-like values associated with a given key from all metadata entries in a given table"""
+		"""Remove a specific item from list-like values associated with a given key from all metadata entries in a given table
+
+		:param *: 
+		:param table: 
+		:param key: 
+		:param value: 
+		:param remove_empty:  (Default value = True)
+
+		"""
 
 		# get id's with specific metadata key and value
 		value_str = json.dumps(value)
@@ -1648,7 +1996,11 @@ class Database:
 		pprint(self.cursor.fetchall())
 
 	def print_table(self, name):
-		"""Print a table's entries"""
+		"""Print a table's entries
+
+		:param name: 
+
+		"""
 		self.execute(f"SELECT * FROM {name}")
 		pprint(self.cursor.fetchall())
 
