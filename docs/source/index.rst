@@ -56,10 +56,13 @@ Reaction
 
 A :class:`.Reaction` is a simplified representation of a synthetic pathway to create a product :class:`.Compound`. Reactants (also :class:`.Compound` objects) as well as a reaction type are required.
 
+See :doc:`definitions` for more detail.
 
 .. toctree::
    :maxdepth: 1
    :caption: Contents:
+
+   Definitions, units, and data types <definitions>
 
    Getting started <getting_started>
 
@@ -74,6 +77,8 @@ A :class:`.Reaction` is a simplified representation of a synthetic pathway to cr
    Quoting with Pycule <pycule_tutorial>
 
    Windows installation <windows>
+
+   Random recipe generation <rgen>
 
    API Reference <api_reference>
 

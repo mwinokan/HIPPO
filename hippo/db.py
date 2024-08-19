@@ -23,7 +23,13 @@ logger = logging.getLogger('HIPPO')
 
 class Database:
 
-	"""Wrapper to connect to the HIPPO sqlite database."""
+	"""Wrapper to connect to the HIPPO sqlite database.
+
+	.. attention::
+
+		:class:`.Database` objects should not be created directly. Instead use the methods in :class:`.HIPPO` to interact with data in the database. See :doc:`getting_started` and :doc:`insert_elaborations`.
+
+	"""
 
 	def __init__(self, path: Path, animal) -> None:
 
@@ -47,7 +53,7 @@ class Database:
 			self.create_blank_db()
 
 		else:
-			# existing database
+			# connect to existing database
 			self.connect()
 		
 	### PROPERTIES
@@ -58,21 +64,21 @@ class Database:
 		return self._path
 
 	@property
-	def connection(self):
-		"""Returns a sqlite3.connection"""
+	def connection(self) -> 'sqlite3.connection':
+		"""Returns a ``sqlite3.connection`` to the database"""
 		if not self._connection:
 			self.connect()
 		return self._connection
 	
 	@property
-	def cursor(self):
-		"""Returns a sqlite3.cursor"""
+	def cursor(self) -> 'sqlite3.cursor':
+		"""Returns a ``sqlite3.cursor``"""
 		if not self._cursor:
 			self._cursor = self.connection.cursor()
 		return self._cursor
 
 	@property
-	def total_changes(self):
+	def total_changes(self) -> int:
 		"""Return the total number of database rows that have been modified, inserted, or deleted since the database connection was opened."""
 		return self.connection.total_changes
 
@@ -87,7 +93,7 @@ class Database:
 
 	### GENERAL SQL
 
-	def connect(self):
+	def connect(self) -> None:
 		"""Connect to the database"""
 		logger.debug('hippo3.Database.connect()')
 
@@ -119,11 +125,11 @@ class Database:
 		self._connection = conn
 		self._cursor = conn.cursor()
 
-	def execute(self, sql, payload=None):
+	def execute(self, sql, payload=None) -> None:
 		"""Execute arbitrary SQL
 
-		:param sql: 
-		:param payload:  (Default value = None)
+		:param sql: SQL query
+		:param payload: Payload for insertion, etc. (Default value = None)
 
 		"""
 		try:
@@ -132,18 +138,15 @@ class Database:
 			else:
 				return self.cursor.execute(sql)
 		except Error as e:
-			# logger.exception(e)
 			raise
 
-	def commit(self):
-		"""Commit the changes"""
-		# logger.debug('db.commit...')
+	def commit(self) -> None:
+		"""Commit changes to the database"""
 		self.connection.commit()
-		# raise Exception
 
 	### CREATE TABLES
 
-	def create_blank_db(self):
+	def create_blank_db(self) -> None:
 		"""Create a blank database"""
 
 		logger.out('Creating blank database...')
@@ -159,9 +162,8 @@ class Database:
 		self.create_table_feature()
 		self.create_table_route()
 		self.create_table_component()
-		# self.create_table_morgan_bfp()
 
-	def create_table_compound(self):
+	def create_table_compound(self) -> None:
 		"""Create the compound table"""
 		logger.debug('HIPPO.Database.create_table_compound()')
 
@@ -181,12 +183,9 @@ class Database:
 			CONSTRAINT UC_compound_smiles UNIQUE (compound_smiles)
 		);
 		"""
-			# CONSTRAINT UC_compound_morgan_bfp UNIQUE (compound_morgan_bfp)
-			# CONSTRAINT UC_compound_pattern_bfp UNIQUE (compound_pattern_bfp)
-
 		self.execute(sql)
 
-	def create_table_inspiration(self):
+	def create_table_inspiration(self) -> None:
 		"""Create the inspiration table"""
 		logger.debug('HIPPO.Database.create_table_inspiration()')
 
@@ -201,7 +200,7 @@ class Database:
 
 		self.execute(sql)
 
-	def create_table_reaction(self):
+	def create_table_reaction(self) -> None:
 		"""Create the reaction table"""
 		logger.debug('HIPPO.Database.create_table_reaction()')
 
@@ -216,7 +215,7 @@ class Database:
 
 		self.execute(sql)
 
-	def create_table_reactant(self):
+	def create_table_reactant(self) -> None:
 		"""Create the reactant table"""
 		logger.debug('HIPPO.Database.create_table_reactant()')
 
@@ -232,7 +231,7 @@ class Database:
 
 		self.execute(sql)
 
-	def create_table_pose(self):
+	def create_table_pose(self) -> None:
 		"""Create the pose table"""
 		logger.debug('HIPPO.Database.create_table_pose()')
 
@@ -240,7 +239,6 @@ class Database:
 			pose_id INTEGER PRIMARY KEY,
 			pose_inchikey TEXT,
 			pose_alias TEXT,
-			-- pose_longname TEXT,
 			pose_smiles TEXT,
 			pose_reference INTEGER,
 			pose_path TEXT,
@@ -263,7 +261,7 @@ class Database:
 
 		self.execute(sql)
 
-	def create_table_tag(self):
+	def create_table_tag(self) -> None:
 		"""Create the tag table"""
 		logger.debug('HIPPO.Database.create_table_tag()')
 
@@ -280,7 +278,7 @@ class Database:
 
 		self.execute(sql)
 
-	def create_table_quote(self):
+	def create_table_quote(self) -> None:
 		"""Create the quote table"""
 		logger.debug('HIPPO.Database.create_table_quote()')
 
@@ -304,11 +302,7 @@ class Database:
 
 		self.execute(sql)
 
-		# if logging.root.level >= logging.DEBUG:
-		# 	self.execute(f'PRAGMA table_info(quote);')
-		# 	pprint(self.cursor.fetchall())
-
-	def create_table_target(self):
+	def create_table_target(self) -> None:
 		"""Create the target table"""
 		logger.debug('HIPPO.Database.create_table_target()')
 		sql = """CREATE TABLE target(
@@ -321,7 +315,7 @@ class Database:
 
 		self.execute(sql)
 
-	def create_table_feature(self):
+	def create_table_feature(self) -> None:
 		"""Create the feature table"""
 		logger.debug('HIPPO.Database.create_table_feature()')
 		sql = """CREATE TABLE feature(
@@ -338,7 +332,7 @@ class Database:
 
 		self.execute(sql)
 
-	def create_table_route(self):
+	def create_table_route(self) -> None:
 		"""Create the route table"""
 		logger.debug('HIPPO.Database.create_table_route()')
 		sql = """CREATE TABLE route(
@@ -349,7 +343,7 @@ class Database:
 
 		self.execute(sql)
 
-	def create_table_component(self):
+	def create_table_component(self) -> None:
 		"""Create the component table"""
 		logger.debug('HIPPO.Database.create_table_component()')
 		sql = """CREATE TABLE component(
@@ -363,19 +357,11 @@ class Database:
 
 		self.execute(sql)
 
-	def create_table_pattern_bfp(self):
+	def create_table_pattern_bfp(self) -> None:
 		"""Create the pattern_bfp table"""
 		logger.debug('HIPPO.Database.create_table_pattern_bfp()')
 
 		sql = "CREATE VIRTUAL TABLE compound_pattern_bfp USING rdtree(compound_id, fp bits(2048))"
- 
-		self.execute(sql)
-
-	def create_table_morgan_bfp(self):
-		"""Create the morgan_bfp table"""
-		logger.debug('HIPPO.Database.create_table_morgan_bfp()')
- 
-		sql = "CREATE VIRTUAL TABLE compound_morgan_bfp USING rdtree(compound_id, fp bits(2048))"
  
 		self.execute(sql)
 
@@ -386,23 +372,24 @@ class Database:
 		smiles: str, 
 		base: Compound | int | None = None, 
 		alias: str | None = None,
-		tags: None | list = None, 
-		warn_duplicate=True,
-		commit=True,
-		metadata=None,
+		tags: None | list[str] = None, 
+		warn_duplicate: bool = True,
+		commit: bool = True,
+		metadata: None | dict = None,
 		inchikey: str = None, 
 	) -> int:
-		"""Insert a compound
 
-		:param *: 
-		:param smiles: str: 
-		:param base: Compound | int | None:  (Default value = None)
-		:param alias: str | None:  (Default value = None)
-		:param tags: None | list:  (Default value = None)
-		:param warn_duplicate:  (Default value = True)
-		:param commit:  (Default value = True)
-		:param metadata:  (Default value = None)
-		:param inchikey: str:  (Default value = None)
+		"""Insert an entry into the compound table
+
+		:param smiles: SMILES string
+		:param base: base :class:`.Compound` object or ID, (Default value = None)
+		:param alias: optional alias for the compound (Default value = None)
+		:param tags: list of string tags, (Default value = None)
+		:param warn_duplicate: print a warning if the compound already exists (Default value = True)
+		:param commit: commit the changes to the database (Default value = True)
+		:param metadata: dictionary of metadata (Default value = None)
+		:param inchikey: provide an InChI-key, otherwise it's calculated from the SMILES, (Default value = None)
+		:returns: compound ID
 
 		"""
 
@@ -412,12 +399,8 @@ class Database:
 		if base and not isinstance(base,int):
 			base = base.id
 
-		# logger.debug(f'{base=}')
-
 		# generate the inchikey name
 		inchikey = inchikey or inchikey_from_smiles(smiles)
-
-		# logger.debug(f'{smiles} --> {name}')
 
 		sql = """
 		INSERT INTO compound(compound_inchikey, compound_smiles, compound_base, compound_mol, compound_pattern_bfp, compound_morgan_bfp, compound_alias)
@@ -443,8 +426,6 @@ class Database:
 			else:
 				logger.exception(e)
 
-			# if tags:
-				# logger.error('Unused tag data')
 			return None
 
 		except Exception as e:
@@ -467,23 +448,20 @@ class Database:
 		if not result:
 			logger.error('Could not insert compound pattern bfp')
 
-		# ### register the morgan fingerprint
-
-		# result = self.insert_compound_morgan_bfp(compound_id)
-
-		# if not result:
-		# 	logger.error('Could not insert compound morgan bfp')
-
 		if metadata:
 			self.insert_metadata(table='compound', id=compound_id, payload=metadata, commit=commit)
 
 		return compound_id
 
-	def insert_compound_pattern_bfp(self, compound_id, commit=True):
+	def insert_compound_pattern_bfp(self, 
+		compound_id: int, 
+		commit: bool = True
+	) -> int:
 		"""Insert a compound_pattern_bfp
 
-		:param compound_id: 
-		:param commit:  (Default value = True)
+		:param compound_id: ID of the associated compound
+		:param commit: commit the changes to the database (Default value = True)
+		:returns: binary fingerprint ID
 
 		"""
 
@@ -506,32 +484,6 @@ class Database:
 
 		return bfp_id
 
-	def insert_compound_morgan_bfp(self, compound_id):
-		"""Insert a compound_morgan_bfp
-
-		:param compound_id: 
-
-		"""
-
-
-		sql = """
-		INSERT INTO compound_morgan_bfp(compound_id, fp)
-		VALUES(?1, ?2)
-		"""
-
-		bfp, = self.select_where('compound_morgan_bfp', 'compound', 'id', compound_id)
-
-		try:
-			self.execute(sql, (compound_id, bfp))
-
-		except Exception as e:
-			logger.exception(e)
-
-		mfp_id = self.cursor.lastrowid
-		self.commit()
-
-		return mfp_id
-
 	def insert_pose(self,
 		*,
 		compound: Compound | int,
@@ -545,27 +497,26 @@ class Database:
 		distance_score: float | None = None,
 		metadata: None | dict = None,
 		commit: bool = True,
-		longname: str = None,
 		warn_duplicate: bool = True,
 		resolve_path: bool = True,
-	):
-		"""Insert a pose
+	) -> int:
 
-		:param *: 
-		:param compound: Compound | int: 
-		:param target: int | str: 
-		:param path: str: 
-		:param inchikey: str | None:  (Default value = None)
-		:param alias: str | None:  (Default value = None)
-		:param reference: int | Pose | None:  (Default value = None)
-		:param tags: None | list:  (Default value = None)
-		:param energy_score: float | None:  (Default value = None)
-		:param distance_score: float | None:  (Default value = None)
-		:param metadata: None | dict:  (Default value = None)
-		:param commit: bool:  (Default value = True)
-		:param longname: str:  (Default value = None)
-		:param warn_duplicate: bool:  (Default value = True)
-		:param resolve_path: bool:  (Default value = True)
+		"""Insert an entry into the pose table
+
+		:param compound: associated :class:`.Compound` object or ID
+		:param target: protein :class:`.Target` name or ID
+		:param path: path to the molecular structure (.pdb/.mol)
+		:param inchikey: provide an InChI-key if available, (Default value = None)
+		:param alias: optional alias for the compound (Default value = None)
+		:param reference: reference :class:`.Pose` object or ID to use for the protein conformation (Default value = None)
+		:param tags: list of string tags, (Default value = None)
+		:param energy_score: optional score of the ligand's binding energy (Default value = None)
+		:param distance_score: optional score of the ligand's binding position (Default value = None)
+		:param metadata: dictionary of metadata (Default value = None)
+		:param commit: commit the changes to the database (Default value = True)
+		:param warn_duplicate: print a warning if the pose already exists (Default value = True)
+		:param resolve_path: try resolving the path (Default value = True)
+		:returns: the pose ID
 
 		"""
 
@@ -574,9 +525,6 @@ class Database:
 
 		if isinstance(reference, Pose):
 			reference = reference.id
-
-		# assert isinstance(compound, Compound), f'incompatible {compound}'
-		# assert isinstance(reference, Pose) or reference is None, f'incompatible reference={reference}'
 
 		if isinstance(target, str):
 			target = self.get_target_id(name=target)
@@ -632,22 +580,25 @@ class Database:
 
 	def insert_tag(self, 
 		*,
-		name, 
+		name: str, 
 		compound: int = None, 
 		pose: int = None,
 		commit: bool = True,
-	):
-		"""Insert a tag
+	) -> int:
+		"""Insert an entry into the tag table.
 
-		:param *: 
-		:param name: 
-		:param compound: int:  (Default value = None)
-		:param pose: int:  (Default value = None)
-		:param commit: bool:  (Default value = True)
+		.. attention::
+			Exactly one of compound or pose arguments must have a value
+
+		:param name: name of the tag
+		:param compound: associated :class:`.Compound` ID
+		:param pose: associated :class:`.Pose` ID
+		:param commit: commit the changes to the database (Default value = True)
+		:returns: the tag ID
 
 		"""
 
-		assert compound or pose
+		assert bool(compound) ^ bool(pose), "Exactly one of compound or pose arguments must have a value"
 
 		sql = """
 		INSERT INTO tag(tag_name, tag_compound, tag_pose)
@@ -675,13 +626,14 @@ class Database:
 		warn_duplicate: bool = True,
 		commit: bool = True,
 	) -> int:
-		"""Insert an inspiration
 
-		:param *: 
-		:param original: Pose | int: 
-		:param derivative: Pose | int: 
-		:param warn_duplicate: bool:  (Default value = True)
-		:param commit: bool:  (Default value = True)
+		"""Insert an entry into the inspiration table
+
+		:param original: :class:`.Pose` object or ID of the original hit
+		:param derivative: :class:`.Pose` object or ID of the derivative hit
+		:param warn_duplicate: print a warning if the pose already exists (Default value = True)
+		:param commit: commit the changes to the database (Default value = True)
+		:returns: the inspiration ID
 
 		"""
 
@@ -722,13 +674,14 @@ class Database:
 		product_yield: float = 1.0,
 		commit: bool = True,
 	) -> int:
-		"""Insert a reaction
 
-		:param *: 
-		:param type: str: 
-		:param product: Compound | int: 
-		:param product_yield: float:  (Default value = 1.0)
-		:param commit: bool:  (Default value = True)
+		"""Insert an entry into the reaction table
+
+		:param type: string to indicate the reaction type
+		:param product: :class:`.Compound` object or ID of the reaction product
+		:param product_yield: yield fraction of the reaction product (Default value = 1.0)
+		:param commit: commit the changes to the database (Default value = True)
+		:returns: the reaction ID
 
 		"""
 
@@ -756,18 +709,19 @@ class Database:
 
 	def insert_reactant(self,
 		*,
-		compound: Compound,
-		reaction: Reaction,
+		compound: Compound | int,
+		reaction: Reaction | int,
 		amount: float = 1.0,
 		commit: bool = True,
 	) -> int:
-		"""Insert a reactant
 
-		:param *: 
-		:param compound: Compound: 
-		:param reaction: Reaction: 
-		:param amount: float:  (Default value = 1.0)
-		:param commit: bool:  (Default value = True)
+		"""Insert an entry into the reactant table
+
+		:param compound: :class:`.Compound` object or ID of the reactant
+		:param reaction: :class:`.Reaction` object or ID of the reaction
+		:param amount: amount (in ``mg``) needed for each unit of product (Default value = 1.0)
+		:param commit: commit the changes to the database (Default value = True)
+		:returns: the reactant ID
 
 		"""
 
@@ -795,38 +749,41 @@ class Database:
 			logger.exception(e)
 			
 		reactant_id = self.cursor.lastrowid
+		
 		if commit:
 			self.commit()
+
 		return reactant_id
 
 	def insert_quote(self,
 		*,
 		compound: Compound | int,
 		supplier: str,
-		catalogue: str | None,
-		entry: str | None,
+		catalogue: str | None = None,
+		entry: str | None = None,
 		amount: float,
 		price: float,
-		currency: str | None,
-		purity: float | None,
-		lead_time: int,
+		currency: str | None = None,
+		purity: float | None = None,
+		lead_time: float,
 		smiles: str | None = None,
 		commit: bool = True,
 	) -> int | None:
-		"""Insert a quote
 
-		:param *: 
-		:param compound: Compound | int: 
-		:param supplier: str: 
-		:param catalogue: str | None: 
-		:param entry: str | None: 
-		:param amount: float: 
-		:param price: float: 
-		:param currency: str | None: 
-		:param purity: float | None: 
-		:param lead_time: int: 
-		:param smiles: str | None:  (Default value = None)
-		:param commit: bool:  (Default value = True)
+		"""Insert an entry into the quote table
+
+		:param compound: associated :class:`.Compound` object or ID
+		:param supplier: name of the supplier
+		:param catalogue: optional catalogue name 
+		:param entry: name of the catalogue entry
+		:param amount: amount in `mg`
+		:param price: price of the compound
+		:param currency: currency string ``['GBP', 'EUR', 'USD', None]``
+		:param purity: compound purity 
+		:param lead_time: lead time in days
+		:param smiles: quoted SMILES string (Default value = None)
+		:param commit: commit the changes to the database (Default value = True)
+		:returns: the quote ID
 
 		"""
 
@@ -876,12 +833,13 @@ class Database:
 
 	def insert_target(self,
 		*,
-		name: str
+		name: str,
 	) -> int:
-		"""Insert a target
 
-		:param *: 
-		:param name: str: 
+		"""Insert an entry into the target table
+
+		:param name: name of the protein target 
+		:returns: the target ID
 
 		"""
 
@@ -911,17 +869,20 @@ class Database:
 		chain_name: str,
 		residue_name: str,
 		residue_number: int,
-		atom_names: list,
+		atom_names: list[str],
+		commit: bool,
 	) -> int:
-		"""Insert a feature
 
-		:param *: 
-		:param family: str: 
-		:param target: int: 
-		:param chain_name: str: 
-		:param residue_name: str: 
-		:param residue_number: int: 
-		:param atom_names: list: 
+		"""Insert an entry into the feature table
+
+		:param family: feature type string
+		:param target: associated :class:`.Target` ID
+		:param chain_name: single character name of the chain
+		:param residue_name: 3-4 character string name of the residue
+		:param residue_number: integer residue number
+		:param atom_names: list of atom names
+		:param commit: commit the changes to the database (Default value = True)
+		:returns: feature ID
 
 		"""
 
@@ -950,9 +911,10 @@ class Database:
 		except Exception as e:
 			logger.exception(e)
 			
-		target_id = self.cursor.lastrowid
-		self.commit()
-		return target_id
+		feature_id = self.cursor.lastrowid
+		if commit:
+			self.commit()
+		return feature_id
 
 	def insert_metadata(self,
 		*,
@@ -961,13 +923,13 @@ class Database:
 		payload: dict,
 		commit: bool = True,
 	) -> None:
-		"""Insert metadata
 
-		:param *: 
-		:param table: str: 
-		:param id: int: 
-		:param payload: dict: 
-		:param commit: bool:  (Default value = True)
+		"""Insert metadata into an an existing entry in the compound or pose tables
+
+		:param table: table for insertions ``['pose', 'compound']``
+		:param id: associated entry ID
+		:param payload: metadata dictionary
+		:param commit: commit the changes to the database (Default value = True)
 
 		"""
 
@@ -979,13 +941,13 @@ class Database:
 		*,
 		product_id: int,
 		commit: bool = True,
-	) -> None:
+	) -> int:
 
-		"""
+		"""Insert an entry into the route table
 		
-		:param *: 
-		:param product_id: int: 
-		:param commit: bool:  (Default value = True)
+		:param product_id: :class:`.Compound` ID of the product
+		:param commit: commit the changes to the database (Default value = True)
+		:returns: route ID
 		
 		"""
 
@@ -1015,20 +977,22 @@ class Database:
 		ref: int,
 		component_type: int,
 		commit: bool = True,
-	) -> None:
+	) -> int:
 
-		"""----------------------------------------
-		component_type | table    | detail
-		----------------------------------------
-		1 			   | reaction | reaction
-		2 			   | compound | reactant
-		3 			   | compound | intermediate
+		"""
+		================ ========== ============== 
+		component_type   table      ref     
+		================ ========== ============== 
+		              1   reaction   reaction      
+		              2   compound   reactant      
+		              3   compound   intermediate  
+		================ ========== ============== 
 
-		:param *: 
-		:param route: int: 
-		:param ref: int: 
-		:param component_type: int: 
-		:param commit: bool:  (Default value = True)
+		:param route: associated :class:`.Route` ID
+		:param ref: ID of the :class:`.Reaction` or :class:`.Compound`
+		:param component_type: integer specifying the type of the component
+		:param commit: commit the changes to the database (Default value = True)
+		:returns: the component ID
 
 		"""
 
@@ -1064,12 +1028,22 @@ class Database:
 
 	### SELECTION
 
-	def select(self, query, table, multiple=False):
-		"""Select entries
+	def select(self, 
+		query: str, 
+		table: str, 
+		multiple: bool = False,
+	) -> tuple | list[tuple]:
 
-		:param query: 
-		:param table: 
-		:param multiple:  (Default value = False)
+		"""Wrapper for the SQL SELECT query, in the following syntax:
+
+		::
+
+			'SELECT {query} FROM {table}'
+
+		:param query: the columns to return
+		:param table: the table from which to select
+		:param multiple: fetch all results (Default value = False)
+		:returns: the result of the query
 
 		"""
 
@@ -1088,16 +1062,61 @@ class Database:
 
 		return result
 
-	def select_where(self, query, table, key, value=None, multiple=False, none='error', sort=None):
-		"""Select entries where key==value
+	def select_where(self, 
+		query: str, 
+		table: str, 
+		key: str, 
+		value: str | None = None, 
+		multiple: bool = False, 
+		none: str | None = 'error', 
+		sort: str = None,
+	) -> tuple | list[tuple]:
 
-		:param query: 
-		:param table: 
-		:param key: 
-		:param value:  (Default value = None)
-		:param multiple:  (Default value = False)
-		:param none:  (Default value = 'error')
-		:param sort:  (Default value = None)
+		"""Select entries where ``key == value``
+
+		Examples
+		========
+
+		Find compound alias with matching ID:
+
+		::
+
+			animal.db.select_where(
+				query='compound_alias', 
+				table='compound',
+				key='id',
+				value='123',
+			)
+
+			# the above evaluates to:
+			'SELECT compound_id FROM compound WHERE compound_id = 123'
+
+		Find compound aliases with ID below 10 and order alphabetically:
+
+		::
+
+			animal.db.select_where(
+				query='compound_alias', 
+				table='compound',
+				key='compound_id < 10',
+				multiple=True,
+				sort='compound_alias',
+			)
+
+			# the above evaluates to:
+			'SELECT compound_id FROM compound WHERE compound_id < 10 ORDER BY compound_alias'
+
+		Parameters
+		==========
+
+		:param query: the columns to return
+		:param table: the table from which to select
+		:param key: column name to match to value, if no ``value`` is provided this 
+		:param value: the value to match (Default value = None)
+		:param multiple: fetch all results (Default value = False)
+		:param none: define the behaviour for no matches, any value other than ``'error'`` will silently return empty data (Default value = 'error')
+		:param sort: optionally sort the output (Default value = None)
+		:returns: the result of the query
 
 		"""
 
@@ -1131,38 +1150,59 @@ class Database:
 
 		return result
 
-	def select_id_where(self, table, key, value, multiple=False, none='error'):
-		"""Select ID's where key==value
+	def select_id_where(self, 
+		table: str, 
+		key: str, 
+		value: str | None = None, 
+		multiple: bool = False, 
+		none: str | None = 'error', 
+	) -> tuple | list[tuple]:
 
-		:param table: 
-		:param key: 
-		:param value: 
-		:param multiple:  (Default value = False)
-		:param none:  (Default value = 'error')
+		"""Select ID's where ``key==value``. Similar to :meth:`.select_where` except the query argument is always ``{table}_id``.
+
+		:param table: the table from which to select
+		:param key: column name to match to value, if no ``value`` is provided this 
+		:param value: the value to match (Default value = None)
+		:param multiple: fetch all results (Default value = False)
+		:param none: define the behaviour for no matches, any value other than ``'error'`` will silently return empty data (Default value = 'error')
+		:returns: the result of the query
 
 		"""
 		return self.select_where(query=f'{table}_id', table=table, key=key, value=value, multiple=multiple, none=none)
 
-	def select_all_where(self, table, key, value, multiple=False, none='error'):
-		"""Select * where key==value
+	def select_all_where(self, 
+		table: str, 
+		key: str, 
+		value: str | None = None, 
+		multiple: bool = False, 
+		none: str | None = 'error', 
+	) -> tuple | list[tuple]:
 
-		:param table: 
-		:param key: 
-		:param value: 
-		:param multiple:  (Default value = False)
-		:param none:  (Default value = 'error')
+		"""Select entries where ``key==value``. Similar to :meth:`.select_where` except the query argument is always ``*``.
+
+		:param table: the table from which to select
+		:param key: column name to match to value, if no ``value`` is provided this 
+		:param value: the value to match (Default value = None)
+		:param multiple: fetch all results (Default value = False)
+		:param none: define the behaviour for no matches, any value other than ``'error'`` will silently return empty data (Default value = 'error')
+		:returns: the result of the query
 
 		"""
 		return self.select_where(query='*', table=table, key=key, value=value, multiple=multiple, none=none)
 
 	### DELETION
 
-	def delete_where(self, table, key, value=None):
-		"""Delete where key==value
+	def delete_where(self, 
+		table: str, 
+		key: str, 
+		value: str | None = None, 
+	) -> None:
+		
+		"""Delete entries where ``key==value``
 
-		:param table: 
-		:param key: 
-		:param value:  (Default value = None)
+		:param table: the table from which to delete
+		:param key: column name to match to value, if no ``value`` is provided this 
+		:param value: the value to match (Default value = None)
 
 		"""
 
@@ -1185,12 +1225,13 @@ class Database:
 			logger.var('sql',sql)
 			raise
 
-		return None
+	def delete_tag(self, 
+		tag: str,
+	) -> None:
 
-	def delete_tag(self, tag):
-		"""
+		"""Delete all tag entries with the matching name
 
-		:param tag: 
+		:param tag: tag name to match
 
 		"""
 		self.delete_where(table='tag', key='name', value=tag)
@@ -1203,23 +1244,18 @@ class Database:
 		key: str, 
 		value, 
 		commit: bool = True,
-	):
-		"""Update a database entry where key==value
+	) -> int:
 
-		:param *: 
-		:param table: str: 
-		:param id: int: 
-		:param key: str: 
-		:param value: 
-		:param commit: bool:  (Default value = True)
+		"""Update a field in a database entry with given ID
+
+		:param table: the table which to update
+		:param id: the ID of the entry to update
+		:param key: column name to update
+		:param value: the value to insert
+		:param commit: commit the changes to the database (Default value = True)
+		:returns: the ID of the modified entry
 
 		"""
-
-		# sql = f"""
-		# UPDATE ?1
-		# SET ?2 = ?3
-		# WHERE ?4 = ?5;
-		# """
 		
 		sql = f"""
 		UPDATE {table}
@@ -1228,7 +1264,6 @@ class Database:
 		"""
 		
 		try:
-			# self.execute(sql, (table, key, value, f'{table}_id', id))
 			self.execute(sql, (value, ))
 		except sqlite3.OperationalError as e:
 			logger.var('sql',sql)
@@ -1249,14 +1284,15 @@ class Database:
 		alias: str | None = None,
 		smiles: str | None = None,
 	) -> Compound:
-		"""Get a compound
 
-		:param *: 
-		:param table: str:  (Default value = 'compound')
-		:param id: int | None:  (Default value = None)
-		:param inchikey: str | None:  (Default value = None)
-		:param alias: str | None:  (Default value = None)
-		:param smiles: str | None:  (Default value = None)
+		"""Get a compound using one of the following fields: ['id', 'inchikey', 'alias', 'smiles']
+
+		:param table: the table from which to get the entry (Default value = 'compound')
+		:param id: the ID to search for (Default value = None)
+		:param inchikey: the InChi-Key to search for (Default value = None)
+		:param alias: the alias to search for (Default value = None)
+		:param smiles: the smiles to search for (Default value = None)
+		:returns: the :class:`.Compound` object
 
 		"""
 		
@@ -1279,13 +1315,14 @@ class Database:
 		alias: str | None = None, 
 		smiles: str | None = None, 
 	) -> int:
-		"""Get a compound ID
 
-		:param *: 
-		:param table: str:  (Default value = 'compound')
-		:param inchikey: str | None:  (Default value = None)
-		:param alias: str | None:  (Default value = None)
-		:param smiles: str | None:  (Default value = None)
+		"""Get a compound's ID using one of the following fields: ['inchikey', 'alias', 'smiles']
+
+		:param table: the table from which to get the entry (Default value = 'compound')
+		:param inchikey: the InChi-Key to search for (Default value = None)
+		:param alias: the alias to search for (Default value = None)
+		:param smiles: the smiles to search for (Default value = None)
+		:returns: the :class:`.Compound` ID
 
 		"""
 
@@ -1306,13 +1343,19 @@ class Database:
 
 		return None
 
-	def get_compound_computed_property(self, prop, compound_id):
+	def get_compound_computed_property(self, 
+		prop: str, 
+		compound_id: int,
+	) -> int | str:
+
 		"""Use chemicalite to calculate a property from the stored binary molecule
 
-		:param prop: 
-		:param compound_id: 
+		:param prop: the property to calculate [num_heavy_atoms, formula, num_rings]
+		:param compound_id: the compound ID to query
+		:returns: the value of the computed property
 
 		"""
+
 		function = CHEMICALITE_COMPOUND_PROPERTY_MAP[prop]
 		val, = self.select_where(query=f'{function}(compound_mol)', table='compound', key='id', value=compound_id, multiple=False)
 		return val
@@ -1324,13 +1367,14 @@ class Database:
 		inchikey: str = None,
 		alias: str = None,
 	) -> Pose:
-		"""Get a pose
 
-		:param *: 
-		:param table: str:  (Default value = 'pose')
-		:param id: int | None:  (Default value = None)
-		:param inchikey: str:  (Default value = None)
-		:param alias: str:  (Default value = None)
+		"""Get a pose using one of the following fields: ['id', 'inchikey', 'alias']
+
+		:param table: the table from which to get the entry (Default value = 'pose')
+		:param id: the ID to search for (Default value = None)
+		:param inchikey: the InChi-Key to search for (Default value = None)
+		:param alias: the alias to search for (Default value = None)
+		:returns: the :class:`.Pose` object
 
 		"""
 		
@@ -1352,12 +1396,13 @@ class Database:
 		inchikey: str | None = None, 
 		alias: str | None = None, 
 	) -> int:
-		"""Get a pose ID
 
-		:param *: 
-		:param table: str:  (Default value = 'pose')
-		:param inchikey: str | None:  (Default value = None)
-		:param alias: str | None:  (Default value = None)
+		"""Get a pose's ID using one of the following fields: ['inchikey', 'alias', 'smiles']
+
+		:param table: the table from which to get the entry (Default value = 'pose')
+		:param inchikey: the InChi-Key to search for (Default value = None)
+		:param alias: the alias to search for (Default value = None)
+		:returns: the :class:`.Pose` ID
 
 		"""
 
@@ -1387,12 +1432,13 @@ class Database:
 		id: int | None = None,
 		none: str | None = None,
 	) -> Reaction:
-		"""Get a reaction
 
-		:param *: 
-		:param table: str:  (Default value = 'reaction')
-		:param id: int | None:  (Default value = None)
-		:param none: str | None:  (Default value = None)
+		"""Get a reaction using its ID
+
+		:param table: the table from which to get the entry (Default value = 'reaction')
+		:param id: the ID to search for (Default value = None)
+		:param none: define the behaviour for no matches, any value other than ``'error'`` will silently return empty data (Default value = 'error')
+		:returns: the :class:`.Reaction` object
 
 		"""
 		
@@ -1410,13 +1456,14 @@ class Database:
 		table: str = 'quote',
 		id: int | None = None,
 		none: str | None = None,
-	) -> list[dict]:
-		"""Get a quote
+	) -> Quote:
 
-		:param *: 
-		:param table: str:  (Default value = 'quote')
-		:param id: int | None:  (Default value = None)
-		:param none: str | None:  (Default value = None)
+		"""Get a quote using its ID
+
+		:param table: the table from which to get the entry (Default value = 'quote')
+		:param id: the ID to search for (Default value = None)
+		:param none: define the behaviour for no matches, any value other than ``'error'`` will silently return empty data (Default value = 'error')
+		:returns: the :class:`.Quote` object
 
 		"""
 		
@@ -1442,13 +1489,14 @@ class Database:
 	def get_metadata(self, 
 		*,
 		table: str, 
-		id: int
+		id: int,
 	) -> dict:
-		"""Get metadata
 
-		:param *: 
-		:param table: str: 
-		:param id: int: 
+		"""Get metadata dictionary from a specific table and ID
+
+		:param table: the table from which to get the entry
+		:param id: the ID to search for (Default value = None)
+		:returns: a dictionary of metadata
 
 		"""
 
@@ -1470,24 +1518,27 @@ class Database:
 
 	def get_target(self, 
 		*,
-		id=int
+		id: int,
 	) -> Target:
-		"""Get target
 
-		:param *: 
-		:param id:  (Default value = int)
+		"""Get target with specific ID
+
+		:param id: the ID to search for
+		:returns: :class:`.Target` object
 
 		"""
-		return Target(db=self,id=id,name=self.get_target_name(id=id))
+
+		return Target(db=self, id=id, name=self.get_target_name(id=id))
 
 	def get_target_name(self,
 		*,
 		id:int,
 	) -> str:
-		"""Get target name
 
-		:param *: 
-		:param id:int: 
+		"""Get the name of a target with given ID
+
+		:param id: the ID to search for
+		:returns: target name
 
 		"""
 
@@ -1499,6 +1550,7 @@ class Database:
 		*,
 		name: str, 
 	) -> int:
+	
 		"""Get target ID
 
 		:param *: 
@@ -1858,7 +1910,7 @@ class Database:
 
 		:param table: 
 		:param key: 
-		:param value:  (Default value = None)
+		:param value: the value to match (Default value = None)
 
 		"""
 		if value is not None:
