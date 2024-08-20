@@ -464,9 +464,30 @@ class PoseSet:
 		:param ref_id: 
 
 		"""
-		values = self.db.select_where(table='pose', query='pose_id', key='reference', value=ref_id, multiple=True)
+		values = self.db.select_where(table='pose', query='pose_id', key=f'pose_reference={ref_id} AND pose_id in {self.str_ids}', multiple=True)
 		if not values:
 			return None
+		return PoseSet(self.db, [v for v, in values])
+
+	def get_by_compound(self, 
+		*, 
+		compound: 'int | Compound',
+	) -> 'PoseSet | None':
+		
+		"""Select a subset of this :class:`.PoseSet` by the associated compound.
+
+		:param compound: :class:`.Compound` object or ID
+		:returns: a :class:`.PoseSet` of the selection
+
+		"""
+		from .compound import Compound
+		if isinstance(compound, Compound):
+			compound = compound.id
+
+		values = self.db.select_where(query='pose_id', table='pose', key=f'pose_compound={compound} AND pose_id in {self.str_ids}', multiple=True, none='quiet')
+		if not values:
+			return None
+		ids = [v for v, in values if v]
 		return PoseSet(self.db, [v for v, in values])
 
 	def get_by_target(self, *, id):
