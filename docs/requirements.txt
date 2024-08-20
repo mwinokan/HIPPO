@@ -8,4 +8,5 @@ molparse
 pandas
 tqdm
 pycule
+sphinxcontrib-prettyspecialmethods
 
