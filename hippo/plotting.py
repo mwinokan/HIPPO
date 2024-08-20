@@ -344,12 +344,11 @@ def plot_residue_interactions(animal, poses, residue_number, subtitle=None, chai
 			data['residue_name_number'] = f'{f.residue_name} {f.residue_number}'
 
 			if data['pose_name'] not in categoryarray:
-				categoryarray[data['pose_name']] = [data['pose_name'], data['count']]
+				categoryarray[data['pose_name']] = [data['pose_name'], 1]
 			else:
-				categoryarray[data['pose_name']][1] += data['count']
+				categoryarray[data['pose_name']][1] += 1
 
-			for _ in range(value):
-				plot_data.append(data)
+			plot_data.append(data)
 
 	fig = px.histogram(plot_data, x='pose_name', color='family')
 	
