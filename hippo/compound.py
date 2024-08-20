@@ -24,6 +24,8 @@ class Compound:
 
 	"""
 
+	_table = 'compound'
+
 	def __init__(self,
 			animal: 'HIPPO',
 			db: 'Database',
@@ -46,7 +48,6 @@ class Compound:
 		self._base = None
 		self._alias = alias
 		self._tags = None
-		self._table = 'compound'
 		self._metadata = metadata
 		
 		# computed properties
@@ -249,6 +250,10 @@ class Compound:
 	def is_product(self) -> bool:
 		"""Is this Compound a product of at least one reaction"""
 		return bool(self.get_reactions(none=False))
+	
+	@property
+	def table(self):
+		return self._table
 	
 	
 	### METHODS
@@ -573,7 +578,8 @@ class Compound:
 		:param draw: Draw the annotated molecule, defaults to ``True``
 		:returns: A list of tuples containing a descriptor (``str``) and count (``int``) pair
 		"""
-		from molparse.rdkit import classify_mol
+		# from molparse.rdkit import classify_mol
+		from molparse.rdkit.classify import classify_mol
 		return classify_mol(self.mol, draw=draw)
 
 	def murcko_scaffold(self, 
