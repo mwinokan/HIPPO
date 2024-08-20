@@ -380,6 +380,34 @@ class CompoundSet:
 		atomtype_dicts = [c.atomtype_dict for c in self]
 		return combine_atomtype_dicts(atomtype_dicts)
 
+	@property
+	def num_atoms_added(self) -> list[int]:
+
+		"""Calculate the number of atoms added w.r.t the base
+
+		:returns: list of number of atoms added values
+
+		"""
+
+		query = self.db.execute(f"""
+		WITH nums AS (
+			SELECT A.compound_id AS comp_id, 
+			mol_num_hvyatms(A.compound_mol) - mol_num_hvyatms(B.compound_mol) AS diff 
+			FROM compound A, compound B
+			WHERE A.compound_base = B.compound_id
+			AND A.compound_id IN {self.str_ids}
+		)
+
+		SELECT compound_id, diff FROM compound
+		LEFT JOIN nums
+		ON comp_id = compound_id
+		WHERE compound_id IN {self.str_ids}
+		""").fetchall()
+
+		lookup = {k:v for k,v in query}
+
+		return [lookup[i] for i in self.indices]
+
 	### FILTERING
 
 	def get_by_tag(self,tag):
