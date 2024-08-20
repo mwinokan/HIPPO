@@ -64,10 +64,10 @@ class HIPPO:
 		self._db_path = db_path
 		self._db = Database(self.db_path, animal=self)
 
-		self._compounds = CompoundTable(self.db, 'compound')
-		self._poses = PoseTable(self.db, 'pose')
-		self._tags = TagTable(self.db, 'tag')
-		self._reactions = ReactionTable(self.db, 'reaction')
+		self._compounds = CompoundTable(self.db)
+		self._poses = PoseTable(self.db)
+		self._tags = TagTable(self.db)
+		self._reactions = ReactionTable(self.db)
 
 		### in memory subsets
 		self._reactants = None
