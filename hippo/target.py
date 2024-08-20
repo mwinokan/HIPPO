@@ -73,6 +73,9 @@ class Target:
 				residue_name=f.res_name,
 				residue_number=f.res_number,
 				chain_name=f.res_chain,
+				commit=False,
 			)
+
+		self.db.commit()
 
 		return self.features
