@@ -540,7 +540,10 @@ class Pose:
 
 		return data
 
-	def calculate_fingerprint(self):
+	def calculate_fingerprint(self, 
+		debug: bool = False,
+	) -> None:
+
 		"""Calculate the pose's interaction fingerprint"""
 
 		if self.path.endswith('.pdb'):
@@ -614,6 +617,8 @@ class Pose:
 			valid_features = [f for f in complementary_comp_features if np.linalg.norm(f - prot_coord) <= cutoff]
 
 			if valid_features:
+				if debug:
+					logger.debug(f'PROT: {prot_feature.residue_name} {prot_feature.residue_number} {prot_feature.atom_names}, LIG: #{len(valid_features)} {[f for f in valid_features]}')
 				fingerprint[prot_feature.id] = len(valid_features)
 
 		self.fingerprint = fingerprint
