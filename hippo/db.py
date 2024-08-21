@@ -162,6 +162,8 @@ class Database:
 		self.create_table_feature()
 		self.create_table_route()
 		self.create_table_component()
+		self.create_table_interaction()
+		self.commit()
 
 	def create_table_compound(self) -> None:
 		"""Create the compound table"""
@@ -364,6 +366,28 @@ class Database:
 		sql = "CREATE VIRTUAL TABLE compound_pattern_bfp USING rdtree(compound_id, fp bits(2048))"
  
 		self.execute(sql)
+
+	def create_table_interaction(self) -> None:
+		
+		"""Create the interaction table"""
+
+		logger.debug('HIPPO.Database.create_table_interaction()')
+		sql = """CREATE TABLE interaction(
+			interaction_id INTEGER PRIMARY KEY,
+			interaction_feature INTEGER NOT NULL,
+			interaction_pose INTEGER NOT NULL,
+			interaction_family TEXT NOT NULL,
+			interaction_atom_ids TEXT NOT NULL,
+			interaction_prot_coord TEXT NOT NULL,
+			interaction_lig_coord TEXT NOT NULL,
+			interaction_distance REAL NOT NULL,
+			interaction_energy REAL,
+			CONSTRAINT UC_interaction UNIQUE (interaction_feature, interaction_pose, interaction_family, interaction_atom_ids)
+		);
+		"""
+
+		self.execute(sql)
+
 
 	### INSERTION
 
@@ -895,6 +919,9 @@ class Database:
 			target = self.get_target_id(name=target)
 		assert isinstance(target, int)
 
+		from molparse.rdkit.features import FEATURE_FAMILIES
+		assert family in FEATURE_FAMILIES, f'Unsupported {family=}'
+
 		sql = """
 		INSERT INTO feature(feature_family, feature_target, feature_chain_name, feature_residue_name, feature_residue_number, feature_atom_names)
 		VALUES(?1, ?2, ?3, ?4, ?5, ?6)
@@ -1025,6 +1052,106 @@ class Database:
 			self.commit()
 
 		return component_id
+
+	def insert_interaction(self,
+		*,
+		feature: Feature | int,
+		pose: Pose | int,
+		family: str,
+		atom_ids: list[int],
+		prot_coord: list[float],
+		lig_coord: list[float],
+		distance: float,
+		energy: float | None = None,
+		warn_duplicate: bool = True,
+		commit: bool = True,
+	) -> int:
+
+		"""Insert an entry into the interaction table
+		
+		:param feature: associated :class:`.Feature` object or ID
+		:param pose: associated :class:`.Pose` object or ID
+		:param family: ligand feature type
+		:param atom_ids: atom indices of ligand feature
+		:param prot_coord: ``[x,y,z]`` coordinate of protein feature
+		:param lig_coord: ``[x,y,z]`` coordinate of ligand feature
+		:param distance: interaction distance ``Angstrom``
+		:param energy: energy score ``kcal/mol``, defaults to ``None``
+		:param warn_duplicate: print a warning if the pose already exists (Default value = True)
+		:param commit: commit the changes to the database (Default value = True)
+		:returns: the interaction ID
+		"""
+
+		# validation
+
+		if isinstance(feature, Feature):
+			feature = feature.id
+
+		if isinstance(pose, Pose):
+			pose = pose.id
+
+		from molparse.rdkit.features import FEATURE_FAMILIES
+		assert family in FEATURE_FAMILIES, f'Unsupported {family=}'
+
+		assert isinstance(atom_ids, list), f'Unsupported {atom_ids=}'
+		assert not any([not isinstance(i, int) for i in atom_ids]), f'Unsupported {atom_ids=}' 
+		atom_ids = json.dumps(atom_ids)
+
+		prot_coord = list(prot_coord)
+		assert len(prot_coord) == 3, f'Unsupported {prot_coord=}'
+		assert not any([not isinstance(i, float) for i in prot_coord]), f'Unsupported {prot_coord=}' 
+		prot_coord = json.dumps(prot_coord)
+
+		lig_coord = list(lig_coord)
+		assert len(lig_coord) == 3, f'Unsupported {lig_coord=}'
+		assert not any([not isinstance(i, float) for i in lig_coord]), f'Unsupported {lig_coord=}' 
+		lig_coord = json.dumps(lig_coord)
+
+		try:
+			distance = float(distance)
+		except ValueError:
+			raise ValueError(f'Unsupported {distance=}')
+
+		if energy is not None:
+			try:
+				energy = float(energy)
+			except ValueError:
+				raise ValueError(f'Unsupported {energy=}')
+
+		# insertion
+
+		sql = """
+		INSERT INTO interaction(
+			interaction_feature,
+			interaction_pose,
+			interaction_family,
+			interaction_atom_ids,
+			interaction_prot_coord,
+			interaction_lig_coord,
+			interaction_distance,
+			interaction_energy
+		)
+		VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+		"""
+
+		try:
+			self.execute(sql, (feature, pose, family, atom_ids, prot_coord, lig_coord, distance, energy))
+
+		except sqlite3.IntegrityError as e:
+			if warn_duplicate:
+				logger.warning(f"Skipping existing interaction: {(feature, pose, family, atom_ids, prot_coord, lig_coord, distance, energy)}")
+			return None
+
+		except Exception as e:
+			logger.exception(e)
+
+		interaction_id = self.cursor.lastrowid
+
+		if commit:
+			self.commit()
+
+		return interaction_id
+
 
 	### SELECTION
 
@@ -1236,6 +1363,13 @@ class Database:
 		"""
 		self.delete_where(table='tag', key='name', value=tag)
 
+	def delete_interactions(self) -> None:
+		"""Delete all calculated interactions"""
+
+		import pickle
+		self.delete_where(table='interaction', key='interaction_id > 0')
+		self.update_all(table='pose', key='pose_fingerprint', value=0)
+
 	### UPDATE
 
 	def update(self, *, 
@@ -1273,6 +1407,36 @@ class Database:
 		if commit:
 			self.commit()
 		return id
+
+	def update_all(self, *, 
+		table: str, 
+		key: str, 
+		value, 
+		commit: bool = True,
+	) -> None:
+
+		"""Update all field in a table column
+
+		:param table: the table which to update
+		:param key: column name to update
+		:param value: the value to insert
+		:param commit: commit the changes to the database (Default value = True)
+
+		"""
+		
+		sql = f"""
+		UPDATE {table}
+		SET {key} = ?
+		"""
+		
+		try:
+			self.execute(sql, (value, ))
+		except sqlite3.OperationalError as e:
+			logger.var('sql',sql)
+			raise
+
+		if commit:
+			self.commit()
 
 	### GETTERS
 
@@ -1586,7 +1750,6 @@ class Database:
 	) -> Route:
 		"""
 
-		:param *: 
 		:param id: int: 
 		:param debug: bool:  (Default value = False)
 
@@ -1639,6 +1802,36 @@ class Database:
 		if debug: logger.var('recipe', recipe)
 
 		return recipe
+
+	def get_interaction(self,
+		*,
+		id: int,
+	) -> 'Interaction':
+		
+		"""
+
+		:param id: the ID of the Interaction to retrieve
+
+		"""
+
+		from .interaction import Interaction
+
+		result = self.select_all_where(table='interaction', key='id', value=id)
+
+		id, feature_id, pose_id, family, atom_ids, prot_coord, lig_coord, distance, energy = result
+
+		return Interaction(
+			db=self,
+			id=id,
+			feature_id=feature_id,
+			pose_id=pose_id,
+			family=family,
+			atom_ids=atom_ids,
+			prot_coord=prot_coord,
+			lig_coord=lig_coord,
+			distance=distance,
+			energy=energy,
+		)
 
 	def get_possible_reaction_ids(self, *, compound_ids):
 		"""

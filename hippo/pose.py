@@ -17,7 +17,7 @@ logger = logging.getLogger('HIPPO')
 
 from molparse.rdkit.features import FEATURE_FAMILIES, COMPLEMENTARY_FEATURES
 
-CUTOFF_PADDING = 1.0
+CUTOFF_PADDING = 0.0
 
 FEATURE_PAIR_CUTOFFS = {
 	'Donor Acceptor': 3.5 + CUTOFF_PADDING,
@@ -28,6 +28,8 @@ FEATURE_PAIR_CUTOFFS = {
 	'PosIonizable Aromatic': 4.5 + CUTOFF_PADDING,
 	'Aromatic Aromatic': 6.0 + CUTOFF_PADDING,
 	'Hydrophobe Hydrophobe': 4.5 + CUTOFF_PADDING,
+	'LumpedHydrophobe Hydrophobe': 4.5 + CUTOFF_PADDING,
+	'Hydrophobe LumpedHydrophobe': 4.5 + CUTOFF_PADDING,
 }
 
 class Pose:
@@ -53,7 +55,7 @@ class Pose:
 		compound: int,
 		target: str,
 		mol: Chem.Mol | bytes | None,
-		fingerprint: bytes,
+		fingerprint: int,
 		energy_score: float | None = None,
 		distance_score: float | None = None,
 		metadata: dict | None = None,
@@ -74,15 +76,19 @@ class Pose:
 		self._base_id = None
 		self._num_heavy_atoms = None
 
-		if fingerprint:
-			# logger.debug('unpickling fingerprint')
-			fingerprint = pickle.loads(fingerprint)		
-		self._fingerprint = fingerprint
+		self._has_fingerprint = False
+
+		if not isinstance(fingerprint, int):
+			logger.warning('Legacy fingerprint data format')
+			self.has_fingerprint = False
+		else:
+			self.has_fingerprint = bool(fingerprint)
 
 		# print(f'{self}{metadata=}')
 		self._metadata = metadata
 		self._tags = None
 		self._reference = reference
+		self._interactions = None
 
 		if isinstance(mol, bytes):
 			self._mol = Chem.Mol(mol)
@@ -335,22 +341,19 @@ class Pose:
 		return self._metadata
 
 	@property
-	def fingerprint(self):
-		"""Returns the pose's fingerprint"""
-		return self._fingerprint
+	def has_fingerprint(self) -> bool:
+		"""Does the pose have a fingerprint?"""
+		return self._has_fingerprint
 
-	@fingerprint.setter
-	def fingerprint(self, fp):
-		"""Set the pose's fingerprint"""
+	@has_fingerprint.setter
+	def has_fingerprint(self, fp):
 
-		# remove features that don't exist in this fingerprint?
+		assert isinstance(fp, bool)
 
-		self._fingerprint = fp
+		self._has_fingerprint = fp
 
 		# store in the database
-		fp = pickle.dumps(fp)
-		# logger.debug('pickling fingerprint')
-		self.db.update(table='pose', id=self.id, key=f'pose_fingerprint', value=fp)
+		self.db.update(table='pose', id=self.id, key=f'pose_fingerprint', value=int(fp))
 
 	@property
 	def tags(self):
@@ -432,6 +435,20 @@ class Pose:
 	def distance_score(self):
 		""" """
 		return self._distance_score
+
+	@property
+	def interactions(self) -> 'InteractionSet':
+		"""Get a :class:`.InteractionSet` for this :class:`.Pose`"""
+		if not self._interactions:
+			from .iset import InteractionSet
+			self._interactions = InteractionSet.from_pose(self)
+		return self._interactions
+
+	@property
+	def classic_fingerprint(self) -> dict:
+		"""Classic HIPPO fingerprint dictionary, mapping protein :class:`.Feature` ID's to the number of corresponding ligand features (from any :class:`.Pose`)"""
+		return self.interactions.classic_fingerprint
+
 
 	### METHODS
 	
@@ -540,9 +557,100 @@ class Pose:
 
 		return data
 
-	def calculate_fingerprint(self, 
+	def calculate_interactions(self) -> None:
+
+		if not self.has_fingerprint:
+
+			# calculate interactions...
+
+			### load the ligand structure
+
+			if self.path.endswith('.pdb'):
+				from molparse import parse
+				protein_system = self.protein_system
+				if not self.protein_system:
+					protein_system = parse(self.path, verbosity=False).protein_system
+
+			elif self.path.endswith('.mol') and self.reference:
+				protein_system = self.reference.protein_system
+
+			else:
+				logger.debug('Unsupported: Pose.calculate_interactions()')
+				raise NotImplementedError(f'{self.reference=}, {self.path=}')
+
+			assert protein_system
+
+			if not self.mol:
+				logger.error(f'Could not read molecule for {self}')
+				return
+
+			### get features
+
+			comp_features = self.features
+			protein_features = self.target.calculate_features(protein_system)
+
+			### organise ligand features by family
+			comp_features_by_family = {}
+			for family in FEATURE_FAMILIES:
+				comp_features_by_family[family] = [f for f in comp_features if f.family == family]
+
+			### protein chain names
+			chains = protein_system.chain_names
+
+			# loop over protein features
+			for prot_feature in protein_features:
+
+				# skip chains that aren't present
+				if prot_feature.chain_name not in chains:
+					continue
+
+				prot_family = prot_feature.family
+
+				prot_residue = protein_system.get_chain(prot_feature.chain_name).residues[f'n{prot_feature.residue_number}']
+
+				if not prot_residue:
+					continue
+
+				if prot_residue.name != prot_feature.residue_name:
+					logger.warning(f'Feature {repr(prot_feature)}')
+					continue
+
+				### calculate protein coordinate
+				prot_atoms = [prot_residue.get_atom(a) for a in prot_feature.atom_names.split(' ')]
+				
+				prot_coords = [a.np_pos for a in prot_atoms if a is not None]
+				
+				prot_coord = np.array(np.sum(prot_coords,axis=0)/len(prot_atoms))
+
+				complementary_family = COMPLEMENTARY_FEATURES[prot_family]
+
+				complementary_comp_features = comp_features_by_family[complementary_family]
+
+				cutoff = FEATURE_PAIR_CUTOFFS[f'{prot_family} {complementary_family}']
+
+				for lig_feature in complementary_comp_features:
+
+					distance = np.linalg.norm(lig_feature - prot_coord)
+
+					if distance > cutoff:
+						continue
+
+					self.db.insert_interaction(
+						feature=prot_feature.id,
+						pose=self.id,
+						family=lig_feature.family,
+						atom_ids=lig_feature.atom_numbers,
+						prot_coord=prot_coord,
+						lig_coord=lig_feature.position,
+						distance=distance,
+						energy=None,
+					)
+
+		self.has_fingerprint = True
+
+	def calculate_classic_fingerprint(self, 
 		debug: bool = False,
-	) -> None:
+	) -> dict:
 
 		"""Calculate the pose's interaction fingerprint"""
 
@@ -621,7 +729,9 @@ class Pose:
 					logger.debug(f'PROT: {prot_feature.residue_name} {prot_feature.residue_number} {prot_feature.atom_names}, LIG: #{len(valid_features)} {[f for f in valid_features]}')
 				fingerprint[prot_feature.id] = len(valid_features)
 
-		self.fingerprint = fingerprint
+		return fingerprint
+
+		# self.fingerprint = fingerprint
 
 	def draw(self, inspirations=True, protein=False, **kwargs):
 		"""Render this pose (and its inspirations)

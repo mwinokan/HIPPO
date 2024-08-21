@@ -130,6 +130,8 @@ def plot_interaction_histogram(animal, poses, feature_metadata, subtitle=None,):
 
 	"""
 
+	raise NotImplementedError
+
 	df = animal._fingerprint_df(poses)
 
 	plot_data = []
@@ -287,7 +289,7 @@ def plot_interaction_punchcard(animal, poses=None, subtitle=None, opacity=1.0, g
 	return add_punchcard_logo(fig)
 
 @hippo_graph
-def plot_residue_interactions(animal, poses, residue_number, subtitle=None, chain=None):
+def plot_residue_interactions(animal, poses, residue_number, subtitle=None, chain=None, target=1):
 	"""
 
 	:param animal: 
@@ -298,69 +300,42 @@ def plot_residue_interactions(animal, poses, residue_number, subtitle=None, chai
 
 	"""
 
-	assert not chain
+	logger.var('#poses',len(poses))
 
-	logger.debug(poses)
-	logger.debug(residue_number)
+	from .iset import InteractionSet
+	iset = InteractionSet.from_residue(animal.db, residue_number=residue_number, chain=chain)
 
-	plot_data = []
+	# return iset
 
-	categoryarray = {}
+	logger.var('#interactions',len(iset))
 
-	poses = poses or animal.poses
+	plot_data = iset.df
 
-	for pose in poses:
+	# name_lookup = {i:n for i,n in zip(poses.ids,poses.names)}
+	name_lookup = poses.id_name_dict
 
-		fingerprint = pose.fingerprint
+	print(name_lookup)
 
-		if not fingerprint:
-			continue
+	names = []
+	for pose_id in plot_data['pose_id'].values:
+		names.append(name_lookup[pose_id])
+	plot_data['pose_name'] = names
 
-		# loop over each interaction in the pose
-		for key, value in fingerprint.items():
-			if not value:
-				continue
+	fig = px.histogram(plot_data, x='pose_name', color='type')
 
-			f = animal.db.get_feature(id=key)
+	# return plot_data[plot_data['pose_name'] == ' x1762b']
 
-			if chain and f.chain_name != chain:
-				continue
-
-			if residue_number != f.residue_number:
-				continue
-
-			data = dict(str=key,count=value)
-
-			data['id'] = f.id
-			data['family'] = f.family
-			data['residue_name'] = f.residue_name
-			data['residue_number'] = f.residue_number
-			data['chain_name'] = f.chain_name
-			data['atom_names'] = f.atom_names
-			
-			data['pose_name'] = pose.name
-			data['pose_id'] = str(pose)
-			
-			data['residue_name_number'] = f'{f.residue_name} {f.residue_number}'
-
-			if data['pose_name'] not in categoryarray:
-				categoryarray[data['pose_name']] = [data['pose_name'], 1]
-			else:
-				categoryarray[data['pose_name']][1] += 1
-
-			plot_data.append(data)
-
-	fig = px.histogram(plot_data, x='pose_name', color='family')
-	
-	categoryarray = sorted([v for v in categoryarray.values()], key=lambda x: (-x[1], x[0]))
-	categoryarray = [v[0] for v in categoryarray]
-
-	fig.update_xaxes(categoryorder='array', categoryarray=categoryarray)
+	fig.update_xaxes(categoryorder='total descending')
 
 	if not subtitle:
 		subtitle = f'#Poses={len(poses)}'
 
-	title = f"Interactions w/ {data['residue_name_number']}"
+	residue_name = animal.db.get_feature(id=plot_data['feature_id'].values[0]).residue_name
+
+	title = f"Interactions w/ {residue_name} {residue_number}"
+
+	if chain:
+		title += f' {chain}'
 
 	title = f'<b>{animal.name}</b>: {title}<br><sup><i>{subtitle}</i></sup>'
 

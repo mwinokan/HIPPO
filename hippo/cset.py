@@ -942,7 +942,7 @@ class CompoundSet:
 		return iter(self.db.get_compound(table=self.table, id=i) for i in self.indices)
 
 	def __getitem__(self, key) -> 'Compound | CompoundSet':
-		"""Get compounds or subsets thereof from this from"""
+		"""Get compounds or subsets thereof from this set"""
 		match key:
 			case int():
 				index = self.indices[key]
@@ -950,7 +950,7 @@ class CompoundSet:
 			
 			case slice():
 				indices = self.indices[key]
-				return	CompoundSet(self.db, indices)
+				return CompoundSet(self.db, indices)
 
 			case _:
 				raise NotImplementedError	

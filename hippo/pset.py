@@ -66,6 +66,21 @@ class PoseTable:
 		values = self.db.select_where(table='tag', query='DISTINCT tag_name', key='tag_pose IS NOT NULL', multiple=True)
 		return set(v for v, in values)
 
+	@property
+	def id_name_dict(self) -> dict:
+		"""Return a dictionary mapping pose ID's to their name"""
+
+		records = self.db.select(table=self.table, query='pose_id, pose_inchikey, pose_alias', multiple=True)
+
+		lookup = {}
+		for i,inchikey,alias in records:
+			if alias:
+				lookup[i] = alias
+			else:
+				lookup[i] = inchikey
+
+		return lookup
+
 	### METHODS
 
 	def get_by_tag(self, tag):
@@ -225,6 +240,8 @@ class PoseSet:
 		else:
 			self._indices = list(set(indices))
 
+		self._interactions = None
+
 
 	### PROPERTIES
 
@@ -262,6 +279,21 @@ class PoseSet:
 	def inchikeys(self):
 		"""Returns the inchikeys of child poses"""
 		return [self.db.select_where(table=self.table, query='pose_inchikey', key='id', value=i, multiple=False)[0] for i in self.indices]
+
+	@property
+	def id_name_dict(self) -> dict:
+		"""Return a dictionary mapping pose ID's to their name"""
+
+		records = self.db.select_where(table=self.table, query='pose_id, pose_inchikey, pose_alias', key=f'id IN {self.str_ids}', multiple=True)
+
+		lookup = {}
+		for i,inchikey,alias in records:
+			if alias:
+				lookup[i] = alias
+			else:
+				lookup[i] = inchikey
+
+		return lookup
 
 	@property
 	def smiles(self):
@@ -362,21 +394,29 @@ class PoseSet:
 		query = self.db.select_where(table='pose', query=query, key=f'pose_id in {self.str_ids}', multiple=False)
 		return query[0]
 
-	@property
-	def fingerprint(self):
-		"""Combined fingerprint of all member poses"""
+	# @property
+	# def classic_fingerprint(self):
+	# 	"""Combined fingerprint of all member poses"""
 
-		import pickle
-		import collections, functools, operator
+	# 	import pickle
+	# 	import collections, functools, operator
 
-		fps = self.db.select_where(query='pose_fingerprint', table='pose', key=f'pose_id IN {self.str_ids}', multiple=True)
+	# 	fps = self.db.select_where(query='pose_fingerprint', table='pose', key=f'pose_id IN {self.str_ids}', multiple=True)
 
-		fps = [pickle.loads(s) for s, in fps] 
+	# 	fps = [pickle.loads(s) for s, in fps] 
  
-		# sum the values with same keys
-		combined = dict(functools.reduce(operator.add, map(collections.Counter, fps)))
+	# 	# sum the values with same keys
+	# 	combined = dict(functools.reduce(operator.add, map(collections.Counter, fps)))
 
-		return combined	
+	# 	return combined	
+
+	@property
+	def interactions(self) -> 'InteractionSet':
+		"""Get a :class:`.InteractionSet` for this :class:`.Pose`"""
+		if not self._interactions:
+			from .iset import InteractionSet
+			self._interactions = InteractionSet.from_pose(self)
+		return self._interactions
 
 	### FILTERING
 
