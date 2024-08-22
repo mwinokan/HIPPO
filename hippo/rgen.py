@@ -326,6 +326,8 @@ class RandomRecipeGenerator:
 
 		logger.writing(out_file)
 
+		raise NotImplementedError('Need to write the Recipe...')
+
 		return recipe
 
 	### DUNDERS

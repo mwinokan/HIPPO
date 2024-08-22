@@ -382,6 +382,7 @@ class Database:
 			interaction_prot_coord TEXT NOT NULL,
 			interaction_lig_coord TEXT NOT NULL,
 			interaction_distance REAL NOT NULL,
+			interaction_angle REAL,
 			interaction_energy REAL,
 			CONSTRAINT UC_interaction UNIQUE (interaction_feature, interaction_pose, interaction_family, interaction_atom_ids)
 		);
@@ -1064,6 +1065,7 @@ class Database:
 		prot_coord: list[float],
 		lig_coord: list[float],
 		distance: float,
+		angle: float | None = None,
 		energy: float | None = None,
 		warn_duplicate: bool = True,
 		commit: bool = True,
@@ -1079,6 +1081,7 @@ class Database:
 		:param prot_coord: ``[x,y,z]`` coordinate of protein feature
 		:param lig_coord: ``[x,y,z]`` coordinate of ligand feature
 		:param distance: interaction distance ``Angstrom``
+		:param angle: optional interaction angle ``degrees``
 		:param energy: energy score ``kcal/mol``, defaults to ``None``
 		:param warn_duplicate: print a warning if the pose already exists (Default value = True)
 		:param commit: commit the changes to the database (Default value = True)
@@ -1116,6 +1119,12 @@ class Database:
 		except ValueError:
 			raise ValueError(f'Unsupported {distance=}')
 
+		try:
+			if angle is not None:
+				angle = float(angle)
+		except ValueError:
+			raise ValueError(f'Unsupported {angle=}')
+
 		if energy is not None:
 			try:
 				energy = float(energy)
@@ -1134,13 +1143,14 @@ class Database:
 			interaction_prot_coord,
 			interaction_lig_coord,
 			interaction_distance,
+			interaction_angle,
 			interaction_energy
 		)
-		VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+		VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
 		"""
 
 		try:
-			self.execute(sql, (feature, pose, type, family, atom_ids, prot_coord, lig_coord, distance, energy))
+			self.execute(sql, (feature, pose, type, family, atom_ids, prot_coord, lig_coord, distance, angle, energy))
 
 		except sqlite3.IntegrityError as e:
 			if warn_duplicate:
@@ -1824,7 +1834,7 @@ class Database:
 
 		result = self.select_all_where(table='interaction', key='id', value=id)
 
-		id, feature_id, pose_id, type, family, atom_ids, prot_coord, lig_coord, distance, energy = result
+		id, feature_id, pose_id, type, family, atom_ids, prot_coord, lig_coord, distance, angle, energy = result
 
 		return Interaction(
 			db=self,
@@ -1837,6 +1847,7 @@ class Database:
 			prot_coord=prot_coord,
 			lig_coord=lig_coord,
 			distance=distance,
+			angle=angle,
 			energy=energy,
 		)
 

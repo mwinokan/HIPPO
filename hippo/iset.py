@@ -4,6 +4,51 @@ import mcol
 import logging
 logger = logging.getLogger('HIPPO')
 
+class InteractionTable:
+
+	_table = 'interaction'
+
+	def __init__(self, 
+		db: 'Database', 
+	) -> None:
+		
+		self._db = db
+		self._df = None
+
+	### PROPERTIES
+
+	@property
+	def db(self) -> 'Database':
+		"""Returns the associated :class:`.Database`"""
+		return self._db
+
+	@property
+	def table(self) -> str:
+		"""Returns the name of the :class:`.Database` table"""
+		return self._table
+
+	@property
+	def df(self) -> 'pandas.DataFrame':
+		
+		"""DataFrame representation of the interactions
+
+		:returns: a ``pandas.Dataframe`` of the interactions
+
+		"""
+
+		if self._df is None:
+			records = self.db.select_all_where(table='interaction', key=f'interaction_id > 0', multiple=True)
+			df = df_from_interaction_records(self.db, records)
+			self._df = df
+		
+		return self._df
+
+	### DUNDERS
+
+	def __len__(self) -> int:
+		return self.db.count(self.table)
+
+
 class InteractionSet:
 
 	"""
@@ -144,51 +189,17 @@ class InteractionSet:
 		return self.get_classic_fingerprint()
 
 	@property
-	def df(self):
+	def df(self) -> 'pandas.DataFrame':
 
-		if not self._df:
-			import json
-			from pandas import DataFrame
-			# from molparse.rdkit.features import INTERACTION_TYPES
+		"""DataFrame representation of the interactions
 
+		:returns: a ``pandas.Dataframe`` of the interactions
+
+		"""
+
+		if self._df is None:
 			records = self.db.select_all_where(table='interaction', key=f'interaction_id IN {self.str_ids}', multiple=True)
-
-			data = []
-			for record in records:
-
-				id, feature_id, pose_id, type, family, atom_ids, prot_coord, lig_coord, distance, energy = record
-				
-				feature = self.db.get_feature(id=feature_id)
-				
-				d = dict(id=id)
-
-				d['feature_id'] = feature_id
-				d['pose_id'] = pose_id
-				d['target_id'] = feature.target
-				
-				# d['type'] = INTERACTION_TYPES[(feature.family, family)]
-				d['type'] = type
-				
-				d['prot_family'] = feature.family
-				d['lig_family'] = family
-				
-				d['residue_name'] = feature.residue_name
-				d['residue_number'] = feature.residue_number
-				d['chain_name'] = feature.chain_name
-
-				d['distance'] = distance
-				d['energy'] = energy
-				
-				d['prot_coord'] = json.loads(prot_coord)
-				d['lig_coord'] = json.loads(lig_coord)
-
-				d['prot_atoms'] = feature.atom_names
-				d['lig_atoms'] = atom_ids
-				
-				data.append(d)
-
-			df = DataFrame.from_records(data=data)
-
+			df = df_from_interaction_records(self.db, records)
 			self._df = df
 		
 		return self._df
@@ -220,7 +231,7 @@ class InteractionSet:
 			# print(interaction)
 
 			# logger.var(f'{interaction.family_str}', f'{interaction.distance:.1f}')
-			s = f'{interaction.type} [{interaction.feature.chain_res_name_number_str}]'
+			s = f'{interaction.description}'
 
 			if families:
 				s += f' {interaction.feature.family} ~ {interaction.family}'
@@ -239,7 +250,7 @@ class InteractionSet:
 		return {f:c for f,c in pairs}
 
 	def resolve(self, 
-		debug: bool = True,
+		debug: bool = False,
 	) -> 'InteractionSet':
 
 		"""Resolve into predicted key interactions"""
@@ -427,7 +438,8 @@ class InteractionSet:
 
 		### Summary
 
-		self.summary()
+		if debug:
+			self.summary()
 
 	# 	raise NotImplementedError
 
@@ -457,3 +469,51 @@ class InteractionSet:
 
 			case _:
 				raise NotImplementedError	
+
+
+def df_from_interaction_records(
+	db: 'Database',
+	records: list[tuple],
+) -> 'pandas.DataFrame':
+
+	import json
+	from pandas import DataFrame
+
+	data = []
+	for record in records:
+
+		id, feature_id, pose_id, type, family, atom_ids, prot_coord, lig_coord, distance, angle, energy = record
+		
+		feature = db.get_feature(id=feature_id)
+		
+		d = dict(id=id)
+
+		d['feature_id'] = feature_id
+		d['pose_id'] = pose_id
+		d['target_id'] = feature.target
+		
+		# d['type'] = INTERACTION_TYPES[(feature.family, family)]
+		d['type'] = type
+		
+		d['prot_family'] = feature.family
+		d['lig_family'] = family
+		
+		d['residue_name'] = feature.residue_name
+		d['residue_number'] = feature.residue_number
+		d['chain_name'] = feature.chain_name
+
+		d['distance'] = distance
+		d['angle'] = angle
+		d['energy'] = energy
+		
+		d['prot_coord'] = json.loads(prot_coord)
+		d['lig_coord'] = json.loads(lig_coord)
+
+		d['prot_atoms'] = feature.atom_names
+		d['lig_atoms'] = atom_ids
+		
+		data.append(d)
+
+	df = DataFrame.from_records(data=data)
+
+	return df

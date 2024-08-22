@@ -7,6 +7,7 @@ from .cset import CompoundTable, IngredientSet, CompoundSet
 from .pset import PoseTable, PoseSet
 from .tags import TagTable
 from .rset import ReactionTable, ReactionSet
+from .iset import InteractionTable
 from .compound import Compound
 from .reaction import Reaction
 from .target import Target
@@ -68,6 +69,7 @@ class HIPPO:
 		self._poses = PoseTable(self.db)
 		self._tags = TagTable(self.db)
 		self._reactions = ReactionTable(self.db)
+		# self._interactions = InteractionTable(self.db)
 
 		### in memory subsets
 		self._reactants = None
@@ -119,6 +121,13 @@ class HIPPO:
 	def tags(self) -> TagTable:
 		"""Access Tags in the Database"""
 		return self._tags
+
+	@property
+	def interactions(self) -> InteractionTable:
+		"""Access Interactions in the Database"""
+		# return self._interactions
+		from .iset import InteractionTable
+		return InteractionTable(self.db)
 	
 	@property
 	def num_compounds(self) -> int:
@@ -1753,7 +1762,7 @@ class HIPPO:
 
 	### PLOTTING
 
-	def plot_tag_statistics(self, *args, **kwargs):
+	def plot_tag_statistics(self, *args, **kwargs) -> 'plotly.graph_objects.Figure':
 		"""Plot an overview of the number of compounds and poses for each tag, see :func:`hippo.plotting.plot_tag_statistics`"""
 		
 		if not self.num_tags:
@@ -1762,40 +1771,46 @@ class HIPPO:
 		from .plotting import plot_tag_statistics
 		return plot_tag_statistics(self, *args, **kwargs)
 
-	def plot_compound_property(self, prop, **kwargs): 
+	def plot_compound_property(self, prop, **kwargs) -> 'plotly.graph_objects.Figure':
 		"""Plot an arbitrary compound property across the whole dataset, see :func:`hippo.plotting.plot_compound_property`"""
 		from .plotting import plot_compound_property
 		return plot_compound_property(self, prop, **kwargs)
 
-	def plot_pose_property(self, prop, **kwargs): 
+	def plot_pose_property(self, prop, **kwargs) -> 'plotly.graph_objects.Figure':
 		"""Plot an arbitrary pose property across the whole dataset, see :func:`hippo.plotting.plot_pose_property`"""
 		from .plotting import plot_pose_property
 		return plot_pose_property(self, prop, **kwargs)
 
-	def plot_interaction_punchcard(self, poses=None, subtitle=None, opacity=1.0, **kwargs):
+	def plot_interaction_punchcard(self, poses=None, subtitle=None, opacity=1.0, **kwargs) -> 'plotly.graph_objects.Figure':
 		"""Plot an interaction punchcard for a set of poses, see :func:`hippo.plotting.plot_interaction_punchcard`"""
 		from .plotting import plot_interaction_punchcard
 		return plot_interaction_punchcard(self, poses=poses, subtitle=subtitle, opacity=opacity, **kwargs)
 
-	def plot_residue_interactions(self, poses, residue_number, **kwargs):
+	def plot_residue_interactions(self, poses, residue_number, **kwargs) -> 'plotly.graph_objects.Figure':
 		"""Plot an interaction punchcard for a set of poses, see :func:`hippo.plotting.plot_residue_interactions`"""
 		from .plotting import plot_residue_interactions
 		return plot_residue_interactions(self, poses=poses, residue_number=residue_number, **kwargs)
 
-	def plot_compound_availability(self, compounds=None, **kwargs):
+	def plot_compound_availability(self, compounds=None, **kwargs) -> 'plotly.graph_objects.Figure':
 		"""Plot a bar chart of compound availability by supplier/catalogue, see :func:`hippo.plotting.plot_compound_availability`"""
 		from .plotting import plot_compound_availability
 		return plot_compound_availability(self, compounds=compounds, **kwargs)
 
-	def plot_compound_price(self, min_amount, compounds=None, plot_lead_time=False, style='histogram', **kwargs):
+	def plot_compound_price(self, min_amount, compounds=None, plot_lead_time=False, style='histogram', **kwargs) -> 'plotly.graph_objects.Figure':
 		"""Plot a bar chart of minimum compound price for a given minimum amount, see :func:`hippo.plotting.plot_compound_price`"""
 		from .plotting import plot_compound_price
 		return plot_compound_price(self, min_amount=min_amount, compounds=compounds, style=style, **kwargs)
 
-	def plot_reaction_funnel(self, **kwargs):
+	def plot_reaction_funnel(self, **kwargs) -> 'plotly.graph_objects.Figure':
 		"""Plot a funnel chart of the reactants, intermediates, and products across the whole dataset, see :func:`hippo.plotting.plot_reaction_funnel`"""
 		from .plotting import plot_reaction_funnel
 		return plot_reaction_funnel(self, **kwargs)
+
+	def plot_pose_interactions(self, pose: 'Pose') -> 'plotly.graph_objects.Figure':
+		"""3d figure showing the interactions between a :class:`.Pose` and the protein. see :func:`hippo.plotting.plot_pose_interactions`"""
+		from .plotting import plot_pose_interactions
+		return plot_pose_interactions(self, **kwargs)
+
 	
 	### OTHER
 

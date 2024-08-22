@@ -188,68 +188,36 @@ def plot_interaction_punchcard(animal, poses=None, subtitle=None, opacity=1.0, g
 	"""
 
 	import plotly
-
-	plot_data = []
-
-	categoryarray = {}
-
-	if ignore_chains:
-		x = 'res_name_number_str'
-	else:
-		x = 'chain_res_name_number_str'
+	from .pset import PoseTable
 
 	poses = poses or animal.poses
-	
-	logger.var('poses', poses)
 
-	for pose in poses:
-
-		fingerprint = pose.fingerprint
-
-		if not fingerprint:
-			continue
-
-		# loop over each interaction in the pose
-		for key, value in fingerprint.items():
-			if not value:
-				continue
-			
-			data = dict(str=key,count=value)
-
-			f = animal.db.get_feature(id=key)
-
-			data['id'] = f.id
-			data['family'] = f.family
-			data['residue_name'] = f.residue_name
-			data['residue_number'] = f.residue_number
-			data['chain_name'] = f.chain_name
-			data['atom_names'] = f.atom_names
-			
-			data['pose_name'] = pose.name
-			data['pose_id'] = str(pose)
-
-			# data['chain_res_name_number_str'] = f.chain_res_name_number_str
-			data[x] = getattr(f, x)
-
-			if data[x] not in categoryarray:
-				if ignore_chains:
-					categoryarray[data[x]] = (data[x], f.residue_number)
-				else:
-					categoryarray[data[x]] = (data[x], f.chain_name, f.residue_number)
-
-			plot_data.append(data)
-
-	plot_df = pd.DataFrame(plot_data)
-
-	if not len(plot_df):
-		logger.error('Plotting data is empty. Are the poses fingerprinted?')
-		return None
-
-	# plot_df = plot_df.sort_values([group, 'chain_name', 'residue_number'])]
-	if ignore_chains:
-		plot_df = plot_df.sort_values([group, x, 'residue_number'])
+	if isinstance(poses, PoseTable):
+		iset = animal.interactions
 	else:
-		plot_df = plot_df.sort_values([group, x, 'chain_name', 'residue_number'])
+		iset = poses.interactions
+
+	logger.var('#poses',len(poses))
+	logger.var('#interactions',len(iset))
+
+	plot_data = iset.df
+
+	name_lookup = poses.id_name_dict
+
+	names = []
+	for pose_id in plot_data['pose_id'].values:
+		names.append(name_lookup[pose_id])
+	plot_data['pose_name'] = names
+
+	if ignore_chains:
+		x = 'res_name_number'
+		plot_data[x] = plot_data[['residue_name', 'residue_number']].agg(lambda x: ' '.join([str(i) for i in x]), axis=1)
+		plot_data = plot_data.sort_values([group, x, 'residue_number'])
+		sort_key = lambda x: x[1]
+	else:
+		x = 'chain_res_name_number_str'
+		plot_data[x] = plot_data[['chain_name', 'residue_name', 'residue_number']].agg(lambda x: ' '.join([str(i) for i in x]), axis=1)
+		sort_key = lambda x: (x[2], x[1])
 
 	title = 'Interaction Punch-Card'
 
@@ -258,19 +226,18 @@ def plot_interaction_punchcard(animal, poses=None, subtitle=None, opacity=1.0, g
 	else:
 		title = f'<b>{animal.name}</b>: {title}'
 
-	fig = px.scatter(plot_df, x=x, y='family',marginal_x='histogram',marginal_y='histogram', hover_data=plot_df.columns, color=group, title=title)
-	
+	fig = px.scatter(plot_data, x=x, y='type',marginal_x='histogram',marginal_y='histogram', hover_data=plot_data.columns, color=group, title=title)
+
 	fig.update_layout(title=title,title_automargin=False, title_yref='container')
 
 	fig.update_layout(xaxis_title='Residue', yaxis_title='Feature Family')
 
-	if ignore_chains:
-		categoryarray = sorted([v for v in categoryarray.values()], key=lambda x: x[1])
-	else:
-		categoryarray = sorted([v for v in categoryarray.values()], key=lambda x: (x[1], x[2]))
-		
+	# x-axis sorting
+	categoryarray = plot_data[[x, 'residue_number', 'chain_name']].agg(tuple, axis=1)		
+	categoryarray = sorted([v for v in categoryarray.values], key=sort_key)
 	categoryarray = [v[0] for v in categoryarray]
 
+	# sort axes
 	fig.update_xaxes(categoryorder='array', categoryarray=categoryarray)
 	fig.update_yaxes(categoryorder='category descending')
 
@@ -285,8 +252,8 @@ def plot_interaction_punchcard(animal, poses=None, subtitle=None, opacity=1.0, g
 	fig.update_layout(barmode='stack')
 	fig.update_layout(scattermode='group', scattergap=0.75)
 
-	# return add_hippo_logo(fig, in_plot=False)
 	return add_punchcard_logo(fig)
+
 
 @hippo_graph
 def plot_residue_interactions(animal, poses, residue_number, subtitle=None, chain=None, target=1):
@@ -1128,39 +1095,52 @@ def plot_reaction_funnel(animal, title=None, subtitle=None):
 HIPPO_LOGO_URL = 'https://raw.githubusercontent.com/mwinokan/HIPPO/main/logos/hippo_logo_tightcrop.png'
 HIPPO_HEAD_URL = 'https://raw.githubusercontent.com/mwinokan/HIPPO/main/logos/hippo_assets-02.png'
 
-def plot_pose_interactions(animal, pose):
+def plot_pose_interactions(animal: 'HIPPO', 
+	pose: 'Pose'
+) -> 'plotly.graph_objects.Figure':
+
+	"""3d figure showing the interactions between a :class:`.Pose` and the protein. In a Jupyter notebook this figure may be unusable, instead write it as a HTML file and open it in your browser:
+
+	::
+
+		import molparse as mp
+		fig = animal.plot_pose_interactions(pose)
+		mp.write(f'{pose}_interactions.html', fig)
+
+	:param pose: the :class:`.Pose` whose interactions are to be rendered
+
+	""" 
 
 	import molparse as mp
 
 	# get interactions
-
 	iset = pose.interactions
 
-	# iset.summary()
-
+	# get the protein
 	protein = pose.protein_system
 
 	# get interacting residues
-
 	pairs = iset.residue_number_chain_pairs
 
 	# get residues
-
 	residues = []
-
 	for resnum, chain in pairs:
 		residues.append(protein.get_chain(chain).residues[f'n{resnum}'])
 
+	# get ligand
 	lig_group = mp.rdkit.mol_to_AtomGroup(pose.mol)
 
+	# create the combined plotting group
 	plot_group = mp.AtomGroup.from_any(str(pose), residues + [lig_group])
 
+	# interaction labels and vectors
 	labels = []
 	extras = []
 	for interaction in iset:
 		extras.append([interaction.prot_coord, interaction.lig_coord])
 		labels.append(interaction.description)
 
+	# create the figure
 	fig = plot_group.plot3d(show=False, extra=extras, extra_labels=labels)
 
 	return fig

@@ -23,6 +23,7 @@ class Interaction:
 		prot_coord: str,
 		lig_coord: str,
 		distance: float,
+		angle: float,
 		energy: float | None,
 	) -> 'Interaction':
 
@@ -38,6 +39,7 @@ class Interaction:
 		self._prot_coord = json.loads(prot_coord)
 		self._lig_coord = json.loads(lig_coord)
 		self._distance = distance
+		self._angle = angle
 		self._energy = energy
 
 		# placeholders
@@ -103,6 +105,10 @@ class Interaction:
 		return self._distance
 
 	@property
+	def angle(self):
+		return self._angle
+
+	@property
 	def energy(self):
 		return self._energy
 
@@ -118,7 +124,10 @@ class Interaction:
 
 	@property
 	def description(self):
-		return f'{self.type} [{self.feature.chain_res_name_number_str}] {self.distance:.1f} Å'
+		s = f'{self.type} [{self.feature.chain_res_name_number_str}] {self.distance:.1f} Å'
+		if self.angle:
+			s += f', {self.angle:.1f} degrees'
+		return s
 	
 	### METHODS
 
@@ -133,6 +142,7 @@ class Interaction:
 		logger.var('prot_coord', self.prot_coord)
 		logger.var('lig_coord', self.lig_coord)
 		logger.var('distance', self.distance)
+		logger.var('angle', self.angle)
 		logger.var('energy', self.energy)
 
 

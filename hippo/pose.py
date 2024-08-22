@@ -17,23 +17,17 @@ logger = logging.getLogger('HIPPO')
 
 from molparse.rdkit.features import FEATURE_FAMILIES, COMPLEMENTARY_FEATURES, INTERACTION_TYPES
 
-CUTOFF_PADDING = 0.0
-
-FEATURE_PAIR_CUTOFFS = {
-	'Donor Acceptor': 3.5 + CUTOFF_PADDING,
-	'Acceptor Donor': 3.5 + CUTOFF_PADDING,
-	'NegIonizable PosIonizable': 4.5 + CUTOFF_PADDING,
-	'PosIonizable NegIonizable': 4.5 + CUTOFF_PADDING,
-	'Aromatic PosIonizable': 4.5 + CUTOFF_PADDING,
-	'PosIonizable Aromatic': 4.5 + CUTOFF_PADDING,
-	'Aromatic Aromatic': 6.0 + CUTOFF_PADDING,
-	'Hydrophobe Hydrophobe': 4.5 + CUTOFF_PADDING,
-	'LumpedHydrophobe Hydrophobe': 4.5 + CUTOFF_PADDING,
-	'Hydrophobe LumpedHydrophobe': 4.5 + CUTOFF_PADDING,
-	'LumpedHydrophobe LumpedHydrophobe': 4.5 + CUTOFF_PADDING,
+INTERACTION_CUTOFF = {
+	"Hydrophobic": 4.5,
+	"Hydrogen Bond": 3.5,
+	"Electrostatic": 4.5,
+	"π-stacking": 6.0,
+	"π-cation": 4.5,
 }
 
-PI_STACK_MIN_CUTOFF = 3.8 + CUTOFF_PADDING
+PI_STACK_MIN_CUTOFF = 3.8
+PI_STACK_F2F_CUTOFF = 4.5
+PI_STACK_E2F_CUTOFF = 6.0
 
 class Pose:
 
@@ -564,11 +558,55 @@ class Pose:
 
 	def calculate_interactions(self, 
 		resolve: bool = True,
+		distance_padding: float = 0.0,
+		angle_padding: float = 0.0,
 		force: bool = False,
 		debug: bool = False,
+		commit: bool = True,
 	) -> None:
 
+		"""Enumerate all valid interactions between this ligand and the protein
+
+		:param resolve: Cull duplicate / less-significant interactions
+		:param distance_padding: Apply a padding in Angstrom to all distance cutoffs
+		:param angle_padding: Apply a padding in degrees to all angle cutoffs
+		:param force: Force a recalculation even if the pose has already been fingerprinted
+		:param debug: Increase verbosity for debugging
+		:param commit: commit the changes to the database (Default value = True)
+
+		"""
+
 		if not self.has_fingerprint or force:
+		
+			def norm(coords):
+				import numpy as np
+				coords = np.array(coords).T
+				cov = np.cov(coords)
+				eig = np.linalg.eig(cov)
+				vec = eig[1][:,0]
+				return vec
+
+			def unit_vector(vector):
+				""" Returns the unit vector of the vector.  """
+				return vector / np.linalg.norm(vector)
+
+			def angle_between(v1, v2):
+				""" Returns the angle in radians between vectors 'v1' and 'v2'::
+
+						>>> angle_between((1, 0, 0), (0, 1, 0))
+						1.5707963267948966
+						>>> angle_between((1, 0, 0), (1, 0, 0))
+						0.0
+						>>> angle_between((1, 0, 0), (-1, 0, 0))
+						3.141592653589793
+				"""
+				v1_u = unit_vector(v1)
+				v2_u = unit_vector(v2)
+				a = 180*np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))/np.pi
+
+				if a > 90:
+					a = 180 - a
+				return a
 
 			# calculate interactions...
 
@@ -646,22 +684,23 @@ class Pose:
 
 					complementary_comp_features = comp_features_by_family[complementary_family]
 
-					cutoff = FEATURE_PAIR_CUTOFFS[f'{prot_family} {complementary_family}']
-
 					for lig_feature in complementary_comp_features:
 
 						distance = np.linalg.norm(lig_feature - prot_coord)
+						angle = None
 
-						# if prot_feature.family == 'Aromatic':
-						# 	print(prot_feature.residue_name, prot_feature.residue_number, prot_feature.chain_name, prot_feature.family, lig_feature, distance)
-
-						if distance > cutoff:
+						# check distance cutoff
+						if distance > INTERACTION_CUTOFF[interaction_type] + distance_padding:
 							continue
-
-						if interaction_type == 'π-stacking':
-
+							
+						# special rules for aromatics
+						if interaction_type.startswith('π'):
 							lig_coords = [self.mol.GetConformer().GetAtomPosition(i-1) for i in lig_feature.atom_numbers]
 
+						# special rules for pi-stacking
+						if interaction_type == 'π-stacking':
+
+							# calculate minimum distance
 							min_distance = None
 							for lig_coord in lig_coords:
 								for p_coord in prot_coords:
@@ -669,15 +708,50 @@ class Pose:
 									if not min_distance or d < min_distance:
 										min_distance = d
 
-							if min_distance > PI_STACK_MIN_CUTOFF:
+							# skip interaction if no atom is within PI_STACK_MIN_CUTOFF
+							if min_distance > PI_STACK_MIN_CUTOFF + distance_padding:
 								if debug:
 									print(f'skipping {prot_feature} due to pi-stack min_distance')
 									print(prot_feature.residue_name, prot_feature.residue_number, prot_feature.chain_name, prot_feature.family, lig_feature, distance)
 								continue
 
+							### angles
+							lig_norm = norm([list(p) for p in lig_coords])
+							prot_norm = norm(prot_coords)
+							angle = angle_between(lig_norm, prot_norm)
+
+							# Face to Face has more stringent restraints
+							if angle < 40 - angle_padding and distance > PI_STACK_F2F_CUTOFF + distance_padding:
+								if debug:
+									print(prot_feature.res_name_number_family_str)
+									print(angle, distance)
+								continue
+						
+						# special rules for pi-cation
+						elif interaction_type == 'π-cation':
+
+							# construct vectors
+							if prot_family == 'Aromatic':
+								aromatic_norm = norm(prot_coords)
+								cation_vec = lig_feature.position - prot_coord
+							else:
+								aromatic_norm = norm([list(p) for p in lig_coords])
+								cation_vec = prot_coord - lig_feature.position
+
+							# calculate angle
+							angle = angle_between(aromatic_norm, cation_vec)
+
+							# skip if angle too large
+							if angle > 30 + angle_padding:
+								if debug:
+									print(prot_feature.res_name_number_family_str)
+									print(angle, distance)
+								continue
+
 						if debug:
 							print(prot_feature, lig_feature)
 
+						# insert into the Database
 						self.db.insert_interaction(
 							feature=prot_feature.id,
 							pose=self.id,
@@ -687,6 +761,7 @@ class Pose:
 							prot_coord=prot_coord,
 							lig_coord=lig_feature.position,
 							distance=distance,
+							angle=angle,
 							energy=None,
 						)
 

@@ -284,7 +284,7 @@ class PoseSet:
 	def id_name_dict(self) -> dict:
 		"""Return a dictionary mapping pose ID's to their name"""
 
-		records = self.db.select_where(table=self.table, query='pose_id, pose_inchikey, pose_alias', key=f'id IN {self.str_ids}', multiple=True)
+		records = self.db.select_where(table=self.table, query='pose_id, pose_inchikey, pose_alias', key=f'pose_id IN {self.str_ids}', multiple=True)
 
 		lookup = {}
 		for i,inchikey,alias in records:
