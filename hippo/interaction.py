@@ -6,8 +6,12 @@ logger = logging.getLogger('HIPPO')
 
 class Interaction:
 
-	"""
-	Interaction class
+	"""A :class:`.Interaction` represents an interaction between an rdkit Feature on a :class:`.Pose` and a :class:`.Feature` on the protein :class:`.Target`.
+	
+	.. attention::
+	
+		:class:`.Interaction` objects should not be created directly. Instead use :meth:`.Pose.interactions`, or :meth:`.PoseSet.interactions` methods.
+
 	"""
 
 	_table = 'interaction'
@@ -25,7 +29,7 @@ class Interaction:
 		distance: float,
 		angle: float,
 		energy: float | None,
-	) -> 'Interaction':
+	) -> None:
 
 		import json
 
@@ -48,72 +52,85 @@ class Interaction:
 
 		self._db = db
 		
-	### FACTORIES
-
 	### PROPERTIES
 
 	@property
-	def id(self):
+	def id(self) -> int:
+		"""Returns the interaction's database ID"""
 		return self._id
 
 	@property
-	def table(self):
+	def table(self) -> str:
+		"""Returns the name of the :class:`.Database` table"""
 		return self._table
 
 	@property
-	def db(self):
+	def db(self) -> 'Database':
+		"""Returns a pointer to the parent database"""
 		return self._db
 
 	@property
-	def family(self):
+	def family(self) -> str:
+		"""The Feature family"""
 		return self._family
 
 	@property
-	def pose_id(self):
+	def pose_id(self) -> int:
+		"""Returns the associated :class:`.Pose`'s database ID"""
 		return self._pose_id
 
 	@property
-	def pose(self):
+	def pose(self) -> 'Pose':
+		"""Returns the associated :class:`.Pose`'s object"""
 		if not self._pose:
 			self._pose = self.db.get_pose(id=self.pose_id)
 		return self._pose
 	
 	@property
-	def feature_id(self):
+	def feature_id(self) -> int:
+		"""Returns the associated :class:`.Feature`'s database ID"""
 		return self._feature_id
 
 	@property
-	def feature(self):
+	def feature(self) -> 'Feature':
+		"""Returns the associated :class:`.Feature`'s object"""
 		if not self._feature:
 			self._feature = self.db.get_feature(id=self.feature_id)
 		return self._feature
 
 	@property
-	def atom_ids(self):
+	def atom_ids(self) -> list[int]:
+		"""Returns the indices of atoms making up the ligand feature"""
 		return self._atom_ids
 
 	@property
-	def prot_coord(self):
+	def prot_coord(self) -> list[float]:
+		"""Returns the cartesian position of the protein :class:`.Feature`"""
 		return self._prot_coord
 
 	@property
-	def lig_coord(self):
+	def lig_coord(self) -> list[float]:
+		"""Returns the cartesian position of the ligand feature"""
 		return self._lig_coord
 
 	@property
-	def distance(self):
+	def distance(self) -> float:
+		"""Returns the euclidian distance of the interaction"""
 		return self._distance
 
 	@property
-	def angle(self):
+	def angle(self) -> float | None:
+		"""Returns the interaction angle (only defined for π-stacking and π-cation interactions)"""
 		return self._angle
 
 	@property
-	def energy(self):
+	def energy(self) -> float | None:
+		"""Returns the interaction energy, if defined"""
 		return self._energy
 
 	@property
-	def family_str(self):
+	def family_str(self) -> str:
+		"""String of the two feature families"""
 		return f'{repr(self.feature)} ~ {self.family}'
 
 	@property
@@ -123,7 +140,8 @@ class Interaction:
 		return INTERACTION_TYPES[(self.feature.family, self.family)]
 
 	@property
-	def description(self):
+	def description(self) -> str:
+		"""One line description of this interaction"""
 		s = f'{self.type} [{self.feature.chain_res_name_number_str}] {self.distance:.1f} Å'
 		if self.angle:
 			s += f', {self.angle:.1f} degrees'
@@ -131,7 +149,8 @@ class Interaction:
 	
 	### METHODS
 
-	def summary(self):
+	def summary(self) -> None:
+		"""Print a summary of this interaction's properties"""
 		
 		logger.header(f'Interaction {self.id}')
 		
@@ -150,9 +169,8 @@ class Interaction:
 
 	def __str__(self) -> str:
 		"""Plain string representation"""
-		# return f'P{self.pose_id} -> I{self.id} ({self.family}) {self.feature}'
 		return f'I{self.id}'
 
-	def __repr__(self):
+	def __repr__(self) -> str:
 		"""Formatted string representation"""
 		return f'{mcol.bold}{mcol.underline}{str(self)}{mcol.unbold}{mcol.ununderline}'

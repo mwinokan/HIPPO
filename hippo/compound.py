@@ -253,6 +253,7 @@ class Compound:
 	
 	@property
 	def table(self):
+		"""Returns the name of the :class:`.Database` table"""
 		return self._table
 	
 	

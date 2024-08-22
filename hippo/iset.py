@@ -6,6 +6,14 @@ logger = logging.getLogger('HIPPO')
 
 class InteractionTable:
 
+	"""Class representing all :class:`.Interaction` objects in the 'interaction' table of the :class:`.Database`.
+
+	.. attention::
+
+		:class:`.InteractionTable` objects should not be created directly. Instead use the :meth:`.HIPPO.interactions` property.
+
+	"""
+
 	_table = 'interaction'
 
 	def __init__(self, 
@@ -46,12 +54,18 @@ class InteractionTable:
 	### DUNDERS
 
 	def __len__(self) -> int:
+		"""The total number of interactions"""
 		return self.db.count(self.table)
 
 
 class InteractionSet:
 
-	"""
+	"""Class representing a subset of the :class:`.Interaction` objects in the 'interaction' table of the :class:`.Database`.
+
+	.. attention::
+
+		:class:`.InteractionSet` objects should not be created directly. Instead use :meth:`.Pose.interactions`, or :meth:`.PoseSet.interactions` methods.
+
 	"""
 
 	_table = 'interaction'
@@ -59,7 +73,7 @@ class InteractionSet:
 	def __init__(self,
 		db: 'Database',
 		indices: list = None,
-	):
+	) -> None:
 
 		self._db = db
 
@@ -80,6 +94,13 @@ class InteractionSet:
 	def from_pose(cls, 
 		pose: 'Pose | PoseSet',
 	) -> 'InteractionSet':
+
+		"""Construct a :class:`.InteractionSet` from one or more poses.
+
+		:param pose: a :class:`.Pose` or :class:`.PoseSet` object
+		:returns: an :class:`.InteractionSet`
+
+		"""
 
 		self = cls.__new__(cls)
 
@@ -162,10 +183,12 @@ class InteractionSet:
 
 	@property
 	def indices(self) -> list[int]:
+		"""Returns the ids of interactions in this set"""
 		return self._indices
 
 	@property
 	def ids(self) -> list[int]:
+		"""Returns the ids of interactions in this set"""
 		return self._indices
 
 	@property
@@ -205,7 +228,8 @@ class InteractionSet:
 		return self._df
 	
 	@property
-	def residue_number_chain_pairs(self) -> list[int]:
+	def residue_number_chain_pairs(self) -> list[tuple[int]]:
+		"""Get a list of ``(residue_number, chain_name)`` tuples"""
 
 		sql = f"""
 		SELECT DISTINCT feature_residue_number, feature_chain_name FROM interaction
@@ -215,8 +239,6 @@ class InteractionSet:
 		"""
 
 		return self.db.execute(sql).fetchall()
-
-		# return [n,c for n,c in records]
 
 	### METHODS
 
@@ -253,7 +275,11 @@ class InteractionSet:
 		debug: bool = False,
 	) -> 'InteractionSet':
 
-		"""Resolve into predicted key interactions"""
+		"""Resolve into predicted key interactions. In place modification.
+
+		:param debug: Increased verbosity for debugging (Default value = False)
+		:returns: a filtered :class:`.InteractionSet`
+		"""
 
 		keep_list = []
 
@@ -326,10 +352,6 @@ class InteractionSet:
 		WHERE interaction_id IN {self.str_ids}
 		AND interaction_type = "Hydrophobic"
 		"""
-		# SELECT interaction_id, MIN(interaction_distance)
-		# INNER JOIN feature
-		# ON feature_id = interaction_feature
-		# GROUP BY interaction_atom_ids, feature_residue_number, feature_chain_name
 
 		records = self.db.execute(sql).fetchall()
 		ids = [a for a,b in records]
@@ -441,8 +463,6 @@ class InteractionSet:
 		if debug:
 			self.summary()
 
-	# 	raise NotImplementedError
-
 	### DUNDERS
 
 	def __len__(self) -> int:
@@ -450,6 +470,7 @@ class InteractionSet:
 		return len(self.indices)
 
 	def __repr__(self) -> str:
+		"""Formatted command-line representation"""
 		return f'{mcol.bold}{mcol.underline}''{'f'I x {len(self)}''}'f'{mcol.unbold}{mcol.ununderline}'
 
 	def __iter__(self):
@@ -475,6 +496,8 @@ def df_from_interaction_records(
 	db: 'Database',
 	records: list[tuple],
 ) -> 'pandas.DataFrame':
+	
+	"""Construct a dataframe from the 'interaction' table records"""
 
 	import json
 	from pandas import DataFrame
