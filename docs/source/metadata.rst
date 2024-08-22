@@ -4,9 +4,6 @@ Metadata
 .. autoclass:: hippo.metadata.MetaData
     :members:
 
-.. autoclass:: hippo.feature.Feature
-    :members:
-
 .. autoclass:: hippo.tags.TagTable
     :members:
 

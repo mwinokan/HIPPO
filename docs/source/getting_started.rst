@@ -3,7 +3,7 @@
 Getting started with HIPPO
 ==========================
 
-To create a HIPPO database or interface with an existing one, create a :class:`.HIPPO` 'animal' object:
+To create a HIPPO database or interface with an existing one, create a :class:`.HIPPO` `'animal'` object:
 
 ::
 
@@ -27,11 +27,15 @@ Loading crystallographic hits from Fragalysis
 		aligned_directory='/path/to/aligned_files',
 	)
 
-*N.B. all poses loaded into a HIPPO database only have an absolute path stored to the original file - they are not copied! It is your responsibility that their original files remain accessible.*
+.. attention::
+
+	N.B. all poses loaded into a HIPPO database only have an absolute path stored to the original file - they are not copied! It is your responsibility to ensure that their original files remain accessible.
 
 
 Navigating compounds and poses
 ==============================
+
+The below sections explain how to work with :class:`.Compound` objects and sets thereof. For further details on the concept of :class:`.Compound` objects and others see :doc:`definitions`.
 
 Getting compounds/poses
 -----------------------
@@ -61,11 +65,11 @@ Additionally you can get compounds by their tag:
 
 ::
 	
-	hits = animal.compounds.get_by_tag('hits')
+	hits = animal.compounds(tag='hits')
 
-See also the :doc:`tools for structure-based searching<queries>`
+.. See also the :doc:`tools for structure-based searching<queries>`
 
-Equivalent methods exist for animal.poses (returns a :class:`PoseTable`), animal.reactions (returns a :class:`.ReactionSet`), and animal.tags returns a :class:`TagTable`).
+Equivalent methods exist for animal.poses (returns a :class:`PoseTable`), animal.reactions (returns a :class:`.ReactionTable`), animal.interactions (returns a :class:`.InteractionTable`), and animal.tags returns a :class:`TagTable`). See also the :doc:`api_reference` pages. 
 
 Inspecting a compound and its poses
 -----------------------------------
@@ -125,12 +129,43 @@ Interactions fingerprinted as follows:
 	from tqdm import tqdm
 
 	for pose in tqdm(animal.poses):
-		pose.calculate_fingerprint()
+		pose.calculate_interactions()
 
 *N.B. tqdm just gives you a nice progress bar*
 
-Interaction fingerprints can be visualised with a 'punchcard':
+Interaction fingerprints can be visualised with a 'punchcard', per-residue histogram, or viewed individually for a :class:`.Pose`.
+
+Interaction Punchcard
+---------------------
 
 ::
 
-	animal.plot_interaction_punchcard(poses=animal.poses.get_by_tag('hits'), subtitle='hits', group='pose_name')
+	animal.plot_interaction_punchcard(poses=animal.poses(tag='hits'), subtitle='hits', group='pose_name')
+
+See also :func:`.plotting.plot_interaction_punchcard`.
+
+Interactions by residue
+-----------------------
+
+::
+
+	animal.plot_residue_interactions(poses=animal.poses(tag='hits'), residue_number=123, chain='A', subtitle='hits')
+
+See also :func:`.plotting.plot_residue_interactions`.
+
+Interactions of a single Pose
+-----------------------------
+
+This will create an HTML file you can open in your browser.
+
+::
+
+	import molparse as mp
+	pose = animal.poses[1]
+	fig = animal.plot_pose_interactions(pose=pose)
+	mp.write(f'{pose}_interactions.html', fig)
+
+This method of writing to an HTML file works for all the above figures.
+
+See also :func:`.plotting.plot_pose_interactions`.
+

@@ -10,10 +10,12 @@ API Reference
    animal
    compounds
    poses
+   interactions
    reactions
    quoting
+   recipes
    metadata
+   plotting
    db
-
-
+   
 
