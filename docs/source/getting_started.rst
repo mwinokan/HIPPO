@@ -156,7 +156,11 @@ See also :func:`.plotting.plot_residue_interactions`.
 Interactions of a single Pose
 -----------------------------
 
-This will create an HTML file you can open in your browser.
+This will create an HTML file you can open in your browser:
+
+.. image:: ../images/plot_pose_interactions.png
+  :width: 900
+  :alt: plot_pose_interactions
 
 ::
 
