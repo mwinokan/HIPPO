@@ -17,22 +17,26 @@ class Interaction:
 		id: int,
 		feature_id: int,
 		pose_id: int,
+		type: str,
 		family: str,
-		atom_ids: list[int],
-		prot_coord: list[float],
-		lig_coord: list[float],
+		atom_ids: str,
+		prot_coord: str,
+		lig_coord: str,
 		distance: float,
 		energy: float | None,
 	) -> 'Interaction':
+
+		import json
 
 		# from interaction table
 		self._id = id
 		self._feature_id = feature_id
 		self._pose_id = pose_id
+		self._type = type
 		self._family = family
-		self._atom_ids = atom_ids
-		self._prot_coord = prot_coord
-		self._lig_coord = lig_coord
+		self._atom_ids = json.loads(atom_ids)
+		self._prot_coord = json.loads(prot_coord)
+		self._lig_coord = json.loads(lig_coord)
 		self._distance = distance
 		self._energy = energy
 
@@ -111,6 +115,10 @@ class Interaction:
 		"""Interaction type string"""
 		from molparse.rdkit.features import INTERACTION_TYPES
 		return INTERACTION_TYPES[(self.feature.family, self.family)]
+
+	@property
+	def description(self):
+		return f'{self.type} [{self.feature.chain_res_name_number_str}] {self.distance:.1f} Å'
 	
 	### METHODS
 

@@ -376,6 +376,7 @@ class Database:
 			interaction_id INTEGER PRIMARY KEY,
 			interaction_feature INTEGER NOT NULL,
 			interaction_pose INTEGER NOT NULL,
+			interaction_type TEXT NOT NULL,
 			interaction_family TEXT NOT NULL,
 			interaction_atom_ids TEXT NOT NULL,
 			interaction_prot_coord TEXT NOT NULL,
@@ -1057,6 +1058,7 @@ class Database:
 		*,
 		feature: Feature | int,
 		pose: Pose | int,
+		type: str,
 		family: str,
 		atom_ids: list[int],
 		prot_coord: list[float],
@@ -1071,6 +1073,7 @@ class Database:
 		
 		:param feature: associated :class:`.Feature` object or ID
 		:param pose: associated :class:`.Pose` object or ID
+		:param type: interaction type
 		:param family: ligand feature type
 		:param atom_ids: atom indices of ligand feature
 		:param prot_coord: ``[x,y,z]`` coordinate of protein feature
@@ -1090,8 +1093,9 @@ class Database:
 		if isinstance(pose, Pose):
 			pose = pose.id
 
-		from molparse.rdkit.features import FEATURE_FAMILIES
+		from molparse.rdkit.features import FEATURE_FAMILIES, INTERACTION_TYPES
 		assert family in FEATURE_FAMILIES, f'Unsupported {family=}'
+		assert type in INTERACTION_TYPES.values(), f'Unsupported {type=}'
 
 		assert isinstance(atom_ids, list), f'Unsupported {atom_ids=}'
 		assert not any([not isinstance(i, int) for i in atom_ids]), f'Unsupported {atom_ids=}' 
@@ -1124,6 +1128,7 @@ class Database:
 		INSERT INTO interaction(
 			interaction_feature,
 			interaction_pose,
+			interaction_type,
 			interaction_family,
 			interaction_atom_ids,
 			interaction_prot_coord,
@@ -1131,15 +1136,16 @@ class Database:
 			interaction_distance,
 			interaction_energy
 		)
-		VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+		VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
 		"""
 
 		try:
-			self.execute(sql, (feature, pose, family, atom_ids, prot_coord, lig_coord, distance, energy))
+			self.execute(sql, (feature, pose, type, family, atom_ids, prot_coord, lig_coord, distance, energy))
 
 		except sqlite3.IntegrityError as e:
 			if warn_duplicate:
-				logger.warning(f"Skipping existing interaction: {(feature, pose, family, atom_ids, prot_coord, lig_coord, distance, energy)}")
+				# logger.warning(f"Skipping existing interaction: {(feature, pose, family, atom_ids, prot_coord, lig_coord, distance, energy)}")
+				logger.warning(f"Skipping existing interaction: {feature=} {pose=} {family=} {atom_ids=}")
 			return None
 
 		except Exception as e:
@@ -1818,13 +1824,14 @@ class Database:
 
 		result = self.select_all_where(table='interaction', key='id', value=id)
 
-		id, feature_id, pose_id, family, atom_ids, prot_coord, lig_coord, distance, energy = result
+		id, feature_id, pose_id, type, family, atom_ids, prot_coord, lig_coord, distance, energy = result
 
 		return Interaction(
 			db=self,
 			id=id,
 			feature_id=feature_id,
 			pose_id=pose_id,
+			type=type,
 			family=family,
 			atom_ids=atom_ids,
 			prot_coord=prot_coord,

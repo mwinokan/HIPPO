@@ -149,14 +149,14 @@ class InteractionSet:
 		if not self._df:
 			import json
 			from pandas import DataFrame
-			from molparse.rdkit.features import INTERACTION_TYPES
+			# from molparse.rdkit.features import INTERACTION_TYPES
 
 			records = self.db.select_all_where(table='interaction', key=f'interaction_id IN {self.str_ids}', multiple=True)
 
 			data = []
 			for record in records:
 
-				id, feature_id, pose_id, family, atom_ids, prot_coord, lig_coord, distance, energy = record
+				id, feature_id, pose_id, type, family, atom_ids, prot_coord, lig_coord, distance, energy = record
 				
 				feature = self.db.get_feature(id=feature_id)
 				
@@ -166,7 +166,8 @@ class InteractionSet:
 				d['pose_id'] = pose_id
 				d['target_id'] = feature.target
 				
-				d['type'] = INTERACTION_TYPES[(feature.family, family)]
+				# d['type'] = INTERACTION_TYPES[(feature.family, family)]
+				d['type'] = type
 				
 				d['prot_family'] = feature.family
 				d['lig_family'] = family
@@ -192,11 +193,25 @@ class InteractionSet:
 		
 		return self._df
 	
+	@property
+	def residue_number_chain_pairs(self) -> list[int]:
 
+		sql = f"""
+		SELECT DISTINCT feature_residue_number, feature_chain_name FROM interaction
+		INNER JOIN feature
+		ON feature_id = interaction_feature
+		WHERE interaction_id IN {self.str_ids}
+		"""
+
+		return self.db.execute(sql).fetchall()
+
+		# return [n,c for n,c in records]
 
 	### METHODS
 
-	def summary(self) -> None:
+	def summary(self,
+		families: bool = False,
+	) -> None:
 		"""Print a summary of this :class:`.InteractionSet`"""
 
 		logger.header(self)
@@ -205,7 +220,12 @@ class InteractionSet:
 			# print(interaction)
 
 			# logger.var(f'{interaction.family_str}', f'{interaction.distance:.1f}')
-			logger.var(f'{interaction.type} [{interaction.feature.chain_res_name_number_str}]', f'{interaction.distance:.1f}', dict(unit='Å', append=interaction.feature.chain_res_name_number_str))
+			s = f'{interaction.type} [{interaction.feature.chain_res_name_number_str}]'
+
+			if families:
+				s += f' {interaction.feature.family} ~ {interaction.family}'
+
+			logger.var(s, f'{interaction.distance:.1f}', dict(unit='Å'))
 
 	def get_classic_fingerprint(self) -> dict:
 		"""Classic HIPPO fingerprint dictionary, mapping protein :class:`.Feature` ID's to the number of corresponding ligand features (from any :class:`.Pose`)"""
@@ -217,6 +237,199 @@ class InteractionSet:
 		""").fetchall()
 
 		return {f:c for f,c in pairs}
+
+	def resolve(self, 
+		debug: bool = True,
+	) -> 'InteractionSet':
+
+		"""Resolve into predicted key interactions"""
+
+		keep_list = []
+
+		### H-Bonds (closest)
+
+		sql = f"""
+		SELECT interaction_id, MIN(interaction_distance)
+		FROM interaction
+		WHERE interaction_id IN {self.str_ids}
+		AND interaction_type = "Hydrogen Bond"
+		GROUP BY interaction_atom_ids
+		"""
+
+		records = self.db.execute(sql).fetchall()
+		ids = [a for a,b in records]
+		keep_list += ids
+
+		### pi-stacking (closest)
+
+		sql = f"""
+		SELECT interaction_id, MIN(interaction_distance)
+		FROM interaction
+		INNER JOIN feature
+		ON feature_id = interaction_feature
+		WHERE interaction_id IN {self.str_ids}
+		AND interaction_type = "π-stacking"
+		GROUP BY feature_atom_names
+		"""
+		# GROUP BY interaction_atom_ids
+
+		records = self.db.execute(sql).fetchall()
+		ids = [a for a,b in records]
+		keep_list += ids
+
+		### pi-cation (closest)
+
+		sql = f"""
+		SELECT interaction_id, MIN(interaction_distance)
+		FROM interaction
+		WHERE interaction_id IN {self.str_ids}
+		AND interaction_type = "π-cation"
+		GROUP BY interaction_atom_ids
+		"""
+		# GROUP BY interaction_atom_ids
+
+		records = self.db.execute(sql).fetchall()
+		ids = [a for a,b in records]
+		keep_list += ids
+
+		### electrostatic (closest)
+
+		sql = f"""
+		SELECT interaction_id, MIN(interaction_distance)
+		FROM interaction
+		WHERE interaction_id IN {self.str_ids}
+		AND interaction_type = "Electrostatic"
+		GROUP BY interaction_atom_ids
+		"""
+		# GROUP BY interaction_atom_ids
+
+		records = self.db.execute(sql).fetchall()
+		ids = [a for a,b in records]
+		keep_list += ids
+
+		### hydrophobic
+
+		sql = f"""
+		SELECT interaction_id, interaction_distance
+		FROM interaction
+		WHERE interaction_id IN {self.str_ids}
+		AND interaction_type = "Hydrophobic"
+		"""
+		# SELECT interaction_id, MIN(interaction_distance)
+		# INNER JOIN feature
+		# ON feature_id = interaction_feature
+		# GROUP BY interaction_atom_ids, feature_residue_number, feature_chain_name
+
+		records = self.db.execute(sql).fetchall()
+		ids = [a for a,b in records]
+		subset = InteractionSet(self.db, ids)
+
+		# aggregate lumped
+
+		hydrophobic_interactions_in_lumped = {}
+		lumped_hydrophobic_in_lumped_lumped = {}
+
+		for interaction in subset:
+			families = (interaction.feature.family, interaction.family)
+			
+			if families == ('LumpedHydrophobe', 'Hydrophobe'):
+				for name in interaction.feature.atom_names.split():
+					key = (name, interaction.atom_ids[0])
+					if key not in hydrophobic_interactions_in_lumped:
+						hydrophobic_interactions_in_lumped[key] = []
+					hydrophobic_interactions_in_lumped[key].append(interaction.id)
+
+			elif families == ('Hydrophobe', 'LumpedHydrophobe'):
+				for atom_id in interaction.atom_ids:
+					key = (interaction.feature.atom_names, atom_id)
+					if key not in hydrophobic_interactions_in_lumped:
+						hydrophobic_interactions_in_lumped[key] = []
+					hydrophobic_interactions_in_lumped[key].append(interaction.id)
+
+			elif families == ('LumpedHydrophobe', 'LumpedHydrophobe'):
+				for name in interaction.feature.atom_names.split():
+					for atom_id in interaction.atom_ids:
+						key = (name, atom_id)
+						if key not in hydrophobic_interactions_in_lumped:
+							hydrophobic_interactions_in_lumped[key] = []
+						hydrophobic_interactions_in_lumped[key].append(interaction.id)
+
+				key = interaction.feature.atom_names
+				lumped_hydrophobic_in_lumped_lumped[key] = tuple(interaction.atom_ids)
+
+		keep_hydrophobic_ids = set(subset.ids)
+		rev_hydrophobic_in_lumped_lumped = {v:k for k,v in lumped_hydrophobic_in_lumped_lumped.items()}
+
+		# modify keep list by those covered in lumped
+
+		for interaction in subset:
+			families = (interaction.feature.family, interaction.family)
+
+			if families == ('Hydrophobe', 'Hydrophobe'):
+				key = (interaction.feature.atom_names, interaction.atom_ids[0])
+
+				if key in hydrophobic_interactions_in_lumped:
+					keep_hydrophobic_ids -= set([interaction.id])
+
+			elif families == ('LumpedHydrophobe', 'Hydrophobe'):
+				
+				key = interaction.feature.atom_names
+
+				if key in lumped_hydrophobic_in_lumped_lumped:
+					atom_id = interaction.atom_ids[0]
+					value = lumped_hydrophobic_in_lumped_lumped[key]
+					if atom_id in value:
+						keep_hydrophobic_ids -= set([interaction.id])
+			
+			elif families == ('Hydrophobe', 'LumpedHydrophobe'):
+				
+				key = tuple(interaction.atom_ids)
+
+				if key in rev_hydrophobic_in_lumped_lumped:
+
+					atom_name = interaction.feature.atom_names
+					value = rev_hydrophobic_in_lumped_lumped[key]
+
+					if atom_name in value:
+						keep_hydrophobic_ids -= set([interaction.id])
+
+		keep_list += list(keep_hydrophobic_ids)
+
+		### cull non-keepers
+
+		cull_list = set(self.ids) - set(keep_list)
+		cull_iset = InteractionSet(self.db, cull_list)
+		self.db.delete_where(table='interaction', key=f'interaction_id IN {cull_iset.str_ids}')
+		self._indices = sorted(list(set(keep_list)))
+
+		### revisit hydrophobes
+
+		# for a given protein feature, choose the closest interaction
+
+		cull_list = []
+
+		hydrophobic_keeper_iset = InteractionSet(self.db, keep_hydrophobic_ids)
+
+		sql = f"""
+		SELECT interaction_id, MIN(interaction_distance)
+		FROM interaction
+		WHERE interaction_id IN {hydrophobic_keeper_iset.str_ids}
+		GROUP BY interaction_feature
+		"""
+
+		records = self.db.execute(sql).fetchall()
+		ids = [a for a,b in records]
+
+		cull_list = set(hydrophobic_keeper_iset.ids) - set(ids)
+		cull_iset = InteractionSet(self.db, cull_list)
+		self.db.delete_where(table='interaction', key=f'interaction_id IN {cull_iset.str_ids}')
+		self._indices = sorted(list(set(keep_list) - cull_list))
+
+		### Summary
+
+		self.summary()
+
+	# 	raise NotImplementedError
 
 	### DUNDERS
 

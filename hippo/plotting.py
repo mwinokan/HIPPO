@@ -314,7 +314,7 @@ def plot_residue_interactions(animal, poses, residue_number, subtitle=None, chai
 	# name_lookup = {i:n for i,n in zip(poses.ids,poses.names)}
 	name_lookup = poses.id_name_dict
 
-	print(name_lookup)
+	# print(name_lookup)
 
 	names = []
 	for pose_id in plot_data['pose_id'].values:
@@ -1127,6 +1127,43 @@ def plot_reaction_funnel(animal, title=None, subtitle=None):
 
 HIPPO_LOGO_URL = 'https://raw.githubusercontent.com/mwinokan/HIPPO/main/logos/hippo_logo_tightcrop.png'
 HIPPO_HEAD_URL = 'https://raw.githubusercontent.com/mwinokan/HIPPO/main/logos/hippo_assets-02.png'
+
+def plot_pose_interactions(animal, pose):
+
+	import molparse as mp
+
+	# get interactions
+
+	iset = pose.interactions
+
+	# iset.summary()
+
+	protein = pose.protein_system
+
+	# get interacting residues
+
+	pairs = iset.residue_number_chain_pairs
+
+	# get residues
+
+	residues = []
+
+	for resnum, chain in pairs:
+		residues.append(protein.get_chain(chain).residues[f'n{resnum}'])
+
+	lig_group = mp.rdkit.mol_to_AtomGroup(pose.mol)
+
+	plot_group = mp.AtomGroup.from_any(str(pose), residues + [lig_group])
+
+	labels = []
+	extras = []
+	for interaction in iset:
+		extras.append([interaction.prot_coord, interaction.lig_coord])
+		labels.append(interaction.description)
+
+	fig = plot_group.plot3d(show=False, extra=extras, extra_labels=labels)
+
+	return fig
 
 def add_hippo_logo(fig, in_plot=True, position='top right'):
 	"""

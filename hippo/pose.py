@@ -15,7 +15,7 @@ from pathlib import Path
 import logging
 logger = logging.getLogger('HIPPO')
 
-from molparse.rdkit.features import FEATURE_FAMILIES, COMPLEMENTARY_FEATURES
+from molparse.rdkit.features import FEATURE_FAMILIES, COMPLEMENTARY_FEATURES, INTERACTION_TYPES
 
 CUTOFF_PADDING = 0.0
 
@@ -30,7 +30,10 @@ FEATURE_PAIR_CUTOFFS = {
 	'Hydrophobe Hydrophobe': 4.5 + CUTOFF_PADDING,
 	'LumpedHydrophobe Hydrophobe': 4.5 + CUTOFF_PADDING,
 	'Hydrophobe LumpedHydrophobe': 4.5 + CUTOFF_PADDING,
+	'LumpedHydrophobe LumpedHydrophobe': 4.5 + CUTOFF_PADDING,
 }
+
+PI_STACK_MIN_CUTOFF = 3.8 + CUTOFF_PADDING
 
 class Pose:
 
@@ -78,7 +81,9 @@ class Pose:
 
 		self._has_fingerprint = False
 
-		if not isinstance(fingerprint, int):
+		if fingerprint is None:
+			self._has_fingerprint = False
+		elif not isinstance(fingerprint, int):
 			logger.warning('Legacy fingerprint data format')
 			self.has_fingerprint = False
 		else:
@@ -448,7 +453,7 @@ class Pose:
 	def classic_fingerprint(self) -> dict:
 		"""Classic HIPPO fingerprint dictionary, mapping protein :class:`.Feature` ID's to the number of corresponding ligand features (from any :class:`.Pose`)"""
 		return self.interactions.classic_fingerprint
-
+	
 
 	### METHODS
 	
@@ -557,11 +562,20 @@ class Pose:
 
 		return data
 
-	def calculate_interactions(self) -> None:
+	def calculate_interactions(self, 
+		resolve: bool = True,
+		force: bool = False,
+		debug: bool = False,
+	) -> None:
 
-		if not self.has_fingerprint:
+		if not self.has_fingerprint or force:
 
 			# calculate interactions...
+
+			### clear old interactions
+
+			self.db.delete_where(table='interaction', key='pose', value=self.id)
+			self.has_fingerprint = False
 
 			### load the ligand structure
 
@@ -622,31 +636,68 @@ class Pose:
 				
 				prot_coord = np.array(np.sum(prot_coords,axis=0)/len(prot_atoms))
 
-				complementary_family = COMPLEMENTARY_FEATURES[prot_family]
+				complementary_families = COMPLEMENTARY_FEATURES[prot_family]
 
-				complementary_comp_features = comp_features_by_family[complementary_family]
+				# print(prot_family, complementary_families)
 
-				cutoff = FEATURE_PAIR_CUTOFFS[f'{prot_family} {complementary_family}']
+				for complementary_family in complementary_families:
 
-				for lig_feature in complementary_comp_features:
+					interaction_type = INTERACTION_TYPES[(prot_family, complementary_family)]
 
-					distance = np.linalg.norm(lig_feature - prot_coord)
+					complementary_comp_features = comp_features_by_family[complementary_family]
 
-					if distance > cutoff:
-						continue
+					cutoff = FEATURE_PAIR_CUTOFFS[f'{prot_family} {complementary_family}']
 
-					self.db.insert_interaction(
-						feature=prot_feature.id,
-						pose=self.id,
-						family=lig_feature.family,
-						atom_ids=lig_feature.atom_numbers,
-						prot_coord=prot_coord,
-						lig_coord=lig_feature.position,
-						distance=distance,
-						energy=None,
-					)
+					for lig_feature in complementary_comp_features:
 
-		self.has_fingerprint = True
+						distance = np.linalg.norm(lig_feature - prot_coord)
+
+						# if prot_feature.family == 'Aromatic':
+						# 	print(prot_feature.residue_name, prot_feature.residue_number, prot_feature.chain_name, prot_feature.family, lig_feature, distance)
+
+						if distance > cutoff:
+							continue
+
+						if interaction_type == 'π-stacking':
+
+							lig_coords = [self.mol.GetConformer().GetAtomPosition(i-1) for i in lig_feature.atom_numbers]
+
+							min_distance = None
+							for lig_coord in lig_coords:
+								for p_coord in prot_coords:
+									d = np.linalg.norm(lig_coord - p_coord)
+									if not min_distance or d < min_distance:
+										min_distance = d
+
+							if min_distance > PI_STACK_MIN_CUTOFF:
+								if debug:
+									print(f'skipping {prot_feature} due to pi-stack min_distance')
+									print(prot_feature.residue_name, prot_feature.residue_number, prot_feature.chain_name, prot_feature.family, lig_feature, distance)
+								continue
+
+						if debug:
+							print(prot_feature, lig_feature)
+
+						self.db.insert_interaction(
+							feature=prot_feature.id,
+							pose=self.id,
+							type=interaction_type,
+							family=lig_feature.family,
+							atom_ids=lig_feature.atom_numbers,
+							prot_coord=prot_coord,
+							lig_coord=lig_feature.position,
+							distance=distance,
+							energy=None,
+						)
+
+			self.has_fingerprint = True
+			
+			if resolve:
+				self.interactions.resolve(debug=debug)
+
+		elif debug:
+			logger.warning(f'{self} is already fingerprinted, no new calculation')
+
 
 	def calculate_classic_fingerprint(self, 
 		debug: bool = False,
@@ -813,6 +864,19 @@ class Pose:
 			return f'{self.compound}->{self}: {self.name}'
 		else:
 			return f'{self.compound}->{self}'
+
+	def plot3d(self, features: bool = False, **kwargs):
+
+		mol = self.mol
+
+		import molparse as mp
+
+		group = mp.rdkit.mol_to_AtomGroup(mol)
+
+		if features:
+			features = self.features
+
+		return mp.go.plot3d(atoms=group.atoms, features=features, **kwargs)
 
 	### DUNDERS
 
