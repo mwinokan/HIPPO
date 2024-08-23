@@ -55,6 +55,13 @@ class Database:
 		else:
 			# connect to existing database
 			self.connect()
+
+		if 'interaction' not in self.table_names:
+			logger.warning('This is a legacy format database (hippo-db < 0.3.23)')
+			logger.warning('Existing fingerprints will not be compatible.')
+			logger.warning('Clear them with: animal.db.delete_interactions()')
+			self.create_table_interaction()
+			
 		
 	### PROPERTIES
 
@@ -81,6 +88,12 @@ class Database:
 	def total_changes(self) -> int:
 		"""Return the total number of database rows that have been modified, inserted, or deleted since the database connection was opened."""
 		return self.connection.total_changes
+
+	@property
+	def table_names(self) -> list[str]:
+		"""List of all the table names in the database"""
+		results = self.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()
+		return [n for n, in results]
 
 	### PUBLIC METHODS / API CALLS
 
@@ -2251,12 +2264,7 @@ class Database:
 			# commit the changes
 			self.commit()
 
-	### PRINTING
-
-	def list_tables(self):
-		"""List all tables in the database"""
-		self.execute("SELECT name FROM sqlite_master WHERE type='table';")
-		pprint(self.cursor.fetchall())
+	### PRINTING	
 
 	def print_table(self, name):
 		"""Print a table's entries
