@@ -1267,7 +1267,7 @@ class Database:
 
 		:param query: the columns to return
 		:param table: the table from which to select
-		:param key: column name to match to value, if no ``value`` is provided this 
+		:param key: column name to match to value, if no ``value`` is provided the key argument should contain the a SQL string to select entries
 		:param value: the value to match (Default value = None)
 		:param multiple: fetch all results (Default value = False)
 		:param none: define the behaviour for no matches, any value other than ``'error'`` will silently return empty data (Default value = 'error')
@@ -1393,7 +1393,7 @@ class Database:
 		self.delete_where(table='tag', key='name', value=tag)
 
 	def delete_interactions(self) -> None:
-		"""Delete all calculated interactions"""
+		"""Delete all calculated interactions and set pose_fingerprint appropriately"""
 
 		import pickle
 		self.delete_where(table='interaction', key='interaction_id > 0')
@@ -1444,7 +1444,7 @@ class Database:
 		commit: bool = True,
 	) -> None:
 
-		"""Update all field in a table column
+		"""Update all fields in a table column at once
 
 		:param table: the table which to update
 		:param key: column name to update
@@ -1471,16 +1471,14 @@ class Database:
 
 	def get_compound(self,
 		*,
-		table: str = 'compound',
 		id: int | None = None,
 		inchikey: str | None = None,
 		alias: str | None = None,
 		smiles: str | None = None,
 	) -> Compound:
 
-		"""Get a compound using one of the following fields: ['id', 'inchikey', 'alias', 'smiles']
+		"""Get a :class:`.Compound` using one of the following fields: ['id', 'inchikey', 'alias', 'smiles']
 
-		:param table: the table from which to get the entry (Default value = 'compound')
 		:param id: the ID to search for (Default value = None)
 		:param inchikey: the InChi-Key to search for (Default value = None)
 		:param alias: the alias to search for (Default value = None)
@@ -1497,13 +1495,12 @@ class Database:
 			return None
 
 		query = 'compound_id, compound_inchikey, compound_alias, compound_smiles, compound_base'
-		entry = self.select_where(query=query, table=table, key='id', value=id)
+		entry = self.select_where(query=query, table='compound', key='id', value=id)
 		compound = Compound(self._animal, self, *entry, metadata=None, mol=None)
 		return compound
 
 	def get_compound_id(self, 
 		*,
-		table: str = 'compound',
 		inchikey: str | None = None, 
 		alias: str | None = None, 
 		smiles: str | None = None, 
@@ -1511,7 +1508,6 @@ class Database:
 
 		"""Get a compound's ID using one of the following fields: ['inchikey', 'alias', 'smiles']
 
-		:param table: the table from which to get the entry (Default value = 'compound')
 		:param inchikey: the InChi-Key to search for (Default value = None)
 		:param alias: the alias to search for (Default value = None)
 		:param smiles: the smiles to search for (Default value = None)
@@ -1520,13 +1516,13 @@ class Database:
 		"""
 
 		if inchikey:
-			entry = self.select_id_where(table=table, key='inchikey', value=inchikey)
+			entry = self.select_id_where(table='compound', key='inchikey', value=inchikey)
 
 		elif alias:
-			entry = self.select_id_where(table=table, key='alias', value=alias)
+			entry = self.select_id_where(table='compound', key='alias', value=alias)
 
 		elif smiles:
-			entry = self.select_id_where(table=table, key='smiles', value=smiles)
+			entry = self.select_id_where(table='compound', key='smiles', value=smiles)
 
 		else:
 			raise NotImplementedError
@@ -1555,7 +1551,6 @@ class Database:
 
 	def get_pose(self,
 		*,
-		table: str = 'pose',
 		id: int | None = None,
 		inchikey: str = None,
 		alias: str = None,
@@ -1563,7 +1558,6 @@ class Database:
 
 		"""Get a pose using one of the following fields: ['id', 'inchikey', 'alias']
 
-		:param table: the table from which to get the entry (Default value = 'pose')
 		:param id: the ID to search for (Default value = None)
 		:param inchikey: the InChi-Key to search for (Default value = None)
 		:param alias: the alias to search for (Default value = None)
@@ -1579,13 +1573,12 @@ class Database:
 			return None
 
 		query = 'pose_id, pose_inchikey, pose_alias, pose_smiles, pose_reference, pose_path, pose_compound, pose_target, pose_mol, pose_fingerprint, pose_energy_score, pose_distance_score'
-		entry = self.select_where(query=query, table=table, key='id', value=id)
+		entry = self.select_where(query=query, table='pose', key='id', value=id)
 		pose = Pose(self, *entry)
 		return pose
 
 	def get_pose_id(self, 
 		*,
-		table: str = 'pose',
 		inchikey: str | None = None, 
 		alias: str | None = None, 
 	) -> int:
@@ -1601,7 +1594,7 @@ class Database:
 
 		if inchikey:
 			# inchikey might not be unique
-			entries = self.select_id_where(table=table, key='inchikey', value=inchikey, multiple=True)
+			entries = self.select_id_where(table='pose', key='inchikey', value=inchikey, multiple=True)
 			if len(entries) != 1:
 				logger.warning(f'Multiple poses with {inchikey=}')
 				return entries
@@ -1609,7 +1602,7 @@ class Database:
 				entry = entries[0]
 
 		elif alias:
-			entry = self.select_id_where(table=table, key='alias', value=alias)
+			entry = self.select_id_where(table='pose', key='alias', value=alias)
 		
 		else:
 			raise NotImplementedError
@@ -1621,14 +1614,12 @@ class Database:
 
 	def get_reaction(self,
 		*,
-		table: str = 'reaction',
 		id: int | None = None,
 		none: str | None = None,
 	) -> Reaction:
 
 		"""Get a reaction using its ID
 
-		:param table: the table from which to get the entry (Default value = 'reaction')
 		:param id: the ID to search for (Default value = None)
 		:param none: define the behaviour for no matches, any value other than ``'error'`` will silently return empty data (Default value = 'error')
 		:returns: the :class:`.Reaction` object
@@ -1640,20 +1631,18 @@ class Database:
 			return None
 
 		query = 'reaction_id, reaction_type, reaction_product, reaction_product_yield'
-		entry = self.select_where(query=query, table=table, key='id', value=id, none=none)
+		entry = self.select_where(query=query, table='reaction', key='id', value=id, none=none)
 		reaction = Reaction(self, *entry)
 		return reaction
 
 	def get_quote(self,
 		*,
-		table: str = 'quote',
 		id: int | None = None,
 		none: str | None = None,
 	) -> Quote:
 
 		"""Get a quote using its ID
 
-		:param table: the table from which to get the entry (Default value = 'quote')
 		:param id: the ID to search for (Default value = None)
 		:param none: define the behaviour for no matches, any value other than ``'error'`` will silently return empty data (Default value = 'error')
 		:returns: the :class:`.Quote` object
@@ -1661,7 +1650,7 @@ class Database:
 		"""
 		
 		query = 'quote_compound, quote_supplier, quote_catalogue, quote_entry, quote_amount, quote_price, quote_currency, quote_lead_time, quote_purity, quote_date, quote_smiles, quote_id '
-		entry = self.select_where(query=query, table=table, key='id', value=id, none=none)
+		entry = self.select_where(query=query, table='quote', key='id', value=id, none=none)
 
 		return Quote(
 			db=self,
@@ -1716,7 +1705,7 @@ class Database:
 
 		"""Get target with specific ID
 
-		:param id: the ID to search for
+		:param id: the ID of the target to retrieve
 		:returns: :class:`.Target` object
 
 		"""
@@ -1730,7 +1719,7 @@ class Database:
 
 		"""Get the name of a target with given ID
 
-		:param id: the ID to search for
+		:param id: the ID of the target to retrieve
 		:returns: target name
 
 		"""
@@ -1744,10 +1733,10 @@ class Database:
 		name: str, 
 	) -> int:
 	
-		"""Get target ID
+		"""Get target ID with a given name
 
-		:param *: 
-		:param name: str: 
+		:param name: the protein target name
+		:returns: the :class:`.Target` ID
 
 		"""
 			
@@ -1763,12 +1752,14 @@ class Database:
 		*,
 		id:int,
 	) -> Feature:
-		"""Get feature
+		
+		"""Get a protein interaction :class:`.Feature` with a given ID
 
-		:param *: 
-		:param id:int: 
+		:param id: the protein interaction :class:`.Feature` ID to be retrieved
+		:returns: :class:`.Feature` object
 
 		"""
+
 		entry = self.select_all_where(table='feature', key='id', value=id)
 		return Feature(*entry)
 
@@ -1777,10 +1768,12 @@ class Database:
 		id: int,
 		debug: bool = False,
 	) -> Route:
-		"""
 
-		:param id: int: 
-		:param debug: bool:  (Default value = False)
+		"""Fetch a :class:`.Route` object stored in the :class:`.Database`.
+
+		:param id: the ID of the :class:`.Route` to be retrieved
+		:param debug: increase verbosity for debugging, defaults to False
+		:returns: :class:`.Route` object
 
 		"""
 
@@ -1837,9 +1830,10 @@ class Database:
 		id: int,
 	) -> 'Interaction':
 		
-		"""
+		"""Fetch the :class:`.Interaction` object with given ID
 
 		:param id: the ID of the Interaction to retrieve
+		:returns: :class:`.Interaction` object
 
 		"""
 
@@ -1864,11 +1858,15 @@ class Database:
 			energy=energy,
 		)
 
-	def get_possible_reaction_ids(self, *, compound_ids):
-		"""
+	def get_possible_reaction_ids(self, 
+		*, 
+		compound_ids: list[int], 
+	) -> list[int]:
 
-		:param *: 
-		:param compound_ids: 
+		"""Given a set of reactant :class:`.Compound` ID's, compute which :class:`.Reaction` objects are possible (all reactants present).
+
+		:param compound_ids: the list of reactant :class:`.Compound` IDs 
+		:returns: a list of :class:`.Reaction` ID's that are possible with the given reactants
 
 		"""
 
@@ -1891,12 +1889,17 @@ class Database:
 
 		return [q for q, in result]
 
-	def get_unsolved_reaction_tree(self, *, product_ids, debug=False):
-		"""
+	def get_unsolved_reaction_tree(self, 
+		*, 
+		product_ids: list[int], 
+		debug: bool = False,
+	) -> '(CompoundSet, ReactionSet)':
 
-		:param *: 
-		:param product_ids: 
-		:param debug:  (Default value = False)
+		"""Given a set of product :class:`.Compound` IDs, recursively solve for all the reactants (:class:`.CompoundSet`) and reactions (:class:`.ReactionSet`) that could be involved in their synthesis. N.B. This evaluates all synthesis branches.
+
+		:param product_ids: list of product :class:`.Compound` IDs
+		:param debug: increase verbosity for debugging, defaults to False
+		:returns: a tuple of ``(reactants, reactions)``
 
 		"""
 
@@ -1969,11 +1972,15 @@ class Database:
 
 		return all_reactants, all_reactions
 
-	def get_reaction_price_estimate(self, *, reaction):
-		"""
+	def get_reaction_price_estimate(self, 
+		*, 
+		reaction: Reaction,
+	) -> float:
+		
+		"""Estimate the price of a :class:`.Reaction`
 
-		:param *: 
-		:param reaction: 
+		:param reaction: :class:`.Reaction` object
+		:returns: price estimate
 
 		"""
 
@@ -1998,23 +2005,15 @@ class Database:
 
 		return price
 
-	def get_preferred_reaction_dict(self, *, compound_ids):
-		"""
+	def get_possible_reaction_product_ids(self, 
+		*, 
+		reaction_ids: list[int],
+	) -> list[int]:
+		
+		"""Given a set of :class:`.Reaction` IDs return the :class:`.Compound` IDs of their synthesis products
 
-		:param *: 
-		:param compound_ids: 
-
-		"""
-
-		print(compound_ids)
-
-		raise NotImplementedError
-
-	def get_possible_reaction_product_ids(self, *, reaction_ids):
-		"""
-
-		:param *: 
-		:param reaction_ids: 
+		:param reaction_ids: :class:`.Reaction` IDs
+		:returns: list of :class:`.Compound` IDs
 
 		"""
 		reaction_ids_str = str(tuple(reaction_ids)).replace(',)',')')
@@ -2022,12 +2021,18 @@ class Database:
 
 	### COMPOUND QUERY
 
-	def query_substructure(self, query, fast=True, none='error'):
-		"""Search compounds by substructure
+	def query_substructure(self, 
+		query: str, 
+		fast: bool = True, 
+		none: str = 'error'
+	) -> 'CompoundSet':
 
-		:param query: 
-		:param fast:  (Default value = True)
-		:param none:  (Default value = 'error')
+		"""Search for compounds by substructure
+
+		:param query: SMILES string of the substructure
+		:param fast: Use pattern binary fingerprint table to improve performance (Default value = True)
+		:param none: define the behaviour for no matches, any value other than ``'error'`` will silently return empty data (Default value = 'error')
+		:returns: :class:`.CompoundSet` object
 
 		"""
 
@@ -2055,19 +2060,24 @@ class Database:
 			logger.error(f'No compounds with substructure {query}')
 			return None
 
-		compounds = []
-		for id, in result:
-			compounds.append(self.get_compound(id=id))
+		from .cset import CompoundSet
+		return CompoundSet(self, [i for i, in result])
 
-		return compounds
 
-	def query_similarity(self, query, threshold, return_similarity=False, none='error'):
-		"""Search compounds by similarity
+	def query_similarity(self, 
+		query: str, 
+		threshold: float, 
+		return_similarity: bool = False, 
+		none='error',
+	) -> 'CompoundSet | (CompoundSet, list[float])':
 
-		:param query: 
-		:param threshold: 
-		:param return_similarity:  (Default value = False)
-		:param none:  (Default value = 'error')
+		"""Search compounds by tanimoto similarity
+
+		:param query: SMILES string
+		:param threshold: similarity threshold to exceed
+		:param return_similarity: return a list of similarity values together with the :class:`.CompoundSet` (Default value = False)
+		:param none: define the behaviour for no matches, any value other than ``'error'`` will silently return empty data (Default value = 'error')
+		:returns: :class:`.CompoundSet` and optionally a list of similarity values
 
 		"""
 
@@ -2077,11 +2087,9 @@ class Database:
 		if isinstance(query, str):
 
 			if return_similarity:
-				# sql = f"SELECT compound_id, bfp_tanimoto(mol_morgan_bfp(mol_from_smiles(?1), 2, 1024), mol_morgan_bfp(compound.compound_mol, 2, 1024)) as t FROM compound JOIN compound_morgan_bfp AS mfp USING(compound_id) WHERE mfp.compound_id match rdtree_tanimoto(mol_morgan_bfp(mol_from_smiles(?1), 2, 1024), ?2) ORDER BY t DESC "
 				sql = f"SELECT compound_id, bfp_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), mol_pattern_bfp(compound.compound_mol, 2048)) as t FROM compound JOIN compound_pattern_bfp AS mfp USING(compound_id) WHERE mfp.compound_id match rdtree_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), ?2) ORDER BY t DESC "
 			else:
-				# sql = f"SELECT compound_id FROM compound_morgan_bfp AS mfp WHERE mfp.compound_id match rdtree_tanimoto(mol_morgan_bfp(mol_from_smiles(?1), 2, 1024), ?2) "
-				sql = f"SELECT compound_id FROM compound_pattern_bfp AS mfp WHERE mfp.compound_id match rdtree_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), ?2) "
+				sql = f"SELECT compound_id FROM compound_pattern_bfp AS bfp WHERE bfp.compound_id match rdtree_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), ?2) "
 
 		else:
 			raise NotImplementedError
@@ -2108,20 +2116,29 @@ class Database:
 
 		return cset
 
-	def query_exact(self, query):
-		"""Search for exact match compounds
+	def query_exact(self, 
+		query: str,
+		threshold: float = 0.989,
+	) -> 'CompoundSet':
 
-		:param query: 
+		"""Search for exact match compounds (default similarity > 0.989)
+
+		:param query: SMILES string
+		:param threshold: similarity threshold to exceed
 
 		"""
+
 		return self.query_similarity(query, 0.989, return_similarity=False)
 
 	### COUNTING
 
-	def count(self, table):
+	def count(self, 
+		table: str,
+	) -> int:
+
 		"""Count all entries in a table
 
-		:param table: 
+		:param table: table to count entries from
 
 		"""
 
@@ -2129,11 +2146,16 @@ class Database:
 		self.execute(sql)
 		return self.cursor.fetchone()[0]
 
-	def count_where(self, table, key, value=None):
-		"""Count all entries in a table where key==value
+	def count_where(self, 
+		table: str, 
+		key: str, 
+		value = None,
+	):
 
-		:param table: 
-		:param key: 
+		"""Count all entries in a table where ``key==value``
+
+		:param table: table to count entries from
+		:param key: the key to match as ``{table}_{key} = {value}`` or the SQL string if ``value == None``
 		:param value: the value to match (Default value = None)
 
 		"""
@@ -2148,32 +2170,48 @@ class Database:
 
 	### ID SELECTION
 
-	def min_id(self, table):
+	def min_id(self, 
+		table: str,
+	) -> int:
+		
+		"""Get the minimal entry ID from a given table
+
+		:param table: the database table to query
+		:returns: the smallest entry ID
+
 		"""
 
-		:param table: 
-
-		"""
 		id, = self.select(table=table, query=f'MIN({table}_id)')
 		return id
 
-	def max_id(self, table):
-		"""
+	def max_id(self, 
+		table: str,
+	) -> int:
+		
+		"""Get the maximal entry ID from a given table
 
-		:param table: 
+		:param table: the database table to query
+		:returns: the largest entry ID
 
 		"""
 		id, = self.select(table=table, query=f'MAX({table}_id)')
 		return id
 
-	def slice_ids(self, *, table, start, stop, step=1):
-		"""
+	def slice_ids(self, 
+		*, 
+		table: str, 
+		start: int | None, 
+		stop: int | None, 
+		step: int = 1,
+	) -> list[int]:
+		
+		"""Retrieve ID's matching a slice
 
-		:param *: 
-		:param table: 
-		:param start: 
-		:param stop: 
-		:param step:  (Default value = 1)
+		:param table: the database table to query
+		:param start: return IDs equal to or larger than this value
+		:param stop: return IDs smaller than this value
+		:param step: return IDs in increments of this value (Default value = 1)
+		:returns: matching IDs
 
 		"""
 
@@ -2200,11 +2238,14 @@ class Database:
 
 	### PRUNING
 
-	def prune_reactions(self, compound, reactions):
-		"""Remove duplicate reactions for a given compound
+	def prune_reactions(self, 
+		reactions: 'ReactionSet',
+	) -> list[Reaction]:
 
-		:param compound: 
-		:param reactions: 
+		"""Remove duplicate reactions
+
+		:param reactions: :class:`.ReactionSet`
+		:returns: list of pruned :class:`.Reaction` objects
 
 		"""
 
@@ -2227,14 +2268,20 @@ class Database:
 
 		return pruned
 
-	def remove_metadata_list_item(self, *, table, key, value, remove_empty=True):
+	def remove_metadata_list_item(self, 
+		*, 
+		table: str, 
+		key: str, 
+		value, 
+		remove_empty: bool = True,
+	) -> None:
+
 		"""Remove a specific item from list-like values associated with a given key from all metadata entries in a given table
 
-		:param *: 
-		:param table: 
-		:param key: 
-		:param value: 
-		:param remove_empty:  (Default value = True)
+		:param table: the database table to query
+		:param key: the :class:`.Metadata` key to match 
+		:param value: the value to remove from the list
+		:param remove_empty: remove the key from the metadata if the list is empty (Default value = True)
 
 		"""
 
@@ -2266,19 +2313,28 @@ class Database:
 
 	### PRINTING	
 
-	def print_table(self, name):
+	def print_table(self, 
+		table: str,
+	) -> None:
+		
 		"""Print a table's entries
 
-		:param name: 
+		:param table: the table to print
 
 		"""
-		self.execute(f"SELECT * FROM {name}")
+
+		self.execute(f"SELECT * FROM {table}")
 		pprint(self.cursor.fetchall())
 
 	### DUNDERS
 
 	def __str__(self):
+		"""Unformatted string representation"""
 		return str(self.path.resolve())
+
+	def __repr__(self):
+		"""Formatted string representation"""
+		return f'{mcol.bold}{mcol.underline}Database(path={self}){mcol.clear}'
 
 CHEMICALITE_COMPOUND_PROPERTY_MAP = {
 	'num_heavy_atoms':'mol_num_hvyatms',

@@ -170,7 +170,7 @@ class PoseTable:
 					return self.__getitem__(key=key)
 
 				else:
-					return self.db.get_pose(table=self.table, id=key)
+					return self.db.get_pose(id=key)
 
 			case str():
 				pose = self.db.get_pose(alias=key)
@@ -1067,7 +1067,7 @@ class PoseSet:
 		return len(self.indices)
 
 	def __iter__(self):
-		return iter(self.db.get_pose(table=self.table, id=i) for i in self.indices)
+		return iter(self.db.get_pose(id=i) for i in self.indices)
 
 	def __getitem__(self, key) -> Pose:
 		match key:
@@ -1078,7 +1078,7 @@ class PoseSet:
 				except IndexError:
 					logger.exception(f'list index out of range: {key=} for {self}')
 					raise
-				return self.db.get_pose(table=self.table, id=index)
+				return self.db.get_pose(id=index)
 			
 			case slice():
 				ids = self.indices[key]

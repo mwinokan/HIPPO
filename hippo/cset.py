@@ -276,12 +276,12 @@ class CompoundTable:
 					return self.__getitem__(key=key)
 
 				else:
-					return self.db.get_compound(table=self.table, id=key)
+					return self.db.get_compound(id=key)
 
 			case str():
-				comp = self.db.get_compound(table=self.table, inchikey=key)
+				comp = self.db.get_compound(inchikey=key)
 				if not comp:
-					comp = self.db.get_compound(table=self.table, alias=key)
+					comp = self.db.get_compound(alias=key)
 				return comp
 
 			case key if isinstance(key, list) or isinstance(key, tuple) or isinstance(key, set):
@@ -939,14 +939,14 @@ class CompoundSet:
 
 	def __iter__(self):
 		"""Iterate through compounds in this set"""
-		return iter(self.db.get_compound(table=self.table, id=i) for i in self.indices)
+		return iter(self.db.get_compound(id=i) for i in self.indices)
 
 	def __getitem__(self, key) -> 'Compound | CompoundSet':
 		"""Get compounds or subsets thereof from this set"""
 		match key:
 			case int():
 				index = self.indices[key]
-				return self.db.get_compound(table=self.table, id=index)
+				return self.db.get_compound(id=index)
 			
 			case slice():
 				indices = self.indices[key]
@@ -971,9 +971,6 @@ class CompoundSet:
 			case IngredientSet():
 				logger.warning('Subtracting IngredientSet from CompoundSet. Ignoring quote/amount data')
 				ids = set(self.ids) - set([int(i) for i in other.compound_ids])
-				# print(self.ids)
-				# print(ids)
-				# print([int(i) for i in other.compound_ids])
 				return CompoundSet(self.db, ids)
 				
 			case _:
