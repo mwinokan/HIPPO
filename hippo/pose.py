@@ -333,7 +333,7 @@ class Pose:
 		return self.path.endswith('.pdb')
 
 	@property
-	def metadata(self):
+	def metadata(self) -> 'MetaData':
 		"""Returns the pose's metadata"""
 		if self._metadata is None:
 			self._metadata = self.db.get_metadata(table='pose', id=self.id)
