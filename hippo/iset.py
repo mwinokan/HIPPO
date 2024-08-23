@@ -273,11 +273,13 @@ class InteractionSet:
 
 	def resolve(self, 
 		debug: bool = False,
+		commit: bool = True,
 	) -> 'InteractionSet':
 
 		"""Resolve into predicted key interactions. In place modification.
 
 		:param debug: Increased verbosity for debugging (Default value = False)
+		:param commit: commit the changes (Default value = True)
 		:returns: a filtered :class:`.InteractionSet`
 		"""
 
@@ -432,7 +434,7 @@ class InteractionSet:
 
 		cull_list = set(self.ids) - set(keep_list)
 		cull_iset = InteractionSet(self.db, cull_list)
-		self.db.delete_where(table='interaction', key=f'interaction_id IN {cull_iset.str_ids}')
+		self.db.delete_where(table='interaction', key=f'interaction_id IN {cull_iset.str_ids}', commit=commit)
 		self._indices = sorted(list(set(keep_list)))
 
 		### revisit hydrophobes
@@ -455,7 +457,7 @@ class InteractionSet:
 
 		cull_list = set(hydrophobic_keeper_iset.ids) - set(ids)
 		cull_iset = InteractionSet(self.db, cull_list)
-		self.db.delete_where(table='interaction', key=f'interaction_id IN {cull_iset.str_ids}')
+		self.db.delete_where(table='interaction', key=f'interaction_id IN {cull_iset.str_ids}', commit=commit)
 		self._indices = sorted(list(set(keep_list) - cull_list))
 
 		### Summary

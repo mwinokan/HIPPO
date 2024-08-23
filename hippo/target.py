@@ -1,6 +1,9 @@
 
 import mcol
 
+import logging
+logger = logging.getLogger('HIPPO')
+
 class Target:
 	
 	"""Object representing a protein target
@@ -10,6 +13,8 @@ class Target:
 		:class:`.Target` objects should not be created directly. Instead use :meth:`.HIPPO.register_target` or :meth:`.Pose.target`.
 	
 	"""
+
+	_feature_cache = {}
 
 	def __init__(self, 
 		db: 'Database', 
@@ -69,8 +74,9 @@ class Target:
 		"""Formatted string representation"""
 		return f'{mcol.bold}{mcol.underline}{self} "{self.name}"{mcol.unbold}{mcol.ununderline}'
 
-	def calculate_features(self, 
-		protein: 'mp.System'
+	def calculate_features(self,
+		protein: 'mp.System',
+		reference_id: int | None = None, 
 	) -> list['Feature']:
 
 		"""Calculate features from a protein system
@@ -80,19 +86,30 @@ class Target:
 
 		"""
 
-		features = protein.get_protein_features()
+		if reference_id and reference_id in self._feature_cache:
+			# logger.debug(f'Using cached {reference_id=}')
+			return self._feature_cache[reference_id]
 
-		for f in features:
-			self.db.insert_feature(
-				family=f.family,
-				target=self.id,
-				atom_names=[a.name for a in f.atoms],
-				residue_name=f.res_name,
-				residue_number=f.res_number,
-				chain_name=f.res_chain,
-				commit=False,
-			)
+		else:
 
-		self.db.commit()
+			features = protein.get_protein_features()
 
-		return self.features
+			for f in features:
+				self.db.insert_feature(
+					family=f.family,
+					target=self.id,
+					atom_names=[a.name for a in f.atoms],
+					residue_name=f.res_name,
+					residue_number=f.res_number,
+					chain_name=f.res_chain,
+					commit=False,
+				)
+
+			self.db.commit()
+
+			features = self.features
+
+			if reference_id:
+				self._feature_cache[reference_id] = features
+
+			return features

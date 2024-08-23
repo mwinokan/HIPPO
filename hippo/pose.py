@@ -87,6 +87,7 @@ class Pose:
 		self._metadata = metadata
 		self._tags = None
 		self._reference = reference
+		self._reference_id = reference
 		self._interactions = None
 
 		if isinstance(mol, bytes):
@@ -187,6 +188,11 @@ class Pose:
 			self._reference = self.db.get_pose(id=self._reference)
 		return self._reference
 
+	@property
+	def reference_id(self) -> int:
+		"""Returns the pose's protein reference ID"""
+		return self._reference_id
+	
 	@reference.setter
 	def reference(self, p):
 		"""Set the pose's reference"""
@@ -194,6 +200,7 @@ class Pose:
 			assert p._table == 'pose'
 			p = p.id
 		self._reference = p
+		self._reference_id = p
 		self.db.update(table='pose', id=self.id, key='pose_reference', value=p)
 
 	@property
@@ -612,7 +619,7 @@ class Pose:
 
 			### clear old interactions
 
-			self.db.delete_where(table='interaction', key='pose', value=self.id)
+			self.db.delete_where(table='interaction', key='pose', value=self.id, commit=commit)
 			self.has_fingerprint = False
 
 			### load the ligand structure
@@ -639,7 +646,7 @@ class Pose:
 			### get features
 
 			comp_features = self.features
-			protein_features = self.target.calculate_features(protein_system)
+			protein_features = self.target.calculate_features(protein_system, reference_id=self.reference_id)
 
 			### organise ligand features by family
 			comp_features_by_family = {}
@@ -763,6 +770,7 @@ class Pose:
 							distance=distance,
 							angle=angle,
 							energy=None,
+							commit=commit,
 						)
 
 			self.has_fingerprint = True

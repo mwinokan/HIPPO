@@ -1352,6 +1352,7 @@ class Database:
 		table: str, 
 		key: str, 
 		value: str | None = None, 
+		commit: bool = True,
 	) -> None:
 		
 		"""Delete entries where ``key==value``
@@ -1359,6 +1360,7 @@ class Database:
 		:param table: the table from which to delete
 		:param key: column name to match to value, if no ``value`` is provided this 
 		:param value: the value to match (Default value = None)
+		:param commit: commit the changes (Default value = True)
 
 		"""
 
@@ -1375,11 +1377,13 @@ class Database:
 
 		try:
 			result = self.execute(sql)
-			self.commit()
 
 		except sqlite3.OperationalError as e:
 			logger.var('sql',sql)
 			raise
+
+		if commit:
+			self.commit()
 
 	def delete_tag(self, 
 		tag: str,
