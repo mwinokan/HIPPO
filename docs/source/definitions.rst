@@ -28,5 +28,5 @@ Units
 
 lead time: days
 compound quantities/amounts: mg
-purity
+purity: fraction [0,1]
 product_yield

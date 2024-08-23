@@ -818,7 +818,7 @@ class Database:
 		:param amount: amount in `mg`
 		:param price: price of the compound
 		:param currency: currency string ``['GBP', 'EUR', 'USD', None]``
-		:param purity: compound purity 
+		:param purity: compound purity fraction
 		:param lead_time: lead time in days
 		:param smiles: quoted SMILES string (Default value = None)
 		:param commit: commit the changes to the database (Default value = True)

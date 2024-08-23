@@ -1,25 +1,24 @@
 
 import mcol
-# from dataclasses import dataclass, field, asdict
-
 from .price import Price
 
 import logging
 logger = logging.getLogger('HIPPO')
 
-# from typing import TypeVar, Type
-
-# T = TypeVar('T')
-
-# @dataclass
 class Quote:
 	
-	"""Dataclass representing a quote in the database"""
+	"""Supplier quote for a specific quantity of a :class:`.Compound`.
+
+	.. attention::
+	
+		:class:`.Quote` objects should not be created directly. Instead use :meth:`.Compound.get_quotes`.
+
+	"""
 
 	_db = None
 
 	def __init__(self,
-		db,
+		db: 'Database',
 		id: int,
 		compound: int,
 		smiles: str,
@@ -33,7 +32,7 @@ class Quote:
 		lead_time: int,
 		date: str | None = None,
 		type: str | None = None,
-	):
+	) -> None:
 
 		price = Price(price, currency)
 
@@ -46,7 +45,6 @@ class Quote:
 		self._entry = entry
 		self._amount = amount
 		self._price = price
-		# self._currency = currency
 		self._purity = purity
 		self._lead_time = lead_time
 		self._date = date
@@ -61,16 +59,18 @@ class Quote:
 	### FACTORIES
 
 	@classmethod
-	def combination(cls, required_amount, quotes):
+	def combination(cls, 
+		required_amount: float, 
+		quotes: list['Quote'],
+	) -> 'Quote':
 
-		"""
+		"""Combine a list of quotes into one :class:`.Quote` object. 
 
 		* Start with biggest pack
 		* Estimate by scaling linearly with unit price
-		* Use MCule confirmed stock amount
 
-		:param required_amount: 
-		:param quotes: 
+		:param required_amount: amount in mg
+		:param quotes: list of quotes to be combined
 
 		"""
 
@@ -101,86 +101,86 @@ class Quote:
 	### PROPERTIES
 
 	@property
-	def entry_str(self):
-		""" """
+	def entry_str(self) -> str:
+		"""Unformatted string including the supplier, catalogue (if available), and entry name of the quote"""
 		if self.catalogue:
 			return f'{self.supplier}:{self.catalogue}:{self.entry}'
 		else:
 			return f'{self.supplier}:{self.entry}'
 
 	@property
-	def db(self):
-		""" """
+	def db(self) -> 'Database':
+		"""Returns a pointer to the parent database"""
 		return self._db
 
 	@property
-	def id(self):
-		""" """
+	def id(self) -> int:
+		"""Returns the quote's database ID"""
 		return self._id
 
 	@property
-	def compound(self):
-		""" """
+	def compound(self) -> int:
+		"""Returns the associated :class:`.Compound`"""
 		return self._compound
 
 	@property
-	def smiles(self):
-		""" """
+	def smiles(self) -> str:
+		"""Returns the catalogue SMILES string"""
 		return self._smiles
 
 	@property
-	def supplier(self):
-		""" """
+	def supplier(self) -> str:
+		"""Name of the supplier"""
 		return self._supplier
 
 	@property
-	def catalogue(self):
-		""" """
+	def catalogue(self) -> str | None:
+		"""Name of the catalogue"""
 		return self._catalogue
 
 	@property
-	def entry(self):
-		""" """
+	def entry(self) -> str:
+		"""Name/ID of the catalogue entry"""
 		return self._entry
 
 	@property
-	def amount(self):
-		""" """
+	def amount(self) -> float:
+		"""Amount in mg"""
 		return self._amount
 
 	@property
-	def price(self):
-		""" """
+	def price(self) -> 'Price':
+		"""Price"""
 		return self._price
 
 	@property
-	def currency(self):
-		""" """
+	def currency(self) -> str:
+		"""Currency of the associated :class:`.Price` object"""
 		return self.price.currency
 
 	@property
-	def purity(self):
-		""" """
+	def purity(self) -> float:
+		"""Purity fraction"""
 		return self._purity
 
 	@property
-	def lead_time(self):
-		""" """
+	def lead_time(self) -> float:
+		"""Lead time in days"""
 		return self._lead_time
 
 	@property
-	def date(self):
-		""" """
+	def date(self) -> str:
+		"""Date the quote was registered to the database"""
 		return self._date
 
 	@property
-	def type(self):
-		""" """
+	def type(self) -> str:
+		"""Description of this quote"""
 		return self._type
 
 	@property
-	def dict(self):
-		""" """
+	def dict(self) -> dict:
+		"""Dictionary representation of this quote"""
 		return dict(
 			id=self.id,
 			compound=self.compound,
@@ -190,7 +190,6 @@ class Quote:
 			entry=self.entry,
 			amount=self.amount,
 			price=self.price,
-			# currency=self.currency,
 			purity=self.purity,
 			lead_time=self.lead_time,
 			date=self.date,
@@ -198,15 +197,16 @@ class Quote:
 		)
 
 	@property
-	def currency_symbol(self):
-		""" """
+	def currency_symbol(self) -> str:
+		"""Currency symbol of the associated :class:`.Price`"""
 		return self.price.symbol
 	
 	### METHODS
 
 	### DUNDERS
 
-	def __repr__(self):
+	def __repr__(self) -> str:
+		"""Formatted string representation of this Quote"""
 
 		if self.purity:
 			purity = f' @ {self.purity:.0%}'
