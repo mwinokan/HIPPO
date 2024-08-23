@@ -42,7 +42,7 @@ class Pose:
 	_table = 'pose'
 
 	def __init__(self, 
-		db,
+		db: 'Database',
 		id: int,
 		inchikey: str | None,
 		alias: str | None,
@@ -100,7 +100,7 @@ class Pose:
 	### PROPERTIES
 
 	@property
-	def db(self):
+	def db(self) -> 'Database':
 		"""Returns a pointer to the parent database"""
 		return self._db
 
@@ -130,21 +130,21 @@ class Pose:
 			return self.inchikey
 
 	@alias.setter
-	def alias(self, n):
+	def alias(self, n) -> None:
 		"""Set the pose's alias"""
 		assert isinstance(n, str)
 		self._alias = n
 		self.db.update(table='pose', id=self.id, key='pose_alias', value=n)
 
 	@inchikey.setter
-	def inchikey(self, n):
+	def inchikey(self, n) -> None:
 		"""Set the pose's inchikey"""
 		assert isinstance(n, str)
 		self._inchikey = n
 		self.db.update(table='pose', id=self.id, key='pose_inchikey', value=n)
 
 	@property
-	def smiles(self):
+	def smiles(self) -> str:
 		"""Returns the pose's smiles"""
 		if not self._smiles:
 			from molparse.rdkit import mol_to_smiles
@@ -160,7 +160,7 @@ class Pose:
 		return self._smiles
 
 	@property
-	def target(self):
+	def target(self) -> 'Target':
 		"""Returns the pose's associated target"""
 		if isinstance(self._target, int):
 			self._target = self.db.get_target(id=self._target)
@@ -172,17 +172,17 @@ class Pose:
 		return self._compound_id
 
 	@property
-	def compound(self):
+	def compound(self) -> 'Compound':
 		"""Returns the pose's associated compound"""
 		return self.get_compound()
 
 	@property
-	def path(self):
+	def path(self) -> str:
 		"""Returns the pose's path"""
 		return self._path
 
 	@property
-	def reference(self):
+	def reference(self) -> 'Pose':
 		"""Returns the pose's protein reference (another pose)"""
 		if isinstance(self._reference, int):
 			self._reference = self.db.get_pose(id=self._reference)
@@ -204,7 +204,7 @@ class Pose:
 		self.db.update(table='pose', id=self.id, key='pose_reference', value=p)
 
 	@property
-	def mol(self):
+	def mol(self) -> 'rdkit.Chem.Mol':
 		"""Returns a pose's rdkit.Chem.Mol"""
 		if not self._mol and self.path:
 
@@ -296,7 +296,7 @@ class Pose:
 		self.db.update(table='pose', id=self.id, key='pose_mol', value=m.ToBinary())
 
 	@property
-	def protein_system(self):
+	def protein_system(self) -> 'molparse.System':
 		"""Returns the pose's protein molparse.System"""
 		if self._protein_system is None and self.path.endswith('.pdb'):
 			# logger.debug(f'getting pose protein system {self}')
@@ -309,7 +309,7 @@ class Pose:
 		self._protein_system = a
 
 	@property
-	def complex_system(self):
+	def complex_system(self) -> 'molparse.System':
 
 		if self.has_complex_pdb_path:
 			return mp.parse(self.path, verbosity=False)
@@ -335,8 +335,8 @@ class Pose:
 			raise NotImplementedError
 
 	@property
-	def has_complex_pdb_path(self):
-		""" """
+	def has_complex_pdb_path(self) -> bool:
+		"""Does this pose have a PDB file?"""
 		return self.path.endswith('.pdb')
 
 	@property
@@ -362,84 +362,98 @@ class Pose:
 		self.db.update(table='pose', id=self.id, key=f'pose_fingerprint', value=int(fp))
 
 	@property
-	def tags(self):
+	def tags(self) -> 'TagSet':
 		"""Returns the pose's tags"""
 		if not self._tags:
 			self._tags = self.get_tags()
 		return self._tags
 
 	@property
-	def inspirations(self):
+	def inspirations(self) -> 'PoseSet':
 		"""Returns the pose's inspirations"""
 		return self.get_inspirations()
 
 	@property
-	def features(self):
+	def features(self) -> 'list[molparse.rdkit.Feature]':
 		"""Returns the pose's features"""
 		return mp.rdkit.features_from_mol(self.mol)
 	
 	@property
-	def dict(self):
+	def dict(self) -> dict:
 		"""Serialised dictionary representing the pose"""
 		return self.get_dict()
 
 	@property
-	def table(self):
-		""" """
+	def table(self) -> str:
+		"""Get the name of the database table"""
 		return self._table
 
 	@property
-	def num_heavy_atoms(self):
+	def num_heavy_atoms(self) -> int:
 		"""Number of heavy atoms"""
 		if not self._num_heavy_atoms:
-			# print(self.compound_id)
 			self._num_heavy_atoms = self.db.get_compound_computed_property('num_heavy_atoms', self.compound_id)
 		return self._num_heavy_atoms
 
 	@property
-	def num_atoms_added(self):
+	def num_atoms_added(self) -> int:
 		"""Calculate the number of atoms added relative to the base or inspirations"""
-		# use base
 		if (b_id := self.base_id):
-			n_e = self.num_heavy_atoms
-			n_b = self.db.get_compound_computed_property('num_heavy_atoms', b_id)
-			return n_e - n_b
-			
-		# use inspirations
+			return self.num_atoms_added_wrt_base
 		else:
-			# raise NotImplementedError
-			inspirations = self.inspirations
-			assert inspirations
-	
-			count = 0
-			for i in inspirations:
-				count += i.num_heavy_atoms
-	
-			if (self_count := self.num_heavy_atoms) is None:
-				return None
-			return self.num_heavy_atoms - count
+			return self.num_atoms_added_wrt_inspirations
 
 	@property
-	def base_id(self):
+	def num_atoms_added_wrt_base(self) -> int | None:
+		"""Calculate the number of atoms added relative to the base"""
+		if not (b_id := self.base_id):
+			logger.error(f'{self} has no base')	
+			return None
+
+		n_e = self.num_heavy_atoms
+		n_b = self.db.get_compound_computed_property('num_heavy_atoms', b_id)
+		return n_e - n_b
+
+	@property
+	def num_atoms_added_wrt_inspirations(self) -> int | None:
+		"""Calculate the number of atoms added relative to its inspirations"""
+
+		inspirations = self.inspirations
+
+		if not inspirations:
+			logger.error(f'{self} has no inspirations')	
+			return None
+
+		count = 0
+		for i in inspirations:
+			count += i.num_heavy_atoms
+
+		if (self_count := self.num_heavy_atoms) is None:
+			return None
+
+		return self.num_heavy_atoms - count
+
+	@property
+	def base_id(self) -> int:
 		"""Get the base compound ID"""
 		if not self._base_id:
 			val, = self.db.select_where(table='compound', query='compound_base', key='id', value=self.compound_id)
 			self._base_id = val
 		return self._base_id
 
-	@property
-	def fields(self):
-		""" """
-		return [p for p in dir(self) if not p.startswith('_')]
+	# @property
+	# def fields(self):
+	# 	""" """
+	# 	return [p for p in dir(self) if not p.startswith('_')]
 	
 	@property
-	def energy_score(self):
-		""" """
+	def energy_score(self) -> float | None:
+		"""Energy score of the Pose (kcal/mol)"""
 		return self._energy_score
 
 	@property
-	def distance_score(self):
-		""" """
+	def distance_score(self) -> float | None:
+		"""Distance score of the Pose (w.r.t. its inspirations), in Angstroms"""
 		return self._distance_score
 
 	@property
@@ -458,11 +472,15 @@ class Pose:
 
 	### METHODS
 	
-	def score_inspiration(self, debug=False, draw=False):
-		"""
+	def score_inspiration(self,
+		debug: bool = False, 
+		draw: bool = False,
+	) -> float:
 
-		:param debug:  (Default value = False)
-		:param draw:  (Default value = False)
+		"""Score how well this Pose recapitulates the pharmacophoric features of its inspirations.
+
+		:param debug: Increased verbosity for debugging (Default value = False)
+		:param draw: Render each inspiration pose with it's features, the derivative with the combined features of the inspirations, and the derivative with it's features. (Default value = False)
 
 		"""
 		
@@ -481,24 +499,24 @@ class Pose:
 
 		return multi_sucos
 
-	def get_compound(self):
-		""" """
+	def get_compound(self) -> 'Compound':
+		"""Get the :class:`.Compound` that this pose is a conformer of"""
 		return self.db.get_compound(id=self._compound_id)
 
-	def get_tags(self):
-		""" """
+	def get_tags(self) -> 'TagSet':
+		"""Get this Pose's tags"""
 		tags = self.db.select_where(query='tag_name', table='tag', key='pose', value=self.id, multiple=True, none='quiet')
 		return TagSet(self, {t[0] for t in tags})
 	
-	def get_inspiration_ids(self):
-		""" """
+	def get_inspiration_ids(self) -> list[int]:
+		"""Get the :class:`.Pose` IDs of this pose's inspirations"""
 		inspirations = self.db.select_where(query='inspiration_original', table='inspiration', key='derivative', value=self.id, multiple=True, none='quiet')
 		if not inspirations:
 			return None
 		return set([v for v, in inspirations])
 
-	def get_inspirations(self):	
-		""" """
+	def get_inspirations(self) -> 'PoseSet':	
+		"""Get a :class:`.PoseSet` of this pose's inspirations"""
 		if not (inspirations := self.get_inspiration_ids()):
 			return None
 
@@ -516,12 +534,12 @@ class Pose:
 
 		"""Returns a dictionary representing this Pose. Arguments:
 
-		:param mol: bool: [True, False] (Default value = False)
-		:param inspirations: bool | str: [True, False, 'fragalysis'] (Default value = True)
-		:param reference: bool | str: [True, False, 'name'] (Default value = True)
-		:param metadata: bool:  (Default value = True)
-		:param duplicate_name: str | bool:  (Default value = False)
-		:param tags: bool:  (Default value = True)
+		:param mol: Include a ``rdkit.Chem.Mol`` in the output?  (Default value = False)
+		:param inspirations: Include inspirations? ``[True, False, 'fragalysis']`` Specify ``fragalysis`` to format as a comma-separated string (Default value = True)
+		:param reference: Include reference? ``[True, False, 'name']`` Specify ``name`` to include the :class:`.Pose` name rather than it's ID (Default value = True)
+		:param metadata: Include metadata? (Default value = True)
+		:param duplicate_name: Specify the name of a new column duplicating the pose name column  (Default value = False)
+		:param tags: bool: Include tags? (Default value = True)
 		
 		"""
 
@@ -867,17 +885,21 @@ class Pose:
 
 		# self.fingerprint = fingerprint
 
-	def draw(self, inspirations=True, protein=False, **kwargs):
+	def draw(self, 
+		inspirations: bool = True, 
+		protein: bool = False, 
+		**kwargs,
+	) -> None:
+
 		"""Render this pose (and its inspirations)
 
-		:param inspirations:  (Default value = True)
-		:param protein:  (Default value = False)
+		:param inspirations: Render the inspirations? (Default value = True)
+		:param protein: Render the protein? This wraps :meth:`.Pose.render` (Default value = False)
 
 		"""
 		
 		if protein:
-			from molparse.py3d import render
-			return render(self.complex_system, **kwargs)
+			self.render(**kwargs)
 
 		from molparse.rdkit import draw_mols
 		
@@ -885,16 +907,26 @@ class Pose:
 		if inspirations and self.inspirations:
 			mols += [i.mol for i in self.inspirations]
 		
-		return draw_mols(mols)
+		draw_mols(mols)
 
-	def render(self, **kwargs):
+	def render(self, 
+		protein='cartoon', 
+		ligand='stick', 
+		protein_color='spectrum',
+	) -> None:
+
+		"""Render this pose with the protein using py3Dmol
+
+		:param protein: protein representation, default = 'cartoon'
+		:param ligand: ligand representation, default = 'stick'
+		:param protein_color: color of protein representation, default = 'spectrum'
+
 		"""
 
-		"""
 		from molparse.py3d import render
-		return render(self.complex_system, **kwargs)
+		display(render(self.complex_system, protein=protein, ligand=ligand, protein_color=protein_color))
 
-	def grid(self):
+	def grid(self) -> None:
 		"""Draw a grid of this pose with its inspirations"""
 		from molparse.rdkit import draw_grid
 		from IPython.display import display
@@ -907,10 +939,13 @@ class Pose:
 
 		display(draw_grid(mols, labels=labels))
 
-	def summary(self, metadata:bool = True):
+	def summary(self, 
+		metadata:bool = True
+	) -> None:
+
 		"""Print a summary of this pose
 
-		:param metadata:bool:  (Default value = True)
+		:param metadata: include metadata (Default value = True)
 
 		"""
 		if self.alias:
@@ -932,8 +967,9 @@ class Pose:
 		if metadata:
 			logger.var('metadata', str(self.metadata))
 
-	def showcase(self):
-		""" """
+	def showcase(self) -> None:
+		"""Print and render this pose as if you were using :meth:`.PoseSet.interactive`"""
+		
 		self.summary(metadata=False)
 		self.grid()
 		self.draw()
@@ -941,14 +977,23 @@ class Pose:
 		logger.title('Metadata:')
 		pprint(self.metadata)
 
-	def plain_repr(self):
-		"""Unformatted __repr__"""
+	def plain_repr(self) -> str:
+		"""Unformatted detailed string representation"""
 		if self.name:
 			return f'{self.compound}->{self}: {self.name}'
 		else:
 			return f'{self.compound}->{self}'
 
-	def plot3d(self, features: bool = False, **kwargs):
+	def plot3d(self, 
+		features: bool = False, 
+		**kwargs,
+	) -> 'plotly.graph_objects.Figure':
+		"""Use Molparse/Plotly to create a 3d figure of this pose
+
+		:param features: include the features in the figure
+		:returns: a plotly Figure object
+
+		"""
 
 		mol = self.mol
 
@@ -963,13 +1008,18 @@ class Pose:
 
 	### DUNDERS
 
-	def __str__(self):
+	def __str__(self) -> str:
+		"""Unformatted string representation"""
 		return f'P{self.id}'
 
-	def __repr__(self):
+	def __repr__(self) -> str:
+		"""Formatted string representation"""
 		return f'{mcol.bold}{mcol.underline}{self.plain_repr()}{mcol.unbold}{mcol.ununderline}'
 
-	def __eq__(self, other):
+	def __eq__(self, 
+		other: 'Pose'
+	) -> bool:
+		"""Compare this pose with another instance"""
 
 		if isinstance(other, int):
 			return self.id == other
@@ -978,5 +1028,5 @@ class Pose:
 
 
 class InvalidMolError(Exception):
-	""" """
+	"""Exception to be thrown when the molecule could not be parsed"""
 	...
