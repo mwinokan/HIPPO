@@ -1,4 +1,3 @@
-
 import re
 import numpy as np
 from molparse.rdkit import mol_from_smiles
@@ -10,309 +9,334 @@ from datetime import datetime
 from string import ascii_uppercase
 
 from mlog import setup_logger
-logger = setup_logger('HIPPO')
+
+logger = setup_logger("HIPPO")
 
 from ase.data import chemical_symbols
+
 chemical_symbols = chemical_symbols[1:]
 chemical_symbols = sorted(chemical_symbols, key=lambda x: len(x), reverse=True)
 
+
 def df_row_to_dict(df_row):
-	"""
+    """
 
-	:param df_row: 
+    :param df_row:
 
-	"""
+    """
 
-	assert len(df_row) == 1, f'{len(df_row)=}'
+    assert len(df_row) == 1, f"{len(df_row)=}"
 
-	data = {}
+    data = {}
 
-	for col in df_row.columns:
+    for col in df_row.columns:
 
-		if col == 'Unnamed: 0':
-			continue
+        if col == "Unnamed: 0":
+            continue
 
-		value = df_row[col].values[0]
+        value = df_row[col].values[0]
 
-		if not isinstance(value,str) and np.isnan(value):
-			value = None
+        if not isinstance(value, str) and np.isnan(value):
+            value = None
 
-		data[col] = value
+        data[col] = value
 
-	return data
+    return data
+
 
 def remove_other_ligands(sys, residue_number, chain):
-	"""
+    """
 
-	:param sys: 
-	:param residue_number: 
-	:param chain: 
+    :param sys:
+    :param residue_number:
+    :param chain:
 
-	"""
-	
-	ligand_residues = [r.number for r in sys['rLIG'] if r.number != residue_number]
-	
-	# if ligand_residues:
-	for c in sys.chains:
-		if c.name != chain:
-			c.remove_residues(names=['LIG'], verbosity=0)
-		elif ligand_residues:
-			c.remove_residues(numbers=ligand_residues, verbosity=0)
+    """
 
-	# print([r.name_number_str for r in sys['rLIG']])
+    ligand_residues = [r.number for r in sys["rLIG"] if r.number != residue_number]
 
-	assert len([r.name_number_str for r in sys['rLIG']]) == 1, f"{sys.name} {[r.name_number_str for r in sys['rLIG']]}"
+    # if ligand_residues:
+    for c in sys.chains:
+        if c.name != chain:
+            c.remove_residues(names=["LIG"], verbosity=0)
+        elif ligand_residues:
+            c.remove_residues(numbers=ligand_residues, verbosity=0)
 
-	return sys
+    # print([r.name_number_str for r in sys['rLIG']])
+
+    assert (
+        len([r.name_number_str for r in sys["rLIG"]]) == 1
+    ), f"{sys.name} {[r.name_number_str for r in sys['rLIG']]}"
+
+    return sys
+
 
 def inchikey_from_smiles(smiles):
-	"""
+    """
 
-	:param smiles: 
+    :param smiles:
 
-	"""
-	mol = mol_from_smiles(smiles)
-	return MolToInchiKey(mol)
+    """
+    mol = mol_from_smiles(smiles)
+    return MolToInchiKey(mol)
+
 
 def flat_inchikey(smiles):
-	"""
+    """
 
-	:param smiles: 
+    :param smiles:
 
-	"""
-	smiles = sanitise_smiles(smiles)
-	return inchikey_from_smiles(smiles)
+    """
+    smiles = sanitise_smiles(smiles)
+    return inchikey_from_smiles(smiles)
+
 
 def remove_isotopes_from_smiles(smiles):
-	"""
+    """
 
-	:param smiles: 
+    :param smiles:
 
-	"""
+    """
 
-	mol = MolFromSmiles(smiles)
+    mol = MolFromSmiles(smiles)
 
-	atom_data = [(atom, atom.GetIsotope()) for atom in mol.GetAtoms()]
+    atom_data = [(atom, atom.GetIsotope()) for atom in mol.GetAtoms()]
 
-	for atom, isotope in atom_data:
-		if isotope:
-			atom.SetIsotope(0)
+    for atom, isotope in atom_data:
+        if isotope:
+            atom.SetIsotope(0)
 
-	return MolToSmiles(mol)
+    return MolToSmiles(mol)
+
 
 def smiles_has_isotope(smiles, regex=True):
-	"""
+    """
 
-	:param smiles: 
-	:param regex:  (Default value = True)
+    :param smiles:
+    :param regex:  (Default value = True)
 
-	"""
-	if regex:
-		return re.search(r'([\[][0-9]+[A-Z]+\])',smiles)
-	else:
-		mol = MolFromSmiles(smiles)
-		return any(atom.GetIsotope() for atom in mol.GetAtoms())
+    """
+    if regex:
+        return re.search(r"([\[][0-9]+[A-Z]+\])", smiles)
+    else:
+        mol = MolFromSmiles(smiles)
+        return any(atom.GetIsotope() for atom in mol.GetAtoms())
 
-def sanitise_smiles(s, verbosity=False, sanitisation_failed='error', radical='error'):
-	"""
 
-	:param s: 
-	:param verbosity:  (Default value = False)
-	:param sanitisation_failed:  (Default value = 'error')
-	:param radical:  (Default value = 'error')
+def sanitise_smiles(s, verbosity=False, sanitisation_failed="error", radical="error"):
+    """
 
-	"""
+    :param s:
+    :param verbosity:  (Default value = False)
+    :param sanitisation_failed:  (Default value = 'error')
+    :param radical:  (Default value = 'error')
 
-	assert isinstance(s, str), f'non-string smiles={s}'
+    """
 
-	orig_smiles = s
+    assert isinstance(s, str), f"non-string smiles={s}"
 
-	# if multiple molecules take the largest
-	if '.' in s:
-		s = sorted(s.split('.'), key=lambda x: len(x))[-1]
-	
-	# flatten the smiles
-	stereo_smiles = s
-	smiles = s.replace('@','')
-	smiles = smiles.replace('/','')
-	smiles = smiles.replace('\\','')
+    orig_smiles = s
 
-	# remove isotopic stuff
-	if smiles_has_isotope(smiles):
-		mout.warning(f'Isotope(s) in SMILES: {smiles}')
-		smiles = remove_isotopes_from_smiles(smiles)
+    # if multiple molecules take the largest
+    if "." in s:
+        s = sorted(s.split("."), key=lambda x: len(x))[-1]
 
-	# canonicalise
-	mol = MolFromSmiles(smiles)
-	if mol:
-		smiles = MolToSmiles(mol,True)
-	elif sanitisation_failed =='error':
-		raise SanitisationError
-	elif sanitisation_failed =='warning':
-		logger.warning(f'sanitisation failed for {smiles=}')
+    # flatten the smiles
+    stereo_smiles = s
+    smiles = s.replace("@", "")
+    smiles = smiles.replace("/", "")
+    smiles = smiles.replace("\\", "")
 
-	# check radicals
-	reconstruct = False
-	for atom in mol.GetAtoms():
-		if not atom.GetNumRadicalElectrons():
-			continue
+    # remove isotopic stuff
+    if smiles_has_isotope(smiles):
+        mout.warning(f"Isotope(s) in SMILES: {smiles}")
+        smiles = remove_isotopes_from_smiles(smiles)
 
-		if radical == 'warning':
-			logger.warning(f'Radical atom in {smiles=}')
-		elif radical == 'error':
-			raise SanitisationError(f'Radical atom in {smiles=}')
-		elif radical == 'remove':
-			logger.warning(f'Removed radical atom')
-			atom.SetNumRadicalElectrons(0)         
-			smiles = MolToSmiles(mol,True)
-			reconstruct = True
-			# atom.SetFormalCharge(0)
-		else:
-			raise NotImplementedError(f'Unknown option {radical=}')
+    # canonicalise
+    mol = MolFromSmiles(smiles)
+    if mol:
+        smiles = MolToSmiles(mol, True)
+    elif sanitisation_failed == "error":
+        raise SanitisationError
+    elif sanitisation_failed == "warning":
+        logger.warning(f"sanitisation failed for {smiles=}")
 
-	if reconstruct:
-		mol = AddHs(mol)
-		mol = RemoveHs(mol, implicitOnly=True)
-		smiles = MolToSmiles(mol,True)
-		logger.warning(f'New {smiles=}')
+    # check radicals
+    reconstruct = False
+    for atom in mol.GetAtoms():
+        if not atom.GetNumRadicalElectrons():
+            continue
 
-	if verbosity:
+        if radical == "warning":
+            logger.warning(f"Radical atom in {smiles=}")
+        elif radical == "error":
+            raise SanitisationError(f"Radical atom in {smiles=}")
+        elif radical == "remove":
+            logger.warning(f"Removed radical atom")
+            atom.SetNumRadicalElectrons(0)
+            smiles = MolToSmiles(mol, True)
+            reconstruct = True
+            # atom.SetFormalCharge(0)
+        else:
+            raise NotImplementedError(f"Unknown option {radical=}")
 
-		if smiles != orig_smiles:
+    if reconstruct:
+        mol = AddHs(mol)
+        mol = RemoveHs(mol, implicitOnly=True)
+        smiles = MolToSmiles(mol, True)
+        logger.warning(f"New {smiles=}")
 
-			annotated_smiles_str = orig_smiles.replace('.',f'{mcol.error}{mcol.underline}.{mcol.clear}{mcol.warning}')
-			annotated_smiles_str = annotated_smiles_str.replace('@',f'{mcol.error}{mcol.underline}@{mcol.clear}{mcol.warning}')
-			
-			mout.warning(f'SMILES was changed: {annotated_smiles_str} --> {smiles}')
+    if verbosity:
 
-	return smiles
+        if smiles != orig_smiles:
+
+            annotated_smiles_str = orig_smiles.replace(
+                ".", f"{mcol.error}{mcol.underline}.{mcol.clear}{mcol.warning}"
+            )
+            annotated_smiles_str = annotated_smiles_str.replace(
+                "@", f"{mcol.error}{mcol.underline}@{mcol.clear}{mcol.warning}"
+            )
+
+            mout.warning(f"SMILES was changed: {annotated_smiles_str} --> {smiles}")
+
+    return smiles
+
 
 def sanitise_mol(m):
-	"""
+    """
 
-	:param m: 
+    :param m:
 
-	"""
-	from rdkit.Chem import MolToMolBlock, MolFromMolBlock
-	return MolFromMolBlock(MolToMolBlock(m))
+    """
+    from rdkit.Chem import MolToMolBlock, MolFromMolBlock
+
+    return MolFromMolBlock(MolToMolBlock(m))
+
 
 def pose_gap(a, b):
-	"""
+    """
 
-	:param a: 
-	:param b: 
+    :param a:
+    :param b:
 
-	"""
+    """
 
-	from numpy.linalg import norm
-	from molparse.rdkit import mol_to_AtomGroup
+    from numpy.linalg import norm
+    from molparse.rdkit import mol_to_AtomGroup
 
-	min_dist = None
+    min_dist = None
 
-	a = mol_to_AtomGroup(a.mol)
-	b = mol_to_AtomGroup(b.mol)
+    a = mol_to_AtomGroup(a.mol)
+    b = mol_to_AtomGroup(b.mol)
 
-	for atom1 in a.atoms:
-		for atom2 in b.atoms:
-			dist = norm(atom1.np_pos - atom2.np_pos)
-			if min_dist is None or dist < min_dist:
-				min_dist = dist
+    for atom1 in a.atoms:
+        for atom2 in b.atoms:
+            dist = norm(atom1.np_pos - atom2.np_pos)
+            if min_dist is None or dist < min_dist:
+                min_dist = dist
 
-	return min_dist
+    return min_dist
+
 
 def formula_to_atomtype_dict(formula):
-	"""
+    """
 
-	:param formula: 
+    :param formula:
 
-	"""
+    """
 
-	import re
+    import re
 
-	remaining = formula.replace('+','')
+    remaining = formula.replace("+", "")
 
-	atomtype_dict = {}
-	
-	while remaining:
-		for symbol in chemical_symbols:
-			if remaining.startswith(symbol):
-				remaining = remaining.removeprefix(symbol)
+    atomtype_dict = {}
 
-				count_str = re.findall(r'^([0-9]*)', remaining)[0]
+    while remaining:
+        for symbol in chemical_symbols:
+            if remaining.startswith(symbol):
+                remaining = remaining.removeprefix(symbol)
 
-				if count_str:
-					remaining = remaining.removeprefix(count_str)
-					count = int(count_str)
-				else:
-					count = 1
+                count_str = re.findall(r"^([0-9]*)", remaining)[0]
 
-				atomtype_dict[symbol] = count
+                if count_str:
+                    remaining = remaining.removeprefix(count_str)
+                    count = int(count_str)
+                else:
+                    count = 1
 
-				break
-		else:
-			raise Exception(f'Could not match any chemical symbol to the start of {remaining} {formula=}')
+                atomtype_dict[symbol] = count
 
-	return atomtype_dict
+                break
+        else:
+            raise Exception(
+                f"Could not match any chemical symbol to the start of {remaining} {formula=}"
+            )
+
+    return atomtype_dict
+
 
 def combine_atomtype_dicts(atomtype_dicts):
-	"""
+    """
 
-	:param atomtype_dicts: 
+    :param atomtype_dicts:
 
-	"""
+    """
 
-	merged = {}
-	for atomtype_dict in atomtype_dicts:
-		for symbol, count in atomtype_dict.items():
-			if symbol not in merged:
-				merged[symbol] = 0
+    merged = {}
+    for atomtype_dict in atomtype_dicts:
+        for symbol, count in atomtype_dict.items():
+            if symbol not in merged:
+                merged[symbol] = 0
 
-			merged[symbol] += count
+            merged[symbol] += count
 
-	return merged
+    return merged
+
 
 def atomtype_dict_to_formula(atomtype_dict):
-	"""
+    """
 
-	:param atomtype_dict: 
+    :param atomtype_dict:
 
-	"""
-	
-	symbols = []
+    """
 
-	"""For organic compounds, the order is carbon, hydrogen, 
+    symbols = []
+
+    """For organic compounds, the order is carbon, hydrogen, 
 	then all other elements in alphabetical order of their chemical symbols."""
 
-	key = 'C'
-	if key in atomtype_dict:
-		value = atomtype_dict[key]
-		if value > 1:
-			symbols.append(f'C{value}')
-		else:
-			symbols.append('C')
+    key = "C"
+    if key in atomtype_dict:
+        value = atomtype_dict[key]
+        if value > 1:
+            symbols.append(f"C{value}")
+        else:
+            symbols.append("C")
 
-	key = 'H'
-	if key in atomtype_dict:
-		value = atomtype_dict[key]
-		if value > 1:
-			symbols.append(f'{key}{value}')
-		else:
-			symbols.append(key)
+    key = "H"
+    if key in atomtype_dict:
+        value = atomtype_dict[key]
+        if value > 1:
+            symbols.append(f"{key}{value}")
+        else:
+            symbols.append(key)
 
-	keys = sorted(list(atomtype_dict.keys()))
+    keys = sorted(list(atomtype_dict.keys()))
 
-	for key in keys:
-		value = atomtype_dict[key]
-		if key in ['C', 'H']:
-			continue
-		if value > 1:
-			symbols.append(f'{key}{value}')
-		else:
-			symbols.append(key)
+    for key in keys:
+        value = atomtype_dict[key]
+        if key in ["C", "H"]:
+            continue
+        if value > 1:
+            symbols.append(f"{key}{value}")
+        else:
+            symbols.append(key)
 
-	return ''.join(symbols)
+    return "".join(symbols)
 
-ALPHANUMERIC_CHARS = '0123456789' + ascii_uppercase
+
+ALPHANUMERIC_CHARS = "0123456789" + ascii_uppercase
+
 
 def numberToBase(n, b):
     if n == 0:
@@ -323,6 +347,7 @@ def numberToBase(n, b):
         n //= b
     return digits[::-1]
 
+
 def dt_hash():
     dt = datetime.now()
     x = int(dt.month*36000*24*365.25 + dt.day*36000*24 + dt.hour*36000 + dt.minute*600 + dt.second*10 + dt.microsecond/10000)
@@ -330,5 +355,6 @@ def dt_hash():
     return timehash
 
 class SanitisationError(Exception):
-	""" """
-	...
+    """ """
+
+    ...
