@@ -1,260 +1,253 @@
-
 # from .db import Database
 from collections.abc import MutableSet
 import mcol
 
+
 class TagTable:
-	
-	"""Object representing the 'tag' table in the :class:`.Database`.
+    """Object representing the 'tag' table in the :class:`.Database`.
 
-	.. attention::
+    .. attention::
 
-		:class:`.TagTable` objects should not be created directly. Instead use the :meth:`.HIPPO.tags` property.
-	
-	"""
+            :class:`.TagTable` objects should not be created directly. Instead use the :meth:`.HIPPO.tags` property.
 
-	_table = 'tag'
+    """
 
-	def __init__(self, 
-		db: 'Database', 
-	) -> None:
-		
-		self._db = db
+    _table = "tag"
 
-	### FACTORIES
+    def __init__(
+        self,
+        db: "Database",
+    ) -> None:
 
-	### PROPERTIES
+        self._db = db
 
-	@property
-	def db(self) -> 'Database':
-		"""Returns a pointer to the parent database"""
-		return self._db
-	
-	@property
-	def table(self) -> str:
-		"""Returns the name of the :class:`.Database` table"""
-		return self._table
+    ### FACTORIES
 
-	@property
-	def unique(self) -> set[str]:
-		"""Returns a set of unique tag names contained in the table"""
-		values = self.db.select(table=self.table, query='DISTINCT tag_name', multiple=True)
-		return set(v for v, in values)
+    ### PROPERTIES
 
-	### METHODS
+    @property
+    def db(self) -> "Database":
+        """Returns a pointer to the parent database"""
+        return self._db
 
-	### DUNDERS
+    @property
+    def table(self) -> str:
+        """Returns the name of the :class:`.Database` table"""
+        return self._table
 
-	def __repr__(self) -> str:
-		"""Formatted representation of this object"""
-		return f'{mcol.bold}{mcol.underline}Tags {self.unique}{mcol.clear}'
+    @property
+    def unique(self) -> set[str]:
+        """Returns a set of unique tag names contained in the table"""
+        values = self.db.select(
+            table=self.table, query="DISTINCT tag_name", multiple=True
+        )
+        return set(v for v, in values)
+
+    ### METHODS
+
+    ### DUNDERS
+
+    def __repr__(self) -> str:
+        """Formatted representation of this object"""
+        return f"{mcol.bold}{mcol.underline}Tags {self.unique}{mcol.clear}"
 
 
 class TagSet(MutableSet):
-	
-	"""Object representing a subset of the 'tag' table in the :class:`.Database` belonging to a certain :class:`.Compound` or :class:`.Pose`.
+    """Object representing a subset of the 'tag' table in the :class:`.Database` belonging to a certain :class:`.Compound` or :class:`.Pose`.
 
-	.. attention::
+    .. attention::
 
-		:class:`.TagSet` objects should not be created directly. Instead use the :meth:`.Compound.tags` or :meth:`.Pose.tags` property.
+            :class:`.TagSet` objects should not be created directly. Instead use the :meth:`.Compound.tags` or :meth:`.Pose.tags` property.
 
-	"""
+    """
 
-	def __init__(self, 
-		parent: 'Compound | Pose',
-		tags: list | tuple | None = None, 
-		immutable: bool = False,
-		commit: bool = True,
-	):
-		
-		self._elements = []
-		self._immutable = immutable
-		self._parent = parent
+    def __init__(
+        self,
+        parent: "Compound | Pose",
+        tags: list | tuple | None = None,
+        immutable: bool = False,
+        commit: bool = True,
+    ):
 
-		tags = tags or ()
+        self._elements = []
+        self._immutable = immutable
+        self._parent = parent
 
-		for tag in tags:
-			self.add(tag, commit=False)
-		
-		if commit:
-			self.db.commit()
-		
-	### FACTORIES
+        tags = tags or ()
 
-	### PROPERTIES
+        for tag in tags:
+            self.add(tag, commit=False)
 
-	@property
-	def tags(self) -> list:
-		"""Returns the elements in this set"""
-		return self._elements
+        if commit:
+            self.db.commit()
 
-	@property
-	def immutable(self) -> bool:
-		"""Is this set is immutable?"""
-		return self._immutable
-	
-	@immutable.setter
-	def immutable(self, 
-		b: bool,
-	) -> None:
-		self._immutable = b
+    ### FACTORIES
 
-	@property
-	def parent(self):
-		"""Returns this set of tags parent :class:`.Compound` or :class:`.Pose`."""
-		return self._parent
+    ### PROPERTIES
 
-	@property
-	def db(self) -> 'Database':
-		"""Returns a pointer to the parent database"""
-		return self.parent.db
+    @property
+    def tags(self) -> list:
+        """Returns the elements in this set"""
+        return self._elements
 
-	
-	### DATABASE
+    @property
+    def immutable(self) -> bool:
+        """Is this set is immutable?"""
+        return self._immutable
 
-	def _remove_tag_from_db(self, 
-		tag: str,
-	) -> None:
+    @immutable.setter
+    def immutable(
+        self,
+        b: bool,
+    ) -> None:
+        self._immutable = b
 
-		"""Delete a specific tag assignment for the parent :class:`.Compound`/:class:`.Pose`
+    @property
+    def parent(self):
+        """Returns this set of tags parent :class:`.Compound` or :class:`.Pose`."""
+        return self._parent
 
-		:param tag: tag to delete
+    @property
+    def db(self) -> "Database":
+        """Returns a pointer to the parent database"""
+        return self.parent.db
 
-		"""
-		sql = f'DELETE FROM tag WHERE tag_name="{tag}" AND tag_{self.parent.table} = {self.parent.id}'
-		self.db.execute(sql)
+    ### DATABASE
 
-	def _clear_tags_from_db(self, 
-		tag: str,
-	) -> None:
+    def _remove_tag_from_db(
+        self,
+        tag: str,
+    ) -> None:
+        """Delete a specific tag assignment for the parent :class:`.Compound`/:class:`.Pose`
 
-		"""Delete all tag assignments for the parent :class:`.Compound`/:class:`.Pose`
+        :param tag: tag to delete
 
-		:param tag: tag to delete
+        """
+        sql = f'DELETE FROM tag WHERE tag_name="{tag}" AND tag_{self.parent.table} = {self.parent.id}'
+        self.db.execute(sql)
 
-		"""
-		sql = f'DELETE FROM tag WHERE tag_{self.parent.table} = {self.parent.id}'
-		self.db.execute(sql)
+    def _clear_tags_from_db(
+        self,
+        tag: str,
+    ) -> None:
+        """Delete all tag assignments for the parent :class:`.Compound`/:class:`.Pose`
 
-	def _add_tag_to_db(self, 
-		tag: str, 
-		commit: bool = True,
-	) -> None:
+        :param tag: tag to delete
 
-		"""Assign a given tag to the parent
+        """
+        sql = f"DELETE FROM tag WHERE tag_{self.parent.table} = {self.parent.id}"
+        self.db.execute(sql)
 
-		:param tag: tag to add
-		:param commit: commit the changes? (Default value = True)
+    def _add_tag_to_db(
+        self,
+        tag: str,
+        commit: bool = True,
+    ) -> None:
+        """Assign a given tag to the parent
 
-		"""
-		payload = { 'name':tag, self.parent.table:self.parent.id }
-		self.db.insert_tag(**payload, commit=commit)
-			
+        :param tag: tag to add
+        :param commit: commit the changes? (Default value = True)
 
-	### METHODS
+        """
+        payload = {"name": tag, self.parent.table: self.parent.id}
+        self.db.insert_tag(**payload, commit=commit)
 
-	def pop(self) -> str:
-		"""Pop the last element"""
-		assert not self.immutable
-		return self._elements.pop()
+    ### METHODS
 
-	def discard(self,
-		tag: str,
-	) -> None:
+    def pop(self) -> str:
+        """Pop the last element"""
+        assert not self.immutable
+        return self._elements.pop()
 
-		"""Discard an element
+    def discard(
+        self,
+        tag: str,
+    ) -> None:
+        """Discard an element
 
-		:param tag: tag to discard
+        :param tag: tag to discard
 
-		"""
+        """
 
-		self.discard(tag)
+        self.discard(tag)
 
-	def clear(self):
-		"""Clear all tags"""
-		self._elements = []
-		self._clear_tags_from_db(self)
+    def clear(self):
+        """Clear all tags"""
+        self._elements = []
+        self._clear_tags_from_db(self)
 
-	def remove(self, 
-		tag: str
-	) -> None:
-		
-		"""Remove an element
+    def remove(self, tag: str) -> None:
+        """Remove an element
 
-		:param tag: tag to remove
-		:raises ValueError: if tag is not in set 
+        :param tag: tag to remove
+        :raises ValueError: if tag is not in set
 
-		"""
+        """
 
-		assert not self.immutable
-		if tag in self:
-			i = self._elements.index(tag)
-			del self._elements[i]
-			self._remove_tag_from_db(tag)
-		else:
-			raise ValueError(f'{tag} not in {self}')
+        assert not self.immutable
+        if tag in self:
+            i = self._elements.index(tag)
+            del self._elements[i]
+            self._remove_tag_from_db(tag)
+        else:
+            raise ValueError(f"{tag} not in {self}")
 
-	def add(self, 
-		tag: str, 
-		commit: bool = True,
-	) -> None:
+    def add(
+        self,
+        tag: str,
+        commit: bool = True,
+    ) -> None:
+        """Add a tag to the set
 
-		"""Add a tag to the set
+        :param tag: tag to add
+        :param commit: commit the change? (Default value = True)
 
-		:param tag: tag to add
-		:param commit: commit the change? (Default value = True)
+        """
 
-		"""
+        assert not self.immutable
+        if tag not in self._elements:
+            self._elements.append(tag)
+            self._add_tag_to_db(tag, commit=commit)
 
-		assert not self.immutable
-		if tag not in self._elements:
-			self._elements.append(tag)
-			self._add_tag_to_db(tag, commit=commit)
+    def glob(self, pattern: str) -> list[str]:
+        """Construct a list from tags in the set names that match a given UNIX-style pattern.
 
-	def glob(self, 
-		pattern: str
-	) -> list[str]:
-		
-		"""Construct a list from tags in the set names that match a given UNIX-style pattern.
+        :param pattern: unix style pattern with shell-style wildcards
+        :returns: list of tags
 
-		:param pattern: unix style pattern with shell-style wildcards
-		:returns: list of tags
+        """
 
-		"""
+        import fnmatch
 
-		import fnmatch
-		return fnmatch.filter(self.tags, pattern)
+        return fnmatch.filter(self.tags, pattern)
 
-	### DUNDERS
+    ### DUNDERS
 
-	def __contains__(self, 
-		tag: str
-	) -> bool:
-		"""Is this tag in the set?"""
-		return tag in self.tags
+    def __contains__(self, tag: str) -> bool:
+        """Is this tag in the set?"""
+        return tag in self.tags
 
-	def __repr__(self) -> str:
-		"""Formatted representation of this set"""
-		return str(self._elements)
+    def __repr__(self) -> str:
+        """Formatted representation of this set"""
+        return str(self._elements)
 
-	def __len__(self) -> int:
-		"""Number of tags in this set"""
-		return len(self._elements)
+    def __len__(self) -> int:
+        """Number of tags in this set"""
+        return len(self._elements)
 
-	def __iter__(self):
-		"""Iterate through this set"""
-		return iter(self._elements)
+    def __iter__(self):
+        """Iterate through this set"""
+        return iter(self._elements)
 
-	def __add__(self, other):
-		"""
-		.. attention::
+    def __add__(self, other):
+        """
+        .. attention::
 
-			Adding sets together is not supported
+                Adding sets together is not supported
 
-		"""
-		raise NotImplementedError
+        """
+        raise NotImplementedError
 
-	def __getitem__(self, key: int):
-		"""Get a specific element in the set by index"""
-		return self._elements[key]
-
+    def __getitem__(self, key: int):
+        """Get a specific element in the set by index"""
+        return self._elements[key]
