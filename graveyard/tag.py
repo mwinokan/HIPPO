@@ -1,24 +1,23 @@
-
 class Tag:
 
-	def __init__(self, name):
-		
-		self._name = name
-		
-	### FACTORIES
+    def __init__(self, name):
 
-	### PROPERTIES
+        self._name = name
 
-	@property
-	def name(self):
-		return self._name
+    ### FACTORIES
 
-	### METHODS
+    ### PROPERTIES
 
-	### DUNDERS
+    @property
+    def name(self):
+        return self._name
 
-	def __str__(self):
-		return self.name
+    ### METHODS
 
-	def __repr__(self):
-		return f'Tag("{self.name}")'
+    ### DUNDERS
+
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return f'Tag("{self.name}")'

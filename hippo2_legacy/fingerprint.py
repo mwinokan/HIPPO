@@ -1,4 +1,3 @@
-
 import mout
 from pprint import pprint
 import numpy as np
@@ -11,17 +10,18 @@ from collections import UserDict
 CUTOFF_PADDING = 1.0
 
 FEATURE_PAIR_CUTOFFS = {
-    'Donor Acceptor': 3.5 + CUTOFF_PADDING,
-    'Acceptor Donor': 3.5 + CUTOFF_PADDING,
-    'NegIonizable PosIonizable': 4.5 + CUTOFF_PADDING,
-    'PosIonizable NegIonizable': 4.5 + CUTOFF_PADDING,
-    'Aromatic PosIonizable': 4.5 + CUTOFF_PADDING,
-    'PosIonizable Aromatic': 4.5 + CUTOFF_PADDING,
-    'Aromatic Aromatic': 6.0 + CUTOFF_PADDING,
-    'Hydrophobe Hydrophobe': 4.5 + CUTOFF_PADDING,
+    "Donor Acceptor": 3.5 + CUTOFF_PADDING,
+    "Acceptor Donor": 3.5 + CUTOFF_PADDING,
+    "NegIonizable PosIonizable": 4.5 + CUTOFF_PADDING,
+    "PosIonizable NegIonizable": 4.5 + CUTOFF_PADDING,
+    "Aromatic PosIonizable": 4.5 + CUTOFF_PADDING,
+    "PosIonizable Aromatic": 4.5 + CUTOFF_PADDING,
+    "Aromatic Aromatic": 6.0 + CUTOFF_PADDING,
+    "Hydrophobe Hydrophobe": 4.5 + CUTOFF_PADDING,
 }
 
 FEATURE_METADATA = {}
+
 
 class Fingerprint(UserDict):
 
@@ -33,7 +33,9 @@ class Fingerprint(UserDict):
         self.data = self.calculate(ligand_mol, protein_system)
 
     def __repr__(self):
-        return f'Fingerprint(#features={len(self)}, #interactions={self.num_interactions})'
+        return (
+            f"Fingerprint(#features={len(self)}, #interactions={self.num_interactions})"
+        )
 
     ### PROPERTIES
 
@@ -44,7 +46,7 @@ class Fingerprint(UserDict):
     @property
     def num_interactions(self):
         return sum([n for n in self.data.values()])
-    
+
     ### METHODS
 
     def trim_keys(self, shared_keys):
@@ -64,7 +66,9 @@ class Fingerprint(UserDict):
 
         comp_features_by_family = {}
         for family in FEATURE_FAMILIES:
-            comp_features_by_family[family] = [f for f in comp_features if f.family == family]
+            comp_features_by_family[family] = [
+                f for f in comp_features if f.family == family
+            ]
 
         for prot_feature in protein_features:
 
@@ -74,9 +78,13 @@ class Fingerprint(UserDict):
 
             complementary_comp_features = comp_features_by_family[complementary_family]
 
-            cutoff = FEATURE_PAIR_CUTOFFS[f'{prot_family} {complementary_family}']
+            cutoff = FEATURE_PAIR_CUTOFFS[f"{prot_family} {complementary_family}"]
 
-            valid_features = [f for f in complementary_comp_features if np.linalg.norm(prot_feature - f) <= cutoff]
+            valid_features = [
+                f
+                for f in complementary_comp_features
+                if np.linalg.norm(prot_feature - f) <= cutoff
+            ]
 
             feature_key = prot_feature.family_name_number_chain_atoms_str
 

@@ -1,4 +1,3 @@
-
 import pycule
 import mout
 import mcol
@@ -9,418 +8,460 @@ from requests import TooManyRedirects
 
 from .bb import BuildingBlock, PricePicker
 
+
 class Quoter:
 
-	def __init__(self, supplier, username, password, force=False):
+    def __init__(self, supplier, username, password, force=False):
 
-		self.supplier = supplier
-		self.username = username
-		self.password = password
-		# self.catalogue = catalogue
-		self.force = force
+        self.supplier = supplier
+        self.username = username
+        self.password = password
+        # self.catalogue = catalogue
+        self.force = force
 
-		mout.var('supplier', supplier)
-		if force:
-			mout.warning('Not using cache!')
-		mout.var('pycule', str(Path(pycule.__file__).parent), valCol=mcol.file)
+        mout.var("supplier", supplier)
+        if force:
+            mout.warning("Not using cache!")
+        mout.var("pycule", str(Path(pycule.__file__).parent), valCol=mcol.file)
 
-		self.requests_data = dict(id_queries={}, smiles_queries={})
+        self.requests_data = dict(id_queries={}, smiles_queries={})
 
-		if self.supplier == 'enamine':
-			self.query = self.get_bb_info
-			self.wrapper = pycule.core.EnamineWrapper(username=username, password=password)
+        if self.supplier == "enamine":
+            self.query = self.get_bb_info
+            self.wrapper = pycule.core.EnamineWrapper(
+                username=username, password=password
+            )
 
-			from pycule.decorators import ENAMINE_MAXIMUM_REQUESTS_PER_MINUTE, ENAMINE_MAXIMUM_REQUESTS_PER_DAY
-			mout.var('max frequency', ENAMINE_MAXIMUM_REQUESTS_PER_MINUTE, unit='per minute')
-			mout.var('max requests', ENAMINE_MAXIMUM_REQUESTS_PER_DAY, unit='per day')
-		
-		else:
-			mout.error(f'Unsupported supplier: "{supplier}"')
+            from pycule.decorators import (
+                ENAMINE_MAXIMUM_REQUESTS_PER_MINUTE,
+                ENAMINE_MAXIMUM_REQUESTS_PER_DAY,
+            )
 
-	@classmethod
-	def from_json(cls, path):
+            mout.var(
+                "max frequency", ENAMINE_MAXIMUM_REQUESTS_PER_MINUTE, unit="per minute"
+            )
+            mout.var("max requests", ENAMINE_MAXIMUM_REQUESTS_PER_DAY, unit="per day")
 
-		self = cls.__new__(cls)
+        else:
+            mout.error(f'Unsupported supplier: "{supplier}"')
 
-		data = json.load(open(path,'rt'))
+    @classmethod
+    def from_json(cls, path):
 
-		self.__init__(
-			data['supplier'],
-			data['username'],
-			data['password'],
-			data['force'],
-		)
+        self = cls.__new__(cls)
 
-		self.requests_data = dict(id_queries=data['id_queries'], smiles_queries=data['smiles_queries'])
-		
-		return self
+        data = json.load(open(path, "rt"))
 
-	def write_json(self, path):
+        self.__init__(
+            data["supplier"],
+            data["username"],
+            data["password"],
+            data["force"],
+        )
 
-		mout.out(f'writing {mcol.file}{path}{mcol.clear} ... ', end='')
+        self.requests_data = dict(
+            id_queries=data["id_queries"], smiles_queries=data["smiles_queries"]
+        )
 
-		f = open(path, 'wt')
+        return self
 
-		data = dict(
-			supplier=self.supplier,
-			username=self.username,
-			password=self.password,
-			# catalogue=self.catalogue,
-			force=self.force,
-			id_queries=self.requests_data['id_queries'],
-			smiles_queries=self.requests_data['smiles_queries'],
-		)
+    def write_json(self, path):
 
-		json.dump(data, f)
-		mout.out('Done.')
+        mout.out(f"writing {mcol.file}{path}{mcol.clear} ... ", end="")
 
-	def in_cache(self, comp):
-		if comp.name_is_smiles and comp.smiles in self.requests_data['smiles_queries']:
-			return True
+        f = open(path, "wt")
 
-		elif not comp.name_is_smiles and comp.name in self.requests_data['smiles_queries']:
-			return True
+        data = dict(
+            supplier=self.supplier,
+            username=self.username,
+            password=self.password,
+            # catalogue=self.catalogue,
+            force=self.force,
+            id_queries=self.requests_data["id_queries"],
+            smiles_queries=self.requests_data["smiles_queries"],
+        )
 
-		elif not comp.name_is_smiles and comp.name in self.requests_data['id_queries']:
-			return True
+        json.dump(data, f)
+        mout.out("Done.")
 
-		return False
+    def in_cache(self, comp):
+        if comp.name_is_smiles and comp.smiles in self.requests_data["smiles_queries"]:
+            return True
 
-	def get_bb_info(self, comp):
+        elif (
+            not comp.name_is_smiles
+            and comp.name in self.requests_data["smiles_queries"]
+        ):
+            return True
 
-		try:
+        elif not comp.name_is_smiles and comp.name in self.requests_data["id_queries"]:
+            return True
 
-			# ### CACHE
+        return False
 
-			if comp.name_is_smiles and comp.smiles in self.requests_data['smiles_queries']:
-				entry = self.requests_data['smiles_queries'][comp.smiles]
-				if entry is None:
-					raise NotInCatalogues(f'Cached entry is None: {comp.smiles}')
-				comp.name = entry
+    def get_bb_info(self, comp):
 
-			elif not comp.name_is_smiles and comp.name in self.requests_data['smiles_queries']:
-				entry = self.requests_data['smiles_queries'][comp.name]
-				if entry is None:
-					raise NotInCatalogues(f'Cached entry is None: {comp.name}')
-				comp.name = entry
-            
-			### QUERY
+        try:
 
-			# we have a name
-			if not comp.name_is_smiles:
+            # ### CACHE
 
-				comp_id = comp.name
+            if (
+                comp.name_is_smiles
+                and comp.smiles in self.requests_data["smiles_queries"]
+            ):
+                entry = self.requests_data["smiles_queries"][comp.smiles]
+                if entry is None:
+                    raise NotInCatalogues(f"Cached entry is None: {comp.smiles}")
+                comp.name = entry
 
-				if not self.force and comp_id in self.requests_data['id_queries']:
-					result = self.requests_data['id_queries'][comp_id]
-					# mout.out(f"{mcol.success}using cache.")
-					try:
-						return self.parse_enamine_response(result, comp)
-					except NoDataInReponse:
-						mout.header(f'{mcol.error}null data in cache ({comp_id=}).')
+            elif (
+                not comp.name_is_smiles
+                and comp.name in self.requests_data["smiles_queries"]
+            ):
+                entry = self.requests_data["smiles_queries"][comp.name]
+                if entry is None:
+                    raise NotInCatalogues(f"Cached entry is None: {comp.name}")
+                comp.name = entry
 
-				else:
+            ### QUERY
 
-					# mout.header(f'Quoting: {comp.name}, {comp.smiles}')
+            # we have a name
+            if not comp.name_is_smiles:
 
-					# mout.out(f"Enamine ID search...", end='')
-					try:
-						parsed, result = self.enamine_comp_id_query(comp)
-					
-						if parsed:
-							self.requests_data['id_queries'][comp_id] = result
-						else:
-							mout.error(f'Failed to parse request data {comp_id}')
-							return None
+                comp_id = comp.name
 
-						# mout.out(f"{mcol.success}OK.")
-						return parsed
+                if not self.force and comp_id in self.requests_data["id_queries"]:
+                    result = self.requests_data["id_queries"][comp_id]
+                    # mout.out(f"{mcol.success}using cache.")
+                    try:
+                        return self.parse_enamine_response(result, comp)
+                    except NoDataInReponse:
+                        mout.header(f"{mcol.error}null data in cache ({comp_id=}).")
 
-					except NotInCatalogues as e:
-						# mout.error(f'{e}: {comp.name}')
-						mout.header(f'{mcol.error}not found ({comp_id=}).')
+                else:
 
-						if hasattr(comp,'_catalogue_renamed'):
-							if getattr(comp,'_catalogue_renamed'):
-								raise NotInCatalogues(f'Renamed entry not found {comp_id}')
-				
-			# search by smiles
-				
-			# mout.out("Enamine SMILES search...", end=' ')
+                    # mout.header(f'Quoting: {comp.name}, {comp.smiles}')
 
-			smiles = comp.smiles
-			
-			# if not self.force and smiles in self.requests_data['smiles_queries']:
-				# result = self.requests_data['smiles_queries'][smiles]
+                    # mout.out(f"Enamine ID search...", end='')
+                    try:
+                        parsed, result = self.enamine_comp_id_query(comp)
 
-			comp_id = self.enamine_exact_search(comp)
+                        if parsed:
+                            self.requests_data["id_queries"][comp_id] = result
+                        else:
+                            mout.error(f"Failed to parse request data {comp_id}")
+                            return None
 
-			if comp_id is None:
-				self.requests_data['smiles_queries'][comp.name] = None
-				raise NotInCatalogues("Couldn't find SMILES in BB, SCR, MADE, or REAL")
+                        # mout.out(f"{mcol.success}OK.")
+                        return parsed
 
-			if comp.name_is_smiles:
-				self.requests_data['smiles_queries'][smiles] = comp_id
-			else:
-				self.requests_data['smiles_queries'][comp.name] = comp_id
-			
-			# mout.out(f"{mcol.success}OK.")
+                    except NotInCatalogues as e:
+                        # mout.error(f'{e}: {comp.name}')
+                        mout.header(f"{mcol.error}not found ({comp_id=}).")
 
-			mout.out(f"Renaming and retrying...")
-			comp.name = comp_id
-			comp._catalogue_renamed = True
+                        if hasattr(comp, "_catalogue_renamed"):
+                            if getattr(comp, "_catalogue_renamed"):
+                                raise NotInCatalogues(
+                                    f"Renamed entry not found {comp_id}"
+                                )
 
-			return self.get_bb_info(comp)
+            # search by smiles
 
-		except TooManyRedirects as e:
-			mout.error(f'TooManyRedirects {e}')
-			mout.error(f'{comp}')
-			return None
+            # mout.out("Enamine SMILES search...", end=' ')
 
-	def __call__(self, *args, **kwargs):
-		return self.query(*args, **kwargs)
+            smiles = comp.smiles
 
-	def enamine_exact_search(self, compound):
+            # if not self.force and smiles in self.requests_data['smiles_queries']:
+            # result = self.requests_data['smiles_queries'][smiles]
 
-		'''
-		exactsearch(self, smiles: str, currency: str = 'USD', catalogue: str = 'BB') -> requests.models.Response
+            comp_id = self.enamine_exact_search(comp)
+
+            if comp_id is None:
+                self.requests_data["smiles_queries"][comp.name] = None
+                raise NotInCatalogues("Couldn't find SMILES in BB, SCR, MADE, or REAL")
+
+            if comp.name_is_smiles:
+                self.requests_data["smiles_queries"][smiles] = comp_id
+            else:
+                self.requests_data["smiles_queries"][comp.name] = comp_id
+
+            # mout.out(f"{mcol.success}OK.")
+
+            mout.out(f"Renaming and retrying...")
+            comp.name = comp_id
+            comp._catalogue_renamed = True
+
+            return self.get_bb_info(comp)
+
+        except TooManyRedirects as e:
+            mout.error(f"TooManyRedirects {e}")
+            mout.error(f"{comp}")
+            return None
+
+    def __call__(self, *args, **kwargs):
+        return self.query(*args, **kwargs)
+
+    def enamine_exact_search(self, compound):
+        """
+                exactsearch(self, smiles: str, currency: str = 'USD', catalogue: str = 'BB') -> requests.models.Response
         This search returns the exact match search results for the queried compound.
-        
+
         Args:
             code (str): Required -  the SMILES to search for
             currency (str):  Required -  set to “USD”. Available values: "USD" and "EUR"
             mode (str): Optional (default is "BB"). Available values: "BB", "SCR", "REAL"
         Returns:
             dict: dictionary containing the search response
-		'''
+        """
 
-		smiles = compound.smiles
+        smiles = compound.smiles
 
-		result = self.wrapper.exactsearch(smiles, "BB")
-		# pprint(result)
+        result = self.wrapper.exactsearch(smiles, "BB")
+        # pprint(result)
 
-		if result['response']['result']['code'] == 0:
-			try:
-				comp_id = self.pick_enamine_exact_data(smiles, result['response']['data'])
-				mout.header(f'{mcol.success}found in BB ({smiles} ==> {comp_id}).')
-				return comp_id
-			except NoDataInReponse:
-				pass
-		
-		result = self.wrapper.exactsearch(smiles, "SCR")
+        if result["response"]["result"]["code"] == 0:
+            try:
+                comp_id = self.pick_enamine_exact_data(
+                    smiles, result["response"]["data"]
+                )
+                mout.header(f"{mcol.success}found in BB ({smiles} ==> {comp_id}).")
+                return comp_id
+            except NoDataInReponse:
+                pass
 
-		if result['response']['result']['code'] == 0:
-			try:
-				comp_id = self.pick_enamine_exact_data(smiles, result['response']['data'])
-				mout.header(f'{mcol.success}found in SCR ({smiles} ==> {comp_id}).')
-				return comp_id
-			except NoDataInReponse:
-				pass
+        result = self.wrapper.exactsearch(smiles, "SCR")
 
-		result = self.wrapper.exactsearch(smiles, "MADE")
+        if result["response"]["result"]["code"] == 0:
+            try:
+                comp_id = self.pick_enamine_exact_data(
+                    smiles, result["response"]["data"]
+                )
+                mout.header(f"{mcol.success}found in SCR ({smiles} ==> {comp_id}).")
+                return comp_id
+            except NoDataInReponse:
+                pass
 
-		if result['response']['result']['code'] == 0:
-			try:
-				comp_id = self.pick_enamine_exact_data(smiles, result['response']['data'])
-				mout.header(f'{mcol.success}found in MADE ({smiles} ==> {comp_id}).')
-				return comp_id
-			except NoDataInReponse:
-				pass
+        result = self.wrapper.exactsearch(smiles, "MADE")
 
-		result = self.wrapper.exactsearch(smiles, "REAL")
+        if result["response"]["result"]["code"] == 0:
+            try:
+                comp_id = self.pick_enamine_exact_data(
+                    smiles, result["response"]["data"]
+                )
+                mout.header(f"{mcol.success}found in MADE ({smiles} ==> {comp_id}).")
+                return comp_id
+            except NoDataInReponse:
+                pass
 
-		if result['response']['result']['code'] == 0:
-			try:
-				comp_id = self.pick_enamine_exact_data(smiles, result['response']['data'])
-				mout.header(f'{mcol.success}found in REAL ({smiles} ==> {comp_id}).')
-				return comp_id
-			except NoDataInReponse:
-				pass
+        result = self.wrapper.exactsearch(smiles, "REAL")
 
-		mout.header(f'{mcol.error}not found ({smiles=}).')
-		return None
+        if result["response"]["result"]["code"] == 0:
+            try:
+                comp_id = self.pick_enamine_exact_data(
+                    smiles, result["response"]["data"]
+                )
+                mout.header(f"{mcol.success}found in REAL ({smiles} ==> {comp_id}).")
+                return comp_id
+            except NoDataInReponse:
+                pass
 
-	def enamine_comp_id_query(self, compound):
+        mout.header(f"{mcol.error}not found ({smiles=}).")
+        return None
 
-		# try BB
-		result = self.wrapper.compoundidsearch(compound.name, catalogue="BB")
-		# pprint(result)
+    def enamine_comp_id_query(self, compound):
 
-		if result['response']['result']['code'] == 0:
-			try:
-				mout.header(f'{mcol.success}found in BB ({compound.name}).')
-				return self.parse_enamine_response(result, compound), result
-			except NoDataInReponse:
-				pass
+        # try BB
+        result = self.wrapper.compoundidsearch(compound.name, catalogue="BB")
+        # pprint(result)
 
-		# try SCR
-		result = self.wrapper.compoundidsearch(compound.name, catalogue="SCR")
-		# pprint(result)
+        if result["response"]["result"]["code"] == 0:
+            try:
+                mout.header(f"{mcol.success}found in BB ({compound.name}).")
+                return self.parse_enamine_response(result, compound), result
+            except NoDataInReponse:
+                pass
 
-		if result['response']['result']['code'] == 0:
-			try:
-				mout.header(f'{mcol.success}found in SCR ({compound.name}).')
-				return self.parse_enamine_response(result, compound), result
-			except NoDataInReponse:
-				pass
+        # try SCR
+        result = self.wrapper.compoundidsearch(compound.name, catalogue="SCR")
+        # pprint(result)
 
-		# try MADE
-		result = self.wrapper.compoundidsearch(compound.name, catalogue="MADE")
-		# pprint(result)
+        if result["response"]["result"]["code"] == 0:
+            try:
+                mout.header(f"{mcol.success}found in SCR ({compound.name}).")
+                return self.parse_enamine_response(result, compound), result
+            except NoDataInReponse:
+                pass
 
-		if result['response']['result']['code'] == 0:
-			try:
-				mout.header(f'{mcol.success}found in MADE ({compound.name}).')
-				return self.parse_enamine_response(result, compound), result
-			except NoDataInReponse:
-				pass
+        # try MADE
+        result = self.wrapper.compoundidsearch(compound.name, catalogue="MADE")
+        # pprint(result)
 
-		# try REAL
-		result = self.wrapper.compoundidsearch(compound.name, catalogue="REAL")
-		# pprint(result)
+        if result["response"]["result"]["code"] == 0:
+            try:
+                mout.header(f"{mcol.success}found in MADE ({compound.name}).")
+                return self.parse_enamine_response(result, compound), result
+            except NoDataInReponse:
+                pass
 
-		if result['response']['result']['code'] == 0:
-			try:
-				mout.header(f'{mcol.success}found in REAL ({compound.name}).')
-				return self.parse_enamine_response(result, compound), result
-				# return self.parse_enamine_REAL_response(result, compound), result
-			except NoDataInReponse:
-				pass
+        # try REAL
+        result = self.wrapper.compoundidsearch(compound.name, catalogue="REAL")
+        # pprint(result)
 
-		raise NotInCatalogues(f"Couldn't find {compound.name=} in BB, SCR, MADE, or REAL")
+        if result["response"]["result"]["code"] == 0:
+            try:
+                mout.header(f"{mcol.success}found in REAL ({compound.name}).")
+                return self.parse_enamine_response(result, compound), result
+                # return self.parse_enamine_REAL_response(result, compound), result
+            except NoDataInReponse:
+                pass
 
-	# def parse_enamine_REAL_response(self, result, compound):
+        raise NotInCatalogues(
+            f"Couldn't find {compound.name=} in BB, SCR, MADE, or REAL"
+        )
 
-	# 	pprint(result)
+    # def parse_enamine_REAL_response(self, result, compound):
 
-	# 	delivery = data['deliveryDays']
-	# 	days = self.parse_enamine_delivery_string(delivery)
-	# 	packs = [dict()]
-		
-	# 	raise Exception('needs work')
-	
-	def parse_enamine_response(self, result, compound):
+    # 	pprint(result)
 
-		from pprint import pprint
+    # 	delivery = data['deliveryDays']
+    # 	days = self.parse_enamine_delivery_string(delivery)
+    # 	packs = [dict()]
 
-		# if result['response']['result']['code']:
-		# 	mout.error(f'Failed to query by ID {compound.name}')
-		# 	mout.error(result['response']['result']['message'])
-		# 	return None
+    # 	raise Exception('needs work')
 
-		if len(result['response']['data']) == 1:
-			data = result['response']['data'][0]
-		else:
-			data = self.pick_enamine_data(compound.name, result['response']['data'])
-		
-		delivery = data['deliveryDays']
-		days = self.parse_enamine_delivery_string(delivery)
-		# mout.var("days", days, unit='days')
+    def parse_enamine_response(self, result, compound):
 
-		# purity = float(data['purity'])
-		# mout.var("purity", purity, unit='%')
+        from pprint import pprint
 
-		if not data['packs'] and 'synthesis' in delivery:
-			packs = [dict(amount=1, price=207)]
+        # if result['response']['result']['code']:
+        # 	mout.error(f'Failed to query by ID {compound.name}')
+        # 	mout.error(result['response']['result']['message'])
+        # 	return None
 
-		else:
-			packs = []
-			for pack in data['packs']:
-				packs.append(self.parse_enamine_ice_pack(pack))
+        if len(result["response"]["data"]) == 1:
+            data = result["response"]["data"][0]
+        else:
+            data = self.pick_enamine_data(compound.name, result["response"]["data"])
 
-			packs = [p for p in packs if p['price'] > 0]
+        delivery = data["deliveryDays"]
+        days = self.parse_enamine_delivery_string(delivery)
+        # mout.var("days", days, unit='days')
 
-			if not packs:
+        # purity = float(data['purity'])
+        # mout.var("purity", purity, unit='%')
 
-				# print(compound)
-				# print(data)
-				mout.error(f'No packs {compound.name}')
+        if not data["packs"] and "synthesis" in delivery:
+            packs = [dict(amount=1, price=207)]
 
-				# raise NoDataInReponse
-				return None
+        else:
+            packs = []
+            for pack in data["packs"]:
+                packs.append(self.parse_enamine_ice_pack(pack))
 
-		#### DO STUFF TO THE COMPOUND
+            packs = [p for p in packs if p["price"] > 0]
 
-		compound.lead_time = days
-		compound.price_picker = PricePicker(packs)
+            if not packs:
 
-		return dict(days=days, packs=packs)
-		# return dict(days=days, purity=purity, packs=packs)
+                # print(compound)
+                # print(data)
+                mout.error(f"No packs {compound.name}")
 
-	def parse_enamine_delivery_string(self, string):
+                # raise NoDataInReponse
+                return None
 
-		if string.startswith('regular delivery, ') and string.endswith('days'):
-			return int(string.removeprefix('regular delivery, ').removesuffix(' days'))
+        #### DO STUFF TO THE COMPOUND
 
-		if string.startswith('backorder, ') and string.endswith('days'):
-			return int(string.removeprefix('backorder, ').removesuffix(' days'))
+        compound.lead_time = days
+        compound.price_picker = PricePicker(packs)
 
-		if string == '3 weeks synthesis time':
-			return 15
+        return dict(days=days, packs=packs)
+        # return dict(days=days, purity=purity, packs=packs)
 
-		raise Exception(f'Unexpected delivery string: {string}')
+    def parse_enamine_delivery_string(self, string):
 
-	def parse_enamine_ice_pack(self, pack):
+        if string.startswith("regular delivery, ") and string.endswith("days"):
+            return int(string.removeprefix("regular delivery, ").removesuffix(" days"))
 
-		if pack['measure'] == 'g':
-			amount = float(pack['amount'])*1000 # mg
-		
-		elif pack['measure'] == 'mg':
-			amount = float(pack['amount']) # mg
+        if string.startswith("backorder, ") and string.endswith("days"):
+            return int(string.removeprefix("backorder, ").removesuffix(" days"))
 
-		else:
-			raise Exception(f'Unsupported pack_measure: {pack["measure"]}')
+        if string == "3 weeks synthesis time":
+            return 15
 
-		price = float(pack['price']) # USD
-		assert pack['currencyName'] == 'USD'
+        raise Exception(f"Unexpected delivery string: {string}")
 
-		return dict(amount=amount, price=price)
-		
-	def pick_enamine_data(self, comp_id,data):
-		data = [d for d in data if d['Id'] == comp_id]
+    def parse_enamine_ice_pack(self, pack):
 
-		# new_data = [d for d in data if not any([p['price'] == 0.0 for p in d['packs']])]
+        if pack["measure"] == "g":
+            amount = float(pack["amount"]) * 1000  # mg
 
-		# if len(new_data) == 0:
-		# 	print(data)
+        elif pack["measure"] == "mg":
+            amount = float(pack["amount"])  # mg
 
-		# data = new_data
-        
-		if len(data) == 0:
-			raise NoDataInReponse
+        else:
+            raise Exception(f'Unsupported pack_measure: {pack["measure"]}')
 
-		elif len(data) == 1:
-			return data[0]
+        price = float(pack["price"])  # USD
+        assert pack["currencyName"] == "USD"
 
-		data = [d for d in data if not any([p['price'] == 0.0 for p in d['packs']])]
+        return dict(amount=amount, price=price)
 
-		if len(data) > 1:
-			mout.warning(f'Taking first data entry after stripping non-priced ({comp_id})')
-		return data[0]
-		
-		# raise Exception(f'ambiguous enamine response {data}')
-		
-		# assert len(data) == 1, data
-		return data[0]
+    def pick_enamine_data(self, comp_id, data):
+        data = [d for d in data if d["Id"] == comp_id]
 
-	def pick_enamine_exact_data(self, smiles, data):
-	
-		if len(data) == 1:
-			return data[0]['Id']
+        # new_data = [d for d in data if not any([p['price'] == 0.0 for p in d['packs']])]
 
-		if len(data) == 0:
-			raise NoDataInResponse(smiles)
+        # if len(new_data) == 0:
+        # 	print(data)
 
-		# sort the results by increasing lead_time, and increasing stereo-complexity
-		data = sorted(data, key=lambda x: (self.parse_enamine_delivery_string(x['deliveryDays']), stereo_complexity(x['smile'])))
-		mout.warning(f'Picking quickest and least stereo complex result from: {[x["Id"] for x in data]}')
-		return data[0]['Id']
+        # data = new_data
+
+        if len(data) == 0:
+            raise NoDataInReponse
+
+        elif len(data) == 1:
+            return data[0]
+
+        data = [d for d in data if not any([p["price"] == 0.0 for p in d["packs"]])]
+
+        if len(data) > 1:
+            mout.warning(
+                f"Taking first data entry after stripping non-priced ({comp_id})"
+            )
+        return data[0]
+
+        # raise Exception(f'ambiguous enamine response {data}')
+
+        # assert len(data) == 1, data
+        return data[0]
+
+    def pick_enamine_exact_data(self, smiles, data):
+
+        if len(data) == 1:
+            return data[0]["Id"]
+
+        if len(data) == 0:
+            raise NoDataInResponse(smiles)
+
+        # sort the results by increasing lead_time, and increasing stereo-complexity
+        data = sorted(
+            data,
+            key=lambda x: (
+                self.parse_enamine_delivery_string(x["deliveryDays"]),
+                stereo_complexity(x["smile"]),
+            ),
+        )
+        mout.warning(
+            f'Picking quickest and least stereo complex result from: {[x["Id"] for x in data]}'
+        )
+        return data[0]["Id"]
+
 
 def stereo_complexity(smiles):
-	return smiles.count('@') + smiles.count('/') + smiles.count('\\')
+    return smiles.count("@") + smiles.count("/") + smiles.count("\\")
 
-class NoDataInReponse(Exception):
-	...
 
-class NotInCatalogues(Exception):
-	...
+class NoDataInReponse(Exception): ...
+
+
+class NotInCatalogues(Exception): ...

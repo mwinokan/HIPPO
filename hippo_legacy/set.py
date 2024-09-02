@@ -1,4 +1,3 @@
-
 import os
 import mout
 import molparse as mp
@@ -8,6 +7,7 @@ import pandas as pd
 import random
 
 from collections.abc import MutableSet
+
 
 class CompoundSet(MutableSet):
 
@@ -44,29 +44,31 @@ class CompoundSet(MutableSet):
 
     def __getitem__(self, key):
 
-        if isinstance(key,list):
-            return CompoundSet('queried',[c for c in [self[k] for k in key] if c is not None])
+        if isinstance(key, list):
+            return CompoundSet(
+                "queried", [c for c in [self[k] for k in key] if c is not None]
+            )
 
-        if isinstance(key,Compound):
+        if isinstance(key, Compound):
             key = str(key)
 
-        elif isinstance(key,int):
+        elif isinstance(key, int):
             return [c for c in self][key]
 
         matches = [comp for comp in self if str(comp) == key]
 
         if len(matches) < 1:
-            mout.error(f'{key} not in {self}')
+            mout.error(f"{key} not in {self}")
             return None
         elif len(matches) > 1:
-            mout.error(f'Multiple {key} in {self}')
+            mout.error(f"Multiple {key} in {self}")
             exit()
             return None
 
         return matches[0]
 
     def __setitem__(self, key, value):
-        assert isinstance(key,int)
+        assert isinstance(key, int)
         [c for c in self][key] = value
 
     ### FACTORIES
@@ -83,17 +85,23 @@ class CompoundSet(MutableSet):
         for index, row in df.iterrows():
             mol_name = row[id_col]
             if verbosity:
-                mout.progress(index,len(df),prepend='mol --> Compound',append=mol_name, fill='🦛')
+                mout.progress(
+                    index,
+                    len(df),
+                    prepend="mol --> Compound",
+                    append=mol_name,
+                    fill="🦛",
+                )
             mol = row[mol_col]
-            compound = Compound.from_rdkit_mol(mol_name,mol)
+            compound = Compound.from_rdkit_mol(mol_name, mol)
             compound._set_name = name
             compound._protein_system = protein
             compounds.append(compound)
 
         if verbosity:
             mout.finish()
-        
-        self.__init__(name,compounds)
+
+        self.__init__(name, compounds)
 
         return self
 
@@ -104,14 +112,16 @@ class CompoundSet(MutableSet):
 
         compounds = []
         for pdb in pdbs:
-            pose_name = os.path.basename(pdb).removesuffix('_bound.pdb')
+            pose_name = os.path.basename(pdb).removesuffix("_bound.pdb")
             comp_name = pose_name.removeprefix(prefix)
-            metadata = df_row_to_dict(metadata_df[ metadata_df['crystal_name'] == pose_name ])
+            metadata = df_row_to_dict(
+                metadata_df[metadata_df["crystal_name"] == pose_name]
+            )
             compound = Compound.from_bound_pdb(comp_name, pdb, metadata)
             compound._set_name = name
             compounds.append(compound)
 
-        self.__init__(name,compounds)
+        self.__init__(name, compounds)
 
         return self
 
@@ -122,13 +132,13 @@ class CompoundSet(MutableSet):
         return self._name
 
     @name.setter
-    def name(self,a):
+    def name(self, a):
         self._name = a
-    
+
     @property
     def compounds(self):
         return self._elements
-   
+
     @property
     def num_compounds(self):
         return len(self.compounds)
@@ -146,16 +156,16 @@ class CompoundSet(MutableSet):
         if self._fingerprint_df is None:
             fingerprints = self.fingerprints
             if len(fingerprints) < 1:
-                mout.error(f'no fingerprints for {self}')
+                mout.error(f"no fingerprints for {self}")
             self._fingerprint_df = pd.DataFrame(fingerprints)
         return self._fingerprint_df
-    
+
     @property
     def immutable(self):
         return self._immutable
-    
+
     @immutable.setter
-    def immutable(self,b):
+    def immutable(self, b):
         self._immutable = b
 
     ### METHODS
@@ -172,7 +182,7 @@ class CompoundSet(MutableSet):
             i = self._elements.index(key)
             del self._elements[i]
         else:
-            raise ValueError(f'{key} not in {self}')
+            raise ValueError(f"{key} not in {self}")
 
     def remove(self, key):
         assert not self.immutable
@@ -180,7 +190,7 @@ class CompoundSet(MutableSet):
             i = self._elements.index(key)
             del self._elements[i]
         else:
-            raise ValueError(f'{key} not in {self}')
+            raise ValueError(f"{key} not in {self}")
 
     def add(self, compound):
         assert not self.immutable
@@ -188,7 +198,7 @@ class CompoundSet(MutableSet):
             self._elements.append(compound)
             compound._set_name = self.name
         else:
-            raise ValueError(f'{compound} already in {self}')
+            raise ValueError(f"{compound} already in {self}")
 
     def shuffle(self):
         random.shuffle(self._elements)
@@ -199,7 +209,9 @@ class CompoundSet(MutableSet):
     def get_present_features(self):
 
         features = set()
-        for col in [c for c in self.fingerprint_df.columns if c not in self._metadata_cols]:
+        for col in [
+            c for c in self.fingerprint_df.columns if c not in self._metadata_cols
+        ]:
             covered = any(self.fingerprint_df[col].values)
             if covered:
                 features.add(col)
@@ -212,18 +224,20 @@ class CompoundSet(MutableSet):
 
         print_data = []
         for comp in self:
-            print_data.append(dict(
-                smiles=comp.smiles,
-                set_name=comp.set_name,
-                is_pains=comp.is_pains,
-                building_blocks=comp.building_blocks,
-                cost_range_str=comp.cost_range_str,
-                lead_time=comp.lead_time,
-            ))
+            print_data.append(
+                dict(
+                    smiles=comp.smiles,
+                    set_name=comp.set_name,
+                    is_pains=comp.is_pains,
+                    building_blocks=comp.building_blocks,
+                    cost_range_str=comp.cost_range_str,
+                    lead_time=comp.lead_time,
+                )
+            )
 
         print(pd.DataFrame(print_data))
 
-    def get_building_blocks(self,purchaseable_only=False):
+    def get_building_blocks(self, purchaseable_only=False):
 
         from .block import BuildingBlockSet
 
@@ -240,46 +254,46 @@ class CompoundSet(MutableSet):
     ### PROTECTION
 
     def __le__(self):
-        raise NotImplementedError('CompoundSet.__le__')
+        raise NotImplementedError("CompoundSet.__le__")
 
     def __lt__(self):
-        raise NotImplementedError('CompoundSet.__lt__')
+        raise NotImplementedError("CompoundSet.__lt__")
 
     def __eq__(self):
-        raise NotImplementedError('CompoundSet.__eq__')
+        raise NotImplementedError("CompoundSet.__eq__")
 
     def __ne__(self):
-        raise NotImplementedError('CompoundSet.__ne__')
+        raise NotImplementedError("CompoundSet.__ne__")
 
     def __gt__(self):
-        raise NotImplementedError('CompoundSet.__gt__')
+        raise NotImplementedError("CompoundSet.__gt__")
 
     def __ge__(self):
-        raise NotImplementedError('CompoundSet.__ge__')
+        raise NotImplementedError("CompoundSet.__ge__")
 
     def __and__(self):
-        raise NotImplementedError('CompoundSet.__and__')
+        raise NotImplementedError("CompoundSet.__and__")
 
     def __or__(self):
-        raise NotImplementedError('CompoundSet.__or__')
+        raise NotImplementedError("CompoundSet.__or__")
 
     # def __sub__(self):
     #     raise NotImplementedError('CompoundSet.__sub__')
 
     def __xor__(self):
-        raise NotImplementedError('CompoundSet.__xor__')
+        raise NotImplementedError("CompoundSet.__xor__")
 
     def isdisjoint(self):
-        raise NotImplementedError('CompoundSet.isdisjoint')
+        raise NotImplementedError("CompoundSet.isdisjoint")
 
     def __ior__(self):
-        raise NotImplementedError('CompoundSet.__ior__')
+        raise NotImplementedError("CompoundSet.__ior__")
 
     def __ixor__(self):
-        raise NotImplementedError('CompoundSet.__ixor__')
+        raise NotImplementedError("CompoundSet.__ixor__")
 
     def __iand__(self):
-        raise NotImplementedError('CompoundSet.__iand__')
+        raise NotImplementedError("CompoundSet.__iand__")
 
     def __isub__(self):
-        raise NotImplementedError('CompoundSet.__isub__')
+        raise NotImplementedError("CompoundSet.__isub__")

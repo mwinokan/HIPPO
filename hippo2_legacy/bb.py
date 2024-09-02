@@ -1,182 +1,182 @@
-
 from .compound import Compound
 import mout
 import math
 
+
 class BuildingBlock(Compound):
 
-	def __init__(self, smiles, tags=None, amount=None):
-		super().__init__(smiles, smiles, tags)
+    def __init__(self, smiles, tags=None, amount=None):
+        super().__init__(smiles, smiles, tags)
 
-		self._amount = amount # mg
+        self._amount = amount  # mg
 
-		self._name_is_smiles = True
+        self._name_is_smiles = True
 
-		self._lead_time = None
-		self._price_picker = None
+        self._lead_time = None
+        self._price_picker = None
 
-		# self._enamine_bb_id = None
+        # self._enamine_bb_id = None
 
-		## blanks
-		# self._purchaseable = None
-	
-	### PROPERTIES	
+        ## blanks
+        # self._purchaseable = None
 
-	@property
-	def amount(self):
-		return self._amount
+    ### PROPERTIES
 
-	@amount.setter
-	def amount(self, a):
-		# mout.debug(f'{self}.amount = {a}')
-		self._amount = a
-	
-	@property
-	def dict(self):
-		d = dict(
-			name = self.name,
-			smiles = self.smiles,
-			amount = self.amount,
-			name_is_smiles = self.name_is_smiles,
-			has_price_picker = self.price_picker is not None,
-			lead_time = self.lead_time,
-			quote_attempted = 'quote_attempted' in self.tags,
-		)
+    @property
+    def amount(self):
+        return self._amount
 
-		if self.price_picker and self.amount:
-			d['price'] = self.get_price(self.amount)
+    @amount.setter
+    def amount(self, a):
+        # mout.debug(f'{self}.amount = {a}')
+        self._amount = a
 
-		return d
+    @property
+    def dict(self):
+        d = dict(
+            name=self.name,
+            smiles=self.smiles,
+            amount=self.amount,
+            name_is_smiles=self.name_is_smiles,
+            has_price_picker=self.price_picker is not None,
+            lead_time=self.lead_time,
+            quote_attempted="quote_attempted" in self.tags,
+        )
 
-	@property
-	def name(self):
-		return self._name
+        if self.price_picker and self.amount:
+            d["price"] = self.get_price(self.amount)
 
-	@name.setter
-	def name(self, name):
-		self._name = name
-		self._name_is_smiles = False
+        return d
 
-	@property
-	def name_is_smiles(self):
-		return self._name_is_smiles
+    @property
+    def name(self):
+        return self._name
 
-	@property
-	def lead_time(self):
-		return self._lead_time
-	
-	@lead_time.setter
-	def lead_time(self, d):
-		self._lead_time = d
+    @name.setter
+    def name(self, name):
+        self._name = name
+        self._name_is_smiles = False
 
-	@property
-	def price_picker(self):
-		return self._price_picker
-	
-	@price_picker.setter
-	def price_picker(self, d):
-		self._price_picker = d
+    @property
+    def name_is_smiles(self):
+        return self._name_is_smiles
 
-	### METHODS
+    @property
+    def lead_time(self):
+        return self._lead_time
 
-	def copy(self):
-		bb = BuildingBlock(self.smiles, self.tags, amount=self.amount)
-		bb._name = self.name
-		bb._name_is_smiles = self.name_is_smiles
-		bb._price_picker = self._price_picker
-		bb._lead_time = self._lead_time
-		return bb
+    @lead_time.setter
+    def lead_time(self, d):
+        self._lead_time = d
 
-	def get_price(self, *args, **kwargs):
-		assert self.price_picker
-		return self.price_picker.get_price(*args, **kwargs)
+    @property
+    def price_picker(self):
+        return self._price_picker
 
-	def get_pack(self, *args, **kwargs):
-		assert self.price_picker
-		return self.price_picker.get_pack(*args, **kwargs)
+    @price_picker.setter
+    def price_picker(self, d):
+        self._price_picker = d
 
-	### DUNDERS
+    ### METHODS
 
-	def __repr__(self):
-		return f'BuildingBlock({self.name}, {self.smiles}, #amount={self.amount})'
+    def copy(self):
+        bb = BuildingBlock(self.smiles, self.tags, amount=self.amount)
+        bb._name = self.name
+        bb._name_is_smiles = self.name_is_smiles
+        bb._price_picker = self._price_picker
+        bb._lead_time = self._lead_time
+        return bb
+
+    def get_price(self, *args, **kwargs):
+        assert self.price_picker
+        return self.price_picker.get_price(*args, **kwargs)
+
+    def get_pack(self, *args, **kwargs):
+        assert self.price_picker
+        return self.price_picker.get_pack(*args, **kwargs)
+
+    ### DUNDERS
+
+    def __repr__(self):
+        return f"BuildingBlock({self.name}, {self.smiles}, #amount={self.amount})"
+
 
 class PricePicker:
 
-	def __init__(self, price_dict):
+    def __init__(self, price_dict):
 
-		self._data = {}
-		for d in sorted(price_dict, key=lambda x: x['amount']):
-			if d['price'] > 0:
-				self._data[d['amount']] = d['price']
+        self._data = {}
+        for d in sorted(price_dict, key=lambda x: x["amount"]):
+            if d["price"] > 0:
+                self._data[d["amount"]] = d["price"]
 
-		if not self._data:
-			self._min_amount = None
-			self._min_price = None
-			self._max_amount = None
-			self._max_price = None
+        if not self._data:
+            self._min_amount = None
+            self._min_price = None
+            self._max_amount = None
+            self._max_price = None
 
-		else:
-			self._min_amount = min(self.data.keys())
-			self._min_price = self.data[self.min_amount]
-			self._max_amount = max(self.data.keys())
-			self._max_price = self.data[self.max_amount]
+        else:
+            self._min_amount = min(self.data.keys())
+            self._min_price = self.data[self.min_amount]
+            self._max_amount = max(self.data.keys())
+            self._max_price = self.data[self.max_amount]
 
-	def __bool__(self):
-		return len(self.data) > 0
+    def __bool__(self):
+        return len(self.data) > 0
 
-	def reinit(self):
-		# try:
-		data = []
-		for key, value in self.data.items():
-			data.append(dict(amount=key, price=value))
-		return PricePicker(data)
+    def reinit(self):
+        # try:
+        data = []
+        for key, value in self.data.items():
+            data.append(dict(amount=key, price=value))
+        return PricePicker(data)
 
-	def get_pack(self, amount):
+    def get_pack(self, amount):
 
-		budget = self.get_price(amount)
-		order = amount
+        budget = self.get_price(amount)
+        order = amount
 
-		for amount, price in self.data.items():
-			if price <= budget and amount >= order:
-				order = amount
+        for amount, price in self.data.items():
+            if price <= budget and amount >= order:
+                order = amount
 
-		return dict(amount=order, price=budget)
+        return dict(amount=order, price=budget)
 
-	def get_price(self, query):
+    def get_price(self, query):
 
-		# mout.debug(self.data)
-		# mout.debug(query)
+        # mout.debug(self.data)
+        # mout.debug(query)
 
-		for amount, price in self.data.items():
-			if amount >= query:
-				return price
+        for amount, price in self.data.items():
+            if amount >= query:
+                return price
 
-		else:
-			return self.max_price * query/self.max_amount
+        else:
+            return self.max_price * query / self.max_amount
 
-		# if amount < self.min_amount:
-			# return self.min_price
+        # if amount < self.min_amount:
+        # return self.min_price
 
-	# def __getitem__(self, key):
-	# 	return self._data[key]
+    # def __getitem__(self, key):
+    # 	return self._data[key]
 
-	@property
-	def min_amount(self):
-		return self._min_amount
+    @property
+    def min_amount(self):
+        return self._min_amount
 
-	@property
-	def min_price(self):
-		return self._min_price
+    @property
+    def min_price(self):
+        return self._min_price
 
-	@property
-	def max_amount(self):
-		return self._max_amount
+    @property
+    def max_amount(self):
+        return self._max_amount
 
-	@property
-	def max_price(self):
-		return self._max_price
+    @property
+    def max_price(self):
+        return self._max_price
 
-	@property
-	def data(self):
-		return self._data
-	
+    @property
+    def data(self):
+        return self._data

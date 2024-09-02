@@ -1,87 +1,86 @@
-
 # set of Tags
 
 # from .tag import Tag
 from collections.abc import MutableSet
 
+
 class TagSet(MutableSet):
 
-	def __init__(self, tags=(), immutable=False):
-		
-		self._elements = []
-		self._immutable = immutable
+    def __init__(self, tags=(), immutable=False):
 
-		for tag in tags:
-			if ';' in tag:
-				[self.add(t.strip()) for t in tag.split(';')]
-			else:
-				self.add(tag)
-		
-	### FACTORIES
+        self._elements = []
+        self._immutable = immutable
 
-	### PROPERTIES
+        for tag in tags:
+            if ";" in tag:
+                [self.add(t.strip()) for t in tag.split(";")]
+            else:
+                self.add(tag)
 
-	@property
-	def tags(self):
-		return self._elements
+    ### FACTORIES
 
-	@property
-	def immutable(self):
-		return self._immutable
-	
-	@immutable.setter
-	def immutable(self,b):
-		self._immutable = b
+    ### PROPERTIES
 
-	### METHODS
+    @property
+    def tags(self):
+        return self._elements
 
-	def pop(self):
-		assert not self.immutable
-		return self._elements.pop()
+    @property
+    def immutable(self):
+        return self._immutable
 
-	def discard(self, key):
-		assert not self.immutable
-		if key in self:
-			i = self._elements.index(key)
-			del self._elements[i]
-		else:
-			raise ValueError(f'{key} not in {self}')
+    @immutable.setter
+    def immutable(self, b):
+        self._immutable = b
 
-	def remove(self, key):
-		assert not self.immutable
-		if key in self:
-			i = self._elements.index(key)
-			del self._elements[i]
-		else:
-			raise ValueError(f'{key} not in {self}')
+    ### METHODS
 
-	def add(self, tag, duplicate_error=True):
-		assert not self.immutable
-		# if isinstance(tag, str):
-		# 	tag = Tag(tag)
-		if tag not in self._elements:
-			self._elements.append(tag)
-		elif duplicate_error:
-			raise ValueError(f'{tag} already in {self}')
+    def pop(self):
+        assert not self.immutable
+        return self._elements.pop()
 
-	### DUNDERS
+    def discard(self, key):
+        assert not self.immutable
+        if key in self:
+            i = self._elements.index(key)
+            del self._elements[i]
+        else:
+            raise ValueError(f"{key} not in {self}")
 
-	def __contains__(self, tag):
-		return tag in self.tags
-		# return tag.name in [t.name for t in self.tags]
+    def remove(self, key):
+        assert not self.immutable
+        if key in self:
+            i = self._elements.index(key)
+            del self._elements[i]
+        else:
+            raise ValueError(f"{key} not in {self}")
 
-	def __repr__(self):
-		return str(self._elements)
+    def add(self, tag, duplicate_error=True):
+        assert not self.immutable
+        # if isinstance(tag, str):
+        # 	tag = Tag(tag)
+        if tag not in self._elements:
+            self._elements.append(tag)
+        elif duplicate_error:
+            raise ValueError(f"{tag} already in {self}")
 
-	def __len__(self):
-		return len(self._elements)
+    ### DUNDERS
 
-	def __iter__(self):
-		return iter(self._elements)
+    def __contains__(self, tag):
+        return tag in self.tags
+        # return tag.name in [t.name for t in self.tags]
 
-	def __iter__(self):
-		return iter(self.tags)
+    def __repr__(self):
+        return str(self._elements)
 
-	def __add__(self, other):
-		return TagSet(self.tags+other)
-		
+    def __len__(self):
+        return len(self._elements)
+
+    def __iter__(self):
+        return iter(self._elements)
+
+    def __iter__(self):
+        return iter(self.tags)
+
+    def __add__(self, other):
+        return TagSet(self.tags + other)

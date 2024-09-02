@@ -1,4 +1,3 @@
-
 import os
 from rdkit import RDConfig, Chem
 from rdkit.Chem import AllChem
@@ -7,9 +6,12 @@ import molparse as mp
 import numpy as np
 from .fingerprint import Fingerprint
 
+
 class Compound:
 
-    _fdef = AllChem.BuildFeatureFactory(os.path.join(RDConfig.RDDataDir,'BaseFeatures.fdef'))
+    _fdef = AllChem.BuildFeatureFactory(
+        os.path.join(RDConfig.RDDataDir, "BaseFeatures.fdef")
+    )
 
     ### DUNDERS
 
@@ -24,7 +26,7 @@ class Compound:
         self._set_name = None
         self._ligand_features = None
         self._building_blocks = None
-        
+
         # from_rdkit_mol
         self._mol = None
         self._protein_system = None
@@ -74,16 +76,16 @@ class Compound:
 
         self._bound_pdb = pdb
 
-        self._pose_name = metadata['crystal_name']
-        self._crystal_name = metadata['RealCrystalName']
-        self.smiles = metadata['new_smiles'] or metadata['smiles']
+        self._pose_name = metadata["crystal_name"]
+        self._crystal_name = metadata["RealCrystalName"]
+        self.smiles = metadata["new_smiles"] or metadata["smiles"]
 
-        self._alternate_name = metadata['alternate_name']
-        self._site_name = metadata['site_name']
-        self._pdb_entry = metadata['pdb_entry']
+        self._alternate_name = metadata["alternate_name"]
+        self._site_name = metadata["site_name"]
+        self._pdb_entry = metadata["pdb_entry"]
 
         return self
-    
+
     @classmethod
     def from_rdkit_mol(cls, name, mol, protonate=False, verbosity=1):
 
@@ -95,9 +97,9 @@ class Compound:
 
         if protonate:
             try:
-                prot_mol = mp.rdkit.protonate(self.mol,verbosity=verbosity-1)
+                prot_mol = mp.rdkit.protonate(self.mol, verbosity=verbosity - 1)
             except ValueError as e:
-                mout.error(f'Cound not protonate: {e}')
+                mout.error(f"Cound not protonate: {e}")
                 self._protonation_failed = True
             else:
                 self._mol = prot_mol
@@ -136,7 +138,7 @@ class Compound:
 
             # solve for a pose
             ps = AllChem.ETKDGv3()
-            AllChem.EmbedMolecule(m_pdb_prot,ps)
+            AllChem.EmbedMolecule(m_pdb_prot, ps)
 
             self._mol = m_pdb_prot
 
@@ -161,14 +163,14 @@ class Compound:
         return self._smiles
 
     @smiles.setter
-    def smiles(self,s):
+    def smiles(self, s):
         if self._smiles is not None:
-            mout.warning(f'Overwriting SMILES: {self.name}')
-        assert isinstance(s,str)
-        if '.' in s:
-            mout.error(f'There is a dot in the SMILES [{self.name}]: {s}')
-            s = sorted(s.split('.'), key=lambda x: len(x))[-1]
-            mout.warning(f'Using: {s}')
+            mout.warning(f"Overwriting SMILES: {self.name}")
+        assert isinstance(s, str)
+        if "." in s:
+            mout.error(f"There is a dot in the SMILES [{self.name}]: {s}")
+            s = sorted(s.split("."), key=lambda x: len(x))[-1]
+            mout.warning(f"Using: {s}")
         self._smiles = s
 
     @property
@@ -204,29 +206,23 @@ class Compound:
             building_blocks = None
 
         d = dict(
-
             # properties
-            name = self.name,
-            smiles = self.smiles,
-            set_name = self.set_name,
-            
-            target = self.target,
-            target_type = self.target_type,
-            reaction = self.reaction,
-            inspirations = self.inspirations,
-            
-            is_pains = self.is_pains,
-            num_atom_difference = self.num_atom_difference,
-
-            fragmenstein_ddG = self.fragmenstein_ddG,
-            fragmenstein_mRMSD = self.fragmenstein_mRMSD,
-            fragmenstein_ligand_efficiency = self.fragmenstein_ligand_efficiency,
-            fragmenstein_outcome = self.fragmenstein_outcome,
-
-            building_blocks = building_blocks,
-
+            name=self.name,
+            smiles=self.smiles,
+            set_name=self.set_name,
+            target=self.target,
+            target_type=self.target_type,
+            reaction=self.reaction,
+            inspirations=self.inspirations,
+            is_pains=self.is_pains,
+            num_atom_difference=self.num_atom_difference,
+            fragmenstein_ddG=self.fragmenstein_ddG,
+            fragmenstein_mRMSD=self.fragmenstein_mRMSD,
+            fragmenstein_ligand_efficiency=self.fragmenstein_ligand_efficiency,
+            fragmenstein_outcome=self.fragmenstein_outcome,
+            building_blocks=building_blocks,
         )
-        
+
         return d
 
     @property
@@ -237,14 +233,14 @@ class Compound:
             d[key] = value
 
         return d
-    
+
     @property
     def ligand_group(self):
         if self._ligand_group is None:
 
             # if self._bound_pdb:
 
-            lig_residues = self.bound_system['rLIG']
+            lig_residues = self.bound_system["rLIG"]
             lig_residues = [l for l in lig_residues if l.chain == self._chain_char]
 
             split_lig_residues = []
@@ -284,7 +280,9 @@ class Compound:
                 if len(indices) == 1:
                     position = self.ligand_group.atoms[indices[0]].np_pos
                 else:
-                    position = np.mean([self.ligand_group.atoms[i].np_pos for i in indices],axis=0)
+                    position = np.mean(
+                        [self.ligand_group.atoms[i].np_pos for i in indices], axis=0
+                    )
 
                 f_dict = dict(
                     family=family,
@@ -296,11 +294,11 @@ class Compound:
                 )
 
                 feature = mp.rdkit.Feature(
-                    family=f_dict['family'], 
+                    family=f_dict["family"],
                     atoms=[self.ligand_group.atoms[i] for i in indices],
                     position=position,
                     sidechain=None,
-                    res_name='LIG',
+                    res_name="LIG",
                     res_number=None,
                     res_chain=self._chain_char,
                 )
@@ -312,13 +310,15 @@ class Compound:
     @property
     def bound_pdb(self):
         if self._bound_pdb is None:
-            mout.error(f'{self} has no self._bound_pdb',fatal=True)
+            mout.error(f"{self} has no self._bound_pdb", fatal=True)
         return self._bound_pdb
 
     @property
     def bound_system(self):
         if self._bound_system is None:
-            self._bound_system = mp.parsePDB(self.bound_pdb, verbosity=0, alternative_site_warnings=False)
+            self._bound_system = mp.parsePDB(
+                self.bound_pdb, verbosity=0, alternative_site_warnings=False
+            )
         return self._bound_system
 
     @property
@@ -328,7 +328,7 @@ class Compound:
     @property
     def cost_range_str(self):
         if self.building_blocks:
-        
+
             cost_min = 0
             cost_max = 0
             for bb in self.building_blocks:
@@ -342,10 +342,10 @@ class Compound:
                 cost_min += bb._cost_min
                 cost_max += bb._cost_max
 
-            return f'${cost_min}-{cost_max}'
+            return f"${cost_min}-{cost_max}"
 
         return None
-    
+
     @property
     def lead_time(self):
         if self.building_blocks:
@@ -374,11 +374,11 @@ class Compound:
     def fragmenstein_outcome(self):
         return self._fragmenstein_outcome
 
-    
     ### METHODS
 
     def calculate_fingerprint(self):
         self._fingerprint = Fingerprint(self)
+
 
 class FailedToAssignBondOrders(Exception):
     pass

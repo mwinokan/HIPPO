@@ -1,114 +1,117 @@
-
 import mout
 import mcol
 from .compound import Compound
 from .cset import CompoundSet
 
+
 class Reaction:
 
-	def __init__(self, reaction_type, product, reactants, product_amount=None, amounts=1):
-		
-		self._type = reaction_type
-		self._product = product
-		self._product_amount = product_amount
-		self._reactants = CompoundSet(f"{self.type} reactants",reactants)
-		self._amounts = {}
-		
-		if isinstance(amounts, list):
-			for comp, amount in zip(self.reactants, amounts):
-				self.amounts[comp.smiles] = amount
-		else:
-			for comp in self.reactants:
-				self.amounts[comp.smiles] = amounts
-		
-	### FACTORIES
+    def __init__(
+        self, reaction_type, product, reactants, product_amount=None, amounts=1
+    ):
 
-	# @classmethod
-	#     def single_step(cls, reaction_type, smiles1, smiles2, amount1=1, amount2=1):
-	
-	#         self = cls.__new__(cls)
-	
-	#         self.__init__(...)
-			
-	#         return self
+        self._type = reaction_type
+        self._product = product
+        self._product_amount = product_amount
+        self._reactants = CompoundSet(f"{self.type} reactants", reactants)
+        self._amounts = {}
 
-	### PROPERTIES
+        if isinstance(amounts, list):
+            for comp, amount in zip(self.reactants, amounts):
+                self.amounts[comp.smiles] = amount
+        else:
+            for comp in self.reactants:
+                self.amounts[comp.smiles] = amounts
 
-	@property
-	def amounts(self):
-		return self._amounts
+    ### FACTORIES
 
-	@property
-	def reactants(self):
-		return self._reactants
+    # @classmethod
+    #     def single_step(cls, reaction_type, smiles1, smiles2, amount1=1, amount2=1):
 
-	@property
-	def num_reactants(self):
-		return len(self.reactants)
-	
-	@property
-	def type(self):
-		return self._type
+    #         self = cls.__new__(cls)
 
-	@property
-	def product(self):
-		return self._product
+    #         self.__init__(...)
 
-	@property
-	def product_amount(self):
-		return self._product_amount
+    #         return self
 
-	@property
-	def reactant_names(self):
-		return [c.name for c in self.reactants]
+    ### PROPERTIES
 
-	@property
-	def reactant_smiles(self):
-		return [c.smiles for c in self.reactants]
+    @property
+    def amounts(self):
+        return self._amounts
 
-	# @property
-	# def building_blocks(self):
-	# 	return self._reactants
+    @property
+    def reactants(self):
+        return self._reactants
 
-	@property
-	def dict(self):
-		return dict(
-			type=self.type,
-			product_name=self.product.name,
-			product_smiles=self.product.smiles,
-			num_reactants=self.num_reactants,
-			reactant_names=self.reactant_names,
-			reactant_smiles=self.reactant_smiles,
-		)
-	
-	
-	### METHODS
+    @property
+    def num_reactants(self):
+        return len(self.reactants)
 
-	def summary(self):
+    @property
+    def type(self):
+        return self._type
 
-		mout.header(str(self))
+    @property
+    def product(self):
+        return self._product
 
-		# mout.var('type',self.type)
+    @property
+    def product_amount(self):
+        return self._product_amount
 
-		mout.out(f'\n{mcol.func}product')
-		mout.var(self.product.name, self.product_amount, unit='mg', symbol='x')
+    @property
+    def reactant_names(self):
+        return [c.name for c in self.reactants]
 
-		mout.out(f'\n{mcol.func}reactants [#={len(self.reactants)}]')
-		for reactant in self.reactants:
-			mout.var(reactant.name, self.amounts[reactant.smiles], unit='mg', symbol='x')
+    @property
+    def reactant_smiles(self):
+        return [c.smiles for c in self.reactants]
 
-	### DUNDERS
+    # @property
+    # def building_blocks(self):
+    # 	return self._reactants
 
-	def __repr__(self):
-		return f'Reaction(type={self.type}, #reactants={self.num_reactants}, product={self.product.name})'
+    @property
+    def dict(self):
+        return dict(
+            type=self.type,
+            product_name=self.product.name,
+            product_smiles=self.product.smiles,
+            num_reactants=self.num_reactants,
+            reactant_names=self.reactant_names,
+            reactant_smiles=self.reactant_smiles,
+        )
 
-	def __eq__(self, other):
+    ### METHODS
 
-		if self.num_reactants != other.num_reactants:
-			return False
+    def summary(self):
 
-		for reactant in self.reactants:
-			if reactant not in other.reactants:
-				return False
+        mout.header(str(self))
 
-		return True
+        # mout.var('type',self.type)
+
+        mout.out(f"\n{mcol.func}product")
+        mout.var(self.product.name, self.product_amount, unit="mg", symbol="x")
+
+        mout.out(f"\n{mcol.func}reactants [#={len(self.reactants)}]")
+        for reactant in self.reactants:
+            mout.var(
+                reactant.name, self.amounts[reactant.smiles], unit="mg", symbol="x"
+            )
+
+    ### DUNDERS
+
+    def __repr__(self):
+        return f"Reaction(type={self.type}, #reactants={self.num_reactants}, product={self.product.name})"
+
+    def __eq__(self, other):
+
+        if self.num_reactants != other.num_reactants:
+            return False
+
+        for reactant in self.reactants:
+            if reactant not in other.reactants:
+                return False
+
+        return True

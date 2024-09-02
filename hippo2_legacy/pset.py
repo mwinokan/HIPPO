@@ -1,158 +1,161 @@
-
 # set of Poses
 
 import pandas as pd
 from collections.abc import MutableSet
 
+
 class PoseSet(MutableSet):
 
-	def __init__(self, poses=(), immutable=False):
-		
-		self._elements = []
-		self._immutable = immutable
-		self._fingerprint_df = None
-		self._metadata_cols = []
+    def __init__(self, poses=(), immutable=False):
 
-		for pose in poses:
-			self.add(pose)
-		
-	### FACTORIES
+        self._elements = []
+        self._immutable = immutable
+        self._fingerprint_df = None
+        self._metadata_cols = []
 
-	### PROPERTIES
+        for pose in poses:
+            self.add(pose)
 
-	@property
-	def immutable(self):
-		return self._immutable
-	
-	@immutable.setter
-	def immutable(self,b):
-		self._immutable = b
+    ### FACTORIES
 
-	@property
-	def poses(self):
-		return self._elements
+    ### PROPERTIES
 
-	@property
-	def fingerprints(self):
-		return [p.fingerprint for p in self.poses if p._fingerprint is not None]
+    @property
+    def immutable(self):
+        return self._immutable
 
-	@property
-	def fingerprint_df(self):
-		if self._fingerprint_df is None:
-			import pandas as pd
-			fingerprints = self.fingerprints
-			if len(fingerprints) < 1:
-				mout.error(f'no fingerprints for {self}')
-			self._fingerprint_df = pd.DataFrame(fingerprints)
-		return self._fingerprint_df
+    @immutable.setter
+    def immutable(self, b):
+        self._immutable = b
 
-	@property
-	def df(self, compound_dict=True):
-		data = []
+    @property
+    def poses(self):
+        return self._elements
 
-		for pose in self:
+    @property
+    def fingerprints(self):
+        return [p.fingerprint for p in self.poses if p._fingerprint is not None]
 
-			d = {}
+    @property
+    def fingerprint_df(self):
+        if self._fingerprint_df is None:
+            import pandas as pd
 
-			d['_Name'] = pose.longname
-			d['ROMol'] = pose.mol
+            fingerprints = self.fingerprints
+            if len(fingerprints) < 1:
+                mout.error(f"no fingerprints for {self}")
+            self._fingerprint_df = pd.DataFrame(fingerprints)
+        return self._fingerprint_df
 
-			if compound_dict:
-				d['compound'] = pose.compound.dict
-				d['compound_mol'] = pose.compound.mol
+    @property
+    def df(self, compound_dict=True):
+        data = []
 
-			if compound_dict:
-				d['base'] = pose.compound.base.dict
-				d['base_mol'] = pose.compound.base.mol
+        for pose in self:
 
-			d.update(pose.dict)
+            d = {}
 
-			data.append(d)
+            d["_Name"] = pose.longname
+            d["ROMol"] = pose.mol
 
-		return pd.DataFrame(data)
+            if compound_dict:
+                d["compound"] = pose.compound.dict
+                d["compound_mol"] = pose.compound.mol
 
-	### METHODS
+            if compound_dict:
+                d["base"] = pose.compound.base.dict
+                d["base_mol"] = pose.compound.base.mol
 
-	def pop(self):
-		assert not self.immutable
-		return self._elements.pop()
+            d.update(pose.dict)
 
-	def discard(self, key):
-		assert not self.immutable
-		if key in self:
-			i = self._elements.index(key)
-			del self._elements[i]
-		else:
-			raise ValueError(f'{key} not in {self}')
+            data.append(d)
 
-	def remove(self, key):
-		assert not self.immutable
-		if key in self:
-			i = self._elements.index(key)
-			del self._elements[i]
-		else:
-			raise ValueError(f'{key} not in {self}')
+        return pd.DataFrame(data)
 
-	def add(self, compound):
-		assert not self.immutable
-		# if compound not in self._elements:
-		self._elements.append(compound)
-		# else:
-			# raise ValueError(f'{compound} already in {self}')
+    ### METHODS
 
-	def remove_unfingerprinted(self, animal):
+    def pop(self):
+        assert not self.immutable
+        return self._elements.pop()
 
-		new = []
-		for pose in self:
-			if pose.fingerprint is not None:
-				new.append(pose)
+    def discard(self, key):
+        assert not self.immutable
+        if key in self:
+            i = self._elements.index(key)
+            del self._elements[i]
+        else:
+            raise ValueError(f"{key} not in {self}")
 
-		self.__init__(new)
+    def remove(self, key):
+        assert not self.immutable
+        if key in self:
+            i = self._elements.index(key)
+            del self._elements[i]
+        else:
+            raise ValueError(f"{key} not in {self}")
 
-	def get_present_features(self):
+    def add(self, compound):
+        assert not self.immutable
+        # if compound not in self._elements:
+        self._elements.append(compound)
+        # else:
+        # raise ValueError(f'{compound} already in {self}')
 
-		features = set()
-		for col in [c for c in self.fingerprint_df.columns if c not in self._metadata_cols]:
-			covered = any(self.fingerprint_df[col].values)
-			if covered:
-				features.add(col)
+    def remove_unfingerprinted(self, animal):
 
-		return features
+        new = []
+        for pose in self:
+            if pose.fingerprint is not None:
+                new.append(pose)
 
-	### DUNDERS
+        self.__init__(new)
 
-	def __contains__(self, pose):
-		if isinstance(pose,str):
-			return pose in [c.name for c in self.poses]
-		else:
-			return pose in self.poses
+    def get_present_features(self):
 
-	def __repr__(self):
-		if not self:
-			return f'PoseSet(empty)'
-		else:
-			return f'PoseSet(#poses={len(self)}, [{", ".join(p.name for p in self)}])'
+        features = set()
+        for col in [
+            c for c in self.fingerprint_df.columns if c not in self._metadata_cols
+        ]:
+            covered = any(self.fingerprint_df[col].values)
+            if covered:
+                features.add(col)
 
-	def __len__(self):
-		return len(self._elements)
+        return features
 
-	def __iter__(self):
-		return iter(self._elements)
+    ### DUNDERS
 
-	def __add__(self, other):
-		if isinstance(other, PoseSet):
-			return PoseSet(self._elements + other._elements)
-		elif isinstance(other, list):
-			return PoseSet(self._elements + other)
+    def __contains__(self, pose):
+        if isinstance(pose, str):
+            return pose in [c.name for c in self.poses]
+        else:
+            return pose in self.poses
 
-	def __iadd__(self, other):
-		if isinstance(other, PoseSet):
-			return PoseSet(self._elements + other._elements)
-		elif isinstance(other, list):
-			return PoseSet(self._elements + other)
+    def __repr__(self):
+        if not self:
+            return f"PoseSet(empty)"
+        else:
+            return f'PoseSet(#poses={len(self)}, [{", ".join(p.name for p in self)}])'
 
-	def __getitem__(self, key):
-		return self._elements[key]
-		
-	def __iter__(self):
-		return iter(self.poses)
+    def __len__(self):
+        return len(self._elements)
+
+    def __iter__(self):
+        return iter(self._elements)
+
+    def __add__(self, other):
+        if isinstance(other, PoseSet):
+            return PoseSet(self._elements + other._elements)
+        elif isinstance(other, list):
+            return PoseSet(self._elements + other)
+
+    def __iadd__(self, other):
+        if isinstance(other, PoseSet):
+            return PoseSet(self._elements + other._elements)
+        elif isinstance(other, list):
+            return PoseSet(self._elements + other)
+
+    def __getitem__(self, key):
+        return self._elements[key]
+
+    def __iter__(self):
+        return iter(self.poses)

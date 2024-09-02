@@ -1,2 +1,1 @@
-
 from .animal import HIPPO

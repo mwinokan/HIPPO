@@ -1,4 +1,3 @@
-
 import mout
 from pprint import pprint
 import numpy as np
@@ -9,17 +8,18 @@ import molparse as mp
 from collections import UserDict
 
 FEATURE_PAIR_CUTOFFS = {
-    'Donor Acceptor': 3.5,
-    'Acceptor Donor': 3.5,
-    'NegIonizable PosIonizable': 4.5,
-    'PosIonizable NegIonizable': 4.5,
-    'Aromatic PosIonizable': 4.5,
-    'PosIonizable Aromatic': 4.5,
-    'Aromatic Aromatic': 6.0,
-    'Donor Acceptor': 6.0,
-    'Acceptor Donor': 6.0,
-    'Hydrophobe Hydrophobe': 4.5,
+    "Donor Acceptor": 3.5,
+    "Acceptor Donor": 3.5,
+    "NegIonizable PosIonizable": 4.5,
+    "PosIonizable NegIonizable": 4.5,
+    "Aromatic PosIonizable": 4.5,
+    "PosIonizable Aromatic": 4.5,
+    "Aromatic Aromatic": 6.0,
+    "Donor Acceptor": 6.0,
+    "Acceptor Donor": 6.0,
+    "Hydrophobe Hydrophobe": 4.5,
 }
+
 
 class Fingerprint(UserDict):
 
@@ -30,7 +30,7 @@ class Fingerprint(UserDict):
         self.data = self.calculate(compound)
 
     ### PROPERTIES
-    
+
     ### METHODS
 
     def trim_keys(self, shared_keys):
@@ -57,7 +57,9 @@ class Fingerprint(UserDict):
 
         comp_features_by_family = {}
         for family in FEATURE_FAMILIES:
-            comp_features_by_family[family] = [f for f in comp_features if f.family == family]
+            comp_features_by_family[family] = [
+                f for f in comp_features if f.family == family
+            ]
 
         for prot_feature in protein_features:
 
@@ -67,20 +69,25 @@ class Fingerprint(UserDict):
 
             complementary_comp_features = comp_features_by_family[complementary_family]
 
-            cutoff = FEATURE_PAIR_CUTOFFS[f'{prot_family} {complementary_family}']
+            cutoff = FEATURE_PAIR_CUTOFFS[f"{prot_family} {complementary_family}"]
 
-            valid_features = [f for f in complementary_comp_features if np.linalg.norm(prot_feature - f) <= cutoff]
+            valid_features = [
+                f
+                for f in complementary_comp_features
+                if np.linalg.norm(prot_feature - f) <= cutoff
+            ]
 
-            fingerprint[prot_feature.family_name_number_chain_atoms_str] = len(valid_features)
+            fingerprint[prot_feature.family_name_number_chain_atoms_str] = len(
+                valid_features
+            )
             # fingerprint[prot_feature.family_name_number_chain_str] = len(valid_features)
 
         return fingerprint
 
+        # group = mp.rdkit.mol_to_AtomGroup(compound.mol)
 
-            # group = mp.rdkit.mol_to_AtomGroup(compound.mol)
+        # group.plot3d(features=features)
 
-            # group.plot3d(features=features)
+        # exit()
 
-            # exit()
-
-            # raise Exception('Fingerprinting needs a bound PDB!')
+        # raise Exception('Fingerprinting needs a bound PDB!')
