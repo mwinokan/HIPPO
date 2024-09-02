@@ -103,18 +103,18 @@ class ReactionTable:
         else:
 
             sql = """
-			SELECT {query}
-			FROM reaction 
+            SELECT {query}
+            FROM reaction 
 
-			INNER JOIN reactant 
-				ON reaction.reaction_id = reactant.reactant_reaction
+            INNER JOIN reactant 
+                ON reaction.reaction_id = reactant.reactant_reaction
 
-			INNER JOIN compound c_r
-				ON c_r.compound_id = reactant.reactant_compound
+            INNER JOIN compound c_r
+                ON c_r.compound_id = reactant.reactant_compound
 
-			INNER JOIN compound c_p
-				ON c_p.compound_id = reaction.reaction_product
-			"""
+            INNER JOIN compound c_p
+                ON c_p.compound_id = reaction.reaction_product
+            """
 
             if not mols:
                 sql = sql.format(
@@ -179,7 +179,7 @@ class ReactionTable:
                     return self.__getitem__(key=key)
 
                 else:
-					return self.db.get_reaction(id=key)
+                    return self.db.get_reaction(id=key)
 
             case key if isinstance(key, list) or isinstance(key, tuple) or isinstance(
                 key, set
@@ -270,11 +270,11 @@ class ReactionSet:
         intermediates = self.intermediates
         product_ids = self.db.execute(
             f"""
-			SELECT compound_id FROM compound
-			INNER JOIN reaction ON compound_id = reaction_product
-			WHERE reaction_id IN {self.str_ids}
-			AND compound_id NOT IN {intermediates.str_ids}
-		"""
+            SELECT compound_id FROM compound
+            INNER JOIN reaction ON compound_id = reaction_product
+            WHERE reaction_id IN {self.str_ids}
+            AND compound_id NOT IN {intermediates.str_ids}
+        """
         ).fetchall()
         return CompoundSet(self.db, [i for i, in product_ids])
 
@@ -284,11 +284,11 @@ class ReactionSet:
         from .cset import CompoundSet
 
         sql = f"""
-			SELECT DISTINCT compound_id FROM compound
-			INNER JOIN reaction ON compound_id = reaction_product
-			INNER JOIN reactant ON compound_id = reactant_compound
-			WHERE reactant_reaction IN {self.str_ids}
-		"""
+            SELECT DISTINCT compound_id FROM compound
+            INNER JOIN reaction ON compound_id = reaction_product
+            INNER JOIN reactant ON compound_id = reactant_compound
+            WHERE reactant_reaction IN {self.str_ids}
+        """
         # print(sql)
         intermediate_ids = self.db.execute(sql).fetchall()
         return CompoundSet(self.db, [i for i, in intermediate_ids])
@@ -377,7 +377,7 @@ class ReactionSet:
                     # break
 
                     # if draw:
-                    # 	comp.draw()
+                    #   comp.draw()
 
         out = interactive_output(
             widget,
