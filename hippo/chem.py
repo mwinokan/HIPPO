@@ -61,10 +61,6 @@ SUPPORTED_CHEMISTRY = {
     "Nucleophilic_substitution": {
         "heavy_atoms_diff": 1,
         "rings_diff": 0,
-        # "atomtype":
-        # {
-        #   "removed" : { "C":7, "H":6 },
-        # },
     },
 }
 
