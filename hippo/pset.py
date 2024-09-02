@@ -1,4 +1,3 @@
-
 from .db import Database
 from .pose import Pose
 from .cset import IngredientSet
@@ -59,7 +58,7 @@ class PoseTable:
 
     """
 
-    _table = 'pose'
+    _table = "pose"
 
     def __init__(
         self,
@@ -135,9 +134,10 @@ class PoseTable:
 
     ### METHODS
 
-    def get_by_tag(self, 
+    def get_by_tag(
+        self,
         tag: str,
-    ) -> 'PoseSet':
+    ) -> "PoseSet":
         """Get all child poses with a certain tag
 
         :param tag: tag to search for
@@ -150,10 +150,11 @@ class PoseTable:
         ids = [v for v, in values if v]
         return self[ids]
 
-    def get_by_target(self, 
-        *, 
+    def get_by_target(
+        self,
+        *,
         id: int,
-    ) -> 'PoseSet':
+    ) -> "PoseSet":
         """Get all child poses with a certain :class:`.Target` ID:
 
         :param id: :class:`.Target` ID
@@ -167,10 +168,11 @@ class PoseTable:
         ids = [v for v, in values if v]
         return self[ids]
 
-    def get_by_metadata(self, 
-        key: str, 
+    def get_by_metadata(
+        self,
+        key: str,
         value: str | None = None,
-    ) -> 'PoseSet':
+    ) -> "PoseSet":
         """Get all child poses by their metadata. If no value is passed, then simply containing the key in the metadata dictionary is sufficient
 
         :param key: metadata key to match
@@ -189,7 +191,8 @@ class PoseTable:
             ids = [i for i, d in results if d and f'"{key}": {value}' in d]
         return self[ids]
 
-    def draw(self, 
+    def draw(
+        self,
         max_draw: int = 100,
     ) -> None:
         """Render the poses
@@ -223,9 +226,10 @@ class PoseTable:
 
     ### DUNDERS
 
-    def __call__(self, 
-        *, 
-        tag: str = None, 
+    def __call__(
+        self,
+        *,
+        tag: str = None,
         target: int = None,
     ) -> "PoseSet":
         """Filter poses by a given tag or target ID. See :meth:`.PoseTable.get_by_tag` and :meth:`.PoseTable.get_by_target`"""
@@ -237,7 +241,8 @@ class PoseTable:
         else:
             raise NotImplementedError
 
-    def __getitem__(self, 
+    def __getitem__(
+        self,
         key: int | str | tuple | list | set | slice,
     ) -> Pose:
         """Get a member :class:`.Pose` object or subset :class:`.PoseSet` thereof.
@@ -393,7 +398,7 @@ class PoseSet:
     ### PROPERTIES
 
     @property
-    def db(self) -> 'Database':
+    def db(self) -> "Database":
         """Returns the associated :class:`.Database`"""
         return self._db
 
@@ -493,7 +498,7 @@ class PoseSet:
         return set(v for v, in values)
 
     @property
-    def compounds(self) -> 'CompoundSet':
+    def compounds(self) -> "CompoundSet":
         """Get the compounds associated to this set of poses"""
         from .cset import CompoundSet
 
@@ -507,7 +512,7 @@ class PoseSet:
         return CompoundSet(self.db, ids)
 
     @property
-    def mols(self) -> 'list[rdkit.Chem.mol]':
+    def mols(self) -> "list[rdkit.Chem.mol]":
         """Get the rdkit Molecules contained in this set"""
         return [p.mol for p in self]
 
@@ -517,7 +522,7 @@ class PoseSet:
         return len(self.compounds)
 
     @property
-    def df(self) -> 'pandas.DataFrame':
+    def df(self) -> "pandas.DataFrame":
         """Get a DataFrame of the poses in this set"""
         return self.get_df(mol=True)
 
@@ -557,7 +562,7 @@ class PoseSet:
         return str(tuple(self.ids)).replace(",)", ")")
 
     @property
-    def targets(self) -> 'list[Target]':
+    def targets(self) -> "list[Target]":
         """Returns the :class:`.Target` objects of poses in this set"""
         return [self.db.get_target(id=q) for q in self.target_ids]
 
@@ -602,10 +607,11 @@ class PoseSet:
 
     ### FILTERING
 
-    def get_by_tag(self, 
-        tag: str, 
+    def get_by_tag(
+        self,
+        tag: str,
         inverse: bool = False,
-    ) -> 'PoseSet':
+    ) -> "PoseSet":
         """Get all child poses with a certain tag
 
         :param tag: tag to filter by
@@ -622,11 +628,7 @@ class PoseSet:
             ids = [v for v, in values if v and v in self.ids]
         return PoseSet(self.db, ids)
 
-    def get_by_metadata(self, 
-        key: str, 
-        value: str | None = None
-    ) -> 'PoseSet':
-
+    def get_by_metadata(self, key: str, value: str | None = None) -> "PoseSet":
         """Get all child poses with by their metadata. If no value is passed, then simply containing the key in the metadata dictionary is sufficient
 
         :param key: metadata key to search for
@@ -648,10 +650,7 @@ class PoseSet:
             ]
         return PoseSet(self.db, ids)
 
-    def get_by_inspiration(self, 
-        inspiration: int | Pose, 
-        inverse: bool = False
-    ):
+    def get_by_inspiration(self, inspiration: int | Pose, inverse: bool = False):
         """Get all child poses with with this inspiration.
 
         :param inspiration: inspiration :class:`.Pose` ID or object
@@ -677,10 +676,7 @@ class PoseSet:
 
         return PoseSet(self.db, ids)
 
-    def get_df(self, 
-        skip_no_mol=True, 
-        **kwargs
-    ) -> 'pandas.DataFrame':
+    def get_df(self, skip_no_mol=True, **kwargs) -> "pandas.DataFrame":
         """Get a DataFrame of the poses in this set. Keyword arguments passed to :meth:`.Pose.get_dict`.
 
         :param skip_no_mol: skip poses that have no mol (Default value = True)
@@ -701,9 +697,10 @@ class PoseSet:
 
         return DataFrame(data)
 
-    def get_by_reference(self, 
+    def get_by_reference(
+        self,
         ref_id: int,
-    ) -> 'PoseSet | None':
+    ) -> "PoseSet | None":
         """Get poses with a certain reference id
 
         :param ref_id: reference :class:`.Pose` ID
@@ -747,10 +744,11 @@ class PoseSet:
         ids = [v for v, in values if v]
         return PoseSet(self.db, [v for v, in values])
 
-    def get_by_target(self, 
-        *, 
+    def get_by_target(
+        self,
+        *,
         id: int,
-    ) -> 'PoseSet | None':
+    ) -> "PoseSet | None":
         """Select a subset of this :class:`.PoseSet` by the associated :class:`.Target`.
 
         :param id: :class:`.Target` ID
@@ -770,8 +768,9 @@ class PoseSet:
             return None
         return PoseSet(self.db, ids)
 
-    def filter(self, 
-        function, 
+    def filter(
+        self,
+        function,
         inverse: bool = False,
     ):
         """Filter this :class:`.PoseSet` by selecting members where ``function(pose)`` is truthy
@@ -797,7 +796,9 @@ class PoseSet:
     @property
     def reference(self):
         """Bulk set the references for poses in this set"""
-        raise NotImplementedError('This attribute only allows setting, ``PoseSet.reference = ...``')
+        raise NotImplementedError(
+            "This attribute only allows setting, ``PoseSet.reference = ...``"
+        )
 
     @reference.setter
     def reference(self, r) -> None:
@@ -813,7 +814,8 @@ class PoseSet:
 
         self.db.commit()
 
-    def add_tag(self, 
+    def add_tag(
+        self,
         tag: str,
     ) -> None:
         """Add this tag to every member of the set"""
@@ -827,11 +829,11 @@ class PoseSet:
 
         self.db.commit()
 
-    def append_to_metadata(self, 
-        key, 
+    def append_to_metadata(
+        self,
+        key,
         value,
     ) -> None:
-
         """Append a specific item to list-like values associated with a given key for all member's metadata dictionaries
 
         :param key: the :class:`.Metadata` key to match
@@ -844,7 +846,7 @@ class PoseSet:
 
     ### SPLITTING
 
-    def split_by_reference(self) -> 'dict[int,PoseSet]':
+    def split_by_reference(self) -> "dict[int,PoseSet]":
         """Split this :class:`.PoseSet` into subsets grouped by reference ID
 
         :returns: a dictionary with reference :class:`.Pose` IDs as keys and :class:`.PoseSet` subsets as values
@@ -855,9 +857,10 @@ class PoseSet:
             sets[ref_id] = self.get_by_reference(ref_id)
         return sets
 
-    def split_by_inspirations(self, 
+    def split_by_inspirations(
+        self,
         single_set: bool = False,
-    ) -> 'dict[int,PoseSet] | PoseSet':
+    ) -> "dict[int,PoseSet] | PoseSet":
         """Split this :class:`.PoseSet` into subsets grouped by inspirations
 
         :param single_set: Return a single :class:`.PoseSet` with members sorted by inspirations (Default value = False)
@@ -884,9 +887,10 @@ class PoseSet:
 
     ### EXPORTING
 
-    def write_sdf(self, 
-        out_path: str, 
-        name_col: str = "name", 
+    def write_sdf(
+        self,
+        out_path: str,
+        name_col: str = "name",
         inspirations: bool | str = "fragalysis",
     ) -> None:
         """Write an SDF
@@ -1125,9 +1129,7 @@ class PoseSet:
 
         return pose_df
 
-    def to_pymol(self, 
-        prefix: str | None = None
-    ) -> None:
+    def to_pymol(self, prefix: str | None = None) -> None:
         """Group the poses by reference protein and inspirations and output relevant PDBs and SDFs.
 
         :param prefix: prefix to give all output subdirectories (Default value = None)
@@ -1203,9 +1205,10 @@ class PoseSet:
 
     ### OUTPUT
 
-    def interactive(self, 
-        print_name: str = True, 
-        method: str | None = None, 
+    def interactive(
+        self,
+        print_name: str = True,
+        method: str | None = None,
         **kwargs,
     ):
         """Interactive widget to navigate compounds in the table
@@ -1342,9 +1345,10 @@ class PoseSet:
         """Iterate through poses in this set"""
         return iter(self.db.get_pose(id=i) for i in self.indices)
 
-    def __getitem__(self, 
+    def __getitem__(
+        self,
         key: int | slice,
-    ) -> 'Pose | PoseSet':
+    ) -> "Pose | PoseSet":
         """Get poses or subsets thereof from this set
 
         :param key: integer index or slice of indices
@@ -1367,9 +1371,10 @@ class PoseSet:
             case _:
                 raise NotImplementedError
 
-    def __add__(self, 
-        other: 'PoseSet',
-    ) -> 'PoseSet':
+    def __add__(
+        self,
+        other: "PoseSet",
+    ) -> "PoseSet":
         """Add a :class:`.PoseSet` to this set"""
         assert isinstance(other, PoseSet)
         return PoseSet(self.db, self.ids + other.ids, sort=False)

@@ -290,11 +290,12 @@ class CompoundTable:
 
     ### DUNDERS
 
-    def __call__(self, 
-        *, 
-        tag: str = None, 
+    def __call__(
+        self,
+        *,
+        tag: str = None,
         base: int | Compound = None,
-    ) -> 'CompoundSet':
+    ) -> "CompoundSet":
         """Filter compounds by a given tag or base. See :meth:`.CompoundTable.get_by_tag` and :meth:`.CompoundTable.get_by_base`"""
 
         if tag:
@@ -304,7 +305,8 @@ class CompoundTable:
         else:
             raise NotImplementedError(f"{type(i)=}")
 
-    def __getitem__(self, 
+    def __getitem__(
+        self,
         key: int | str | tuple | list | set | slice,
     ) -> Compound:
         """Get a member :class:`.Pose` object or subset :class:`.PoseSet` thereof.
@@ -1090,7 +1092,8 @@ class CompoundSet:
         """Iterate through compounds in this set"""
         return iter(self.db.get_compound(id=i) for i in self.indices)
 
-    def __getitem__(self, 
+    def __getitem__(
+        self,
         key: int | slice,
     ) -> "Compound | CompoundSet":
         """Get compounds or subsets thereof from this set
@@ -1110,7 +1113,8 @@ class CompoundSet:
             case _:
                 raise NotImplementedError
 
-    def __sub__(self,
+    def __sub__(
+        self,
         other: "CompoundSet | IngredientSet",
     ) -> "CompoundSet":
         """Subtract a :class:`.Compound` object or ID to this set, or subtract multiple at once when ``other`` is a :class:`.CompoundSet` or :class:`.IngredientSet`"""
@@ -1131,7 +1135,8 @@ class CompoundSet:
             case _:
                 raise NotImplementedError
 
-    def __add__(self,
+    def __add__(
+        self,
         other: "Compound | CompoundSet | IngredientSet | int",
     ) -> "CompoundSet":
         """Add a :class:`.Compound` object or ID to this set, or add multiple at once when ``other`` is a :class:`.CompoundSet` or :class:`.IngredientSet`"""
