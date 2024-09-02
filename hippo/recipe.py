@@ -941,7 +941,6 @@ class Recipe:
 		compound_ids_only: bool = False,
 		products: bool = True,
 		serialise_price: bool = False,
-		fingerprint: bool = False,
 	):
 
 		"""Serialise this recipe object
@@ -966,7 +965,6 @@ class Recipe:
 		:param compound_ids_only: bool:  (Default value = False)
 		:param products: bool:  (Default value = True)
 		:param serialise_price: bool:  (Default value = False)
-		:param fingerprint: bool:  (Default value = False)
 
 		"""
 
@@ -997,14 +995,9 @@ class Recipe:
 		else:
 			data['reactants'] = self.reactants.df.to_dict(orient='list')
 			data['intermediates'] = self.intermediates.df.to_dict(orient='list')
-			if products: data['products'] = self.products.df.to_dict(orient='list')
-			# data['reactants'] = self.reactants.df.to_dict(orient='records')
-			# data['intermediates'] = self.intermediates.df.to_dict(orient='records')
-			# if products: data['products'] = self.products.df.to_dict(orient='records')
+			if products: 
+				data['products'] = self.products.df.to_dict(orient='list')
 
-		if fingerprint:
-			data['fingerprint'] = self.get_product_fingerprint()
-			
 		# ReactionSet
 		data['reaction_ids'] = self.reactions.ids
 
