@@ -154,7 +154,7 @@ class ReactionTable:
 					return self.__getitem__(key=key)
 
 				else:
-					return self.db.get_reaction(table=self.table, id=key)
+					return self.db.get_reaction(id=key)
 
 			case key if isinstance(key, list) or isinstance(key, tuple) or isinstance(key, set):
 				return ReactionSet(self.db, key)
@@ -381,7 +381,7 @@ class ReactionSet:
 		return len(self.indices)
 
 	def __iter__(self):
-		return iter(self.db.get_reaction(table=self.table, id=i) for i in self.indices)
+		return iter(self.db.get_reaction(id=i) for i in self.indices)
 
 	def __getitem__(self, key) -> Reaction:
 		try:
@@ -389,7 +389,7 @@ class ReactionSet:
 		except IndexError:
 			logger.exception(f'list index out of range: {key=} for {self}')
 			raise
-		return self.db.get_reaction(table=self.table, id=index)
+		return self.db.get_reaction(id=index)
 
 	def __add__(self, other):
 		for reaction in other:
