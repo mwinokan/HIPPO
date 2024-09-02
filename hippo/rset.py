@@ -171,6 +171,8 @@ class ReactionTable:
 
         match key:
 
+            case int():
+
                 if key == 0:
                     return self.__getitem__(key=1)
 
