@@ -350,9 +350,17 @@ def numberToBase(n, b):
 
 def dt_hash():
     dt = datetime.now()
-    x = int(dt.month*36000*24*365.25 + dt.day*36000*24 + dt.hour*36000 + dt.minute*600 + dt.second*10 + dt.microsecond/10000)
-    timehash = ''.join([ALPHANUMERIC_CHARS[v] for v in numberToBase(x,36)])
+    x = int(
+        dt.month * 36000 * 24 * 365.25
+        + dt.day * 36000 * 24
+        + dt.hour * 36000
+        + dt.minute * 600
+        + dt.second * 10
+        + dt.microsecond / 10000
+    )
+    timehash = "".join([ALPHANUMERIC_CHARS[v] for v in numberToBase(x, 36)])
     return timehash
+
 
 class SanitisationError(Exception):
     """ """

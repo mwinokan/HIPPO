@@ -1031,7 +1031,8 @@ class Recipe:
         logger.writing(file)
         json.dump(data, open(file, "wt"), indent=indent)
 
-    def get_dict(self,
+    def get_dict(
+        self,
         *,
         price: bool = True,
         reactant_supplier: bool = True,
@@ -1041,12 +1042,11 @@ class Recipe:
         products: bool = True,
         serialise_price: bool = False,
     ):
-
         """Serialise this recipe object
-        
+
         Store
         =====
-        
+
         - Path to database
         - Timestamp
         - Reactants (& their quotes, amounts)
@@ -1056,7 +1056,7 @@ class Recipe:
         - Total Price
         - Lead time
 
-        :param *: 
+        :param *:
         :param price: bool:  (Default value = True)
         :param reactant_supplier: bool:  (Default value = True)
         :param database: bool:  (Default value = True)
@@ -1073,32 +1073,36 @@ class Recipe:
         data = {}
 
         # Database
-        if database: data['database'] = str(self.db.path.resolve())
-        if timestamp: data['timestamp'] = str(datetime.now())
+        if database:
+            data["database"] = str(self.db.path.resolve())
+        if timestamp:
+            data["timestamp"] = str(datetime.now())
 
         # Recipe properties
-        if price and serialise_price: 
-            data['price'] = self.price.get_dict()
-        elif price: 
-            data['price'] = self.price
+        if price and serialise_price:
+            data["price"] = self.price.get_dict()
+        elif price:
+            data["price"] = self.price
 
-        if reactant_supplier: data['reactant_supplier'] = self.reactants.supplier
+        if reactant_supplier:
+            data["reactant_supplier"] = self.reactants.supplier
         # data['lead_time'] = self.lead_time
 
         # IngredientSets
         if compound_ids_only:
-            data['reactant_ids'] = self.reactants.compound_ids
-            data['intermediate_ids'] = self.intermediates.compound_ids
-            if products: data['products_ids'] = self.products.compound_ids
+            data["reactant_ids"] = self.reactants.compound_ids
+            data["intermediate_ids"] = self.intermediates.compound_ids
+            if products:
+                data["products_ids"] = self.products.compound_ids
 
         else:
-            data['reactants'] = self.reactants.df.to_dict(orient='list')
-            data['intermediates'] = self.intermediates.df.to_dict(orient='list')
-            if products: 
-                data['products'] = self.products.df.to_dict(orient='list')
+            data["reactants"] = self.reactants.df.to_dict(orient="list")
+            data["intermediates"] = self.intermediates.df.to_dict(orient="list")
+            if products:
+                data["products"] = self.products.df.to_dict(orient="list")
 
         # ReactionSet
-        data['reaction_ids'] = self.reactions.ids
+        data["reaction_ids"] = self.reactions.ids
 
         return data
 

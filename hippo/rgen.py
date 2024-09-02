@@ -340,7 +340,7 @@ class RandomRecipeGenerator:
 
         logger.success(f"Completed after {i} iterations")
 
-        #write the Recipe JSON
+        # write the Recipe JSON
         recipe.write_json(out_file)
 
         return recipe
