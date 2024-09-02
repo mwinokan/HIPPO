@@ -324,9 +324,8 @@ class RandomRecipeGenerator:
 
 		logger.success(f'Completed after {i} iterations')
 
-		logger.writing(out_file)
-
-		raise NotImplementedError('Need to write the Recipe...')
+		#write the Recipe JSON
+		recipe.write_json(out_file)
 
 		return recipe
 
