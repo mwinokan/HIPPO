@@ -17,5 +17,4 @@ from .rgen import RandomRecipeGenerator
 from .rset import ReactionTable, ReactionSet
 from .tags import TagTable, TagSet
 from .target import Target
-
-# from .scoring import Scorer, CustomAttribute
+from .scoring import Scorer, CustomAttribute

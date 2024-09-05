@@ -33,6 +33,7 @@ class Recipe:
         self._intermediates = intermediates
         self._reactions = reactions
         self._db = db
+        self._hash = None
 
     ### FACTORIES
 
@@ -275,11 +276,11 @@ class Recipe:
             # raise NotImplementedError
             ids = reactions.db.execute(
                 f"""
-				SELECT DISTINCT compound_id FROM compound
-				LEFT JOIN reactant ON compound_id = reactant_compound
-				WHERE reactant_compound IS NULL
-				AND compound_id IN {products.str_ids}
-			"""
+                SELECT DISTINCT compound_id FROM compound
+                LEFT JOIN reactant ON compound_id = reactant_compound
+                WHERE reactant_compound IS NULL
+                AND compound_id IN {products.str_ids}
+            """
             ).fetchall()
 
             ids = [i for i, in ids]
@@ -346,7 +347,7 @@ class Recipe:
         assert isinstance(compounds, CompoundSet)
 
         # if permitted_reactions:
-        # 	raise NotImplementedError
+        #   raise NotImplementedError
 
         n_comps = len(compounds)
 
@@ -559,6 +560,7 @@ class Recipe:
         allow_db_mismatch=False,
         clear_quotes=False,
         data=None,
+        db_mismatch_warning: bool = True,
     ):
         """
 
@@ -578,21 +580,26 @@ class Recipe:
 
         # load JSON
         if not data:
-            logger.reading(path)
+            if debug:
+                logger.reading(path)
             data = json.load(open(path, "rt"))
 
         # check metadata
         if str(db.path.resolve()) != data["database"]:
-            logger.var("session", str(db.path.resolve()))
-            logger.var("in file", data["database"])
+            if db_mismatch_warning:
+                logger.var("session", str(db.path.resolve()))
+                logger.var("in file", data["database"])
             if allow_db_mismatch:
-                logger.warning("Database path mismatch")
+                if db_mismatch_warning:
+                    logger.warning("Database path mismatch")
             else:
                 logger.error(
                     "Database path mismatch, set allow_db_mismatch=True to ignore"
                 )
                 return None
-        logger.info(f'Recipe was generated at: {data["timestamp"]}')
+        
+        if debug:
+            logger.info(f'Recipe was generated at: {data["timestamp"]}')
         price = data["price"]
 
         # IngredientSets
@@ -702,18 +709,26 @@ class Recipe:
         # total = 0
         # quotes = self.quotes
         # if not quotes:
-        # 	return None
+        #   return None
         # assert len((currencies := set([q.currency for q in quotes]))) == 1, 'Multiple currencies'
         # return sum([q.price for q in quotes]), list(currencies)[0]
         return self.reactants.price
 
+    @property
+    def num_products(self):
+        return len(self.products)
+    
+    @property
+    def hash(self):
+        return self._hash
+
     # @property
     # def lead_time(self):
-    # 	total = 0
-    # 	quotes = self.quotes
-    # 	if not quotes:
-    # 		return None
-    # 	return max([q.lead_time for q in quotes])
+    #   total = 0
+    #   quotes = self.quotes
+    #   if not quotes:
+    #       return None
+    #   return max([q.lead_time for q in quotes])
 
     ### METHODS
 
@@ -1224,7 +1239,10 @@ class Recipe:
     ### DUNDERS
 
     def __repr__(self):
-        return f"Recipe({self.reactants} --> {self.intermediates} --> {self.products} via {self.reactions})"
+        if self.hash:
+            return f"Recipe_{self.hash}({self.reactants} --> {self.intermediates} --> {self.products} via {self.reactions})"
+        else:
+            return f"Recipe({self.reactants} --> {self.intermediates} --> {self.products} via {self.reactions})"
         # return f'Recipe()'
 
     def __add__(self, other):
@@ -1485,3 +1503,114 @@ class RouteSet:
 
     def __len__(self):
         return len(self.data)
+
+class RecipeSet:
+
+    """
+    RecipeSet class
+
+    :param param1: this is a first param
+    :param param2: this is a second param
+    :returns: this is a description of what is returned
+    :raises keyError: raises an exception
+    """
+
+    def __init__(self, db, directory, pattern='*.json'):
+        
+        from pathlib import Path
+
+        self._db = db
+        self._json_directory = Path(directory)
+        self._json_pattern = pattern
+
+        self._json_paths = {}
+        for path in self._json_directory.glob(self._json_pattern):
+            self._json_paths[path.name.removeprefix('Recipe_').removesuffix('.json')] = path.resolve()
+        
+        logger.reading(f'{directory}/{pattern}')
+
+        self._recipes = {}
+        for key, path in tqdm(self._json_paths.items()):
+            recipe = Recipe.from_json(db=self.db, path=path, allow_db_mismatch=True, debug=False, db_mismatch_warning=False)
+            recipe._hash = key
+            self._recipes[key] = recipe
+
+        # print(self._recipes)
+        
+    ### FACTORIES
+
+    ### PROPERTIES
+
+    @property
+    def db(self):
+        return self._db
+
+    ### METHODS
+
+    def get_values(self, 
+        key: str, 
+        progress: bool = False, 
+        serialise_price: bool = False,
+    ):
+
+        values = []
+        recipes = self._recipes.values()
+        
+        if progress:
+            recipes = tqdm(recipes)
+
+        for recipe in recipes:
+            value = getattr(recipe, key)
+            if serialise_price and key == 'price':
+                value = value.amount
+            values.append(value)
+
+        return values
+
+    def get_df(self, **kwargs) -> 'pandas.DataFrame':
+        
+        data = []
+
+        for recipe in self:
+
+            d = recipe.get_dict(
+                    # reactant_supplier=False,
+                    database=False,
+                    timestamp=False,
+                    **kwargs,
+                    # timestamp=False,
+                )
+
+            data.append(d)
+
+        from pandas import DataFrame
+        return DataFrame(data)
+
+    ### DUNDERS
+
+    def __len__(self) -> int:
+        """Number of recipes in this set"""
+        return len(self._recipes)
+
+    def __getitem__(
+        self,
+        key: int | str,
+    ) -> Recipe:
+
+        match key:
+
+            case int():
+                return list(self._recipes.values())[key]
+
+            case str():
+                return self._recipes[key]
+
+            case _:
+                logger.error(
+                    f"Unsupported type for RecipeSet.__getitem__(): {key=} {type(key)}"
+                )
+
+        return None
+
+    def __iter__(self):
+        return iter(self._recipes.values())

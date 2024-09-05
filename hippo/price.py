@@ -133,6 +133,23 @@ class Price:
             )
         return Price(self.amount + other.amount, self.currency)
 
+    def __eq__(self, other: "Price") -> bool:
+        """Compare two :class:`.Price` objects"""
+
+        if self.is_null and other.is_null:
+            return True
+
+        if self.is_null and not other.is_null:
+            return False
+
+        if not self.is_null and other.is_null:
+            return False
+
+        assert (
+            self.currency == other.currency
+        ), f"Comparing different currencies: {self.currency} != {other.currency}"
+        return self.amount == other.amount
+
     def __lt__(self, other: "Price") -> bool:
         """Compare two :class:`.Price` objects"""
 
@@ -166,3 +183,4 @@ class Price:
             self.currency == other.currency
         ), f"Comparing different currencies: {self.currency} != {other.currency}"
         return self.amount > other.amount
+
