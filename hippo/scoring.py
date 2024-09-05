@@ -1,6 +1,6 @@
-
 import mout
 import numpy as np
+
 # from .block import BuildingBlockSet
 from scipy.interpolate import interp1d
 import pandas as pd
@@ -35,10 +35,11 @@ class Scorer:
 
     """
 
-    def __init__(self, 
-        db: 'Database', 
-        recipes: 'RecipeSet', 
-        attributes: list[str], 
+    def __init__(
+        self,
+        db: "Database",
+        recipes: "RecipeSet",
+        attributes: list[str],
     ) -> None:
 
         self._db = db
@@ -93,33 +94,33 @@ class Scorer:
     def scores(self):
         return [self.score(r) for r in self.recipes]
 
-#     @property
-#     def sorted(self):
-#         if self.verbosity:
-#             mout.debug(f"sorting {len(self.bb_sets)} BB sets...")
+    #     @property
+    #     def sorted(self):
+    #         if self.verbosity:
+    #             mout.debug(f"sorting {len(self.bb_sets)} BB sets...")
 
-#         if self._sorted is None:
-#             self._sorted = sorted(
-#                 self.bb_sets, key=lambda x: self.score(x), reverse=True
-#             )
-#         return self._sorted
+    #         if self._sorted is None:
+    #             self._sorted = sorted(
+    #                 self.bb_sets, key=lambda x: self.score(x), reverse=True
+    #             )
+    #         return self._sorted
 
-#     @property
-#     def best(self):
-#         return self.sorted[0]
+    #     @property
+    #     def best(self):
+    #         return self.sorted[0]
 
-#     ### METHODS
+    #     ### METHODS
 
     # @property
     # def get_values(self):
     #     return self._get_values
 
+    #     def add_attribute(self, a):
+    #         self._attributes.append(a)
 
-#     def add_attribute(self, a):
-#         self._attributes.append(a)
-
-    def score(self, 
-        recipe: 'Recipe', 
+    def score(
+        self,
+        recipe: "Recipe",
         *,
         debug: bool = False,
     ) -> float:
@@ -144,60 +145,66 @@ class Scorer:
 
         return score
 
-    def get_df(self,
+    def get_df(
+        self,
         serialise_price: bool = True,
         **kwargs,
-    ) -> 'pandas.DataFrame': 
+    ) -> "pandas.DataFrame":
 
-        logger.debug('Scorer.get_df()')
+        logger.debug("Scorer.get_df()")
 
         df = self.recipes.get_df(serialise_price=serialise_price, **kwargs)
 
-        df['score'] = self.scores
+        df["score"] = self.scores
 
         for attribute in self.attributes:
-            df[attribute.key] = self.recipes.get_values(key=attribute.key, serialise_price=serialise_price)
+            df[attribute.key] = self.recipes.get_values(
+                key=attribute.key, serialise_price=serialise_price
+            )
 
         return df
 
-    def plot(self, 
+    def plot(
+        self,
         keys: list[str],
         **kwargs,
     ):
 
         import plotly.express as px
 
-        return px.scatter(self.get_df(**kwargs), x=keys[0], y=keys[1], color='score')
+        return px.scatter(self.get_df(**kwargs), x=keys[0], y=keys[1], color="score")
 
-#     def top(self, n):
-#         return self.sorted[:n]
+    #     def top(self, n):
+    #         return self.sorted[:n]
 
     ### DUNDERS
 
     def __repr__(self):
-        return f'Scorer(#recipes={self.num_recipes})'
+        return f"Scorer(#recipes={self.num_recipes})"
+
 
 class Attribute:
 
-    _type = 'Attribute'
+    _type = "Attribute"
 
     ### DUNDERS
 
-    def __init__(self, 
-        scorer: 'Scorer',
-        key: str, 
+    def __init__(
+        self,
+        scorer: "Scorer",
+        key: str,
         *,
-        inverse: bool = False, 
+        inverse: bool = False,
         weight: float = 1.0,
         bins: int = 100,
     ):
 
         self._scorer = scorer
-        
+
         self._key = key
         self._inverse = None
         self._weight = weight
-        
+
         self._value_dict = {}
 
         self._mean = None
@@ -212,11 +219,11 @@ class Attribute:
     @property
     def scorer(self):
         return self._scorer
-    
+
     @property
     def key(self):
         return self._key
-    
+
     @property
     def inverse(self):
         return self._inverse
@@ -256,7 +263,7 @@ class Attribute:
     def weight(self, w):
         self._weight = abs(w)
         self._reverse = w < 0
-    
+
     @property
     def percentile_interpolator(self):
         if self._percentile_interpolator is None:
@@ -271,10 +278,10 @@ class Attribute:
 
         return self._percentile_interpolator
 
-    def __call__(self, 
-        recipe: 'Recipe',
+    def __call__(
+        self,
+        recipe: "Recipe",
     ) -> float:
-
         """return the score of a given value"""
 
         if not self.weight:
@@ -283,7 +290,7 @@ class Attribute:
         value = self.unweighted(recipe)
 
         # if value is None:
-            # return 0.5
+        # return 0.5
 
         return self.weight * value
 
@@ -296,31 +303,36 @@ class Attribute:
 
     ### METHODS
 
-    def get_value(self, 
-        recipe: 'Recipe',
+    def get_value(
+        self,
+        recipe: "Recipe",
         serialise_price: bool = True,
     ) -> float:
         value = getattr(recipe, self.key)
-        if serialise_price and self.key == 'price':
+        if serialise_price and self.key == "price":
             value = value.amount
         return value
 
-    def histogram(self, 
+    def histogram(
+        self,
         progress: bool = False,
-    ) -> 'plotly.graph_objects.Figure':
+    ) -> "plotly.graph_objects.Figure":
 
         import plotly.graph_objects as go
 
-        values = self.scorer.recipes.get_values(self.key, progress=progress, serialise_price=True)
+        values = self.scorer.recipes.get_values(
+            self.key, progress=progress, serialise_price=True
+        )
 
         fig = go.Figure(go.Histogram(x=values))
 
-        fig.update_layout(xaxis_title=self.key, yaxis_title='count')
+        fig.update_layout(xaxis_title=self.key, yaxis_title="count")
 
         return fig
 
-    def unweighted(self, 
-        recipe: 'Recipe', 
+    def unweighted(
+        self,
+        recipe: "Recipe",
         value: float = None,
         debug: bool = False,
     ) -> float:
@@ -329,12 +341,12 @@ class Attribute:
             value = self.get_value(recipe)
 
         if debug:
-            logger.debug(f'{value=}')
+            logger.debug(f"{value=}")
 
         score = float(self.percentile_interpolator(value))
-        
+
         if debug:
-            logger.debug(f'{score=}')
+            logger.debug(f"{score=}")
 
         if self.inverse:
             score = 1 - score
@@ -348,6 +360,8 @@ class CustomAttribute(Attribute):
 
     def __init__(self, key, bb_sets, function):
         raise NotImplementedError
+
+
 #         self.get_value = function
 #         super(CustomAttribute, self).__init__(key=key, bb_sets=bb_sets)
 #         self._type = "CustomAttribute"

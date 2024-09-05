@@ -597,7 +597,7 @@ class Recipe:
                     "Database path mismatch, set allow_db_mismatch=True to ignore"
                 )
                 return None
-        
+
         if debug:
             logger.info(f'Recipe was generated at: {data["timestamp"]}')
         price = data["price"]
@@ -717,7 +717,7 @@ class Recipe:
     @property
     def num_products(self):
         return len(self.products)
-    
+
     @property
     def hash(self):
         return self._hash
@@ -1504,8 +1504,8 @@ class RouteSet:
     def __len__(self):
         return len(self.data)
 
-class RecipeSet:
 
+class RecipeSet:
     """
     RecipeSet class
 
@@ -1515,8 +1515,8 @@ class RecipeSet:
     :raises keyError: raises an exception
     """
 
-    def __init__(self, db, directory, pattern='*.json'):
-        
+    def __init__(self, db, directory, pattern="*.json"):
+
         from pathlib import Path
 
         self._db = db
@@ -1525,18 +1525,26 @@ class RecipeSet:
 
         self._json_paths = {}
         for path in self._json_directory.glob(self._json_pattern):
-            self._json_paths[path.name.removeprefix('Recipe_').removesuffix('.json')] = path.resolve()
-        
-        logger.reading(f'{directory}/{pattern}')
+            self._json_paths[
+                path.name.removeprefix("Recipe_").removesuffix(".json")
+            ] = path.resolve()
+
+        logger.reading(f"{directory}/{pattern}")
 
         self._recipes = {}
         for key, path in tqdm(self._json_paths.items()):
-            recipe = Recipe.from_json(db=self.db, path=path, allow_db_mismatch=True, debug=False, db_mismatch_warning=False)
+            recipe = Recipe.from_json(
+                db=self.db,
+                path=path,
+                allow_db_mismatch=True,
+                debug=False,
+                db_mismatch_warning=False,
+            )
             recipe._hash = key
             self._recipes[key] = recipe
 
         # print(self._recipes)
-        
+
     ### FACTORIES
 
     ### PROPERTIES
@@ -1547,43 +1555,45 @@ class RecipeSet:
 
     ### METHODS
 
-    def get_values(self, 
-        key: str, 
-        progress: bool = False, 
+    def get_values(
+        self,
+        key: str,
+        progress: bool = False,
         serialise_price: bool = False,
     ):
 
         values = []
         recipes = self._recipes.values()
-        
+
         if progress:
             recipes = tqdm(recipes)
 
         for recipe in recipes:
             value = getattr(recipe, key)
-            if serialise_price and key == 'price':
+            if serialise_price and key == "price":
                 value = value.amount
             values.append(value)
 
         return values
 
-    def get_df(self, **kwargs) -> 'pandas.DataFrame':
-        
+    def get_df(self, **kwargs) -> "pandas.DataFrame":
+
         data = []
 
         for recipe in self:
 
             d = recipe.get_dict(
-                    # reactant_supplier=False,
-                    database=False,
-                    timestamp=False,
-                    **kwargs,
-                    # timestamp=False,
-                )
+                # reactant_supplier=False,
+                database=False,
+                timestamp=False,
+                **kwargs,
+                # timestamp=False,
+            )
 
             data.append(d)
 
         from pandas import DataFrame
+
         return DataFrame(data)
 
     ### DUNDERS
