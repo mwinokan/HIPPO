@@ -150,7 +150,7 @@ class Compound:
     @property
     def atomtype_dict(self) -> dict[str, int]:
         """Get a dictionary with atomtypes as keys and corresponding quantities/counts as values."""
-        from .tools import formula_to_atomtype_dict
+        from molparse.atomtypes import formula_to_atomtype_dict
 
         return formula_to_atomtype_dict(self.formula)
 

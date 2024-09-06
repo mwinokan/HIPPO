@@ -584,14 +584,14 @@ class CompoundSet:
     @property
     def formula(self) -> str:
         """Get the combined chemical formula for all compounds"""
-        from .tools import atomtype_dict_to_formula
+        from molparse.atomtypes import atomtype_dict_to_formula
 
         return atomtype_dict_to_formula(self.atomtype_dict)
 
     @property
     def atomtype_dict(self) -> dict[str, int]:
         """Get a dictionary with atomtypes as keys and corresponding quantities/counts as values"""
-        from .tools import formula_to_atomtype_dict, combine_atomtype_dicts
+        from molparse.atomtypes import formula_to_atomtype_dict, combine_atomtype_dicts
 
         atomtype_dicts = [c.atomtype_dict for c in self]
         return combine_atomtype_dicts(atomtype_dicts)
