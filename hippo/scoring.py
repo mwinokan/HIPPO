@@ -344,10 +344,10 @@ class Attribute:
 
 class CustomAttribute(Attribute):
 
-    # _type = 'CustomAttribute'
+    _type = 'CustomAttribute'
 
-    def __init__(self, key, bb_sets, function):
-        raise NotImplementedError
-#         self.get_value = function
-#         super(CustomAttribute, self).__init__(key=key, bb_sets=bb_sets)
-#         self._type = "CustomAttribute"
+    def __init__(self, key, function):
+        self.get_value = function
+        super(CustomAttribute, self).__init__(key=key, bb_sets=bb_sets)
+
+
