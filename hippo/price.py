@@ -183,4 +183,3 @@ class Price:
             self.currency == other.currency
         ), f"Comparing different currencies: {self.currency} != {other.currency}"
         return self.amount > other.amount
-
