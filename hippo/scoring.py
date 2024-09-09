@@ -553,69 +553,59 @@ class CustomAttribute(Attribute):
 
 
 DEFAULT_ATTRIBUTES = {
-
     "num_bases": dict(
         type="custom",
         weight=1.0,
         function=lambda r: r.product_compounds.count_by_tag(tag="Syndirella base"),
         description="The number of Syndirella base compounds in this selection",
     ),
-
     "num_products": dict(
-        type="standard", 
+        type="standard",
         weight=1.0,
         description="The number of product compounds in this selection",
     ),
-
     "num_bases_elaborated": dict(
         type="custom",
         weight=1.0,
         function=lambda r: r.product_compounds.num_bases_elaborated,
         description="The number of Syndirella base compounds that have at least one elaboration in this selection",
     ),
-
     "elaboration_balance": dict(
         type="custom",
         weight=1.0,
         function=lambda r: r.product_compounds.elaboration_balance,
         description="A measure for how evenly base compounds have been elaborated",
     ),
-
     "num_inspirations": dict(
         type="custom",
         weight=1.0,
         function=lambda r: r.product_poses.num_inspirations,
         description="The number of unique fragment compounds that inspired poses for product compounds in this selection",
     ),
-
     "num_inspiration_sets": dict(
         type="custom",
         weight=1.0,
         function=lambda r: r.product_poses.num_inspiration_sets,
         description="The number of unique fragment combinations that inspired poses for product compounds in this selection",
     ),
-    
     "risk_balance": dict(
-        type="custom", 
-        weight=1.0, 
+        type="custom",
+        weight=1.0,
         function=lambda r: r.product_compounds.risk_balance,
         description="A measure of how evenly spread the risk of elaborations are for each base compound. Risk in this case refers to the number of atoms added",
     ),
-    
     "interaction_count": dict(
         type="custom",
         weight=1.0,
         function=lambda r: r.product_interactions.num_features,
         description="The number of protein features that are being interecated with in this selection",
     ),
-
     "interaction_balance": dict(
         type="custom",
         weight=1.0,
         function=lambda r: r.product_interactions.per_feature_count_std,
         description="A measure for how evenly protein features are being interacted with in this selection",
     ),
-
     # "reaction_risk": dict(type='custom', weight=1.0, function=None),
     # "pockets?": dict(type='custom', weight=1.0, function=None),
     # "chemical_diversity": dict(type='custom', weight=1.0, function=None),
