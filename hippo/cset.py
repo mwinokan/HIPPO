@@ -5,7 +5,7 @@ from .db import Database
 
 from .recipe import Recipe
 
-from numpy import int64, nan, isnan
+from numpy import int64, nan, isnan, mean, std
 
 import mcol
 
@@ -606,24 +606,120 @@ class CompoundSet:
 
         query = self.db.execute(
             f"""
-		WITH nums AS (
-			SELECT A.compound_id AS comp_id, 
-			mol_num_hvyatms(A.compound_mol) - mol_num_hvyatms(B.compound_mol) AS diff 
-			FROM compound A, compound B
-			WHERE A.compound_base = B.compound_id
-			AND A.compound_id IN {self.str_ids}
-		)
+        WITH nums AS (
+            SELECT A.compound_id AS comp_id, 
+            mol_num_hvyatms(A.compound_mol) - mol_num_hvyatms(B.compound_mol) AS diff 
+            FROM compound A, compound B
+            WHERE A.compound_base = B.compound_id
+            AND A.compound_id IN {self.str_ids}
+        )
 
-		SELECT compound_id, diff FROM compound
-		LEFT JOIN nums
-		ON comp_id = compound_id
-		WHERE compound_id IN {self.str_ids}
-		"""
+        SELECT compound_id, diff FROM compound
+        LEFT JOIN nums
+        ON comp_id = compound_id
+        WHERE compound_id IN {self.str_ids}
+        """
         ).fetchall()
 
         lookup = {k: v for k, v in query}
 
         return [lookup[i] for i in self.indices]
+
+    @property
+    def avg_num_atoms_added(self) -> float:
+        """Calculate the average number of atoms added w.r.t the base
+
+        :returns: average number of atoms added values for compounds which have a base
+
+        """
+
+        (avg,) = self.db.execute(
+            f"""
+        WITH nums AS (
+            SELECT A.compound_id AS comp_id, 
+            mol_num_hvyatms(A.compound_mol) - mol_num_hvyatms(B.compound_mol) AS diff 
+            FROM compound A, compound B
+            WHERE A.compound_base = B.compound_id
+            AND A.compound_id IN {self.str_ids}
+        )
+
+        SELECT AVG(diff) FROM compound
+        INNER JOIN nums
+        ON comp_id = compound_id
+        WHERE compound_id IN {self.str_ids}
+        """
+        ).fetchone()
+
+        return avg
+
+    @property
+    def risk_diversity(self) -> float:
+        """Calculate the average spread of risk (#atoms added) for each base in this set
+
+        :returns: average of the standard deviations of number of atoms added for each base
+
+        """
+
+        variances = self.db.execute(
+            f"""
+                WITH nums AS (
+                    SELECT B.compound_id as base, A.compound_id AS elab, 
+                    mol_num_hvyatms(A.compound_mol) - mol_num_hvyatms(B.compound_mol) AS diff 
+                    FROM compound A, compound B
+                    WHERE A.compound_base = B.compound_id
+                    AND A.compound_id IN {self.str_ids}
+                ),
+
+                means AS (  
+                    SELECT base, AVG(diff) AS mean FROM nums
+                    GROUP BY base
+                )
+
+                SELECT AVG((nums.diff - mean)*(nums.diff - mean)) var FROM nums
+                LEFT JOIN means
+                ON nums.base = means.base
+                GROUP BY nums.base
+                
+            """
+        ).fetchall()
+
+        variances = [v for v, in variances]
+
+        return mean(variances)
+
+    @property
+    def elaboration_balance(self) -> std:
+        """Measure of how evenly elaborations are distributed across bases in this set"""
+
+        sql = f"""
+        SELECT COUNT(1) FROM compound
+        WHERE compound_id IN {self.str_ids}
+        AND compound_base IS NOT NULL
+        GROUP BY compound_base
+        """
+
+        counts = self.db.execute(sql).fetchall()
+
+        counts = [c for c, in counts]
+
+        return -std(counts)
+
+    @property
+    def num_bases_elaborated(self) -> int:
+        """Count the number of base compounds that have at least one elaboration in this set
+
+        :returns: number of base compounds
+
+        """
+
+        (count,) = self.db.execute(
+            f"""
+                SELECT COUNT(DISTINCT compound_base) FROM compound
+                WHERE compound_id IN {self.str_ids}  
+            """
+        ).fetchone()
+
+        return count
 
     ### FILTERING
 
@@ -661,6 +757,29 @@ class CompoundSet:
             ]
         return CompoundSet(self.db, ids)
 
+    def get_by_base(
+        self,
+        base: Compound | int,
+    ) -> "CompoundSet":
+        """Get all compounds that elaborate the given base compound
+
+        :param base: :class:`.Compound` object or ID to search by
+
+        """
+
+        if not isinstance(base, int):
+            assert base._table == "compound"
+            base = base.id
+
+        values = self.db.select_where(
+            query="compound_id",
+            table="compound",
+            key=f"compound_base = {base} AND compound_id IN {self.str_ids}",
+            multiple=True,
+        )
+        ids = [v for v, in values if v]
+        return CompoundSet(self.db, ids)
+
     def get_all_possible_reactants(
         self,
         debug: bool = False,
@@ -688,6 +807,24 @@ class CompoundSet:
             product_ids=self.ids, debug=debug
         )
         return all_reactions
+
+    def count_by_tag(
+        self,
+        tag: str,
+    ) -> "CompoundSet":
+        """Count all child compounds with a certain tag
+
+        :param tag: tag to filter by
+
+        """
+        (count,) = self.db.select_where(
+            query="COUNT(tag_compound)",
+            table="tag",
+            key="name",
+            value=tag,
+            multiple=False,
+        )
+        return count
 
     ### CONSOLE / NOTEBOOK OUTPUT
 
@@ -1669,16 +1806,16 @@ class IngredientSet:
         # update quotes
         pairs = self.db.execute(
             f"""
-			WITH matching_quotes AS (
-				SELECT quote_id, quote_compound, MIN(quote_price) FROM quote
-				WHERE quote_compound IN {self.str_compound_ids}
-				AND quote_amount >= {amount}
-				GROUP BY quote_compound
-			)
-			SELECT compound_id, quote_id FROM compound
-			LEFT JOIN matching_quotes ON quote_compound = compound_id
-			WHERE compound_id IN {self.str_compound_ids}
-		"""
+            WITH matching_quotes AS (
+                SELECT quote_id, quote_compound, MIN(quote_price) FROM quote
+                WHERE quote_compound IN {self.str_compound_ids}
+                AND quote_amount >= {amount}
+                GROUP BY quote_compound
+            )
+            SELECT compound_id, quote_id FROM compound
+            LEFT JOIN matching_quotes ON quote_compound = compound_id
+            WHERE compound_id IN {self.str_compound_ids}
+        """
         ).fetchall()
 
         for compound_id, quote_id in pairs:
@@ -1738,7 +1875,12 @@ class IngredientSet:
     def __iter__(self):
         return iter(self._get_ingredient(s) for i, s in self.df.iterrows())
 
-    def __call__(self, *, compound_id):
+    def __call__(
+        self,
+        *,
+        compound_id: int | None = None,
+        tag: str | None = None,
+    ) -> "IngredientSet | Ingredient | CompoundSet":
 
         if compound_id:
 
@@ -1755,6 +1897,9 @@ class IngredientSet:
                 )
 
             return self._get_ingredient(matches.iloc[0])
+
+        # elif tag:
+        #     return self.compounds(tag=tag)
 
         else:
             raise NotImplementedError

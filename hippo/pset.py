@@ -541,20 +541,41 @@ class PoseSet:
     @property
     def inspiration_sets(self) -> list[set[int]]:
         """Return a list of unique sets of inspiration :class:`.Pose` IDs"""
-        sets = []
-        for id in self.ids:
-            insp_ids = self.db.select_where(
-                query="inspiration_original",
-                table="inspiration",
-                key="derivative",
-                value=id,
-                multiple=True,
-                sort="inspiration_original",
-            )
-            insp_ids = set(v for v, in insp_ids)
-            if insp_ids not in sets:
-                sets.append(insp_ids)
-        return sets
+
+        sql = f"""
+        SELECT inspiration_derivative, inspiration_original FROM inspiration
+        WHERE inspiration_derivative IN {self.str_ids}
+        """
+
+        pairs = self.db.execute(sql).fetchall()
+
+        data = {}
+        for derivative, original in pairs:
+            if derivative not in data:
+                data[derivative] = set()
+            data[derivative].add(original)
+
+        data = {k: tuple(sorted(list(v))) for k, v in data.items()}
+
+        unique = set(data.values())
+
+        return unique
+
+    @property
+    def num_inspiration_sets(self) -> int:
+        """Return the number of unique sets of inspirations"""
+        return len(self.inspiration_sets)
+
+    @property
+    def num_inspirations(self) -> int:
+        """Return the number of unique inspirations for poses in this set"""
+        (count,) = self.db.select_where(
+            table="inspiration",
+            query="COUNT(DISTINCT inspiration_original)",
+            key=f"inspiration_derivative IN {self.str_ids}",
+        )
+
+        return count
 
     @property
     def str_ids(self) -> str:

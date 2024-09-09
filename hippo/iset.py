@@ -122,16 +122,16 @@ class InteractionSet:
                 logger.warning(f"{has_invalid_fps} Poses have not been fingerprinted")
 
             sql = f"""
-			SELECT interaction_id FROM interaction
-			WHERE interaction_pose IN {pose.str_ids}
-			"""
+            SELECT interaction_id FROM interaction
+            WHERE interaction_pose IN {pose.str_ids}
+            """
 
         else:
 
             sql = f"""
-			SELECT interaction_id FROM interaction
-			WHERE interaction_pose = {pose.id}
-			"""
+            SELECT interaction_id FROM interaction
+            WHERE interaction_pose = {pose.id}
+            """
 
         ids = pose.db.execute(sql).fetchall()
 
@@ -166,12 +166,12 @@ class InteractionSet:
             target = target.id
 
         sql = f"""
-		SELECT interaction_id FROM interaction
-		INNER JOIN feature
-		ON interaction_feature = feature_id
-		WHERE feature_target = {target}
-		AND feature_residue_number = {residue_number}
-		"""
+        SELECT interaction_id FROM interaction
+        INNER JOIN feature
+        ON interaction_feature = feature_id
+        WHERE feature_target = {target}
+        AND feature_residue_number = {residue_number}
+        """
 
         if chain:
             sql += f' AND feature_chain_name = "{chain}"'
@@ -240,13 +240,45 @@ class InteractionSet:
         """Get a list of ``(residue_number, chain_name)`` tuples"""
 
         sql = f"""
-		SELECT DISTINCT feature_residue_number, feature_chain_name FROM interaction
-		INNER JOIN feature
-		ON feature_id = interaction_feature
-		WHERE interaction_id IN {self.str_ids}
-		"""
+        SELECT DISTINCT feature_residue_number, feature_chain_name FROM interaction
+        INNER JOIN feature
+        ON feature_id = interaction_feature
+        WHERE interaction_id IN {self.str_ids}
+        """
 
         return self.db.execute(sql).fetchall()
+
+    @property
+    def num_features(self) -> int:
+        """Count the funmber of protein :class:`.Feature`s with which interactions are formed"""
+
+        (count,) = self.db.execute(
+            f"""
+        SELECT COUNT(DISTINCT interaction_feature) FROM interaction
+        WHERE interaction_id IN {self.str_ids}
+        """
+        ).fetchone()
+
+        return count
+
+    @property
+    def avg_num_interactions_per_feature(self) -> float:
+        """Average number of interactions formed with each protein :class:`.Feature`"""
+
+        (count,) = self.db.execute(
+            f"""
+        WITH counts AS
+        (
+            SELECT interaction_feature, COUNT(1) AS count FROM interaction
+            WHERE interaction_id IN {self.str_ids}
+            GROUP BY interaction_feature
+        )
+
+        SELECT AVG(count) FROM counts
+        """
+        ).fetchone()
+
+        return count
 
     ### METHODS
 
@@ -274,10 +306,10 @@ class InteractionSet:
 
         pairs = self.db.execute(
             f"""
-		SELECT interaction_feature, COUNT(1) FROM interaction
-		WHERE interaction_id IN {self.str_ids}
-		GROUP BY interaction_feature
-		"""
+        SELECT interaction_feature, COUNT(1) FROM interaction
+        WHERE interaction_id IN {self.str_ids}
+        GROUP BY interaction_feature
+        """
         ).fetchall()
 
         return {f: c for f, c in pairs}
@@ -299,12 +331,12 @@ class InteractionSet:
         ### H-Bonds (closest)
 
         sql = f"""
-		SELECT interaction_id, MIN(interaction_distance)
-		FROM interaction
-		WHERE interaction_id IN {self.str_ids}
-		AND interaction_type = "Hydrogen Bond"
-		GROUP BY interaction_atom_ids
-		"""
+        SELECT interaction_id, MIN(interaction_distance)
+        FROM interaction
+        WHERE interaction_id IN {self.str_ids}
+        AND interaction_type = "Hydrogen Bond"
+        GROUP BY interaction_atom_ids
+        """
 
         records = self.db.execute(sql).fetchall()
         ids = [a for a, b in records]
@@ -313,14 +345,14 @@ class InteractionSet:
         ### pi-stacking (closest)
 
         sql = f"""
-		SELECT interaction_id, MIN(interaction_distance)
-		FROM interaction
-		INNER JOIN feature
-		ON feature_id = interaction_feature
-		WHERE interaction_id IN {self.str_ids}
-		AND interaction_type = "π-stacking"
-		GROUP BY feature_atom_names
-		"""
+        SELECT interaction_id, MIN(interaction_distance)
+        FROM interaction
+        INNER JOIN feature
+        ON feature_id = interaction_feature
+        WHERE interaction_id IN {self.str_ids}
+        AND interaction_type = "π-stacking"
+        GROUP BY feature_atom_names
+        """
         # GROUP BY interaction_atom_ids
 
         records = self.db.execute(sql).fetchall()
@@ -330,12 +362,12 @@ class InteractionSet:
         ### pi-cation (closest)
 
         sql = f"""
-		SELECT interaction_id, MIN(interaction_distance)
-		FROM interaction
-		WHERE interaction_id IN {self.str_ids}
-		AND interaction_type = "π-cation"
-		GROUP BY interaction_atom_ids
-		"""
+        SELECT interaction_id, MIN(interaction_distance)
+        FROM interaction
+        WHERE interaction_id IN {self.str_ids}
+        AND interaction_type = "π-cation"
+        GROUP BY interaction_atom_ids
+        """
         # GROUP BY interaction_atom_ids
 
         records = self.db.execute(sql).fetchall()
@@ -345,12 +377,12 @@ class InteractionSet:
         ### electrostatic (closest)
 
         sql = f"""
-		SELECT interaction_id, MIN(interaction_distance)
-		FROM interaction
-		WHERE interaction_id IN {self.str_ids}
-		AND interaction_type = "Electrostatic"
-		GROUP BY interaction_atom_ids
-		"""
+        SELECT interaction_id, MIN(interaction_distance)
+        FROM interaction
+        WHERE interaction_id IN {self.str_ids}
+        AND interaction_type = "Electrostatic"
+        GROUP BY interaction_atom_ids
+        """
         # GROUP BY interaction_atom_ids
 
         records = self.db.execute(sql).fetchall()
@@ -360,11 +392,11 @@ class InteractionSet:
         ### hydrophobic
 
         sql = f"""
-		SELECT interaction_id, interaction_distance
-		FROM interaction
-		WHERE interaction_id IN {self.str_ids}
-		AND interaction_type = "Hydrophobic"
-		"""
+        SELECT interaction_id, interaction_distance
+        FROM interaction
+        WHERE interaction_id IN {self.str_ids}
+        AND interaction_type = "Hydrophobic"
+        """
 
         records = self.db.execute(sql).fetchall()
         ids = [a for a, b in records]
@@ -463,11 +495,11 @@ class InteractionSet:
         hydrophobic_keeper_iset = InteractionSet(self.db, keep_hydrophobic_ids)
 
         sql = f"""
-		SELECT interaction_id, MIN(interaction_distance)
-		FROM interaction
-		WHERE interaction_id IN {hydrophobic_keeper_iset.str_ids}
-		GROUP BY interaction_feature
-		"""
+        SELECT interaction_id, MIN(interaction_distance)
+        FROM interaction
+        WHERE interaction_id IN {hydrophobic_keeper_iset.str_ids}
+        GROUP BY interaction_feature
+        """
 
         records = self.db.execute(sql).fetchall()
         ids = [a for a, b in records]
