@@ -280,6 +280,24 @@ class InteractionSet:
 
         return count
 
+    @property
+    def per_feature_count_std(self) -> float:
+        """A measure for how evenly protein :class:`.Feature`s are being interacted with"""
+
+        counts = self.db.execute(
+        f"""
+        SELECT interaction_feature, COUNT(1) AS count FROM interaction
+        WHERE interaction_id IN {self.str_ids}
+        GROUP BY interaction_feature
+        """
+        ).fetchone()
+
+        counts = [c for c, in counts]
+
+        from numpy import std
+
+        return -std(counts)
+
     ### METHODS
 
     def summary(
