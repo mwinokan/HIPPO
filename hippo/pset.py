@@ -555,7 +555,7 @@ class PoseSet:
                 data[derivative] = set()
             data[derivative].add(original)
 
-        data = {k:tuple(sorted(list(v))) for k,v in data.items()}
+        data = {k: tuple(sorted(list(v))) for k, v in data.items()}
 
         unique = set(data.values())
 
@@ -569,10 +569,10 @@ class PoseSet:
     @property
     def num_inspirations(self) -> int:
         """Return the number of unique inspirations for poses in this set"""
-        count, = self.db.select_where(
-            table='inspiration',
-            query='COUNT(DISTINCT inspiration_original)',
-            key=f'inspiration_derivative IN {self.str_ids}',
+        (count,) = self.db.select_where(
+            table="inspiration",
+            query="COUNT(DISTINCT inspiration_original)",
+            key=f"inspiration_derivative IN {self.str_ids}",
         )
 
         return count

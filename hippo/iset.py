@@ -252,7 +252,7 @@ class InteractionSet:
     def num_features(self) -> int:
         """Count the funmber of protein :class:`.Feature`s with which interactions are formed"""
 
-        count, = self.db.execute(
+        (count,) = self.db.execute(
             f"""
         SELECT COUNT(DISTINCT interaction_feature) FROM interaction
         WHERE interaction_id IN {self.str_ids}
@@ -265,8 +265,8 @@ class InteractionSet:
     def avg_num_interactions_per_feature(self) -> float:
         """Average number of interactions formed with each protein :class:`.Feature`"""
 
-        count, = self.db.execute(
-        f"""
+        (count,) = self.db.execute(
+            f"""
         WITH counts AS
         (
             SELECT interaction_feature, COUNT(1) AS count FROM interaction

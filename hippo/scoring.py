@@ -62,10 +62,11 @@ class Scorer:
     ### FACTORIES
 
     @classmethod
-    def default(cls, 
+    def default(
+        cls,
         db: "Database",
-        directory: 'Path | str',
-        pattern: str = '*.json',
+        directory: "Path | str",
+        pattern: str = "*.json",
     ):
 
         from .recipe import RecipeSet
@@ -74,16 +75,22 @@ class Scorer:
 
         self = cls.__new__(cls)
 
-        attributes = [k for k,v in DEFAULT_ATTRIBUTES.items() if v['type'] == 'standard']
+        attributes = [
+            k for k, v in DEFAULT_ATTRIBUTES.items() if v["type"] == "standard"
+        ]
 
         self.__init__(db=db, recipes=rset, attributes=attributes)
 
         # custom attributes
-        for key,attribute in [(k,v) for k,v in DEFAULT_ATTRIBUTES.items() if v['type'] == 'custom']:
+        for key, attribute in [
+            (k, v) for k, v in DEFAULT_ATTRIBUTES.items() if v["type"] == "custom"
+        ]:
 
             # print(key, attribute)
 
-            self.add_custom_attribute(key, attribute['function'], weight_reset_warning=False)
+            self.add_custom_attribute(
+                key, attribute["function"], weight_reset_warning=False
+            )
 
         # weights
 
@@ -129,8 +136,8 @@ class Scorer:
     @property
     def scores(self):
         if self._scores is None:
-            logger.debug('Scorer.scores')
-            self._scores = { k:self.score(r) for k,r in self.recipes.items() }
+            logger.debug("Scorer.scores")
+            self._scores = {k: self.score(r) for k, r in self.recipes.items()}
 
         return self._scores
 
@@ -138,11 +145,16 @@ class Scorer:
     def sorted_keys(self):
 
         if self._sorted_keys is None:
-            logger.debug('Scorer.sorted_keys')
-            self._sorted_keys = [t[0] for t in sorted([t for t in self.scores.items()], key=lambda t: t[0], reverse=True)]
+            logger.debug("Scorer.sorted_keys")
+            self._sorted_keys = [
+                t[0]
+                for t in sorted(
+                    [t for t in self.scores.items()], key=lambda t: t[0], reverse=True
+                )
+            ]
 
         return self._sorted_keys
-    
+
     @property
     def sorted(self):
         return [self.recipes[key] for key in self.sorted_keys]
@@ -154,23 +166,28 @@ class Scorer:
 
     ### METHODS
 
-    def add_custom_attribute(self, key, function, weight_reset_warning: bool = True,) -> 'CustomAttribute':
+    def add_custom_attribute(
+        self,
+        key,
+        function,
+        weight_reset_warning: bool = True,
+    ) -> "CustomAttribute":
 
         ca = CustomAttribute(self, key, function)
 
         if key not in self._attributes:
-            
+
             self.__flag_modification()
-            
+
             self._attributes[key] = ca
 
             if weight_reset_warning:
-                logger.warning('Attribute weights have been reset')
+                logger.warning("Attribute weights have been reset")
             self.weights = 1.0
 
         else:
-            logger.warning('Existing attribute with {key=}')
-        
+            logger.warning("Existing attribute with {key=}")
+
         return self._attributes[key]
 
     def score(
@@ -215,12 +232,12 @@ class Scorer:
 
         if self._df is None or params != self._df_params:
 
-            if debug: 
+            if debug:
                 logger.debug("Scorer.get_df()")
 
-            if debug: 
+            if debug:
                 logger.debug("Scorer.recipes.get_df()")
-            
+
             data = []
 
             for recipe in self.recipes:
@@ -235,16 +252,16 @@ class Scorer:
                     # timestamp=False,
                 )
 
-                d['hash'] = key
-                d['score'] = self.scores[key]
+                d["hash"] = key
+                d["score"] = self.scores[key]
 
                 data.append(d)
 
             df = DataFrame(data)
 
             for attribute in self.attributes:
-                
-                if debug: 
+
+                if debug:
                     logger.debug(f"Getting {attribute.key=} values")
 
                 if isinstance(attribute, CustomAttribute):
@@ -276,11 +293,10 @@ class Scorer:
             return px.histogram(df, x=keys)
 
         if len(keys) != 2:
-            logger.error('Only two keys supported')
+            logger.error("Only two keys supported")
             return None
 
         return px.scatter(df, x=keys[0], y=keys[1], color="score")
-
 
     def top(self, n):
         return [self.recipes[key] for key in self.sorted_keys[:n]]
@@ -294,10 +310,12 @@ class Scorer:
         self._sorted_keys = None
 
     def summary(self):
-            
+
         logger.header(repr(self))
         for attribute in self.attributes:
-            logger.out(f'{repr(attribute)} min={attribute.min:.3g}, mean={attribute.mean:.3g}, std={attribute.std:.3g}, max={attribute.max:.3g}')
+            logger.out(
+                f"{repr(attribute)} min={attribute.min:.3g}, mean={attribute.mean:.3g}, std={attribute.std:.3g}, max={attribute.max:.3g}"
+            )
 
     ### DUNDERS
 
@@ -359,7 +377,7 @@ class Attribute:
     @property
     def value_dict(self):
         if not self._value_dict:
-            logger.debug(f'Attribute(key={self.key}).value_dict')
+            logger.debug(f"Attribute(key={self.key}).value_dict")
             for recipe in self.scorer.recipes:
                 self._value_dict[recipe.hash] = self.get_value(recipe)
         return self._value_dict
@@ -493,7 +511,7 @@ class Attribute:
 
 class CustomAttribute(Attribute):
 
-    _type = 'CustomAttribute'
+    _type = "CustomAttribute"
 
     def __init__(self, scorer, key, function):
         self.get_value = function
@@ -503,13 +521,13 @@ class CustomAttribute(Attribute):
     ### PROPERTIES
 
     @property
-    def values(self):    
+    def values(self):
 
         if self._values is None:
 
             from tqdm import tqdm
 
-            logger.debug(f'CustomAttribute(key={self.key}).values')
+            logger.debug(f"CustomAttribute(key={self.key}).values")
 
             self._values = []
             for recipe in tqdm(self.scorer.recipes):
@@ -517,7 +535,7 @@ class CustomAttribute(Attribute):
                 self._values.append(value)
 
         return self._values
-    
+
     ### METHODS
 
     def histogram(
@@ -535,23 +553,35 @@ class CustomAttribute(Attribute):
 
 
 DEFAULT_ATTRIBUTES = {
-    "num_bases": dict(type='custom', weight=1.0, function=lambda r: r.product_compounds.count_by_tag(tag='Syndirella base')),
-    "num_products": dict(type='standard', weight=1.0),
-
-    "num_bases_elaborated": dict(type='custom', weight=1.0, function=lambda r: r.product_compounds.num_bases_elaborated),
-
+    "num_bases": dict(
+        type="custom",
+        weight=1.0,
+        function=lambda r: r.product_compounds.count_by_tag(tag="Syndirella base"),
+    ),
+    "num_products": dict(type="standard", weight=1.0),
+    "num_bases_elaborated": dict(
+        type="custom",
+        weight=1.0,
+        function=lambda r: r.product_compounds.num_bases_elaborated,
+    ),
     # "elab_balance": dict(type='custom', weight=1.0, function=None), # needs new CompoundSet method
-
-    # "avg_num_atoms_added": dict(type='custom', weight=1.0, function=lambda r: r.product_compounds.avg_num_atoms_added), 
-    "risk_balance": dict(type='custom', weight=1.0, function=lambda r: r.product_compounds.risk_balance), 
+    # "avg_num_atoms_added": dict(type='custom', weight=1.0, function=lambda r: r.product_compounds.avg_num_atoms_added),
+    "risk_balance": dict(
+        type="custom", weight=1.0, function=lambda r: r.product_compounds.risk_balance
+    ),
     # "risk_balance": dict(type='custom', weight=1.0, function=None), # some sort of measure of balance
-
-    "interaction_count": dict(type='custom', weight=1.0, function=lambda r: r.product_interactions.num_features),
-    "interaction_balance": dict(type='custom', weight=1.0, function=lambda r: r.product_interactions.avg_num_interactions_per_feature),
-
+    "interaction_count": dict(
+        type="custom",
+        weight=1.0,
+        function=lambda r: r.product_interactions.num_features,
+    ),
+    "interaction_balance": dict(
+        type="custom",
+        weight=1.0,
+        function=lambda r: r.product_interactions.avg_num_interactions_per_feature,
+    ),
     # "inspiration_diversity": dict(type='custom', weight=1.0, function=None),
     # "reaction_risk": dict(type='custom', weight=1.0, function=None),
-
     # "pockets?": dict(type='custom', weight=1.0, function=None),
     # "chemical_diversity": dict(type='custom', weight=1.0, function=None),
     # "DMS/sequence_variability": dict(type='custom', weight=1.0, function=None),

@@ -654,20 +654,19 @@ class Recipe:
         return self._products
 
     @property
-    def product_poses(self) -> 'PoseSet':
+    def product_poses(self) -> "PoseSet":
         if self._product_poses is None:
             self._product_poses = self.product_compounds.poses
         return self._product_poses
 
     @property
-    def product_compounds(self) -> 'CompoundSet':
+    def product_compounds(self) -> "CompoundSet":
         if self._product_compounds is None:
             self._product_compounds = self.products.compounds
         return self._product_compounds
-    
 
     @property
-    def product_interactions(self) -> 'InteractionSet':
+    def product_interactions(self) -> "InteractionSet":
         """Product pose interactions"""
         if self._product_interactions is None:
             self._product_interactions = self.product_poses.interactions

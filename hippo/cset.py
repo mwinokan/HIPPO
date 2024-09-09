@@ -624,7 +624,7 @@ class CompoundSet:
         lookup = {k: v for k, v in query}
 
         return [lookup[i] for i in self.indices]
-    
+
     @property
     def avg_num_atoms_added(self) -> float:
         """Calculate the average number of atoms added w.r.t the base
@@ -633,7 +633,7 @@ class CompoundSet:
 
         """
 
-        avg, = self.db.execute(
+        (avg,) = self.db.execute(
             f"""
         WITH nums AS (
             SELECT A.compound_id AS comp_id, 
@@ -661,7 +661,6 @@ class CompoundSet:
         """
 
         variances = self.db.execute(
-
             f"""
                 WITH nums AS (
                     SELECT B.compound_id as base, A.compound_id AS elab, 
@@ -686,7 +685,7 @@ class CompoundSet:
 
         variances = [v for v, in variances]
 
-        return mean(variances)   
+        return mean(variances)
 
     @property
     def elaboration_balance(self) -> std:
@@ -707,14 +706,13 @@ class CompoundSet:
 
     @property
     def num_bases_elaborated(self) -> int:
-
         """Count the number of base compounds that have at least one elaboration in this set
 
         :returns: number of base compounds
 
         """
 
-        count, = self.db.execute(
+        (count,) = self.db.execute(
             f"""
                 SELECT COUNT(DISTINCT compound_base) FROM compound
                 WHERE compound_id IN {self.str_ids}  
@@ -722,7 +720,6 @@ class CompoundSet:
         ).fetchone()
 
         return count
-
 
     ### FILTERING
 
@@ -775,11 +772,13 @@ class CompoundSet:
             base = base.id
 
         values = self.db.select_where(
-            query="compound_id", table="compound", key=f"compound_base = {base} AND compound_id IN {self.str_ids}", multiple=True
+            query="compound_id",
+            table="compound",
+            key=f"compound_base = {base} AND compound_id IN {self.str_ids}",
+            multiple=True,
         )
         ids = [v for v, in values if v]
         return CompoundSet(self.db, ids)
-
 
     def get_all_possible_reactants(
         self,
@@ -818,11 +817,14 @@ class CompoundSet:
         :param tag: tag to filter by
 
         """
-        count, = self.db.select_where(
-            query="COUNT(tag_compound)", table="tag", key="name", value=tag, multiple=False
+        (count,) = self.db.select_where(
+            query="COUNT(tag_compound)",
+            table="tag",
+            key="name",
+            value=tag,
+            multiple=False,
         )
         return count
-
 
     ### CONSOLE / NOTEBOOK OUTPUT
 
@@ -1873,11 +1875,12 @@ class IngredientSet:
     def __iter__(self):
         return iter(self._get_ingredient(s) for i, s in self.df.iterrows())
 
-    def __call__(self, 
-        *, 
+    def __call__(
+        self,
+        *,
         compound_id: int | None = None,
         tag: str | None = None,
-    ) -> 'IngredientSet | Ingredient | CompoundSet':
+    ) -> "IngredientSet | Ingredient | CompoundSet":
 
         if compound_id:
 
