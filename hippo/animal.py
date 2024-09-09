@@ -276,11 +276,11 @@ class HIPPO:
 
         meta_df = pd.read_csv(metadata_csv)
         generated_tag_cols = [
-            "ConformerSites",
-            "CanonSites",
-            "CrystalformSites",
-            "Quatassemblies",
-            "Crystalforms",
+            "ConformerSites alias",
+            "CanonSites alias",
+            "CrystalformSites alias",
+            "Quatassemblies alias",
+            "Crystalforms alias",
         ]
         curated_tag_cols = [
             c
@@ -302,11 +302,9 @@ class HIPPO:
 
             count_directories_tried += 1
 
-            sdfs = list(path.glob("*x?????.sdf"))
+            sdfs = list(path.glob("*[0-9][0-9][0-9][0-9][a-z].sdf"))
 
             assert len(sdfs) == 1, (path, sdfs)
-
-            pdbs = list(path.glob("*x?????.pdb"))
 
             if not pdbs:
                 pdbs = list(path.glob("*.pdb"))
@@ -317,10 +315,6 @@ class HIPPO:
                     and "_apo" not in p.name
                     and "_hippo" not in p.name
                 ]
-                # observation_longname = pdbs[0].name.removesuffix('.pdb')
-                # logger.var('observation_longname',observation_longname)
-            # else:
-            # observation_longname = None
 
             assert len(pdbs) == 1, (path, pdbs)
 
