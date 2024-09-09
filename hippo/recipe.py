@@ -35,6 +35,13 @@ class Recipe:
         self._db = db
         self._hash = None
 
+        self._score = None
+
+        # caches
+        self._product_compounds = None
+        self._product_poses = None
+        self._product_interactions = None
+
     ### FACTORIES
 
     @classmethod
@@ -647,6 +654,26 @@ class Recipe:
         return self._products
 
     @property
+    def product_poses(self) -> 'PoseSet':
+        if self._product_poses is None:
+            self._product_poses = self.product_compounds.poses
+        return self._product_poses
+
+    @property
+    def product_compounds(self) -> 'CompoundSet':
+        if self._product_compounds is None:
+            self._product_compounds = self.products.compounds
+        return self._product_compounds
+    
+
+    @property
+    def product_interactions(self) -> 'InteractionSet':
+        """Product pose interactions"""
+        if self._product_interactions is None:
+            self._product_interactions = self.product_poses.interactions
+        return self._product_interactions
+
+    @property
     def product(self):
         """ """
         assert len(self.products) == 1
@@ -660,6 +687,7 @@ class Recipe:
 
         """
         self._products = a
+        self.__flag_modification()
 
     @property
     def reactants(self):
@@ -674,6 +702,7 @@ class Recipe:
 
         """
         self._reactants = a
+        self.__flag_modification()
 
     @property
     def intermediates(self):
@@ -688,6 +717,7 @@ class Recipe:
 
         """
         self._intermediates = a
+        self.__flag_modification()
 
     @property
     def reactions(self):
@@ -702,6 +732,7 @@ class Recipe:
 
         """
         self._reactions = a
+        self.__flag_modification()
 
     @property
     def price(self):
@@ -721,6 +752,10 @@ class Recipe:
     @property
     def hash(self):
         return self._hash
+
+    @property
+    def score(self):
+        return self._score
 
     # @property
     # def lead_time(self):
@@ -1236,10 +1271,18 @@ class Recipe:
 
         return poses.fingerprint
 
+    def __flag_modification(self):
+        self._product_interactions = None
+        self._score = None
+        self._product_compounds = None
+        self._product_poses = None
+
     ### DUNDERS
 
     def __repr__(self):
-        if self.hash:
+        if self.score:
+            return f"Recipe_{self.hash}({self.reactants} --> {self.intermediates} --> {self.products} via {self.reactions}, score={self.score:.3f})"
+        elif self.hash:
             return f"Recipe_{self.hash}({self.reactants} --> {self.intermediates} --> {self.products} via {self.reactions})"
         else:
             return f"Recipe({self.reactants} --> {self.intermediates} --> {self.products} via {self.reactions})"
@@ -1595,6 +1638,9 @@ class RecipeSet:
         from pandas import DataFrame
 
         return DataFrame(data)
+
+    def items(self):
+        return self._recipes.items()
 
     ### DUNDERS
 

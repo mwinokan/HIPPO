@@ -45,15 +45,49 @@ class Scorer:
         self._db = db
         self._recipes = recipes
 
-        # self._sorted = None
+        self._sorted_keys = None
+        self._scores = None
 
-        self._attributes = []
+        self._attributes = {}
 
         for key in attributes:
             attribute = Attribute(self, key)
-            self._attributes.append(attribute)
+            self._attributes[key] = attribute
 
         self.weights = 1.0
+
+        self._df = None
+        self._df_params = None
+
+    ### FACTORIES
+
+    @classmethod
+    def default(cls, 
+        db: "Database",
+        directory: 'Path | str',
+        pattern: str = '*.json',
+    ):
+
+        from .recipe import RecipeSet
+
+        rset = RecipeSet(db, directory, pattern=pattern)
+
+        self = cls.__new__(cls)
+
+        attributes = [k for k,v in DEFAULT_ATTRIBUTES.items() if v['type'] == 'standard']
+
+        self.__init__(db=db, recipes=rset, attributes=attributes)
+
+        # custom attributes
+        for key,attribute in [(k,v) for k,v in DEFAULT_ATTRIBUTES.items() if v['type'] == 'custom']:
+
+            # print(key, attribute)
+
+            self.add_custom_attribute(key, attribute['function'], weight_reset_warning=False)
+
+        # weights
+
+        return self
 
     ### PROPERTIES
 
@@ -64,7 +98,7 @@ class Scorer:
 
     @property
     def attributes(self):
-        return self._attributes
+        return list(self._attributes.values())
 
     @property
     def recipes(self):
@@ -81,6 +115,8 @@ class Scorer:
     @weights.setter
     def weights(self, ws):
 
+        self.__flag_modification()
+
         if isinstance(ws, float):
             ws = [ws] * self.num_attributes
 
@@ -92,31 +128,50 @@ class Scorer:
 
     @property
     def scores(self):
-        return [self.score(r) for r in self.recipes]
+        if self._scores is None:
+            logger.debug('Scorer.scores')
+            self._scores = { k:self.score(r) for k,r in self.recipes.items() }
 
-    #     @property
-    #     def sorted(self):
-    #         if self.verbosity:
-    #             mout.debug(f"sorting {len(self.bb_sets)} BB sets...")
+        return self._scores
 
-    #         if self._sorted is None:
-    #             self._sorted = sorted(
-    #                 self.bb_sets, key=lambda x: self.score(x), reverse=True
-    #             )
-    #         return self._sorted
+    @property
+    def sorted_keys(self):
 
-    #     @property
-    #     def best(self):
-    #         return self.sorted[0]
+        if self._sorted_keys is None:
+            logger.debug('Scorer.sorted_keys')
+            self._sorted_keys = [t[0] for t in sorted([t for t in self.scores.items()], key=lambda t: t[0], reverse=True)]
 
-    #     ### METHODS
+        return self._sorted_keys
+    
+    @property
+    def sorted(self):
+        return [self.recipes[key] for key in self.sorted_keys]
 
-    # @property
-    # def get_values(self):
-    #     return self._get_values
+    @property
+    def best(self):
+        key = self.sorted_keys[0]
+        return self.recipes[key]
 
-    #     def add_attribute(self, a):
-    #         self._attributes.append(a)
+    ### METHODS
+
+    def add_custom_attribute(self, key, function, weight_reset_warning: bool = True,) -> 'CustomAttribute':
+
+        ca = CustomAttribute(self, key, function)
+
+        if key not in self._attributes:
+            
+            self.__flag_modification()
+            
+            self._attributes[key] = ca
+
+            if weight_reset_warning:
+                logger.warning('Attribute weights have been reset')
+            self.weights = 1.0
+
+        else:
+            logger.warning('Existing attribute with {key=}')
+        
+        return self._attributes[key]
 
     def score(
         self,
@@ -143,39 +198,106 @@ class Scorer:
             print(pd.DataFrame(print_data))
             logger.var("score", score)
 
+        recipe._score = score
+
         return score
 
     def get_df(
         self,
         serialise_price: bool = True,
+        debug: bool = True,
         **kwargs,
     ) -> "pandas.DataFrame":
 
-        logger.debug("Scorer.get_df()")
+        from pandas import DataFrame
 
-        df = self.recipes.get_df(serialise_price=serialise_price, **kwargs)
+        params = dict(serialise_price=serialise_price, **kwargs)
 
-        df["score"] = self.scores
+        if self._df is None or params != self._df_params:
 
-        for attribute in self.attributes:
-            df[attribute.key] = self.recipes.get_values(
-                key=attribute.key, serialise_price=serialise_price
-            )
+            if debug: 
+                logger.debug("Scorer.get_df()")
 
-        return df
+            if debug: 
+                logger.debug("Scorer.recipes.get_df()")
+            
+            data = []
+
+            for recipe in self.recipes:
+
+                key = recipe.hash
+
+                d = recipe.get_dict(
+                    # reactant_supplier=False,
+                    database=False,
+                    timestamp=False,
+                    **kwargs,
+                    # timestamp=False,
+                )
+
+                d['hash'] = key
+                d['score'] = self.scores[key]
+
+                data.append(d)
+
+            df = DataFrame(data)
+
+            for attribute in self.attributes:
+                
+                if debug: 
+                    logger.debug(f"Getting {attribute.key=} values")
+
+                if isinstance(attribute, CustomAttribute):
+
+                    df[attribute.key] = attribute.values
+
+                else:
+
+                    df[attribute.key] = self.recipes.get_values(
+                        key=attribute.key, serialise_price=serialise_price
+                    )
+
+            self._df = df
+            self._df_params = params
+
+        return self._df
 
     def plot(
         self,
-        keys: list[str],
+        keys: str | list[str],
         **kwargs,
     ):
 
         import plotly.express as px
 
-        return px.scatter(self.get_df(**kwargs), x=keys[0], y=keys[1], color="score")
+        df = self.get_df(**kwargs)
 
-    #     def top(self, n):
-    #         return self.sorted[:n]
+        if isinstance(keys, str):
+            return px.histogram(df, x=keys)
+
+        if len(keys) != 2:
+            logger.error('Only two keys supported')
+            return None
+
+        return px.scatter(df, x=keys[0], y=keys[1], color="score")
+
+
+    def top(self, n):
+        return [self.recipes[key] for key in self.sorted_keys[:n]]
+
+    ### INTERNALS
+
+    def __flag_modification(self):
+        self._df = None
+        self._df_params = None
+        self._scores = None
+        self._sorted_keys = None
+
+    def summary(self):
+            
+        logger.header(repr(self))
+        for attribute in self.attributes:
+            logger.out(f'{repr(attribute)} min={attribute.min:.3g}, mean={attribute.mean:.3g}, std={attribute.std:.3g}, max={attribute.max:.3g}')
 
     ### DUNDERS
 
@@ -202,13 +324,15 @@ class Attribute:
         self._scorer = scorer
 
         self._key = key
-        self._inverse = None
+        self._inverse = inverse
         self._weight = weight
 
         self._value_dict = {}
 
         self._mean = None
         self._std = None
+        self._min = None
+        self._max = None
 
         self._bins = bins
 
@@ -235,6 +359,7 @@ class Attribute:
     @property
     def value_dict(self):
         if not self._value_dict:
+            logger.debug(f'Attribute(key={self.key}).value_dict')
             for recipe in self.scorer.recipes:
                 self._value_dict[recipe.hash] = self.get_value(recipe)
         return self._value_dict
@@ -246,14 +371,26 @@ class Attribute:
     @property
     def mean(self):
         if self._mean is None:
-            self._mean = np.mean(self.values.values())
+            self._mean = np.mean(self.values)
         return self._mean
 
     @property
     def std(self):
         if self._std is None:
-            self._std = np.std(self.values.values())
+            self._std = np.std(self.values)
         return self._std
+
+    @property
+    def max(self):
+        if self._max is None:
+            self._max = max(self.values)
+        return self._max
+
+    @property
+    def min(self):
+        if self._min is None:
+            self._min = min(self.values)
+        return self._min
 
     @property
     def weight(self):
@@ -358,6 +495,64 @@ class CustomAttribute(Attribute):
 
     _type = 'CustomAttribute'
 
-    def __init__(self, key, function):
+    def __init__(self, scorer, key, function):
         self.get_value = function
-        super(CustomAttribute, self).__init__(key=key, bb_sets=bb_sets)
+        self._values = None
+        super(CustomAttribute, self).__init__(scorer=scorer, key=key)
+
+    ### PROPERTIES
+
+    @property
+    def values(self):    
+
+        if self._values is None:
+
+            from tqdm import tqdm
+
+            logger.debug(f'CustomAttribute(key={self.key}).values')
+
+            self._values = []
+            for recipe in tqdm(self.scorer.recipes):
+                value = self.get_value(recipe)
+                self._values.append(value)
+
+        return self._values
+    
+    ### METHODS
+
+    def histogram(
+        self,
+        progress: bool = False,
+    ) -> "plotly.graph_objects.Figure":
+
+        import plotly.graph_objects as go
+
+        fig = go.Figure(go.Histogram(x=self.values))
+
+        fig.update_layout(xaxis_title=self.key, yaxis_title="count")
+
+        return fig
+
+
+DEFAULT_ATTRIBUTES = {
+    "num_bases": dict(type='custom', weight=1.0, function=lambda r: r.product_compounds.count_by_tag(tag='Syndirella base')),
+    "num_products": dict(type='standard', weight=1.0),
+
+    "num_bases_elaborated": dict(type='custom', weight=1.0, function=lambda r: r.product_compounds.num_bases_elaborated),
+
+    # "elab_balance": dict(type='custom', weight=1.0, function=None), # needs new CompoundSet method
+
+    # "avg_num_atoms_added": dict(type='custom', weight=1.0, function=lambda r: r.product_compounds.avg_num_atoms_added), 
+    "risk_balance": dict(type='custom', weight=1.0, function=lambda r: r.product_compounds.risk_balance), 
+    # "risk_balance": dict(type='custom', weight=1.0, function=None), # some sort of measure of balance
+
+    "interaction_count": dict(type='custom', weight=1.0, function=lambda r: r.product_interactions.num_features),
+    "interaction_balance": dict(type='custom', weight=1.0, function=lambda r: r.product_interactions.avg_num_interactions_per_feature),
+
+    # "inspiration_diversity": dict(type='custom', weight=1.0, function=None),
+    # "reaction_risk": dict(type='custom', weight=1.0, function=None),
+
+    # "pockets?": dict(type='custom', weight=1.0, function=None),
+    # "chemical_diversity": dict(type='custom', weight=1.0, function=None),
+    # "DMS/sequence_variability": dict(type='custom', weight=1.0, function=None),
+}
