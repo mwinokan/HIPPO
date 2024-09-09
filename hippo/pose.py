@@ -620,12 +620,18 @@ class Pose:
             data["tags"] = self.tags
 
         if inspirations == "fragalysis":
-            data["inspirations"] = ",".join([p.name for p in self.inspirations])
+            if not self.inspirations:
+                data["inspirations"] = ""
+            else:
+                data["inspirations"] = ",".join([p.name for p in self.inspirations])
         elif inspirations:
             data["inspirations"] = self.inspirations
 
         if reference == "name":
-            data["reference"] = self.reference.name
+            if not self.reference:
+                data["reference"] = ""
+            else:
+                data["reference"] = self.reference.name
         elif reference:
             data["reference"] = self.reference
 
