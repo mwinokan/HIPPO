@@ -62,6 +62,11 @@ class Database:
             logger.warning("Clear them with: animal.db.delete_interactions()")
             self.create_table_interaction()
 
+        if "pocket" not in self.table_names or "pocket_tag" not in self.table_names:
+            logger.warning("This is a legacy format database (hippo-db < 0.3.24)")
+            self.create_table_pocket()
+            self.create_table_pocket_tag()
+
     ### PROPERTIES
 
     @property
@@ -400,6 +405,36 @@ class Database:
 			CONSTRAINT UC_interaction UNIQUE (interaction_feature, interaction_pose, interaction_family, interaction_atom_ids)
 		);
 		"""
+
+        self.execute(sql)
+
+    def create_table_pocket(self) -> None:
+        """Create the pocket table"""
+
+        logger.debug("HIPPO.Database.create_table_pocket()")
+        sql = """CREATE TABLE pocket(
+            pocket_id INTEGER PRIMARY KEY,
+            pocket_target INTEGER NOT NULL,
+            pocket_name TEXT NOT NULL,
+            pocket_metadata TEXT,
+            CONSTRAINT UC_pocket UNIQUE (pocket_target, pocket_name)
+        );
+        """
+
+        self.execute(sql)
+
+    def create_table_pocket_tag(self) -> None:
+        """Create the pocket_tag table"""
+
+        logger.debug("HIPPO.Database.create_table_pocket_tag()")
+        sql = """CREATE TABLE pocket_tag(
+            pocket_tag_id INTEGER PRIMARY KEY,
+            pocket_tag_ref INTEGER NOT NULL,
+            pocket_tag_pose INTEGER NOT NULL,
+            pocket_tag_metadata TEXT,
+            CONSTRAINT UC_pocket UNIQUE (pocket_tag_ref, pocket_tag_pose)
+        );
+        """
 
         self.execute(sql)
 
@@ -1035,7 +1070,7 @@ class Database:
     ) -> None:
         """Insert metadata into an an existing entry in the compound or pose tables
 
-        :param table: table for insertions ``['pose', 'compound']``
+        :param table: table for insertions ``['pose', 'compound', 'pocket', 'pocket_tag']``
         :param id: associated entry ID
         :param payload: metadata dictionary
         :param commit: commit the changes to the database (Default value = True)
@@ -1274,6 +1309,99 @@ class Database:
             self.commit()
 
         return interaction_id
+
+    def insert_pocket(self, target: int, name: str, commit: bool = True) -> int:
+        """Insert an entry into the pocket table
+
+        :param target: protein :class:`.Target` ID
+        :param name: name of the protein subsite/pocket
+        :returns: the pocket ID
+
+        """
+
+        assert isinstance(target, int)
+        assert isinstance(name, str)
+
+        sql = """
+        INSERT INTO pocket(pocket_target, pocket_name)
+        VALUES(?1, ?2)
+        """
+
+        try:
+            self.execute(sql, (target, name))
+
+        except sqlite3.IntegrityError as e:
+            logger.warning(f"Skipping existing pocket for {target=} with {name=}")
+            return None
+
+        except Exception as e:
+            logger.exception(e)
+
+        pocket_id = self.cursor.lastrowid
+        if commit:
+            self.commit()
+
+        return pocket_id
+
+    def insert_pocket_tag(
+        self,
+        *,
+        pose_id: int,
+        name: str,
+        target: int | None = None,
+        pocket_id: int | None = None,
+        commit: bool = True,
+    ) -> int:
+        """Insert an entry into the pocket_tag table
+
+        :param pose_id: :class:`.Pose` ID
+        :param name: name of the protein subsite/pocket
+        :param target: protein :class:`.Target` ID, defaults to querying pose table
+        :param target: protein pocket ID, defaults to querying pocket table
+        :returns: the pocket ID
+
+        """
+
+        assert isinstance(name, str)
+        assert isinstance(pose_id, int)
+
+        if not target:
+            (target,) = self.select_where(
+                table="pose", key="id", value=pose_id, query="pose_target"
+            )
+
+        assert isinstance(target, int)
+
+        if not pocket_id:
+            pocket_id = self.get_pocket_id(name=name, none="quiet")
+
+        if not pocket_id:
+            pocket_id = self.insert_pocket(name=name, target=target)
+
+        assert isinstance(pocket_id, int)
+
+        sql = """
+        INSERT INTO pocket_tag(pocket_tag_ref, pocket_tag_pose)
+        VALUES(?1, ?2)
+        """
+
+        try:
+            self.execute(sql, (pocket_id, pose_id))
+
+        except sqlite3.IntegrityError as e:
+            logger.warning(
+                f"Skipping existing pocket_tag for {pocket_id=} with {pose_id=}"
+            )
+            return None
+
+        except Exception as e:
+            logger.exception(e)
+
+        pocket_tag_id = self.cursor.lastrowid
+        if commit:
+            self.commit()
+
+        return pocket_tag_id
 
     ### SELECTION
 
@@ -1859,7 +1987,7 @@ class Database:
         self,
         *,
         name: str,
-    ) -> int:
+    ) -> int | None:
         """Get target ID with a given name
 
         :param name: the protein target name
@@ -2196,6 +2324,40 @@ class Database:
             )
         ]
 
+    def get_pocket_id(self, *, name: str, **kwargs) -> int | None:
+        """Get protein pocket ID with a given name
+
+        :param name: the protein pocket name
+        :returns: the pocket ID
+
+        """
+
+        table = "pocket"
+        entry = self.select_id_where(table=table, key="name", value=name, **kwargs)
+
+        if entry:
+            return entry[0]
+
+        return None
+
+    def get_pocket_name(self, *, id: str, **kwargs) -> int | None:
+        """Get protein :class:`.Pocket` name with a given ID
+
+        :param name: the protein :class:`.Pocket` ID
+        :returns: the :class:`.Pocket` ID
+
+        """
+
+        table = "pocket"
+        entry = self.select_where(
+            query="pocket_name", table=table, key="id", value=id, **kwargs
+        )
+
+        if entry:
+            return entry[0]
+
+        return None
+
     ### COMPOUND QUERY
 
     def query_substructure(
@@ -2378,6 +2540,7 @@ class Database:
         start: int | None,
         stop: int | None,
         step: int = 1,
+        name: bool = False,
     ) -> list[int]:
         """Retrieve ID's matching a slice
 
@@ -2417,7 +2580,10 @@ class Database:
         )
         ids = [q for q, in ids]
 
-        return ids
+        if name:
+            return ids, f"{table}s[{start}:{stop}]"
+        else:
+            return ids
 
     ### PRUNING
 

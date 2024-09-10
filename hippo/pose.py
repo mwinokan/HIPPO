@@ -504,6 +504,27 @@ class Pose:
         """Classic HIPPO fingerprint dictionary, mapping protein :class:`.Feature` ID's to the number of corresponding ligand features (from any :class:`.Pose`)"""
         return self.interactions.classic_fingerprint
 
+    @property
+    def pockets(self):
+
+        from .pocket import PocketTag
+
+        records = self.db.select_where(
+            table="pocket_tag",
+            key="pose",
+            value=self.id,
+            multiple=True,
+            query="pocket_tag_id, pocket_tag_ref",
+        )
+
+        pocket_tags = []
+        for record in records:
+            id, ref = record
+            pocket_tag = PocketTag(db=self.db, id=id, pocket_id=ref, pose_id=self.id)
+            pocket_tags.append(pocket_tag)
+
+        return pocket_tags
+
     ### METHODS
 
     def score_inspiration(

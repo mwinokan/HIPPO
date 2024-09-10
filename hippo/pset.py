@@ -59,6 +59,7 @@ class PoseTable:
     """
 
     _table = "pose"
+    _name = "all poses"
 
     def __init__(
         self,
@@ -80,6 +81,11 @@ class PoseTable:
     def table(self) -> str:
         """Returns the name of the :class:`.Database` table"""
         return self._table
+
+    @property
+    def name(self) -> str | None:
+        """Returns the name of set"""
+        return self._name
 
     @property
     def names(self) -> list[str]:
@@ -148,7 +154,10 @@ class PoseTable:
             query="tag_pose", table="tag", key="name", value=tag, multiple=True
         )
         ids = [v for v, in values if v]
-        return self[ids]
+
+        pset = self[ids]
+        pset._name = f'poses tagged "{tag}"'
+        return pset
 
     def get_by_target(
         self,
@@ -166,7 +175,39 @@ class PoseTable:
             query="pose_id", table="pose", key="target", value=id, multiple=True
         )
         ids = [v for v, in values if v]
-        return self[ids]
+
+        target = self.db.get_target(id=id)
+
+        pset = self[ids]
+        pset._name = f'poses for "{target}"'
+        return pset
+
+    def get_by_pocket(
+        self,
+        *,
+        id: int,
+    ) -> "PoseSet":
+        """Get all child poses with a certain :class:`.Pocket` ID:
+
+        :param id: :class:`.Pocket` ID
+        :returns: a :class:`.PoseSet` of the subset
+
+        """
+        assert isinstance(id, int)
+        values = self.db.select_where(
+            query="pocket_tag_pose",
+            table="pocket_tag",
+            key="ref",
+            value=id,
+            multiple=True,
+        )
+        ids = [v for v, in values if v]
+
+        pocket = self.db.get_pocket_name(id=id)
+
+        pset = self[ids]
+        pset._name = f'poses in "{pocket}"'
+        return pset
 
     def get_by_metadata(
         self,
@@ -185,11 +226,16 @@ class PoseTable:
         )
         if value is None:
             ids = [i for i, d in results if d and f'"{key}":' in d]
+            name = f"poses with {key} in metadata"
         else:
             if isinstance(value, str):
                 value = f'"{value}"'
             ids = [i for i, d in results if d and f'"{key}": {value}' in d]
-        return self[ids]
+            name = f"poses with metadata[{key}] == {value}"
+
+        pset = self[ids]
+        pset._name = name
+        return pset
 
     def draw(
         self,
@@ -231,13 +277,16 @@ class PoseTable:
         *,
         tag: str = None,
         target: int = None,
+        pocket: int = None,
     ) -> "PoseSet":
-        """Filter poses by a given tag or target ID. See :meth:`.PoseTable.get_by_tag` and :meth:`.PoseTable.get_by_target`"""
+        """Filter poses by a given tag, pocket ID, or target ID. See :meth:`.PoseTable.get_by_tag`, :meth:`.PoseTable.get_by_target`, amd :meth:`.PoseTable.get_by_pocket`"""
 
         if tag:
             return self.get_by_tag(tag)
         elif target:
             return self.get_by_target(id=target)
+        elif pocket:
+            return self.get_by_pocket(id=pocket)
         else:
             raise NotImplementedError
 
@@ -291,10 +340,16 @@ class PoseTable:
                 return PoseSet(self.db, indices)
 
             case slice():
-                ids = self.db.slice_ids(
-                    table=self.table, start=key.start, stop=key.stop, step=key.step
+                ids, name = self.db.slice_ids(
+                    table=self.table,
+                    start=key.start,
+                    stop=key.stop,
+                    step=key.step,
+                    name=True,
                 )
-                return self[ids]
+                pset = self[ids]
+                pset._name = name
+                return pset
 
             case _:
                 logger.error(
@@ -305,13 +360,17 @@ class PoseTable:
 
     def __repr__(self) -> str:
         """Formatted string representation"""
-        return (
-            f"{mcol.bold}{mcol.underline}"
-            "{"
-            f"P x {len(self)}"
-            "}"
-            f"{mcol.unbold}{mcol.ununderline}"
-        )
+
+        s = f"{mcol.bold}{mcol.underline}"
+
+        if self.name:
+            s += f"{self.name}: "
+
+        s += "{" f"P x {len(self)}" "}"
+
+        s += f"{mcol.unbold}{mcol.ununderline}"
+
+        return s
 
     def __len__(self) -> int:
         """Total number of compounds"""
@@ -377,6 +436,7 @@ class PoseSet:
         indices: list = None,
         *,
         sort: bool = True,
+        name: str | None = None,
     ) -> None:
 
         self._db = db
@@ -394,6 +454,8 @@ class PoseSet:
             self._indices = list(set(indices))
 
         self._interactions = None
+
+        self._name = name
 
     ### PROPERTIES
 
@@ -416,6 +478,11 @@ class PoseSet:
     def ids(self) -> list[int]:
         """Returns the ids of poses in this set"""
         return self._indices
+
+    @property
+    def name(self) -> str | None:
+        """Returns the name of set"""
+        return self._name
 
     @property
     def names(self) -> list[str]:
@@ -788,6 +855,36 @@ class PoseSet:
         if not ids:
             return None
         return PoseSet(self.db, ids)
+
+    def get_by_pocket(
+        self,
+        *,
+        id: int,
+    ) -> "PoseSet | None":
+        """Select a subset of this :class:`.PoseSet` by the associated :class:`.Pocket`.
+
+        :param id: :class:`.Pocket` ID
+        :returns: a :class:`.PoseSet` of the selection
+
+        """
+        assert isinstance(id, int)
+        values = self.db.select_where(
+            query="pocket_tag_pose",
+            table="pocket_tag",
+            key=f"pocket_tag_ref is {id} AND pocket_tag_pose in {self.str_ids}",
+            multiple=True,
+            none="quiet",
+        )
+        ids = [v for v, in values if v]
+        if not ids:
+            return None
+
+        if self.name:
+            name = f"{self.name} & pocket={id}"
+        else:
+            name = None
+
+        return PoseSet(self.db, ids, name=name)
 
     def filter(
         self,
@@ -1350,13 +1447,18 @@ class PoseSet:
     ### DUNDERS
 
     def __repr__(self) -> str:
-        return (
-            f"{mcol.bold}{mcol.underline}"
-            "{"
-            f"P x {len(self)}"
-            "}"
-            f"{mcol.unbold}{mcol.ununderline}"
-        )
+        """Formatted string representation"""
+
+        s = f"{mcol.bold}{mcol.underline}"
+
+        if self.name:
+            s += f"{self.name}: "
+
+        s += "{" f"P x {len(self)}" "}"
+
+        s += f"{mcol.unbold}{mcol.ununderline}"
+
+        return s
 
     def __len__(self) -> int:
         """The number of poses in this set"""
@@ -1399,3 +1501,21 @@ class PoseSet:
         """Add a :class:`.PoseSet` to this set"""
         assert isinstance(other, PoseSet)
         return PoseSet(self.db, self.ids + other.ids, sort=False)
+
+    def __call__(
+        self,
+        *,
+        tag: str = None,
+        target: int = None,
+        pocket: int = None,
+    ) -> "PoseSet":
+        """Filter poses by a given tag, pocket ID, or target ID. See :meth:`.PoseSet.get_by_tag`, :meth:`.PoseSet.get_by_target`, amd :meth:`.PoseSet.get_by_pocket`"""
+
+        if tag:
+            return self.get_by_tag(tag)
+        elif target:
+            return self.get_by_target(id=target)
+        elif pocket:
+            return self.get_by_pocket(id=pocket)
+        else:
+            raise NotImplementedError

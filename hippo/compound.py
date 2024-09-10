@@ -502,7 +502,7 @@ class Compound:
 
         from .pset import PoseSet
 
-        return PoseSet(self.db, [q[0] for q in pose_ids])
+        return PoseSet(self.db, [q[0] for q in pose_ids], name=f"{self}'s poses")
 
     def get_dict(
         self,

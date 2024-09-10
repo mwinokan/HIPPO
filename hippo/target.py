@@ -27,6 +27,8 @@ class Target:
         self._id = id
         self._name = name
 
+    ### PROPERTIES
+
     @property
     def db(self) -> "Database":
         """Returns a pointer to the parent database"""
@@ -67,13 +69,28 @@ class Target:
             return [self.db.get_feature(id=i) for i in feature_ids]
         return None
 
-    def __str__(self) -> str:
-        """Unformatted string representation"""
-        return f"T{self.id}"
+    @property
+    def pockets(self):
 
-    def __repr__(self) -> str:
-        """Formatted string representation"""
-        return f'{mcol.bold}{mcol.underline}{self} "{self.name}"{mcol.unbold}{mcol.ununderline}'
+        from .pocket import Pocket
+
+        records = self.db.select_where(
+            table="pocket",
+            key="target",
+            value=self.id,
+            multiple=True,
+            query="pocket_id, pocket_name",
+        )
+
+        pockets = []
+        for record in records:
+            id, name = record
+            pocket = Pocket(db=self.db, id=id, name=name, target_id=self.id)
+            pockets.append(pocket)
+
+        return pockets
+
+    ### METHODS
 
     def calculate_features(
         self,
@@ -114,3 +131,13 @@ class Target:
                 self._feature_cache[reference_id] = features
 
             return features
+
+    ### DUNDERS
+
+    def __str__(self) -> str:
+        """Unformatted string representation"""
+        return f"T{self.id}"
+
+    def __repr__(self) -> str:
+        """Formatted string representation"""
+        return f'{mcol.bold}{mcol.underline}{self} "{self.name}"{mcol.unbold}{mcol.ununderline}'
