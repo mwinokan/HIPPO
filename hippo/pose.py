@@ -55,7 +55,7 @@ class Pose:
         reference: int,  # another pose
         path: str,
         compound: int,
-        target: str,
+        target: int,
         mol: Chem.Mol | bytes | None,
         fingerprint: int,
         energy_score: float | None = None,
@@ -505,25 +505,25 @@ class Pose:
         return self.interactions.classic_fingerprint
 
     @property
-    def pockets(self):
+    def subsites(self):
 
-        from .pocket import PocketTag
+        from .subsite import SubsiteTag
 
         records = self.db.select_where(
-            table="pocket_tag",
+            table="subsite_tag",
             key="pose",
             value=self.id,
             multiple=True,
-            query="pocket_tag_id, pocket_tag_ref",
+            query="subsite_tag_id, subsite_tag_ref",
         )
 
-        pocket_tags = []
+        subsite_tags = []
         for record in records:
             id, ref = record
-            pocket_tag = PocketTag(db=self.db, id=id, pocket_id=ref, pose_id=self.id)
-            pocket_tags.append(pocket_tag)
+            subsite_tag = SubsiteTag(db=self.db, id=id, subsite_id=ref, pose_id=self.id)
+            subsite_tags.append(subsite_tag)
 
-        return pocket_tags
+        return subsite_tags
 
     ### METHODS
 
@@ -661,6 +661,22 @@ class Pose:
                 data[key] = metadict[key]
 
         return data
+
+    def add_subsite(self, name: str, commit: bool = True) -> "SubsiteTag":
+        """Tag this pose with a protein subsite
+
+        :param name: the name of the subsite
+        :param commit: commit the insertion to the database
+        :returns: :class:`.SubsiteTag`
+
+        """
+
+        id = self.db.insert_subsite_tag(pose_id=self.id, name=name, commit=commit)
+
+        if not id:
+            return None
+
+        return self.db.get_subsite(id=id)
 
     def calculate_interactions(
         self,

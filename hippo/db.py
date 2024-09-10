@@ -62,10 +62,10 @@ class Database:
             logger.warning("Clear them with: animal.db.delete_interactions()")
             self.create_table_interaction()
 
-        if "pocket" not in self.table_names or "pocket_tag" not in self.table_names:
+        if "subsite" not in self.table_names or "subsite_tag" not in self.table_names:
             logger.warning("This is a legacy format database (hippo-db < 0.3.24)")
-            self.create_table_pocket()
-            self.create_table_pocket_tag()
+            self.create_table_subsite()
+            self.create_table_subsite_tag()
 
     ### PROPERTIES
 
@@ -408,31 +408,31 @@ class Database:
 
         self.execute(sql)
 
-    def create_table_pocket(self) -> None:
-        """Create the pocket table"""
+    def create_table_subsite(self) -> None:
+        """Create the subsite table"""
 
-        logger.debug("HIPPO.Database.create_table_pocket()")
-        sql = """CREATE TABLE pocket(
-            pocket_id INTEGER PRIMARY KEY,
-            pocket_target INTEGER NOT NULL,
-            pocket_name TEXT NOT NULL,
-            pocket_metadata TEXT,
-            CONSTRAINT UC_pocket UNIQUE (pocket_target, pocket_name)
+        logger.debug("HIPPO.Database.create_table_subsite()")
+        sql = """CREATE TABLE subsite(
+            subsite_id INTEGER PRIMARY KEY,
+            subsite_target INTEGER NOT NULL,
+            subsite_name TEXT NOT NULL,
+            subsite_metadata TEXT,
+            CONSTRAINT UC_subsite UNIQUE (subsite_target, subsite_name)
         );
         """
 
         self.execute(sql)
 
-    def create_table_pocket_tag(self) -> None:
-        """Create the pocket_tag table"""
+    def create_table_subsite_tag(self) -> None:
+        """Create the subsite_tag table"""
 
-        logger.debug("HIPPO.Database.create_table_pocket_tag()")
-        sql = """CREATE TABLE pocket_tag(
-            pocket_tag_id INTEGER PRIMARY KEY,
-            pocket_tag_ref INTEGER NOT NULL,
-            pocket_tag_pose INTEGER NOT NULL,
-            pocket_tag_metadata TEXT,
-            CONSTRAINT UC_pocket UNIQUE (pocket_tag_ref, pocket_tag_pose)
+        logger.debug("HIPPO.Database.create_table_subsite_tag()")
+        sql = """CREATE TABLE subsite_tag(
+            subsite_tag_id INTEGER PRIMARY KEY,
+            subsite_tag_ref INTEGER NOT NULL,
+            subsite_tag_pose INTEGER NOT NULL,
+            subsite_tag_metadata TEXT,
+            CONSTRAINT UC_subsite_tag UNIQUE (subsite_tag_ref, subsite_tag_pose)
         );
         """
 
@@ -1070,7 +1070,7 @@ class Database:
     ) -> None:
         """Insert metadata into an an existing entry in the compound or pose tables
 
-        :param table: table for insertions ``['pose', 'compound', 'pocket', 'pocket_tag']``
+        :param table: table for insertions ``['pose', 'compound', 'subsite', 'subsite_tag']``
         :param id: associated entry ID
         :param payload: metadata dictionary
         :param commit: commit the changes to the database (Default value = True)
@@ -1310,12 +1310,12 @@ class Database:
 
         return interaction_id
 
-    def insert_pocket(self, target: int, name: str, commit: bool = True) -> int:
-        """Insert an entry into the pocket table
+    def insert_subsite(self, target: int, name: str, commit: bool = True) -> int:
+        """Insert an entry into the subsite table
 
         :param target: protein :class:`.Target` ID
-        :param name: name of the protein subsite/pocket
-        :returns: the pocket ID
+        :param name: name of the protein subsite/subsite
+        :returns: the subsite ID
 
         """
 
@@ -1323,7 +1323,7 @@ class Database:
         assert isinstance(name, str)
 
         sql = """
-        INSERT INTO pocket(pocket_target, pocket_name)
+        INSERT INTO subsite(subsite_target, subsite_name)
         VALUES(?1, ?2)
         """
 
@@ -1331,34 +1331,34 @@ class Database:
             self.execute(sql, (target, name))
 
         except sqlite3.IntegrityError as e:
-            logger.warning(f"Skipping existing pocket for {target=} with {name=}")
+            logger.warning(f"Skipping existing subsite for {target=} with {name=}")
             return None
 
         except Exception as e:
             logger.exception(e)
 
-        pocket_id = self.cursor.lastrowid
+        subsite_id = self.cursor.lastrowid
         if commit:
             self.commit()
 
-        return pocket_id
+        return subsite_id
 
-    def insert_pocket_tag(
+    def insert_subsite_tag(
         self,
         *,
         pose_id: int,
         name: str,
         target: int | None = None,
-        pocket_id: int | None = None,
+        subsite_id: int | None = None,
         commit: bool = True,
     ) -> int:
-        """Insert an entry into the pocket_tag table
+        """Insert an entry into the subsite_tag table
 
         :param pose_id: :class:`.Pose` ID
         :param name: name of the protein subsite/pocket
         :param target: protein :class:`.Target` ID, defaults to querying pose table
-        :param target: protein pocket ID, defaults to querying pocket table
-        :returns: the pocket ID
+        :param target: protein Subsite ID, defaults to querying Subsite table
+        :returns: the Subsite ID
 
         """
 
@@ -1372,36 +1372,36 @@ class Database:
 
         assert isinstance(target, int)
 
-        if not pocket_id:
-            pocket_id = self.get_pocket_id(name=name, none="quiet")
+        if not subsite_id:
+            subsite_id = self.get_subsite_id(name=name, none="quiet")
 
-        if not pocket_id:
-            pocket_id = self.insert_pocket(name=name, target=target)
+        if not subsite_id:
+            subsite_id = self.insert_subsite(name=name, target=target)
 
-        assert isinstance(pocket_id, int)
+        assert isinstance(subsite_id, int)
 
         sql = """
-        INSERT INTO pocket_tag(pocket_tag_ref, pocket_tag_pose)
+        INSERT INTO subsite_tag(subsite_tag_ref, subsite_tag_pose)
         VALUES(?1, ?2)
         """
 
         try:
-            self.execute(sql, (pocket_id, pose_id))
+            self.execute(sql, (subsite_id, pose_id))
 
         except sqlite3.IntegrityError as e:
             logger.warning(
-                f"Skipping existing pocket_tag for {pocket_id=} with {pose_id=}"
+                f"Skipping existing subsite_tag for {subsite_id=} with {pose_id=}"
             )
             return None
 
         except Exception as e:
             logger.exception(e)
 
-        pocket_tag_id = self.cursor.lastrowid
+        subsite_tag_id = self.cursor.lastrowid
         if commit:
             self.commit()
 
-        return pocket_tag_id
+        return subsite_tag_id
 
     ### SELECTION
 
@@ -2324,15 +2324,37 @@ class Database:
             )
         ]
 
-    def get_pocket_id(self, *, name: str, **kwargs) -> int | None:
-        """Get protein pocket ID with a given name
+    def get_subsite(self, *, id) -> "Subsite":
+        """Get protein subsite with a given ID
 
-        :param name: the protein pocket name
-        :returns: the pocket ID
+        :param ID: the subsite ID
+        :returns: :class:`.Subsite` object
 
         """
 
-        table = "pocket"
+        from .subsite import Subsite
+
+        name, target = self.select_where(
+            table="subsite",
+            key="id",
+            value=id,
+            multiple=False,
+            query="subsite_name, subsite_target",
+        )
+
+        subsite = Subsite(db=self, id=id, name=name, target_id=target)
+
+        return subsite
+
+    def get_subsite_id(self, *, name: str, **kwargs) -> int | None:
+        """Get protein Subsite ID with a given name
+
+        :param name: the protein Subsite name
+        :returns: the Subsite ID
+
+        """
+
+        table = "Subsite"
         entry = self.select_id_where(table=table, key="name", value=name, **kwargs)
 
         if entry:
@@ -2340,17 +2362,17 @@ class Database:
 
         return None
 
-    def get_pocket_name(self, *, id: str, **kwargs) -> int | None:
-        """Get protein :class:`.Pocket` name with a given ID
+    def get_subsite_name(self, *, id: str, **kwargs) -> int | None:
+        """Get protein :class:`.Subsite` name with a given ID
 
-        :param name: the protein :class:`.Pocket` ID
-        :returns: the :class:`.Pocket` ID
+        :param name: the protein :class:`.Subsite` ID
+        :returns: the :class:`.Subsite` ID
 
         """
 
-        table = "pocket"
+        table = "subsite"
         entry = self.select_where(
-            query="pocket_name", table=table, key="id", value=id, **kwargs
+            query="subsite_name", table=table, key="id", value=id, **kwargs
         )
 
         if entry:

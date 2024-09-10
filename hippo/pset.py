@@ -182,31 +182,31 @@ class PoseTable:
         pset._name = f'poses for "{target}"'
         return pset
 
-    def get_by_pocket(
+    def get_by_subsite(
         self,
         *,
         id: int,
     ) -> "PoseSet":
-        """Get all child poses with a certain :class:`.Pocket` ID:
+        """Get all child poses with a certain :class:`.Subsite` ID:
 
-        :param id: :class:`.Pocket` ID
+        :param id: :class:`.Subsite` ID
         :returns: a :class:`.PoseSet` of the subset
 
         """
         assert isinstance(id, int)
         values = self.db.select_where(
-            query="pocket_tag_pose",
-            table="pocket_tag",
+            query="subsite_tag_pose",
+            table="subsite_tag",
             key="ref",
             value=id,
             multiple=True,
         )
         ids = [v for v, in values if v]
 
-        pocket = self.db.get_pocket_name(id=id)
+        subsite = self.db.get_subsite_name(id=id)
 
         pset = self[ids]
-        pset._name = f'poses in "{pocket}"'
+        pset._name = f'poses in "{subsite}"'
         return pset
 
     def get_by_metadata(
@@ -277,16 +277,16 @@ class PoseTable:
         *,
         tag: str = None,
         target: int = None,
-        pocket: int = None,
+        subsite: int = None,
     ) -> "PoseSet":
-        """Filter poses by a given tag, pocket ID, or target ID. See :meth:`.PoseTable.get_by_tag`, :meth:`.PoseTable.get_by_target`, amd :meth:`.PoseTable.get_by_pocket`"""
+        """Filter poses by a given tag, subsite ID, or target ID. See :meth:`.PoseTable.get_by_tag`, :meth:`.PoseTable.get_by_target`, amd :meth:`.PoseTable.get_by_subsite`"""
 
         if tag:
             return self.get_by_tag(tag)
         elif target:
             return self.get_by_target(id=target)
-        elif pocket:
-            return self.get_by_pocket(id=pocket)
+        elif subsite:
+            return self.get_by_subsite(id=subsite)
         else:
             raise NotImplementedError
 
@@ -856,22 +856,22 @@ class PoseSet:
             return None
         return PoseSet(self.db, ids)
 
-    def get_by_pocket(
+    def get_by_subsite(
         self,
         *,
         id: int,
     ) -> "PoseSet | None":
-        """Select a subset of this :class:`.PoseSet` by the associated :class:`.Pocket`.
+        """Select a subset of this :class:`.PoseSet` by the associated :class:`.Subsite`.
 
-        :param id: :class:`.Pocket` ID
+        :param id: :class:`.Subsite` ID
         :returns: a :class:`.PoseSet` of the selection
 
         """
         assert isinstance(id, int)
         values = self.db.select_where(
-            query="pocket_tag_pose",
-            table="pocket_tag",
-            key=f"pocket_tag_ref is {id} AND pocket_tag_pose in {self.str_ids}",
+            query="subsite_tag_pose",
+            table="subsite_tag",
+            key=f"subsite_tag_ref is {id} AND subsite_tag_pose in {self.str_ids}",
             multiple=True,
             none="quiet",
         )
@@ -880,7 +880,7 @@ class PoseSet:
             return None
 
         if self.name:
-            name = f"{self.name} & pocket={id}"
+            name = f"{self.name} & subsite={id}"
         else:
             name = None
 
@@ -1507,15 +1507,15 @@ class PoseSet:
         *,
         tag: str = None,
         target: int = None,
-        pocket: int = None,
+        subsite: int = None,
     ) -> "PoseSet":
-        """Filter poses by a given tag, pocket ID, or target ID. See :meth:`.PoseSet.get_by_tag`, :meth:`.PoseSet.get_by_target`, amd :meth:`.PoseSet.get_by_pocket`"""
+        """Filter poses by a given tag, Subsite ID, or target ID. See :meth:`.PoseSet.get_by_tag`, :meth:`.PoseSet.get_by_target`, amd :meth:`.PoseSet.get_by_subsite`"""
 
         if tag:
             return self.get_by_tag(tag)
         elif target:
             return self.get_by_target(id=target)
-        elif pocket:
-            return self.get_by_pocket(id=pocket)
+        elif subsite:
+            return self.get_by_subsite(id=subsite)
         else:
             raise NotImplementedError

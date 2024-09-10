@@ -70,25 +70,25 @@ class Target:
         return None
 
     @property
-    def pockets(self):
+    def subsites(self):
 
-        from .pocket import Pocket
+        from .subsite import Subsite
 
         records = self.db.select_where(
-            table="pocket",
+            table="subsite",
             key="target",
             value=self.id,
             multiple=True,
-            query="pocket_id, pocket_name",
+            query="subsite_id, subsite_name",
         )
 
-        pockets = []
+        subsites = []
         for record in records:
             id, name = record
-            pocket = Pocket(db=self.db, id=id, name=name, target_id=self.id)
-            pockets.append(pocket)
+            subsite = Subsite(db=self.db, id=id, name=name, target_id=self.id)
+            subsites.append(subsite)
 
-        return pockets
+        return subsites
 
     ### METHODS
 
