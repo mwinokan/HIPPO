@@ -2346,6 +2346,28 @@ class Database:
 
         return subsite
 
+    def get_subsite_tag(self, *, id) -> "SubsiteTag":
+        """Get subsite_tag with a given ID
+
+        :param ID: the subsite_tag ID
+        :returns: :class:`.SubsiteTag` object
+
+        """
+
+        from .subsite import SubsiteTag
+
+        subsite_id, pose_id = self.select_where(
+            table="subsite_tag",
+            key="id",
+            value=id,
+            multiple=False,
+            query="subsite_tag_ref, subsite_tag_pose",
+        )
+
+        subsite_tag = SubsiteTag(db=self, id=id, subsite_id=subsite_id, pose_id=pose_id)
+
+        return subsite_tag
+
     def get_subsite_id(self, *, name: str, **kwargs) -> int | None:
         """Get protein Subsite ID with a given name
 

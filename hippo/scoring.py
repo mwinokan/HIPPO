@@ -588,10 +588,10 @@ DEFAULT_ATTRIBUTES = {
         function=lambda r: r.product_poses.num_inspiration_sets,
         description="The number of unique fragment combinations that inspired poses for product compounds in this selection",
     ),
-    "risk_balance": dict(
+    "risk_diversity": dict(
         type="custom",
         weight=1.0,
-        function=lambda r: r.product_compounds.risk_balance,
+        function=lambda r: r.product_compounds.risk_diversity,
         description="A measure of how evenly spread the risk of elaborations are for each base compound. Risk in this case refers to the number of atoms added",
     ),
     "interaction_count": dict(
@@ -605,6 +605,18 @@ DEFAULT_ATTRIBUTES = {
         weight=1.0,
         function=lambda r: r.product_interactions.per_feature_count_std,
         description="A measure for how evenly protein features are being interacted with in this selection",
+    ),
+    "num_subsites": dict(
+        type="custom",
+        weight=1.0,
+        function=lambda r: r.product_poses.num_subsites,
+        description="Count the number of subsites that poses in this set come into contact with",
+    ),
+    "subsite_balance": dict(
+        type="custom",
+        weight=1.0,
+        function=lambda r: r.product_poses.subsite_balance,
+        description="Count the number of subsites that poses in this set come into contact with",
     ),
     # "reaction_risk": dict(type='custom', weight=1.0, function=None),
     # "pockets?": dict(type='custom', weight=1.0, function=None),

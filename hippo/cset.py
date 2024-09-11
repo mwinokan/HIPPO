@@ -688,7 +688,7 @@ class CompoundSet:
         return mean(variances)
 
     @property
-    def elaboration_balance(self) -> std:
+    def elaboration_balance(self) -> float:
         """Measure of how evenly elaborations are distributed across bases in this set"""
 
         sql = f"""
@@ -700,7 +700,7 @@ class CompoundSet:
 
         counts = self.db.execute(sql).fetchall()
 
-        counts = [c for c, in counts]
+        counts = [c for c, in counts]  # + [0 for _ in range(len(self)-len(counts))]
 
         return -std(counts)
 

@@ -477,8 +477,8 @@ class Pose:
 
     # @property
     # def fields(self):
-    # 	""" """
-    # 	return [p for p in dir(self) if not p.startswith('_')]
+    #   """ """
+    #   return [p for p in dir(self) if not p.startswith('_')]
 
     @property
     def energy_score(self) -> float | None:
@@ -676,7 +676,7 @@ class Pose:
         if not id:
             return None
 
-        return self.db.get_subsite(id=id)
+        return self.db.get_subsite_tag(id=id)
 
     def calculate_interactions(
         self,
@@ -991,7 +991,7 @@ class Pose:
                 continue
 
             # if prot_feature.residue_number == 77:
-            # 	logger.debug(repr(prot_feature))
+            #   logger.debug(repr(prot_feature))
 
             if prot_residue.name != prot_feature.residue_name:
                 logger.warning(f"Feature {repr(prot_feature)}")

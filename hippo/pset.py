@@ -693,6 +693,37 @@ class PoseSet:
             self._interactions = InteractionSet.from_pose(self)
         return self._interactions
 
+    @property
+    def num_subsites(self) -> int:
+        """Count the number of subsites that poses in this set come into contact with"""
+        (count,) = self.db.select_where(
+            query="COUNT(DISTINCT subsite_tag_ref)",
+            table="subsite_tag",
+            key=f"subsite_tag_pose IN {self.str_ids}",
+            none="quiet",
+        )
+        if count is None:
+            count = 0
+        return count
+
+    @property
+    def subsite_balance(self) -> float:
+        """Measure of how evenly subsite counts are distributed across poses in this set"""
+
+        from numpy import std
+
+        sql = f"""
+        SELECT COUNT(DISTINCT subsite_tag_ref) FROM subsite_tag
+        WHERE subsite_tag_pose IN {self.str_ids}
+        GROUP BY subsite_tag_pose
+        """
+
+        counts = self.db.execute(sql).fetchall()
+
+        counts = [c for c, in counts] + [0 for _ in range(len(self) - len(counts))]
+
+        return -std(counts)
+
     ### FILTERING
 
     def get_by_tag(
