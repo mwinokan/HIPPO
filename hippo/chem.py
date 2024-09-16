@@ -23,6 +23,13 @@ SUPPORTED_CHEMISTRY = {
             "removed": {"O": 1, "H": 2},
         },
     },
+    "Ester_amidation": {
+        "heavy_atoms_diff": ">=3",
+        # "rings_diff": 0,
+        "atomtype": {
+            "removed": {"O": ">=1", "*": "*"},
+        },
+    },
     "Williamson_ether_synthesis": {
         "heavy_atoms_diff": 1,
         "rings_diff": 0,
@@ -45,10 +52,68 @@ SUPPORTED_CHEMISTRY = {
         },
     },
     "Sp3-sp2_Suzuki_coupling": {
-        "heavy_atoms_diff": 10,
-        "rings_diff": 1,
+        # "heavy_atoms_diff": 10,
+        "heavy_atoms_diff": ">=4",
+        "rings_diff": ">=0",
         "atomtype": {
-            "removed": {"C": 6, "O": 2, "B": 1, "Ha": 1, "H": 12},  # any halogen
+            # "removed": {"C": 6, "O": 2, "B": 1, "Ha": 1, "H": 12},  # any halogen
+            "removed": {"C": ">=0", "O": 2, "B": 1, "Ha": 1, "H": ">=2"},  # any halogen
+        },
+    },
+    "Sp2-sp2_Suzuki_coupling": {
+        "heavy_atoms_diff": ">=4",
+        "rings_diff": ">=0",
+        "atomtype": {
+            "removed": {"C": ">=0", "O": 2, "B": 1, "Ha": 1, "H": ">=2"},  # any halogen
+        },
+    },
+    "Buchwald-Hartwig_amidation_with_amide-like_nucleophile": {
+        "heavy_atoms_diff": 1,
+        "rings_diff": 0,
+        "atomtype": {
+            "removed": {"Ha": 1, "H": 1},
+        },
+    },
+    "Buchwald-Hartwig_amination": {
+        "heavy_atoms_diff": 1,
+        "rings_diff": 0,
+        "atomtype": {
+            "removed": {"Ha": 1, "H": 1},
+        },
+    },
+    "Nucleophilic_substitution_with_amine": {
+        "heavy_atoms_diff": 1,
+        "rings_diff": 0,
+        "atomtype": {
+            "removed": {"Ha": 1, "H": 1},
+        },
+    },
+    "N-nucleophilic_aromatic_substitution": {
+        "heavy_atoms_diff": 1,
+        "rings_diff": 0,
+        "atomtype": {
+            "removed": {"Ha": 1, "H": 1},  # any halogen
+        },
+    },
+    "Reductive_amination": {
+        "heavy_atoms_diff": 1,
+        "rings_diff": 0,
+        "atomtype": {
+            "removed": {"O": 1},  # any halogen
+        },
+    },
+    "Mitsunobu_reaction_with_amine_alcohol_and_thioalcohol": {
+        "heavy_atoms_diff": 1,
+        "rings_diff": 0,
+        "atomtype": {
+            "removed": {"O": 1, "H": 1},
+        },
+    },
+    "Steglich_esterification": {
+        "heavy_atoms_diff": 1,
+        "rings_diff": 0,
+        "atomtype": {
+            "removed": {"O": 1, "H": 2},
         },
     },
     "Benzyl_alcohol_deprotection": {
@@ -142,14 +207,29 @@ def check_count_diff(check_type, reaction_type, reactants, product, debug=False)
         logger.var(f"#{check_type} product", prod_count)
 
     # check against target value
-    if reac_count - diff != prod_count:
-        if debug:
-            logger.error(f"{reaction_type}: #{check_type} FAIL")
-        return False
+    if isinstance(diff, str):
+
+        assert diff.startswith('>='), diff
+
+        diff = int(diff[2:])
+
+        if reac_count - prod_count < diff:
+            if debug:
+                logger.error(f"{reaction_type}: #{check_type} {(reac_count - prod_count)=} FAIL")
+            return False
+
+        elif debug:
+            logger.success(f"{reaction_type}: #{check_type} OK")
 
     else:
-        if debug:
-            logger.success(f"{reaction_type}: #{check_type} OK")
+
+        if reac_count - diff != prod_count:
+            if debug:
+                logger.error(f"{reaction_type}: #{check_type} FAIL")
+            return False
+
+        elif debug:
+                logger.success(f"{reaction_type}: #{check_type} OK")
 
     return True
 
@@ -226,25 +306,56 @@ def check_specific_atomtype_diff(reaction_type, prod, reac, removal=False, debug
             p_count = halogen_count(prod)
             r_count = halogen_count(reac)
 
+        elif symbol == "*":
+            assert count == "*", (symbol, count)
+            if debug:
+                logger.debug('Allowing wildcard atomtype differences')
+            continue
+
         else:
             p_count = prod[symbol] if symbol in prod else 0
             r_count = reac[symbol] if symbol in reac else 0
 
-        if removal and r_count - p_count != count:
-            if debug:
-                logger.error(f"{symbol}: {r_count=} - {p_count=} = {r_count - p_count}")
-                logger.error(
-                    f"{reaction_type}: atomtype removal {symbol} x {count} FAIL"
-                )
-            return False
 
-        elif not removal and p_count - r_count != count:
-            if debug:
-                logger.error(f"{symbol}: {p_count=} - {r_count=} = {p_count - r_count}")
-                logger.error(
-                    f"{reaction_type}: atomtype addition {symbol} x {count} FAIL"
-                )
-            return False
+        if isinstance(count, str):
+
+            assert count.startswith('>='), (symbol,count)
+
+            count = int(count[2:])
+
+            if removal and r_count - p_count < count:
+                if debug:
+                    logger.error(f"{symbol}: {r_count=} - {p_count=} >= {r_count - p_count}")
+                    logger.error(
+                        f"{reaction_type}: atomtype removal {symbol} x {count} FAIL"
+                    )
+                return False
+
+            elif not removal and p_count - r_count < count:
+                if debug:
+                    logger.error(f"{symbol}: {p_count=} - {r_count=} >= {p_count - r_count}")
+                    logger.error(
+                        f"{reaction_type}: atomtype addition {symbol} x {count} FAIL"
+                    )
+                return False
+
+        else:
+
+            if removal and r_count - p_count != count:
+                if debug:
+                    logger.error(f"{symbol}: {r_count=} - {p_count=} = {r_count - p_count}")
+                    logger.error(
+                        f"{reaction_type}: atomtype removal {symbol} x {count} FAIL"
+                    )
+                return False
+
+            elif not removal and p_count - r_count != count:
+                if debug:
+                    logger.error(f"{symbol}: {p_count=} - {r_count=} = {p_count - r_count}")
+                    logger.error(
+                        f"{reaction_type}: atomtype addition {symbol} x {count} FAIL"
+                    )
+                return False
 
     return True
 
