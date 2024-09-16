@@ -69,6 +69,8 @@ See :doc:`definitions` for more detail.
    Structure-based searching <queries>
 
    Adding data <insert_elaborations>
+
+   Loading Syndirella outputs <load_syndirella>
    
    Inserting synthetic pathways <insert_reactions>
 
