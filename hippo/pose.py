@@ -740,6 +740,10 @@ class Pose:
             )
             self.has_fingerprint = False
 
+            ### create temporary table
+
+            self.db.create_table_interaction(table="temp_interaction", debug=False)
+
             ### load the ligand structure
 
             if self.path.endswith(".pdb"):
@@ -920,12 +924,24 @@ class Pose:
                             angle=angle,
                             energy=None,
                             commit=commit,
+                            table="temp_interaction",
                         )
 
             self.has_fingerprint = True
 
             if resolve:
-                self.interactions.resolve(debug=debug)
+                from .iset import InteractionSet
+
+                interactions = InteractionSet.from_pose(self, table="temp_interaction")
+                interactions.resolve(debug=debug)
+                # self.interactions.resolve(debug=debug, table='temp_interaction')
+
+            ### transfer interactions from temporary table
+            self.db.copy_temp_interactions()
+
+            ### delete temporary table
+
+            self.db.execute("DROP TABLE temp_interaction")
 
         elif debug:
             logger.warning(f"{self} is already fingerprinted, no new calculation")

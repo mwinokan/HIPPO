@@ -14,8 +14,6 @@ class Interaction:
 
     """
 
-    _table = "interaction"
-
     def __init__(
         self,
         db: "Database",
@@ -30,6 +28,7 @@ class Interaction:
         distance: float,
         angle: float,
         energy: float | None,
+        table: str = "interaction",
     ) -> None:
 
         import json
@@ -50,6 +49,7 @@ class Interaction:
         # placeholders
         self._pose = None
         self._feature = None
+        self._table = table
 
         self._db = db
 
