@@ -344,10 +344,6 @@ class InteractionSet:
 
         table = self.table
 
-        # logger.debug(table)
-        # self.db.print_table(table)
-        print(self.db.count(table))
-
         ### H-Bonds (closest)
 
         sql = f"""
