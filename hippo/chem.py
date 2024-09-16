@@ -209,13 +209,15 @@ def check_count_diff(check_type, reaction_type, reactants, product, debug=False)
     # check against target value
     if isinstance(diff, str):
 
-        assert diff.startswith('>='), diff
+        assert diff.startswith(">="), diff
 
         diff = int(diff[2:])
 
         if reac_count - prod_count < diff:
             if debug:
-                logger.error(f"{reaction_type}: #{check_type} {(reac_count - prod_count)=} FAIL")
+                logger.error(
+                    f"{reaction_type}: #{check_type} {(reac_count - prod_count)=} FAIL"
+                )
             return False
 
         elif debug:
@@ -229,7 +231,7 @@ def check_count_diff(check_type, reaction_type, reactants, product, debug=False)
             return False
 
         elif debug:
-                logger.success(f"{reaction_type}: #{check_type} OK")
+            logger.success(f"{reaction_type}: #{check_type} OK")
 
     return True
 
@@ -309,23 +311,24 @@ def check_specific_atomtype_diff(reaction_type, prod, reac, removal=False, debug
         elif symbol == "*":
             assert count == "*", (symbol, count)
             if debug:
-                logger.debug('Allowing wildcard atomtype differences')
+                logger.debug("Allowing wildcard atomtype differences")
             continue
 
         else:
             p_count = prod[symbol] if symbol in prod else 0
             r_count = reac[symbol] if symbol in reac else 0
 
-
         if isinstance(count, str):
 
-            assert count.startswith('>='), (symbol,count)
+            assert count.startswith(">="), (symbol, count)
 
             count = int(count[2:])
 
             if removal and r_count - p_count < count:
                 if debug:
-                    logger.error(f"{symbol}: {r_count=} - {p_count=} >= {r_count - p_count}")
+                    logger.error(
+                        f"{symbol}: {r_count=} - {p_count=} >= {r_count - p_count}"
+                    )
                     logger.error(
                         f"{reaction_type}: atomtype removal {symbol} x {count} FAIL"
                     )
@@ -333,7 +336,9 @@ def check_specific_atomtype_diff(reaction_type, prod, reac, removal=False, debug
 
             elif not removal and p_count - r_count < count:
                 if debug:
-                    logger.error(f"{symbol}: {p_count=} - {r_count=} >= {p_count - r_count}")
+                    logger.error(
+                        f"{symbol}: {p_count=} - {r_count=} >= {p_count - r_count}"
+                    )
                     logger.error(
                         f"{reaction_type}: atomtype addition {symbol} x {count} FAIL"
                     )
@@ -343,7 +348,9 @@ def check_specific_atomtype_diff(reaction_type, prod, reac, removal=False, debug
 
             if removal and r_count - p_count != count:
                 if debug:
-                    logger.error(f"{symbol}: {r_count=} - {p_count=} = {r_count - p_count}")
+                    logger.error(
+                        f"{symbol}: {r_count=} - {p_count=} = {r_count - p_count}"
+                    )
                     logger.error(
                         f"{reaction_type}: atomtype removal {symbol} x {count} FAIL"
                     )
@@ -351,7 +358,9 @@ def check_specific_atomtype_diff(reaction_type, prod, reac, removal=False, debug
 
             elif not removal and p_count - r_count != count:
                 if debug:
-                    logger.error(f"{symbol}: {p_count=} - {r_count=} = {p_count - r_count}")
+                    logger.error(
+                        f"{symbol}: {p_count=} - {r_count=} = {p_count - r_count}"
+                    )
                     logger.error(
                         f"{reaction_type}: atomtype addition {symbol} x {count} FAIL"
                     )
