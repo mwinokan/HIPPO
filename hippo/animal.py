@@ -1487,13 +1487,15 @@ class HIPPO:
             tags=tags,
             metadata=metadata,
             warn_duplicate=False,
-            commit=commit,
+            commit=False,
             alias=alias,
         )
 
         duplicate = not bool(compound_id)
 
         def _return(compound, duplicate, return_compound, return_duplicate):
+            if commit:
+                self.db.commit()
             if not return_compound and not isinstance(compound, int):
                 compound = compound.id
             if return_duplicate:
@@ -1532,14 +1534,9 @@ class HIPPO:
 
             if tags:
                 for tag in tags:
-                    compound.tags.add(tag)
+                    compound.tags.add(tag, commit=False)
 
             return _return(compound, duplicate, return_compound, return_duplicate)
-
-            if return_compound:
-                return compound
-            else:
-                return compound.id
 
         else:
             if not compound_id:
@@ -1553,7 +1550,7 @@ class HIPPO:
                         id=compound_id,
                         key="compound_base",
                         value=base,
-                        commit=commit,
+                        commit=False,
                     )
 
             return _return(compound_id, duplicate, return_compound, return_duplicate)
