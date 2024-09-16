@@ -644,7 +644,7 @@ class HIPPO:
         """
         Load Syndirella base compounds and poses from a pickled DataFrame
 
-        :param df_path: Path to the pickled DataFrame
+        :param df_path: Path to the pickled DataFrame or SDF.
         :param tags: list of tags to assign to compounds and poses, defaults to ``None``
         :param reaction_yield_map: dictionary mapping reaction type strings to their yield ratio, defaults to ``None``
         :param check_chemistry: check the reaction chemistry, defaults to ``True``
@@ -659,7 +659,26 @@ class HIPPO:
 
         if isinstance(df_path, str):
             df_path = Path(df_path)
-        df = pd.read_pickle(df_path)
+
+        from pickle import UnpicklingError
+
+        if df_path.name.endswith(".csv"):
+            raise NotImplementedError
+        elif df_path.name.endswith(".sdf"):
+            from rdkit.Chem import PandasTools
+
+            df = PandasTools.LoadSDF(df_path)
+        else:
+            try:
+                df = pd.read_pickle(df_path)
+            except UnpicklingError:
+                logger.error(
+                    "Could not read DataFrame. Is it a valid sdf or pickled dataframe?"
+                )
+                return None
+
+        if debug:
+            logger.var("len(df)", len(df))
 
         reaction_cols = [c for c in df.columns if "_reaction" in c]
 
@@ -805,8 +824,10 @@ class HIPPO:
         require_truthy_bases: None | list[str] = None,
         require_truthy_elabs: None | list[str] = None,
         require_nonzero_truthy_bases: None | list[str] = None,
-        stop_after=None,
-        check_chemistry=True,
+        stop_after: None | int = None,
+        check_chemistry: bool = True,
+        base_designator: str = "scaffold",
+        target: int | str = 1,
     ) -> None:
         """
         Load Syndirella elaboration compounds and poses from a pickled DataFrame
@@ -850,17 +871,18 @@ class HIPPO:
         )
 
         # check chemistries
-        chemistries = set(
-            sum(
-                [
-                    df[df[f"{j+1}_reaction"].notnull()][f"{j+1}_reaction"].tolist()
-                    for j in range(n_steps)
-                ],
-                [],
+        if check_chemistry:
+            chemistries = set(
+                sum(
+                    [
+                        df[df[f"{j+1}_reaction"].notnull()][f"{j+1}_reaction"].tolist()
+                        for j in range(n_steps)
+                    ],
+                    [],
+                )
             )
-        )
-        logger.var("Present reactions", str(chemistries))
-        check_reaction_types(chemistries)
+            logger.var("Present reactions", str(chemistries))
+            check_reaction_types(chemistries)
 
         if f"{n_steps}_num_atom_diff" not in df.columns:
             logger.error(df_path)
@@ -870,7 +892,9 @@ class HIPPO:
 
         for key in require_nonzero_truthy_bases:
             if not any(
-                df[df[f"{n_steps}_product_name"].str.contains("base")][key].values
+                df[df[f"{n_steps}_product_name"].str.contains(base_designator)][
+                    key
+                ].values
             ):
                 logger.warning(f"No bases have {key}. Inserting them anyway")
                 require_truthy_bases.pop(require_truthy_bases.index(key))
@@ -897,7 +921,7 @@ class HIPPO:
 
                 path_to_mol = row.path_to_mol
 
-                this_row_is_a_base = "base" in row[f"{n_steps}_product_name"]
+                this_row_is_a_base = base_designator in row[f"{n_steps}_product_name"]
 
                 # skip entries that have non-truthy columns
                 if this_row_is_a_base:
@@ -989,16 +1013,17 @@ class HIPPO:
                         if reactant_previous_product == 2:
                             reactant2_id = product_id
                             reactants.append(reactant2_id)
+
                         elif smiles := row[f"{j}_r2_smiles"]:
 
                             if not isinstance(smiles, str):
                                 raise InvalidRowError(f"non-string {j}_r2_smiles")
 
-                            # base = base_reactants[j][1] if not this_row_is_a_base else None
-                            # reactant2_id = self.register_compound(smiles=smiles, commit=False, return_compound=False, tags=tags)
-                            base = (
-                                base_reactants[j][2] if not this_row_is_a_base else None
-                            )
+                            if this_row_is_a_base:
+                                base = None
+                            else:
+                                base = base_reactants[j][2]
+                                assert base
 
                             reactant2_id, duplicate = self.register_compound(
                                 smiles=smiles,
@@ -1022,6 +1047,9 @@ class HIPPO:
                                 elabs_registered.add(reactant2_id)
 
                             reactants.append(reactant2_id)
+
+                        else:
+                            reactant2_id = None
 
                         # product
                         if smiles := row[f"{j}_product_smiles"]:
@@ -1102,7 +1130,12 @@ class HIPPO:
                 inspirations = []
                 for inspiration in row.regarded:
                     if inspiration_map:
-                        inspiration = inspiration_map[inspiration]
+                        match inspiration_map:
+                            case dict():
+                                inspiration = inspiration_map[inspiration]
+                            case _:
+                                inspiration = inspiration_map(inspiration)
+
                     else:
                         # this is really expensive
                         inspiration = self.poses[inspiration]
@@ -1116,7 +1149,7 @@ class HIPPO:
                     # register the pose
                     self.register_pose(
                         compound=product_id,
-                        target="A71EV2A",
+                        target=target,
                         path=path_to_mol,
                         inspirations=inspirations,
                         metadata=metadata,
@@ -1167,7 +1200,7 @@ class HIPPO:
         else:
             logger.warning(f"Loaded {n_reactions} new reactions from {df_path.name}")
 
-        # return base_id
+        return df
 
     def add_enamine_quote(
         self,
