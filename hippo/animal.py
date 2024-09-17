@@ -1853,6 +1853,7 @@ class HIPPO:
 
         pose_id = self.db.insert_pose(**pose_data)
 
+        # if no pose_id then there must be a duplicate
         if not pose_id:
 
             # constraint failed
