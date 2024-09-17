@@ -1480,24 +1480,34 @@ class PoseSet:
     def _delete(self, *, force: bool = False) -> None:
 
         if not force:
-            logger.warning('Deleting Poses is risky! Set force=True to continue')
+            logger.warning("Deleting Poses is risky! Set force=True to continue")
             return
-        
+
         # delete the poses in this set
-        self.db.delete_where(table=self.table, key=f'pose_id IN {self.str_ids}')
+        self.db.delete_where(table=self.table, key=f"pose_id IN {self.str_ids}")
 
         # check for other references to this pose
-        self.db.delete_where(table='tag', key=f'tag_pose IN {self.str_ids}')
-        self.db.delete_where(table='inspiration', key=f'inspiration_original IN {self.str_ids}')
-        self.db.delete_where(table='inspiration', key=f'inspiration_derivative IN {self.str_ids}')
-        self.db.delete_where(table='subsite_tag', key=f'subsite_tag_pose IN {self.str_ids}')
-        self.db.delete_where(table='interaction', key=f'interaction_pose IN {self.str_ids}')
+        self.db.delete_where(table="tag", key=f"tag_pose IN {self.str_ids}")
+        self.db.delete_where(
+            table="inspiration", key=f"inspiration_original IN {self.str_ids}"
+        )
+        self.db.delete_where(
+            table="inspiration", key=f"inspiration_derivative IN {self.str_ids}"
+        )
+        self.db.delete_where(
+            table="subsite_tag", key=f"subsite_tag_pose IN {self.str_ids}"
+        )
+        self.db.delete_where(
+            table="interaction", key=f"interaction_pose IN {self.str_ids}"
+        )
 
-        self.db.execute(f'''
+        self.db.execute(
+            f"""
             UPDATE pose
             SET pose_reference = NULL
             WHERE pose_id IN {self.str_ids}
-        ''')
+        """
+        )
 
     ### DUNDERS
 
