@@ -822,8 +822,9 @@ class HIPPO:
         tags: None | list[str] = None,
         reaction_yield_map: dict | None = None,
         require_truthy_bases: None | list[str] = None,
+        # warn_nontruthy_bases: None | list[str] = None,
         require_truthy_elabs: None | list[str] = None,
-        require_nonzero_truthy_bases: None | list[str] = None,
+        warn_nonzero_truthy_bases: None | list[str] = None,
         stop_after: None | int = None,
         check_chemistry: bool = True,
         base_designator: str = "scaffold",
@@ -839,7 +840,7 @@ class HIPPO:
         :param reaction_yield_map: dictionary mapping reaction type strings to their yield ratio, defaults to ``None``
         :param require_truthy_bases: List of columns that should be truthy to load the given base, defaults to ``['path_to_mol', 'intra_geometry_pass']``
         :param require_truthy_elabs: List of columns that should be truthy to load the given elaboration, defaults to ``['path_to_mol', 'intra_geometry_pass']``
-        :param require_nonzero_truthy_bases: List of columns that should have a truthy value for at least one of the base molecules, defaults to ``['path_to_mol', 'intra_geometry_pass']``
+        :param warn_nonzero_truthy_bases: List of columns that should have a truthy value for at least one of the base molecules, defaults to ``['path_to_mol', 'intra_geometry_pass']``
         :param stop_after: Stop after given number of rows, defaults to ``None``
         :param check_chemistry: check the reaction chemistry, defaults to ``True``
         """
@@ -847,6 +848,11 @@ class HIPPO:
         from .chem import check_reaction_types, InvalidChemistryError
 
         tags = tags or []
+        # require_truthy_bases = require_truthy_bases or []
+        require_truthy_bases = require_truthy_bases or [
+            "path_to_mol",
+            "intra_geometry_pass",
+        ]
         require_truthy_bases = require_truthy_bases or [
             "path_to_mol",
             "intra_geometry_pass",
@@ -855,11 +861,11 @@ class HIPPO:
             "path_to_mol",
             "intra_geometry_pass",
         ]
-        require_nonzero_truthy_bases = require_nonzero_truthy_bases or [
+        warn_nonzero_truthy_bases = warn_nonzero_truthy_bases or [
             "path_to_mol",
             "intra_geometry_pass",
         ]
-        assert all([k in require_truthy_bases for k in require_nonzero_truthy_bases])
+        assert all([k in require_truthy_bases for k in warn_nonzero_truthy_bases])
 
         if isinstance(df_path, str):
             df_path = Path(df_path)
@@ -869,6 +875,8 @@ class HIPPO:
         n_steps = max(
             [int(s.split("_")[0]) for s in df.columns if "_product_smiles" in s]
         )
+
+        # logger.var('#steps',n_steps)
 
         # check chemistries
         if check_chemistry:
@@ -890,13 +898,15 @@ class HIPPO:
             print(df.columns)
             raise NotImplementedError
 
-        for key in require_nonzero_truthy_bases:
-            if not any(
-                df[df[f"{n_steps}_product_name"].str.contains(base_designator)][
-                    key
-                ].values
-            ):
-                logger.warning(f"No bases have {key}. Inserting them anyway")
+        base_df = df[df[f"{n_steps}_product_name"].str.contains(base_designator)]
+
+        if not len(base_df):
+            logger.error(f"No base/scaffold rows found in {df_path.name}")
+            return df
+
+        for key in warn_nonzero_truthy_bases:
+            if not any(base_df[key].values):
+                logger.warning(f"No bases have truthy {key}. Inserting them anyway")
                 require_truthy_bases.pop(require_truthy_bases.index(key))
 
         base_id = None
@@ -919,26 +929,37 @@ class HIPPO:
 
             for i, row in generator:
 
+                # print(f'{i=}', row[f"{n_steps}_num_atom_diff"])
+
                 path_to_mol = row.path_to_mol
 
-                this_row_is_a_base = base_designator in row[f"{n_steps}_product_name"]
+                product_name = row[f"{n_steps}_product_name"]
+
+                this_row_is_a_base = base_designator in product_name
 
                 # skip entries that have non-truthy columns
                 if this_row_is_a_base:
 
                     if any(not row[key] for key in require_truthy_bases):
+                        logger.warning(
+                            f"Skipping (row {i=}) which has {key}={row[key]}"
+                        )
                         continue
 
-                    # for key in warn_not_truthy_bases:
-                    # 	if not row[key]:
-                    # 		logger.warning(f'Base (row {i=}) has {key}={row[key]}')
+                    # for key in warn_nontruthy_bases:
+                    #     if not row[key]:
+                    #         logger.warning(f'Base (row {i=}) has {key}={row[key]}')
 
                 elif any(not row[key] for key in require_truthy_elabs):
+                    # logger.debug(f'row{i=} has at least one non-truthy {require_truthy_elabs}')
                     continue
 
                 if row[f"{n_steps}_num_atom_diff"] <= 0 and not this_row_is_a_base:
                     skipped_smaller += 1
                     continue
+
+                # elif row[f"{n_steps}_num_atom_diff"] == 0:
+                #     logger.debug(f'{i=}, {product_name}')
 
                 if base_only and not this_row_is_a_base:
                     continue
@@ -1069,6 +1090,15 @@ class HIPPO:
                                 this_tags = tags  # + ['Syndirella elaboration']
                                 base = base_id
 
+                            # print(f'''register_compound{dict(
+                            #     smiles=smiles,
+                            #     tags=this_tags,
+                            #     commit=False,
+                            #     return_compound=False,
+                            #     base=base,
+                            #     register_base_if_duplicate=False,
+                            #     return_duplicate=True)}
+                            # )''')
                             product_id, duplicate = self.register_compound(
                                 smiles=smiles,
                                 tags=this_tags,
@@ -1107,6 +1137,7 @@ class HIPPO:
                             product_yield = 1.0
 
                         try:
+                            # print(reactants, product_id, row[f"{j}_reaction"])
                             self.register_reaction(
                                 reactants=reactants,
                                 product=product_id,
@@ -1119,7 +1150,7 @@ class HIPPO:
                             skipped_reactions += 1
 
                 except InvalidRowError as e:
-                    # logger.error(f'Skipping invalid row {i=}: {e}')
+                    logger.error(f"Skipping invalid row {i=}: {e}")
                     skipped_invalid_smiles += 1
                     continue
 
@@ -1381,21 +1412,21 @@ class HIPPO:
             compound = self.register_compound(smiles=smiles)
 
             # if (catalogue := row[catalogue_col]) == 'No starting material':
-            # 	continue
+            #   continue
 
             catalogue = row[catalogue_col]
             lead_time = lead_time_lookup[catalogue]
 
             # if (price := row[price_col]) == 0.0:
-            # 	continue
+            #   continue
 
             # if not isinstance(row[lead_time_col], str):
             # continue
 
             # if 'week' in row[lead_time_col]:
-            # 	lead_time = int(row[lead_time_col].split()[0].split('-')[-1])*5
+            #   lead_time = int(row[lead_time_col].split()[0].split('-')[-1])*5
             # else:
-            # 	raise NotImplementedError
+            #   raise NotImplementedError
 
             quote_data = dict(
                 compound=compound,
