@@ -306,15 +306,13 @@ class HIPPO:
 
             assert len(sdfs) == 1, (path, sdfs)
 
-            if not pdbs:
-                pdbs = list(path.glob("*.pdb"))
-                pdbs = [
-                    p
-                    for p in pdbs
-                    if "_ligand" not in p.name
-                    and "_apo" not in p.name
-                    and "_hippo" not in p.name
-                ]
+            pdbs = [
+                p
+                for p in path.glob("*.pdb")
+                if "_ligand" not in p.name
+                and "_apo" not in p.name
+                and "_hippo" not in p.name
+            ]
 
             assert len(pdbs) == 1, (path, pdbs)
 
