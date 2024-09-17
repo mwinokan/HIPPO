@@ -45,6 +45,10 @@ class TagTable:
 
     ### METHODS
 
+    def delete(self, tag: str) -> None:
+        """Delete all assignments for the given tag"""
+        self.db.delete_where(table="tag", key="name", value=tag)
+
     ### DUNDERS
 
     def __repr__(self) -> str:
