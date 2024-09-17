@@ -1223,6 +1223,21 @@ class CompoundSet:
 
         return df
 
+    def add_tag(
+        self,
+        tag: str,
+    ) -> None:
+        """Add this tag to every member of the set"""
+
+        assert isinstance(tag, str)
+
+        for i in self.indices:
+            self.db.insert_tag(name=tag, compound=i, commit=False)
+
+        logger.info(f'Tagged {self} w/ "{tag}"')
+
+        self.db.commit()
+
     ### DUNDERS
 
     def __len__(self) -> int:
