@@ -386,11 +386,14 @@ class Database:
 
         self.execute(sql)
 
-    def create_table_interaction(self) -> None:
-        """Create the interaction table"""
+    def create_table_interaction(
+        self, table: str = "interaction", debug: bool = True
+    ) -> None:
+        """Create an interaction table"""
 
-        logger.debug("HIPPO.Database.create_table_interaction()")
-        sql = """CREATE TABLE interaction(
+        if debug:
+            logger.debug(f"HIPPO.Database.create_table_interaction({table=})")
+        sql = f"""CREATE TABLE {table}(
 			interaction_id INTEGER PRIMARY KEY,
 			interaction_feature INTEGER NOT NULL,
 			interaction_pose INTEGER NOT NULL,
@@ -1189,6 +1192,7 @@ class Database:
         energy: float | None = None,
         warn_duplicate: bool = True,
         commit: bool = True,
+        table: str = "interaction",
     ) -> int:
         """Insert an entry into the interaction table
 
@@ -1204,6 +1208,7 @@ class Database:
         :param energy: energy score ``kcal/mol``, defaults to ``None``
         :param warn_duplicate: print a warning if the pose already exists (Default value = True)
         :param commit: commit the changes to the database (Default value = True)
+        :param table: the name of the table to insert into (Default value = 'interaction')
         :returns: the interaction ID
         """
 
@@ -1259,8 +1264,8 @@ class Database:
 
         # insertion
 
-        sql = """
-		INSERT INTO interaction(
+        sql = f"""
+		INSERT INTO {table}(
 			interaction_feature,
 			interaction_pose,
 			interaction_type,
@@ -1704,6 +1709,42 @@ class Database:
         if commit:
             self.commit()
 
+    def copy_temp_interactions(self) -> int:
+        """Copy the records from the 'temp_interaction' table to the 'interaction' table
+
+        :returns: ID of the last inserted :class:`.Interaction`
+        """
+
+        cursor = self.execute(
+            """
+            INSERT INTO interaction(
+                interaction_feature, 
+                interaction_pose, 
+                interaction_type, 
+                interaction_family, 
+                interaction_atom_ids, 
+                interaction_prot_coord, 
+                interaction_lig_coord, 
+                interaction_distance, 
+                interaction_angle, 
+                interaction_energy
+            )
+            SELECT interaction_feature, 
+                interaction_pose, 
+                interaction_type, 
+                interaction_family, 
+                interaction_atom_ids, 
+                interaction_prot_coord, 
+                interaction_lig_coord, 
+                interaction_distance, 
+                interaction_angle, 
+                interaction_energy 
+            FROM temp_interaction
+        """
+        )
+
+        return cursor.lastrowid
+
     ### GETTERS
 
     def get_compound(
@@ -2091,11 +2132,7 @@ class Database:
 
         return recipe
 
-    def get_interaction(
-        self,
-        *,
-        id: int,
-    ) -> "Interaction":
+    def get_interaction(self, *, id: int, table: str = "interaction") -> "Interaction":
         """Fetch the :class:`.Interaction` object with given ID
 
         :param id: the ID of the Interaction to retrieve
@@ -2105,7 +2142,7 @@ class Database:
 
         from .interaction import Interaction
 
-        result = self.select_all_where(table="interaction", key="id", value=id)
+        result = self.select_all_where(table=table, key=f"interaction_id = {id}")
 
         (
             id,
@@ -2134,6 +2171,7 @@ class Database:
             distance=distance,
             angle=angle,
             energy=energy,
+            table=table,
         )
 
     def get_possible_reaction_ids(

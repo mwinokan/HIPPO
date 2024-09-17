@@ -14,15 +14,11 @@ class InteractionTable:
 
     """
 
-    _table = "interaction"
-
-    def __init__(
-        self,
-        db: "Database",
-    ) -> None:
+    def __init__(self, db: "Database", table: str = "interaction") -> None:
 
         self._db = db
         self._df = None
+        self._table = table
 
     ### PROPERTIES
 
@@ -69,15 +65,15 @@ class InteractionSet:
 
     """
 
-    _table = "interaction"
-
     def __init__(
         self,
         db: "Database",
         indices: list = None,
+        table: str = "interaction",
     ) -> None:
 
         self._db = db
+        self._table = table
 
         indices = indices or []
 
@@ -93,8 +89,7 @@ class InteractionSet:
 
     @classmethod
     def from_pose(
-        cls,
-        pose: "Pose | PoseSet",
+        cls, pose: "Pose | PoseSet", table: str = "interaction"
     ) -> "InteractionSet":
         """Construct a :class:`.InteractionSet` from one or more poses.
 
@@ -122,14 +117,14 @@ class InteractionSet:
                 logger.warning(f"{has_invalid_fps} Poses have not been fingerprinted")
 
             sql = f"""
-            SELECT interaction_id FROM interaction
+            SELECT interaction_id FROM {table}
             WHERE interaction_pose IN {pose.str_ids}
             """
 
         else:
 
             sql = f"""
-            SELECT interaction_id FROM interaction
+            SELECT interaction_id FROM {table}
             WHERE interaction_pose = {pose.id}
             """
 
@@ -137,7 +132,7 @@ class InteractionSet:
 
         ids = [i for i, in ids]
 
-        self.__init__(pose.db, ids)
+        self.__init__(pose.db, ids, table=table)
 
         return self
 
@@ -226,7 +221,7 @@ class InteractionSet:
 
         if self._df is None:
             records = self.db.select_all_where(
-                table="interaction",
+                table=self.table,
                 key=f"interaction_id IN {self.str_ids}",
                 multiple=True,
             )
@@ -240,7 +235,7 @@ class InteractionSet:
         """Get a list of ``(residue_number, chain_name)`` tuples"""
 
         sql = f"""
-        SELECT DISTINCT feature_residue_number, feature_chain_name FROM interaction
+        SELECT DISTINCT feature_residue_number, feature_chain_name FROM {self.table}
         INNER JOIN feature
         ON feature_id = interaction_feature
         WHERE interaction_id IN {self.str_ids}
@@ -254,7 +249,7 @@ class InteractionSet:
 
         (count,) = self.db.execute(
             f"""
-        SELECT COUNT(DISTINCT interaction_feature) FROM interaction
+        SELECT COUNT(DISTINCT interaction_feature) FROM {self.table}
         WHERE interaction_id IN {self.str_ids}
         """
         ).fetchone()
@@ -269,7 +264,7 @@ class InteractionSet:
             f"""
         WITH counts AS
         (
-            SELECT interaction_feature, COUNT(1) AS count FROM interaction
+            SELECT interaction_feature, COUNT(1) AS count FROM {self.table}
             WHERE interaction_id IN {self.str_ids}
             GROUP BY interaction_feature
         )
@@ -324,7 +319,7 @@ class InteractionSet:
 
         pairs = self.db.execute(
             f"""
-        SELECT interaction_feature, COUNT(1) FROM interaction
+        SELECT interaction_feature, COUNT(1) FROM {self.table}
         WHERE interaction_id IN {self.str_ids}
         GROUP BY interaction_feature
         """
@@ -336,6 +331,7 @@ class InteractionSet:
         self,
         debug: bool = False,
         commit: bool = True,
+        # table: str = 'interaction',
     ) -> "InteractionSet":
         """Resolve into predicted key interactions. In place modification.
 
@@ -346,11 +342,13 @@ class InteractionSet:
 
         keep_list = []
 
+        table = self.table
+
         ### H-Bonds (closest)
 
         sql = f"""
         SELECT interaction_id, MIN(interaction_distance)
-        FROM interaction
+        FROM {table}
         WHERE interaction_id IN {self.str_ids}
         AND interaction_type = "Hydrogen Bond"
         GROUP BY interaction_atom_ids
@@ -364,7 +362,7 @@ class InteractionSet:
 
         sql = f"""
         SELECT interaction_id, MIN(interaction_distance)
-        FROM interaction
+        FROM {table}
         INNER JOIN feature
         ON feature_id = interaction_feature
         WHERE interaction_id IN {self.str_ids}
@@ -381,7 +379,7 @@ class InteractionSet:
 
         sql = f"""
         SELECT interaction_id, MIN(interaction_distance)
-        FROM interaction
+        FROM {table}
         WHERE interaction_id IN {self.str_ids}
         AND interaction_type = "π-cation"
         GROUP BY interaction_atom_ids
@@ -396,7 +394,7 @@ class InteractionSet:
 
         sql = f"""
         SELECT interaction_id, MIN(interaction_distance)
-        FROM interaction
+        FROM {table}
         WHERE interaction_id IN {self.str_ids}
         AND interaction_type = "Electrostatic"
         GROUP BY interaction_atom_ids
@@ -411,14 +409,14 @@ class InteractionSet:
 
         sql = f"""
         SELECT interaction_id, interaction_distance
-        FROM interaction
+        FROM {table}
         WHERE interaction_id IN {self.str_ids}
         AND interaction_type = "Hydrophobic"
         """
 
         records = self.db.execute(sql).fetchall()
         ids = [a for a, b in records]
-        subset = InteractionSet(self.db, ids)
+        subset = InteractionSet(self.db, ids, table=table)
 
         # aggregate lumped
 
@@ -498,7 +496,7 @@ class InteractionSet:
         cull_list = set(self.ids) - set(keep_list)
         cull_iset = InteractionSet(self.db, cull_list)
         self.db.delete_where(
-            table="interaction",
+            table=table,
             key=f"interaction_id IN {cull_iset.str_ids}",
             commit=commit,
         )
@@ -514,7 +512,7 @@ class InteractionSet:
 
         sql = f"""
         SELECT interaction_id, MIN(interaction_distance)
-        FROM interaction
+        FROM {table}
         WHERE interaction_id IN {hydrophobic_keeper_iset.str_ids}
         GROUP BY interaction_feature
         """
@@ -525,7 +523,7 @@ class InteractionSet:
         cull_list = set(hydrophobic_keeper_iset.ids) - set(ids)
         cull_iset = InteractionSet(self.db, cull_list)
         self.db.delete_where(
-            table="interaction",
+            table=table,
             key=f"interaction_id IN {cull_iset.str_ids}",
             commit=commit,
         )
@@ -554,18 +552,20 @@ class InteractionSet:
 
     def __iter__(self):
         """Iterate through interactions in this set"""
-        return iter(self.db.get_interaction(id=i) for i in self.indices)
+        return iter(
+            self.db.get_interaction(id=i, table=self.table) for i in self.indices
+        )
 
     def __getitem__(self, key) -> "Interaction | InteractionSet":
         """Get interaction or subsets thereof from this set"""
         match key:
             case int():
                 index = self.indices[key]
-                return self.db.get_interaction(id=index)
+                return self.db.get_interaction(id=index, table=self.table)
 
             case slice():
                 indices = self.indices[key]
-                return InteractionSet(self.db, indices)
+                return InteractionSet(self.db, indices, table=self.table)
 
             case _:
                 raise NotImplementedError
