@@ -211,6 +211,10 @@ class CompoundTable:
         values = self.db.select_where(
             query="tag_compound", table="tag", key="name", value=tag, multiple=True
         )
+
+        if not values:
+            return None
+
         ids = [v for v, in values if v]
         return self[ids]
 

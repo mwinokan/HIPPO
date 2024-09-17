@@ -153,6 +153,10 @@ class PoseTable:
         values = self.db.select_where(
             query="tag_pose", table="tag", key="name", value=tag, multiple=True
         )
+
+        if not values:
+            return None
+
         ids = [v for v, in values if v]
 
         pset = self[ids]
