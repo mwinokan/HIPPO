@@ -729,10 +729,15 @@ class PoseSet:
         return -std(counts)
 
     @property
-    def derivatives(self) -> 'PoseSet':
-        ids = self.db.select_where(table='inspiration', query='inspiration_derivative', key=f'inspiration_original IN {self.str_ids}', multiple=True)
+    def derivatives(self) -> "PoseSet":
+        ids = self.db.select_where(
+            table="inspiration",
+            query="inspiration_derivative",
+            key=f"inspiration_original IN {self.str_ids}",
+            multiple=True,
+        )
         ids = [i for i, in ids]
-        pset = PoseSet(self.db, ids, name=f'derivatives of {self}')
+        pset = PoseSet(self.db, ids, name=f"derivatives of {self}")
         return pset
 
     ### FILTERING
