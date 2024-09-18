@@ -64,6 +64,7 @@ class CompoundTable:
     """
 
     _table = "compound"
+    _name = "all compounds"
 
     def __init__(
         self,
@@ -91,6 +92,10 @@ class CompoundTable:
         """Returns the names of child compounds"""
         result = self.db.select(table=self.table, query="compound_name", multiple=True)
         return [q for q, in result]
+
+    @property
+    def name(self):
+        return self._name
 
     @property
     def ids(self) -> list[int]:
@@ -162,11 +167,16 @@ class CompoundTable:
     def elabs(self) -> "CompoundSet":
         """Returns a :class:`.CompoundSet` of all compounds that are a an elaboration of an existing base"""
         ids = self.db.select_where(
-            query="compound_id",
-            table="compound",
-            key="compound_base IS NOT NULL",
+            query="scaffold_superstructure",
+            table="scaffold",
+            key="scaffold_superstructure IS NOT NULL",
             multiple=True,
+            none="quiet",
         )
+
+        if not ids:
+            return None
+
         ids = [q for q, in ids]
         from .cset import CompoundSet
 
@@ -176,9 +186,9 @@ class CompoundTable:
     def bases(self) -> "CompoundSet":
         """Returns a :class:`.CompoundSet` of all compounds that are the basis for a set of elaborations"""
         ids = self.db.select_where(
-            query="DISTINCT compound_base",
-            table="compound",
-            key="compound_base IS NOT NULL",
+            query="DISTINCT scaffold_base",
+            table="scaffold",
+            key="scaffold_base IS NOT NULL",
             multiple=True,
             none="quiet",
         )
@@ -255,7 +265,11 @@ class CompoundTable:
             base = base.id
 
         values = self.db.select_where(
-            query="compound_id", table="compound", key="base", value=base, multiple=True
+            query="scaffold_superstructure",
+            table="scaffold",
+            key="base",
+            value=base,
+            multiple=True,
         )
         ids = [v for v, in values if v]
         return self[ids]
@@ -373,13 +387,17 @@ class CompoundTable:
 
     def __repr__(self) -> str:
         """Formatted string representation"""
-        return (
-            f"{mcol.bold}{mcol.underline}"
-            "{"
-            f"C x {len(self)}"
-            "}"
-            f"{mcol.unbold}{mcol.ununderline}"
-        )
+
+        s = f"{mcol.bold}{mcol.underline}"
+
+        if self.name:
+            s += f"{self.name}: "
+
+        s += "{" f"C x {len(self)}" "}"
+
+        s += f"{mcol.unbold}{mcol.ununderline}"
+
+        return s
 
     def __len__(self) -> int:
         """Total number of compounds"""
@@ -451,6 +469,7 @@ class CompoundSet:
         db: Database,
         indices: list = None,
         sort: bool = True,
+        name: str | None = None,
     ):
 
         self._db = db
@@ -466,6 +485,8 @@ class CompoundSet:
             self._indices = sorted(list(set(indices)))
         else:
             self._indices = list(set(indices))
+
+        self._name = name
 
     ### PROPERTIES
 
@@ -488,6 +509,11 @@ class CompoundSet:
     def ids(self) -> list[int]:
         """Returns the ids of compounds in this set"""
         return self.indices
+
+    @property
+    def name(self) -> str | None:
+        """Returns the name of set"""
+        return self._name
 
     @property
     def names(self) -> list[str]:
@@ -664,6 +690,8 @@ class CompoundSet:
 
         """
 
+        raise NotImplementedError
+
         variances = self.db.execute(
             f"""
                 WITH nums AS (
@@ -702,6 +730,8 @@ class CompoundSet:
         GROUP BY compound_base
         """
 
+        raise NotImplementedError
+
         counts = self.db.execute(sql).fetchall()
 
         counts = [c for c, in counts]  # + [0 for _ in range(len(self)-len(counts))]
@@ -716,6 +746,8 @@ class CompoundSet:
 
         """
 
+        raise NotImplementedError
+
         (count,) = self.db.execute(
             f"""
                 SELECT COUNT(DISTINCT compound_base) FROM compound
@@ -724,6 +756,26 @@ class CompoundSet:
         ).fetchone()
 
         return count
+
+    @property
+    def elabs(self) -> "CompoundSet":
+        """Returns a :class:`.CompoundSet` of all compounds that are a an elaboration of an existing base"""
+
+        ids = self.db.select_where(
+            query="scaffold_superstructure",
+            table="scaffold",
+            key=f"scaffold_superstructure IS NOT NULL and scaffold_base IN {self.str_ids}",
+            multiple=True,
+            none="quiet",
+        )
+
+        if not ids:
+            return None
+
+        ids = [q for q, in ids]
+        from .cset import CompoundSet
+
+        return CompoundSet(self.db, ids)
 
     ### FILTERING
 
@@ -776,9 +828,9 @@ class CompoundSet:
             base = base.id
 
         values = self.db.select_where(
-            query="compound_id",
-            table="compound",
-            key=f"compound_base = {base} AND compound_id IN {self.str_ids}",
+            query="scaffold_superstructure",
+            table="scaffold",
+            key=f"scaffold_base = {base} AND scaffold_superstructure IN {self.str_ids}",
             multiple=True,
         )
         ids = [v for v, in values if v]
@@ -1329,13 +1381,18 @@ class CompoundSet:
                 raise NotImplementedError
 
     def __repr__(self) -> str:
-        return (
-            f"{mcol.bold}{mcol.underline}"
-            "{"
-            f"C x {len(self)}"
-            "}"
-            f"{mcol.unbold}{mcol.ununderline}"
-        )
+        """Formatted string representation"""
+
+        s = f"{mcol.bold}{mcol.underline}"
+
+        if self.name:
+            s += f"{self.name}: "
+
+        s += "{" f"C x {len(self)}" "}"
+
+        s += f"{mcol.unbold}{mcol.ununderline}"
+
+        return s
 
     def __contains__(self, other: Compound | Ingredient | int):
         """Check if compound or ingredient is a member of this set"""

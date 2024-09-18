@@ -47,6 +47,7 @@ class HIPPO:
         self,
         name: str,
         db_path: str | Path,
+        update_legacy: bool = False,
     ):
 
         logger.header("Creating HIPPO animal")
@@ -63,7 +64,7 @@ class HIPPO:
         logger.var("db_path", db_path, dict(color="file"))
 
         self._db_path = db_path
-        self._db = Database(self.db_path, animal=self)
+        self._db = Database(self.db_path, animal=self, update_legacy=update_legacy)
 
         self._compounds = CompoundTable(self.db)
         self._poses = PoseTable(self.db)
@@ -651,6 +652,8 @@ class HIPPO:
         :returns: :class:`.CompoundSet` of compounds if ``return_reactions = False``, else returns a tuple: ``(compounds, reactions)``
         """
 
+        raise NotImplementedError
+
         from .chem import check_reaction_types, InvalidChemistryError
 
         tags = tags or []
@@ -827,6 +830,7 @@ class HIPPO:
         check_chemistry: bool = True,
         base_designator: str = "scaffold",
         target: int | str = 1,
+        allow_missing_inspirations: bool = False,
     ) -> None:
         """
         Load Syndirella elaboration compounds and poses from a pickled DataFrame
@@ -845,8 +849,12 @@ class HIPPO:
 
         from .chem import check_reaction_types, InvalidChemistryError
 
+        if inspiration_map is None:
+            inspiration_map = self.db.create_metadata_id_map(
+                table="pose", key="observation_longname"
+            )
+
         tags = tags or []
-        # require_truthy_bases = require_truthy_bases or []
         require_truthy_bases = require_truthy_bases or [
             "path_to_mol",
             "intra_geometry_pass",
@@ -873,8 +881,6 @@ class HIPPO:
         n_steps = max(
             [int(s.split("_")[0]) for s in df.columns if "_product_smiles" in s]
         )
-
-        # logger.var('#steps',n_steps)
 
         # check chemistries
         if check_chemistry:
@@ -927,8 +933,6 @@ class HIPPO:
 
             for i, row in generator:
 
-                # print(f'{i=}', row[f"{n_steps}_num_atom_diff"])
-
                 path_to_mol = row.path_to_mol
 
                 product_name = row[f"{n_steps}_product_name"]
@@ -944,26 +948,20 @@ class HIPPO:
                         )
                         continue
 
-                    # for key in warn_nontruthy_bases:
-                    #     if not row[key]:
-                    #         logger.warning(f'Base (row {i=}) has {key}={row[key]}')
-
                 elif any(not row[key] for key in require_truthy_elabs):
-                    # logger.debug(f'row{i=} has at least one non-truthy {require_truthy_elabs}')
                     continue
 
                 if row[f"{n_steps}_num_atom_diff"] <= 0 and not this_row_is_a_base:
                     skipped_smaller += 1
                     continue
 
-                # elif row[f"{n_steps}_num_atom_diff"] == 0:
-                #     logger.debug(f'{i=}, {product_name}')
-
                 if base_only and not this_row_is_a_base:
                     continue
 
                 if base_only and base_id and not this_row_is_a_base:
                     break
+
+                # logger.debug(f'{i=} {this_row_is_a_base=}')
 
                 if this_row_is_a_base and skipped_smaller and not base_id:
                     logger.warning(
@@ -1010,21 +1008,10 @@ class HIPPO:
                                 commit=False,
                                 return_compound=False,
                                 tags=tags,
-                                base=base,
-                                register_base_if_duplicate=False,
+                                bases=[base],
+                                register_base_if_duplicate=True,
                                 return_duplicate=True,
                             )
-
-                            if duplicate and reactant1_id not in elabs_registered:
-                                if base:
-                                    self.db.update(
-                                        table="compound",
-                                        id=reactant1_id,
-                                        key="compound_base",
-                                        value=base,
-                                        commit=False,
-                                    )
-                                elabs_registered.add(reactant1_id)
 
                             reactants.append(reactant1_id)
 
@@ -1049,21 +1036,10 @@ class HIPPO:
                                 commit=False,
                                 return_compound=False,
                                 tags=tags,
-                                base=base,
-                                register_base_if_duplicate=False,
+                                bases=[base],
+                                register_base_if_duplicate=True,
                                 return_duplicate=True,
                             )
-
-                            if duplicate and reactant2_id not in elabs_registered:
-                                if base:
-                                    self.db.update(
-                                        table="compound",
-                                        id=reactant2_id,
-                                        key="compound_base",
-                                        value=base,
-                                        commit=False,
-                                    )
-                                elabs_registered.add(reactant2_id)
 
                             reactants.append(reactant2_id)
 
@@ -1076,8 +1052,7 @@ class HIPPO:
                                 raise InvalidRowError(f"non-string {j}_product_smiles")
 
                             if j != n_steps:
-                                this_tags = tags  # + ['intermediate']
-                                # base = base_reactants[j]['product'] if not this_row_is_a_base else None
+                                this_tags = tags
                                 base = None
 
                             elif this_row_is_a_base:
@@ -1085,38 +1060,18 @@ class HIPPO:
                                 base = None
 
                             else:
-                                this_tags = tags  # + ['Syndirella elaboration']
+                                this_tags = tags
                                 base = base_id
 
-                            # print(f'''register_compound{dict(
-                            #     smiles=smiles,
-                            #     tags=this_tags,
-                            #     commit=False,
-                            #     return_compound=False,
-                            #     base=base,
-                            #     register_base_if_duplicate=False,
-                            #     return_duplicate=True)}
-                            # )''')
                             product_id, duplicate = self.register_compound(
                                 smiles=smiles,
                                 tags=this_tags,
                                 commit=False,
                                 return_compound=False,
-                                base=base,
-                                register_base_if_duplicate=False,
+                                bases=[base],
+                                register_base_if_duplicate=True,
                                 return_duplicate=True,
                             )
-
-                            if duplicate and product_id not in elabs_registered:
-                                if base:
-                                    self.db.update(
-                                        table="compound",
-                                        id=product_id,
-                                        key="compound_base",
-                                        value=base,
-                                        commit=False,
-                                    )
-                                elabs_registered.add(product_id)
 
                             if not base_id:
                                 base_reactants[j] = {
@@ -1161,7 +1116,18 @@ class HIPPO:
                     if inspiration_map:
                         match inspiration_map:
                             case dict():
-                                inspiration = inspiration_map[inspiration]
+                                try:
+                                    inspiration = inspiration_map[inspiration]
+                                except KeyError:
+                                    logger.error(
+                                        f"{inspiration=} not found in inspiration_map"
+                                    )
+                                    inspiration = None
+                                    if not allow_missing_inspirations:
+                                        from json import dumps
+
+                                        print(dumps(inspiration_map, indent=2))
+                                        raise
                             case _:
                                 inspiration = inspiration_map(inspiration)
 
@@ -1459,7 +1425,7 @@ class HIPPO:
         self,
         *,
         smiles: str,
-        base: Compound | int | None = None,
+        bases: list[Compound] | list[int] | None = None,
         tags: None | list = None,
         metadata: None | dict = None,
         return_compound: bool = True,
@@ -1473,7 +1439,7 @@ class HIPPO:
         """Use a smiles string to add a compound to the database. If it already exists return the compound
 
         :param smiles: The SMILES string of the compound
-        :param base: The :class:`.Compound` object or ID that this compound is based on, defaults to ``None``
+        :param bases: A list of :class:`.Compound` objects or IDs that this compound is based on, defaults to ``None``
         :param tags: A list of tags to assign to this compound, defaults to ``None``
         :param metadata: A dictionary of metadata to assign to this compound, defaults to ``None``
         :param return_compound: return the :class:`.Compound` object instead of the integer ID, defaults to ``True``
@@ -1501,8 +1467,8 @@ class HIPPO:
             logger.error(f"Could not sanitise {smiles=}")
             return None
 
-        if base and isinstance(base, Compound):
-            base = base.id
+        if bases:
+            bases = [b.id if isinstance(b, Compound) else b for b in bases]
 
         inchikey = inchikey_from_smiles(smiles)
 
@@ -1511,7 +1477,6 @@ class HIPPO:
 
         compound_id = self.db.insert_compound(
             smiles=smiles,
-            base=base,
             inchikey=inchikey,
             tags=tags,
             metadata=metadata,
@@ -1543,6 +1508,16 @@ class HIPPO:
                     f"SMILES changed during compound registration: {smiles} --> {db_smiles}"
                 )
 
+        def insert_bases(bases, compound_id):
+            bases = [b for b in bases if b is not None] or []
+            for base in bases:
+                self.db.insert_scaffold(
+                    base=base,
+                    superstructure=compound_id,
+                    warn_duplicate=False,
+                    commit=False,
+                )
+
         if return_compound or metadata or alias or tags:
             if not compound_id:
                 compound = self.compounds[inchikey]
@@ -1558,12 +1533,12 @@ class HIPPO:
             if alias:
                 compound.alias = alias
 
-            if base and not (register_base_if_duplicate and duplicate):
-                compound.base = base
-
             if tags:
                 for tag in tags:
                     compound.tags.add(tag, commit=False)
+
+            if bases and not (not register_base_if_duplicate and duplicate):
+                insert_bases(bases, compound.id)
 
             return _return(compound, duplicate, return_compound, return_duplicate)
 
@@ -1573,14 +1548,8 @@ class HIPPO:
 
                 check_smiles(compound_id, smiles)
 
-                if base and not (register_base_if_duplicate and duplicate):
-                    self.db.update(
-                        table="compound",
-                        id=compound_id,
-                        key="compound_base",
-                        value=base,
-                        commit=False,
-                    )
+            if bases and not (not register_base_if_duplicate and duplicate):
+                insert_bases(bases, compound_id)
 
             return _return(compound_id, duplicate, return_compound, return_duplicate)
 
@@ -1701,6 +1670,7 @@ class HIPPO:
         RMSD_tolerance: float = 1.0,
         split_PDB: bool = False,
         duplicate_alias: str = "modify",
+        resolve_path: bool = True,
     ) -> Pose:
         """Add a :class:`.Pose` to the :class:`.Database`. If it already exists return the pose
 
@@ -1721,6 +1691,7 @@ class HIPPO:
         :param RMSD_tolerance: Tolerance for ``check_RMSD`` in Angstrom, defaults to ``1.0``
         :param split_PDB: Register a :class:`.Pose` for every ligand residue in the PDB, defaults to ``False``
         :param duplicate_alias: In the case of a duplicate, define the behaviour for the ``alias`` property, defaults to ``'modify'`` which appends ``_copy`` to the alias. Set to ``error`` to raise an Exception.
+        :param resolve_path: Resolve to an absoltue path, default = True.
         :returns: The registered/existing :class:`.Pose` object or its ID (depending on ``return_compound``)
         """
 
@@ -1849,7 +1820,7 @@ class HIPPO:
             distance_score=distance_score,
         )
 
-        pose_id = self.db.insert_pose(**pose_data)
+        pose_id = self.db.insert_pose(**pose_data, resolve_path=resolve_path)
 
         # if no pose_id then there must be a duplicate
         if not pose_id:

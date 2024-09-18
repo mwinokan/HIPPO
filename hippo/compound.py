@@ -35,7 +35,6 @@ class Compound:
         inchikey: str,
         alias: str,
         smiles: str,
-        base: int,
         mol: Chem.Mol | bytes | None = None,
         metadata: dict | None = None,
     ):
@@ -46,8 +45,8 @@ class Compound:
         self._alias = alias
         self._smiles = smiles
         self._animal = animal
-        self._base_id = base
-        self._base = None
+        self._bases = None
+        self._elabs = None
         self._alias = alias
         self._tags = None
         self._metadata = metadata
@@ -57,6 +56,7 @@ class Compound:
         self._num_rings = None
         self._formula = None
         self._molecular_weight = None
+        self._total_changes = db.total_changes
 
         if isinstance(mol, bytes):
             mol = Chem.Mol(mol)
@@ -207,16 +207,34 @@ class Compound:
         return self.db.count_where(table="reactant", key="compound", value=self.id)
 
     @property
-    def base(self):
+    def bases(self):
         """Returns the base compound for this elaboration"""
-        if self._base_id and self._base is None:
-            self._base = self.db.get_compound(id=self._base_id)
-        return self._base
+        if self._bases is None or self._db_changed:
+            ids = self.get_base_ids()
+            if not ids:
+                self._bases = None
+            else:
+                from .cset import CompoundSet
 
-    @base.setter
-    def base(self, b):
-        """Set the base compound for this elaboration"""
-        self.set_base(b)
+                self._bases = CompoundSet(
+                    self.db, ids, name=f"base scaffolds of {self}"
+                )
+                self._total_changes = self.db.total_changes
+        return self._bases
+
+    @property
+    def elabs(self):
+        """Returns the base compound for this elaboration"""
+        if self._elabs is None or self._db_changed:
+            ids = self.get_superstructure_ids()
+            if not ids:
+                self._elabs = None
+            else:
+                from .cset import CompoundSet
+
+                self._elabs = CompoundSet(self.db, ids, name=f"elaborations of {self}")
+                self._total_changes = self.db.total_changes
+        return self._elabs
 
     @property
     def reactions(self) -> "ReactionSet":
@@ -244,27 +262,12 @@ class Compound:
         return self.get_dict()
 
     @property
-    def elabs(self) -> "CompoundSet":
-        """Return the set of elaborations based on this compound"""
-        ids = self.db.select_where(
-            query="compound_id",
-            table="compound",
-            key="base",
-            value=self.id,
-            multiple=True,
-        )
-        ids = [q for q, in ids]
-        from .cset import CompoundSet
-
-        return CompoundSet(self.db, ids)
-
-    @property
     def is_base(self) -> bool:
         """Is this Compound the basis for any elaborations?"""
         return bool(
             self.db.select_where(
-                query="compound_id",
-                table="compound",
+                query="1",
+                table="scaffold",
                 key="base",
                 value=self.id,
                 multiple=False,
@@ -275,7 +278,16 @@ class Compound:
     @property
     def is_elab(self) -> bool:
         """Is this Compound the based on any other compound?"""
-        return bool(self.base)
+        return bool(
+            self.db.select_where(
+                query="1",
+                table="scaffold",
+                key="superstructure",
+                value=self.id,
+                multiple=False,
+                none="quiet",
+            )
+        )
 
     @property
     def is_product(self) -> bool:
@@ -286,6 +298,11 @@ class Compound:
     def table(self):
         """Returns the name of the :class:`.Database` table"""
         return self._table
+
+    @property
+    def _db_changed(self) -> bool:
+        """Has the database changed?"""
+        return self._total_changes != self.db.total_changes
 
     ### METHODS
 
@@ -569,9 +586,37 @@ class Compound:
 
         return data
 
-    def set_base(self, base: "Compound | int", commit: bool = True) -> None:
+    def get_base_ids(self) -> list[int]:
+        """Get a list of :class:`.Compound` ID's that this object is a superstructure of"""
+        ids = self.db.select_where(
+            table="scaffold",
+            query="scaffold_base",
+            key="superstructure",
+            value=self.id,
+            none="quiet",
+            multiple=True,
+        )
+        if not ids:
+            return None
+        return [i for i, in ids]
+
+    def get_superstructure_ids(self) -> list[int]:
+        """Get a list of :class:`.Compound` ID's that this object is a substructure of"""
+        ids = self.db.select_where(
+            table="scaffold",
+            query="scaffold_superstructure",
+            key="base",
+            value=self.id,
+            none="quiet",
+            multiple=True,
+        )
+        if not ids:
+            return None
+        return [i for i, in ids]
+
+    def add_base(self, base: "Compound | int", commit: bool = True) -> None:
         """
-        Set the single base :class:`.Compound` this molecule is derived from.
+        Add a base :class:`.Compound` this molecule is derived from.
 
         :param base: The base :class:`.Compound` or its ID.
         :param commit: Commit the changes to the :class:`.Database`, defaults to ``True``
@@ -580,10 +625,7 @@ class Compound:
         if not isinstance(base, int):
             assert base._table == "compound"
             base = base.id
-        self._base_id = base
-        self.db.update(
-            table="compound", id=self.id, key="compound_base", value=base, commit=commit
-        )
+        self.db.insert_scaffold(base=base, superstructure=self.id)
 
     def set_alias(self, alias: str, commit=True) -> None:
         """

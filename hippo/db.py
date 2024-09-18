@@ -21,6 +21,12 @@ import logging
 
 logger = logging.getLogger("HIPPO")
 
+CHEMICALITE_COMPOUND_PROPERTY_MAP = {
+    "num_heavy_atoms": "mol_num_hvyatms",
+    "formula": "mol_formula",
+    "num_rings": "mol_num_rings",
+}
+
 
 class Database:
     """Wrapper to connect to the HIPPO sqlite database.
@@ -31,7 +37,7 @@ class Database:
 
     """
 
-    def __init__(self, path: Path, animal) -> None:
+    def __init__(self, path: Path, animal, update_legacy: bool = False) -> None:
 
         assert isinstance(path, Path)
 
@@ -57,15 +63,36 @@ class Database:
             self.connect()
 
         if "interaction" not in self.table_names:
-            logger.warning("This is a legacy format database (hippo-db < 0.3.23)")
-            logger.warning("Existing fingerprints will not be compatible.")
-            logger.warning("Clear them with: animal.db.delete_interactions()")
-            self.create_table_interaction()
+            if not update_legacy:
+                logger.error("This is a legacy format database (hippo-db < 0.3.23)")
+                logger.error("Existing fingerprints will not be compatible")
+                logger.error(
+                    "Re-initialise HIPPO object with update_legacy=True to fix"
+                )
+                raise LegacyDatabaseError("hippo-db < 0.3.23")
+            else:
+                logger.warning("This is a legacy format database (hippo-db < 0.3.23)")
+                logger.warning("Clearing legacy fingerprints...")
+                self.create_table_interaction()
+                self.delete_interactions()
 
         if "subsite" not in self.table_names or "subsite_tag" not in self.table_names:
             logger.warning("This is a legacy format database (hippo-db < 0.3.24)")
             self.create_table_subsite()
             self.create_table_subsite_tag()
+
+        if "scaffold" not in self.table_names:
+            if not update_legacy:
+                logger.error("This is a legacy format database (hippo-db < 0.3.25)")
+                logger.error("Existing base-elab relationships will not be compatible")
+                logger.error(
+                    "Re-initialise HIPPO object with update_legacy=True to fix"
+                )
+            else:
+                logger.warning("This is a legacy format database (hippo-db < 0.3.25)")
+                logger.warning("Migrating compound_base values to scaffold table...")
+                self.create_table_scaffold()
+                self.migrate_legacy_bases()
 
     ### PROPERTIES
 
@@ -218,6 +245,21 @@ class Database:
 			CONSTRAINT UC_inspiration UNIQUE (inspiration_original, inspiration_derivative)
 		);
 		"""
+
+        self.execute(sql)
+
+    def create_table_scaffold(self) -> None:
+        """Create the scaffold table"""
+        logger.debug("HIPPO.Database.create_table_scaffold()")
+
+        sql = """CREATE TABLE scaffold(
+            scaffold_base INTEGER,
+            scaffold_superstructure INTEGER,
+            FOREIGN KEY (scaffold_base) REFERENCES pose(pose_id),
+            FOREIGN KEY (scaffold_superstructure) REFERENCES pose(pose_id),
+            CONSTRAINT UC_scaffold UNIQUE (scaffold_base, scaffold_superstructure)
+        );
+        """
 
         self.execute(sql)
 
@@ -447,7 +489,6 @@ class Database:
         self,
         *,
         smiles: str,
-        base: Compound | int | None = None,
         alias: str | None = None,
         tags: None | list[str] = None,
         warn_duplicate: bool = True,
@@ -458,7 +499,6 @@ class Database:
         """Insert an entry into the compound table
 
         :param smiles: SMILES string
-        :param base: base :class:`.Compound` object or ID, (Default value = None)
         :param alias: optional alias for the compound (Default value = None)
         :param tags: list of string tags, (Default value = None)
         :param warn_duplicate: print a warning if the compound already exists (Default value = True)
@@ -469,24 +509,16 @@ class Database:
 
         """
 
-        # process the base
-        assert (
-            isinstance(base, int) or isinstance(base, Compound) or base is None
-        ), f"incompatible base={base}"
-
-        if base and not isinstance(base, int):
-            base = base.id
-
         # generate the inchikey name
         inchikey = inchikey or inchikey_from_smiles(smiles)
 
         sql = """
-		INSERT INTO compound(compound_inchikey, compound_smiles, compound_base, compound_mol, compound_pattern_bfp, compound_morgan_bfp, compound_alias)
-		VALUES(?1, ?2, ?3, mol_from_smiles(?2), mol_pattern_bfp(mol_from_smiles(?2), 2048), mol_morgan_bfp(mol_from_smiles(?2), 2, 2048), ?4)
+		INSERT INTO compound(compound_inchikey, compound_smiles, compound_mol, compound_pattern_bfp, compound_morgan_bfp, compound_alias)
+		VALUES(?1, ?2, mol_from_smiles(?2), mol_pattern_bfp(mol_from_smiles(?2), 2048), mol_morgan_bfp(mol_from_smiles(?2), 2, 2048), ?3)
 		"""
 
         try:
-            self.execute(sql, (inchikey, smiles, base, alias))
+            self.execute(sql, (inchikey, smiles, alias))
 
         except sqlite3.IntegrityError as e:
             if "UNIQUE constraint failed: compound.compound_inchikey" in str(e):
@@ -767,7 +799,7 @@ class Database:
         except sqlite3.IntegrityError as e:
             if warn_duplicate:
                 logger.warning(
-                    f"Skipping existing inspiration: {original} {derivative}"
+                    f"Skipping existing inspiration: {original=} {derivative=}"
                 )
             return None
 
@@ -779,6 +811,58 @@ class Database:
         if commit:
             self.commit()
         return inspiration_id
+
+    def insert_scaffold(
+        self,
+        *,
+        base: Compound | int,
+        superstructure: Compound | int,
+        warn_duplicate: bool = True,
+        commit: bool = True,
+    ) -> int:
+        """Insert an entry into the scaffold table
+
+        :param base: :class:`.Compound` object or ID of the base hit
+        :param superstructure: :class:`.Compound` object or ID of the superstructure hit
+        :param warn_duplicate: print a warning if the pose already exists (Default value = True)
+        :param commit: commit the changes to the database (Default value = True)
+        :returns: the scaffold row ID
+
+        """
+
+        if isinstance(base, Compound):
+            base = base.id
+        if isinstance(superstructure, Compound):
+            superstructure = superstructure.id
+
+        assert isinstance(
+            base, int
+        ), f"Must pass an integer ID or Compound object (base) {base=} {type(base)}"
+        assert isinstance(
+            superstructure, int
+        ), f"Must pass an integer ID or Compound object (superstructure) {superstructure=} {type(superstructure)}"
+
+        sql = """
+        INSERT INTO scaffold(scaffold_base, scaffold_superstructure)
+        VALUES(?1, ?2)
+        """
+
+        try:
+            self.execute(sql, (base, superstructure))
+
+        except sqlite3.IntegrityError as e:
+            if warn_duplicate:
+                logger.warning(f"Skipping existing scaffold: {base=} {superstructure=}")
+            return None
+
+        except Exception as e:
+            logger.exception(e)
+
+        scaffold_id = self.cursor.lastrowid
+
+        if commit:
+            self.commit()
+        return scaffold_id
 
     def insert_reaction(
         self,
@@ -1709,6 +1793,8 @@ class Database:
         if commit:
             self.commit()
 
+    ### COPYING / MIGRATION
+
     def copy_temp_interactions(self) -> int:
         """Copy the records from the 'temp_interaction' table to the 'interaction' table
 
@@ -1745,6 +1831,26 @@ class Database:
 
         return cursor.lastrowid
 
+    def migrate_legacy_bases(self) -> int:
+        """Migrate legacy compound_base records from the 'compound' table to the 'scaffold' table
+
+        :returns: ID of the last inserted scaffold record
+        """
+
+        logger.debug("HIPPO.Database.migrate_legacy_bases()")
+
+        cursor = self.execute(
+            """
+            INSERT INTO scaffold(scaffold_base, scaffold_superstructure)
+            SELECT compound_base, compound_id FROM compound
+            WHERE compound_base IS NOT NULL
+            """
+        )
+
+        self.commit()
+
+        return cursor.lastrowid
+
     ### GETTERS
 
     def get_compound(
@@ -1772,7 +1878,7 @@ class Database:
             logger.error(f"Invalid {id=}")
             return None
 
-        query = "compound_id, compound_inchikey, compound_alias, compound_smiles, compound_base"
+        query = "compound_id, compound_inchikey, compound_alias, compound_smiles"
         entry = self.select_where(query=query, table="compound", key="id", value=id)
         compound = Compound(self._animal, self, *entry, metadata=None, mol=None)
         return compound
@@ -2548,6 +2654,22 @@ class Database:
 
         return self.query_similarity(query, 0.989, return_similarity=False)
 
+    ### LOOKUPS / MAPPING
+
+    def create_metadata_id_map(self, *, table: str, key: str) -> dict[str, int]:
+        """Create a mapping between metadata[key] values to their respective parent record ID's
+
+        :returns: dictionary mapping metadata[key] values to integer ID's
+
+        """
+
+        pairs = self.execute(
+            f"""SELECT {table}_id, {table}_metadata FROM {table} WHERE {table}_metadata LIKE '%"{key}": "%'"""
+        ).fetchall()
+        from json import loads
+
+        return {loads(metadata)[key]: pose_id for pose_id, metadata in pairs}
+
     ### COUNTING
 
     def count(
@@ -2780,8 +2902,4 @@ class Database:
         return f"{mcol.bold}{mcol.underline}Database(path={self}){mcol.clear}"
 
 
-CHEMICALITE_COMPOUND_PROPERTY_MAP = {
-    "num_heavy_atoms": "mol_num_hvyatms",
-    "formula": "mol_formula",
-    "num_rings": "mol_num_rings",
-}
+class LegacyDatabaseError(Exception): ...
