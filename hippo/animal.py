@@ -831,6 +831,7 @@ class HIPPO:
         base_designator: str = "scaffold",
         target: int | str = 1,
         allow_missing_inspirations: bool = False,
+        reference: int | Pose | None = None,
     ) -> None:
         """
         Load Syndirella elaboration compounds and poses from a pickled DataFrame
@@ -845,6 +846,7 @@ class HIPPO:
         :param warn_nonzero_truthy_bases: List of columns that should have a truthy value for at least one of the base molecules, defaults to ``['path_to_mol', 'intra_geometry_pass']``
         :param stop_after: Stop after given number of rows, defaults to ``None``
         :param check_chemistry: check the reaction chemistry, defaults to ``True``
+        :param reference: reference :class:`.Pose` object or ID to assign to poses, defaults to ``None``
         """
 
         from .chem import check_reaction_types, InvalidChemistryError
@@ -1141,6 +1143,9 @@ class HIPPO:
 
                     path_to_mol = path_to_mol.replace("//", "/")
 
+                    # print(row)
+                    # raise NotImplementedError
+
                     # register the pose
                     self.register_pose(
                         compound=product_id,
@@ -1155,6 +1160,7 @@ class HIPPO:
                         warn_duplicate=False,
                         energy_score=row["∆∆G"],
                         distance_score=row["comRMSD"],
+                        reference=reference,
                     )
 
                 if stop_after and i > stop_after:
