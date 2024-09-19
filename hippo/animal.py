@@ -831,6 +831,7 @@ class HIPPO:
         base_designator: str = "scaffold",
         target: int | str = 1,
         allow_missing_inspirations: bool = False,
+        inspiration_close_match_cutoff: float = 0.96,
     ) -> None:
         """
         Load Syndirella elaboration compounds and poses from a pickled DataFrame
@@ -845,9 +846,11 @@ class HIPPO:
         :param warn_nonzero_truthy_bases: List of columns that should have a truthy value for at least one of the base molecules, defaults to ``['path_to_mol', 'intra_geometry_pass']``
         :param stop_after: Stop after given number of rows, defaults to ``None``
         :param check_chemistry: check the reaction chemistry, defaults to ``True``
+        :param inspiration_close_match_cutoff: cutoff for difflib get_close_matches() between inspiration longcodes
         """
 
         from .chem import check_reaction_types, InvalidChemistryError
+        import difflib
 
         if inspiration_map is None:
             inspiration_map = self.db.create_metadata_id_map(
@@ -1119,15 +1122,52 @@ class HIPPO:
                                 try:
                                     inspiration = inspiration_map[inspiration]
                                 except KeyError:
-                                    logger.error(
-                                        f"{inspiration=} not found in inspiration_map"
-                                    )
-                                    inspiration = None
-                                    if not allow_missing_inspirations:
-                                        from json import dumps
 
-                                        print(dumps(inspiration_map, indent=2))
-                                        raise
+                                    close_matches = difflib.get_close_matches(
+                                        inspiration,
+                                        inspiration_map.keys(),
+                                        n=5,
+                                        cutoff=inspiration_close_match_cutoff,
+                                    )
+
+                                    if len(close_matches) > 0:
+                                        if len(close_matches) > 1:
+                                            logger.warning(
+                                                f"Taking closest match: {inspiration=} --> {close_matches[0]}"
+                                            )
+                                        inspiration_map[inspiration] = inspiration_map[
+                                            close_matches[0]
+                                        ]
+                                        inspiration = inspiration_map[inspiration]
+
+                                    else:
+
+                                        if allow_missing_inspirations:
+                                            logger.warning(
+                                                f"{inspiration=} not found in inspiration_map"
+                                            )
+
+                                            inspiration = None
+
+                                        else:
+                                            logger.error(
+                                                f"{inspiration=} not found in inspiration_map, try a smaller inspiration_close_match_cutoff?"
+                                            )
+                                            from json import dumps
+
+                                            logger.var(
+                                                "inspiration_close_match_cutoff",
+                                                inspiration_close_match_cutoff,
+                                            )
+                                            logger.var(
+                                                "close_matches",
+                                                dumps(close_matches, indent=2),
+                                            )
+                                            logger.var(
+                                                "inspiration_map",
+                                                dumps(inspiration_map, indent=2),
+                                            )
+                                            raise
                             case _:
                                 inspiration = inspiration_map(inspiration)
 
