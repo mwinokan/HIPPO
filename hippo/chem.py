@@ -106,7 +106,7 @@ SUPPORTED_CHEMISTRY = {
         "heavy_atoms_diff": 1,
         "rings_diff": 0,
         "atomtype": {
-            "removed": {"O": 1, "H": 1},
+            "removed": {"O": 1, "H": ">=1"},
         },
     },
     "Steglich_esterification": {

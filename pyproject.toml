@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 [project]
 name = "hippo-db"
-version = "0.3.25"
+version = "0.3.28"
 authors = [
     { name = "Max Winokan", email = "max@winokan.com" },
 ]

@@ -15,7 +15,7 @@ Loading crystallographic hits from Fragalysis
 =============================================
 
 1. Go `Fragalysis
-<https://fragalysis.diamond.ac.uk>`_. and download a dataset 
+<https://fragalysis.diamond.ac.uk>`_ and download a dataset. For public datasets you can use :func:`.fragalysis.download_target`
 
 2. Load the crystallographic data
 

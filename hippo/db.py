@@ -209,6 +209,9 @@ class Database:
         self.create_table_route()
         self.create_table_component()
         self.create_table_interaction()
+        self.create_table_subsite()
+        self.create_table_subsite_tag()
+        self.create_table_scaffold()
         self.commit()
 
     def create_table_compound(self) -> None:
@@ -657,7 +660,7 @@ class Database:
 
             except FileNotFoundError as e:
                 logger.error(f"Path cannot be resolved: {mcol.file}{path}")
-                return None
+                raise
 
         sql = """
 		INSERT INTO pose(pose_inchikey, pose_alias, pose_smiles, pose_compound, pose_target, pose_path, pose_reference, pose_energy_score, pose_distance_score)

@@ -17,7 +17,7 @@ logger = logging.getLogger("HIPPO")
 
 
 class Compound:
-    """A :class:`.Compound` represents a ligand/small molecule with stereochemistry removed and no atomic coordinates. I.e. it represents the chemical structure. It's name is always an InChiKey. If a compound is an elaboration it can have a :meth:`.Compound.base` property which is another :class:`.Compound`. :class:`.Compound` objects are target-agnostic and can be linked to any number of catalogue entries (:class:`.Quote`) or synthetic pathways (:class:`.Reaction`).
+    """A :class:`.Compound` represents a ligand/small molecule with stereochemistry removed and no atomic coordinates. I.e. it represents the chemical structure. It's name is always an InChiKey. If a compound is an elaboration it can have a :meth:`.Compound.bases` property which is another :class:`.Compound`. :class:`.Compound` objects are target-agnostic and can be linked to any number of catalogue entries (:class:`.Quote`) or synthetic pathways (:class:`.Reaction`).
 
     .. attention::
 
@@ -557,10 +557,15 @@ class Compound:
             except InvalidMolError:
                 data["mol"] = None
 
-        if self.base:
-            data["base"] = self.base.name
+        if self.bases:
+            data["bases"] = self.bases.ids
         else:
-            data["base"] = None
+            data["bases"] = None
+
+        if self.elabs:
+            data["elabs"] = self.elabs.ids
+        else:
+            data["elabs"] = None
 
         data["tags"] = self.tags
 
@@ -688,13 +693,16 @@ class Compound:
         :param align_substructure: Align the two drawing by their common substructure, defaults to ``False``
         """
 
-        if base := self.base:
+        if bases := self.bases:
 
             from molparse.rdkit import draw_mcs
 
-            data = {self.base.smiles: f"{base} (base)", self.smiles: str(self)}
+            data = {}
+            for base in bases:
+                data[base.smiles] = f"{base} (base)"
+            data[self.smiles] = str(self)
 
-            if len(data) == 2:
+            if len(data) > 1:
 
                 drawing = draw_mcs(
                     data,
@@ -756,9 +764,11 @@ class Compound:
         logger.var("inchikey", self.inchikey)
         logger.var("alias", self.alias)
         logger.var("smiles", self.smiles)
-        logger.var("base", self.base)
+        logger.var("bases", self.bases)
+        logger.var("elabs", self.elabs)
 
         logger.var("is_base", self.is_base)
+        logger.var("is_elab", self.is_elab)
         logger.var("num_heavy_atoms", self.num_heavy_atoms)
         logger.var("num_rings", self.num_rings)
         logger.var("formula", self.formula)
