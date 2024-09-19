@@ -1,4 +1,4 @@
-__version__ = "0.3.25"
+__version__ = "0.3.26"
 
 from .animal import HIPPO
 from .compound import Compound, Ingredient
