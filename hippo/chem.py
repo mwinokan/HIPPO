@@ -123,6 +123,14 @@ SUPPORTED_CHEMISTRY = {
             "removed": {"C": 7, "H": 6},
         },
     },
+    "N-Bn_deprotection": {
+        "heavy_atoms_diff": 7,
+        "rings_diff": 1,
+    },
+    "Formation_of_urea_from_two_amines": {
+        "heavy_atoms_diff": -2,
+        "rings_diff": 0,
+    },
     "Nucleophilic_substitution": {
         "heavy_atoms_diff": 1,
         "rings_diff": 0,
