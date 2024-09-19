@@ -16,6 +16,5 @@ API Reference
    recipes
    metadata
    plotting
+   fragalysis
    db
-   
-
