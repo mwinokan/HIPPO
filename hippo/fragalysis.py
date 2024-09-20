@@ -163,7 +163,138 @@ def download_target(
         return Path(zip_path)
 
 
+def parse_observation_longcode(longcode: str) -> dict[str]:
+    """Parse a Fragalysis longcode and try to extract the following information:
+
+    - Target name (target)
+    - Crystal/dataset code (crystal)
+    - Chain letter (chain)
+    - Residue number (residue_number)
+    - Version number (version)
+
+    :returns: dictionary of the above keys in parentheses
+    """
+
+    import re
+
+    dashx_split = longcode.split("-x")
+
+    match len(dashx_split):
+        case 3:
+
+            target = dashx_split[0]
+
+            data = dashx_split[1].removesuffix(target).split("_")
+
+            data = [d for d in data if d]
+
+        case 2:
+
+            if not re.match(r"[^_]*_[A-Z]_[0-9]{3,4}_[0-9]{1,2}_.*", dashx_split[0]):
+                if len(dashx_split[0]) > len(dashx_split[1]):
+                    raise UnsupportedFragalysisLongcodeError(dashx_split)
+
+                else:
+                    data = dashx_split[1].split("_")[:4]
+                    target = dashx_split[0]
+
+            else:
+                data = dashx_split[0].split("_")[:4]
+                target = None
+
+        case 1:
+
+            if not re.match(
+                r"[^_]*_[A-Z]_[0-9]{3,4}_[0-9]{1,2}_[^_+]*\+[A-Z]\+[0-9]{3,4}\+[0-9]{1,2}",
+                dashx_split[0],
+            ):
+                raise UnsupportedFragalysisLongcodeError(dashx_split)
+
+            data = dashx_split[0].split("_")[:4]
+            target = None
+
+        case _:
+            logger.var("dashx_split", dashx_split)
+            raise UnsupportedFragalysisLongcodeError(dashx_split)
+
+    match len(data):
+        case 4:
+            crystal, chain, residue_number, version = data
+        case 3:
+            crystal, chain, residue_number = data
+            version = None
+        case _:
+            raise UnsupportedFragalysisLongcodeError(data)
+
+    residue_number = int(residue_number)
+
+    if len(chain) != 1:
+        raise ValueError(f"{chain=}")
+
+    version = int(version) if version else None
+
+    return dict(
+        target=target,
+        crystal=crystal,
+        chain=chain,
+        residue_number=residue_number,
+        version=version,
+    )
+
+
+def find_observation_longcode_matches(
+    query: str, codes: list[str], debug: bool = False, allow_version_none: bool = False
+) -> list[str]:
+
+    dq = parse_observation_longcode(query)
+
+    keys = dq.keys()
+
+    if debug:
+        logger.var("allow_version_none", allow_version_none)
+        logger.var("dq", str(dq))
+
+    matches = []
+
+    for code in codes:
+
+        if code == query:
+            if debug:
+                logger.debug("exact match")
+            matches.append(code)
+            continue
+
+        dc = parse_observation_longcode(code)
+
+        for key in keys:
+
+            if (
+                allow_version_none
+                and key == "version"
+                and (dc[key] is None or dq[key] is None)
+            ):
+                continue
+
+            if dc[key] != dq[key]:
+                break
+        else:
+            if debug:
+                logger.debug(f"{query} matches {code}")
+            matches.append(code)
+
+    if debug:
+        logger.var("#matches", len(matches))
+
+    if len(matches) < 1 and not allow_version_none:
+        return find_observation_longcode_matches(query, codes, allow_version_none=True)
+
+    return matches
+
+
 STACK_URLS = {
     "production": "https://fragalysis.diamond.ac.uk",
     "staging": "https://fragalysis.xchem.diamond.ac.uk",
 }
+
+
+class UnsupportedFragalysisLongcodeError(NotImplementedError): ...

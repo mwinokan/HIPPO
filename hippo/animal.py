@@ -330,6 +330,10 @@ class HIPPO:
             observation_longname = df.ID[0]
             mol = df.ROMol[0]
 
+            from .fragalysis import parse_observation_longcode
+
+            obs_dict = parse_observation_longcode(observation_longname)
+
             # parse the PDB file
             sys = mp.parse(pdbs[0], verbosity=debug)
 
@@ -338,20 +342,12 @@ class HIPPO:
             if len(lig_residues) > 1 or any(
                 r.contains_alternative_sites for r in lig_residues
             ):
-                try:
-                    lig_res_number = int(
-                        observation_longname.split("-")[1].split("_")[2]
-                    )
-                    lig_chain = observation_longname.split("-")[1].split("_")[1]
-                    sys = remove_other_ligands(sys, lig_res_number, lig_chain)
-                    sys.prune_alternative_sites("A", verbosity=0)
-                    pose_path = str(pdbs[0].resolve()).replace(".pdb", "_hippo.pdb")
-                    mp.write(pose_path, sys, shift_name=True, verbosity=debug)
-                except IndexError:
-                    logger.warning(
-                        f"Non-XChem {observation_longname=} format, cannot split ligands"
-                    )
-                    pose_path = str(pdbs[0].resolve())
+                sys = remove_other_ligands(
+                    sys, obs_dict["residue_number"], obs_dict["chain"]
+                )
+                sys.prune_alternative_sites("A", verbosity=0)
+                pose_path = str(pdbs[0].resolve()).replace(".pdb", "_hippo.pdb")
+                mp.write(pose_path, sys, shift_name=True, verbosity=debug)
             else:
                 pose_path = str(pdbs[0].resolve())
 
