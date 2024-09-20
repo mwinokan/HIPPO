@@ -1,5 +1,6 @@
 import logging
 
+
 logger = logging.getLogger("HIPPO")
 
 
@@ -50,7 +51,7 @@ def download_target(
     *,
     destination: "str | Path" = ".",
     stack: str = "production",
-    unzip: bool = False,
+    unzip: bool = True,
     overwrite: bool = False,
 ) -> "Path":
     """Download a target from Fragalysis
