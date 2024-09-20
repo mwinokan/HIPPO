@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 
 tests/A71EV2A
+tests/targets
 
 # C extensions
 *.so
