@@ -131,6 +131,10 @@ SUPPORTED_CHEMISTRY = {
         "heavy_atoms_diff": -2,
         "rings_diff": 0,
     },
+    "Amide_Schotten-Baumann_with_amine": {
+        "heavy_atoms_diff": 1,
+        "rings_diff": 0,
+    },
     "Nucleophilic_substitution": {
         "heavy_atoms_diff": 1,
         "rings_diff": 0,
