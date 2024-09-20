@@ -1089,7 +1089,6 @@ class CompoundSet:
     def get_df(
         self,
         mol: bool = False,
-        reactions: bool = False,
         metadata: bool = False,
         poses: bool = False,
         count_by_target: bool = False,
@@ -1098,7 +1097,6 @@ class CompoundSet:
         """Get a DataFrame representation of this set
 
         :param mol: include ``rdkit.Chem.Mol`` in output (Default value = False)
-        :param reactions: include reactions in output (Default value = False)
         :param metadata: include metadata in output (Default value = False)
         :param poses: include poses in output (Default value = False)
         :param count_by_target: count poses by target (Default value = False)
@@ -1113,7 +1111,6 @@ class CompoundSet:
         for comp in tqdm(self):
             d = comp.get_dict(
                 mol=mol,
-                reactions=reactions,
                 metadata=metadata,
                 count_by_target=count_by_target,
                 poses=poses,
