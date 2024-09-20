@@ -1092,6 +1092,11 @@ class CompoundSet:
         metadata: bool = False,
         poses: bool = False,
         count_by_target: bool = False,
+        num_reactant: bool = False,
+        num_reactions: bool = False,
+        bases: bool = False,
+        elabs: bool = False,
+        tags: bool = False,
         **kwargs,
     ) -> "DataFrame":
         """Get a DataFrame representation of this set
@@ -1100,6 +1105,11 @@ class CompoundSet:
         :param metadata: include metadata in output (Default value = False)
         :param poses: include poses in output (Default value = False)
         :param count_by_target: count poses by target (Default value = False)
+        :param num_reactant: include num_reactant column
+        :param num_reactions: include num_reactions column
+        :param bases: include bases column
+        :param elabs: include elabs column
+        :param tags: include tags column
 
         """
 
@@ -1114,6 +1124,11 @@ class CompoundSet:
                 metadata=metadata,
                 count_by_target=count_by_target,
                 poses=poses,
+                num_reactant=num_reactant,
+                num_reactions=num_reactions,
+                bases=bases,
+                elabs=elabs,
+                tags=tags,
                 **kwargs,
             )
             data.append(d)

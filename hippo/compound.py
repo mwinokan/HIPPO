@@ -528,6 +528,11 @@ class Compound:
         metadata: bool = True,
         poses: bool = True,
         count_by_target: bool = False,
+        num_reactant: bool = True,
+        num_reactions: bool = True,
+        bases: bool = True,
+        elabs: bool = True,
+        tags: bool = True,
     ) -> "dict":
         """Returns a dictionary representing this :class:`.Compound`
 
@@ -535,6 +540,11 @@ class Compound:
         :param metadata: Include metadata, defaults to ``True``
         :param poses: Include dictionaries of associated :class:`.Pose` objects, defaults to ``True``
         :param count_by_target: Include counts by protein :class:`.Target`, defaults to ``False``. Only applicable when ``count_by_target = True``.
+        :param num_reactant: include num_reactant column
+        :param num_reactions: include num_reactions column
+        :param bases: include bases column
+        :param elabs: include elabs column
+        :param tags: include tags column
         :returns: A dictionary
         """
 
@@ -543,9 +553,12 @@ class Compound:
             "alias",
             "inchikey",
             "smiles",
-            "num_reactant",
-            "num_reactions",
         ]
+
+        if num_reactant:
+            serialisable_fields.append("num_reactant")
+        if num_reactions:
+            serialisable_fields.append("num_reactions")
 
         data = {}
         for key in serialisable_fields:
@@ -557,17 +570,20 @@ class Compound:
             except InvalidMolError:
                 data["mol"] = None
 
-        if self.bases:
-            data["bases"] = self.bases.ids
-        else:
-            data["bases"] = None
+        if bases:
+            if self.bases:
+                data["bases"] = self.bases.ids
+            else:
+                data["bases"] = None
 
-        if self.elabs:
-            data["elabs"] = self.elabs.ids
-        else:
-            data["elabs"] = None
+        if elabs:
+            if self.elabs:
+                data["elabs"] = self.elabs.ids
+            else:
+                data["elabs"] = None
 
-        data["tags"] = self.tags
+        if tags:
+            data["tags"] = self.tags
 
         if poses:
 
