@@ -406,10 +406,13 @@ class HIPPO:
                 path=pose_path,
                 tags=tags,
                 metadata=metadata,
+                commit=False,
             )
 
             if pose_id:
                 count_poses_registered += 1
+
+        self.db.commit()
 
         logger.var("#directories parsed", count_directories_tried)
         logger.var("#compounds registered", count_compound_registered)
@@ -854,11 +857,10 @@ class HIPPO:
         :param stop_after: Stop after given number of rows, defaults to ``None``
         :param check_chemistry: check the reaction chemistry, defaults to ``True``
         :param reference: reference :class:`.Pose` object or ID to assign to poses, defaults to ``None``
-        :param inspiration_close_match_cutoff: cutoff for difflib get_close_matches() between inspiration longcodes
         """
 
         from .chem import check_reaction_types, InvalidChemistryError
-        import difflib
+        from .fragalysis import find_observation_longcode_matches
 
         if inspiration_map is None:
             inspiration_map = self.db.create_metadata_id_map(
@@ -1131,22 +1133,22 @@ class HIPPO:
                                     inspiration = inspiration_map[inspiration]
                                 except KeyError:
 
-                                    close_matches = difflib.get_close_matches(
-                                        inspiration,
-                                        inspiration_map.keys(),
-                                        n=5,
-                                        cutoff=inspiration_close_match_cutoff,
+                                    matches = find_observation_longcode_matches(
+                                        inspiration, inspiration_map.keys()
                                     )
 
-                                    if len(close_matches) > 0:
-                                        if len(close_matches) > 1:
-                                            logger.warning(
-                                                f"Taking closest match: {inspiration=} --> {close_matches[0]}"
-                                            )
-                                        inspiration_map[inspiration] = inspiration_map[
-                                            close_matches[0]
-                                        ]
-                                        inspiration = inspiration_map[inspiration]
+                                    if len(matches) == 1:
+                                        pose_id = inspiration_map[matches[0]]
+                                        inspiration_map[inspiration] = pose_id
+                                        inspiration = pose_id
+
+                                    elif len(matches) > 1:
+                                        logger.error(
+                                            "Multiple matchs for {inspiration=}"
+                                        )
+                                        from json import dumps
+
+                                        dumps(close_matches, indent=2),
 
                                     else:
 
