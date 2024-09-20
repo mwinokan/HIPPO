@@ -525,6 +525,8 @@ class Compound:
         self,
         *,
         mol: bool = True,
+        alias: bool = True,
+        inchikey: bool = True,
         metadata: bool = True,
         poses: bool = True,
         count_by_target: bool = False,
@@ -550,11 +552,13 @@ class Compound:
 
         serialisable_fields = [
             "id",
-            "alias",
-            "inchikey",
             "smiles",
         ]
 
+        if alias:
+            serialisable_fields.append("alias")
+        if inchikey:
+            serialisable_fields.append("inchikey")
         if num_reactant:
             serialisable_fields.append("num_reactant")
         if num_reactions:
