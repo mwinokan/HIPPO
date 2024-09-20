@@ -23,6 +23,7 @@ codes = [
     "6vuq_A_500_1_CHIKV_MacB-x2352+C+401+1",
     "6w8q_A_201_1_6w8q+A+201+1",
     "CHIKV_MacB-x0270_A_304_1_CHIKV_MacB-x2352+C+401+1",
+    "CHIKV_MacB-x0406_A_401_CHIKV_MacB-x0300+A+401+1",
 ]
 
 
@@ -573,7 +574,6 @@ EXAMPLE_MAP = {
     "CHIKV_MacB-x2370_B_401_2_CHIKV_MacB-x2352+C+401+1": 6191,
     "CHIKV_MacB-x2431_B_308_2_CHIKV_MacB-x2352+C+401+1": 6192,
 }
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -1150,34 +1150,59 @@ class HIPPO:
 
                                         dumps(matches, indent=2),
 
-                                    else:
+                                    if len(matches) == 0:
 
-                                        if allow_missing_inspirations:
-                                            logger.warning(
-                                                f"{inspiration=} not found in inspiration_map"
-                                            )
+                                        import difflib
 
-                                            inspiration = None
+                                        inspiration_close_match_cutoff = 0.95
 
-                                        else:
-                                            logger.error(
-                                                f"{inspiration=} not found in inspiration_map, try a smaller inspiration_close_match_cutoff?"
-                                            )
-                                            from json import dumps
+                                        close_matches = difflib.get_close_matches(
+                                            inspiration,
+                                            inspiration_map.keys(),
+                                            n=5,
+                                            cutoff=inspiration_close_match_cutoff,
+                                        )
 
-                                            logger.var(
-                                                "inspiration_close_match_cutoff",
-                                                inspiration_close_match_cutoff,
+                                        if len(close_matches) > 0:
+                                            if len(close_matches) > 1:
+                                                logger.warning(
+                                                    f"Taking closest match: {inspiration=} --> {close_matches[0]}"
+                                                )
+
+                                            inspiration_map[inspiration] = (
+                                                inspiration_map[close_matches[0]]
                                             )
-                                            logger.var(
-                                                "matches",
-                                                dumps(matches, indent=2),
-                                            )
-                                            logger.var(
-                                                "inspiration_map",
-                                                dumps(inspiration_map, indent=2),
-                                            )
-                                            raise
+                                            inspiration = inspiration_map[inspiration]
+
+                                        if isinstance(inspiration, str):
+                                            if allow_missing_inspirations:
+                                                logger.warning(
+                                                    f"{inspiration=} not found in inspiration_map"
+                                                )
+
+                                                inspiration = None
+
+                                            else:
+                                                # logger.error(
+                                                # f"{inspiration=} not found in inspiration_map, try a smaller inspiration_close_match_cutoff?"
+                                                # )
+                                                from json import dumps
+
+                                                logger.var(
+                                                    "matches",
+                                                    dumps(matches, indent=2),
+                                                )
+
+                                                logger.var(
+                                                    "close_matches",
+                                                    dumps(matches, indent=2),
+                                                )
+
+                                                logger.var(
+                                                    "inspiration_map",
+                                                    dumps(inspiration_map, indent=2),
+                                                )
+                                                raise
                             case _:
                                 inspiration = inspiration_map(inspiration)
 
