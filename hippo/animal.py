@@ -305,6 +305,9 @@ class HIPPO:
 
             sdfs = list(path.glob("*[0-9][0-9][0-9][0-9][a-z].sdf"))
 
+            if not sdfs:
+                sdfs = list(path.glob("*.sdf"))
+
             assert len(sdfs) == 1, (path, sdfs)
 
             pdbs = [
@@ -315,7 +318,7 @@ class HIPPO:
                 and "_hippo" not in p.name
             ]
 
-            assert len(pdbs) == 1, (path, pdbs)
+            assert len(pdbs) == 1, (path, pdbs, list(path.glob("*.pdb")))
 
             # load the SDF
             df = PandasTools.LoadSDF(
@@ -326,26 +329,35 @@ class HIPPO:
             observation_shortname = path.name.replace(".sdf", "")
             observation_longname = df.ID[0]
             mol = df.ROMol[0]
-            lig_res_number = int(observation_longname.split("-")[1].split("_")[2])
-            lig_chain = observation_longname.split("-")[1].split("_")[1]
+
+            # parse the PDB file
+            sys = mp.parse(pdbs[0], verbosity=debug)
+
+            # create the single ligand bound pdb
+            lig_residues = sys.residues["LIG"]
+            if len(lig_residues) > 1 or any(
+                r.contains_alternative_sites for r in lig_residues
+            ):
+                try:
+                    lig_res_number = int(
+                        observation_longname.split("-")[1].split("_")[2]
+                    )
+                    lig_chain = observation_longname.split("-")[1].split("_")[1]
+                    sys = remove_other_ligands(sys, lig_res_number, lig_chain)
+                    sys.prune_alternative_sites("A", verbosity=0)
+                    pose_path = str(pdbs[0].resolve()).replace(".pdb", "_hippo.pdb")
+                    mp.write(pose_path, sys, shift_name=True, verbosity=debug)
+                except IndexError:
+                    logger.warning(
+                        f"Non-XChem {observation_longname=} format, cannot split ligands"
+                    )
+                    pose_path = str(pdbs[0].resolve())
+            else:
+                pose_path = str(pdbs[0].resolve())
 
             # smiles
             smiles = mp.rdkit.mol_to_smiles(mol)
             smiles = sanitise_smiles(smiles, verbosity=debug)
-
-            # parse PDB
-            sys = mp.parse(pdbs[0], verbosity=debug)
-
-            if len(sys.residues["LIG"]) > 1 or any(
-                r.contains_alternative_sites for r in sys.residues["LIG"]
-            ):
-                # create the single ligand bound pdb
-                sys = remove_other_ligands(sys, lig_res_number, lig_chain)
-                sys.prune_alternative_sites("A", verbosity=0)
-                pose_path = str(pdbs[0].resolve()).replace(".pdb", "_hippo.pdb")
-                mp.write(pose_path, sys, shift_name=True, verbosity=debug)
-            else:
-                pose_path = str(pdbs[0].resolve())
 
             # create the molecule / pose
             compound_id = self.db.insert_compound(

@@ -2671,7 +2671,11 @@ class Database:
         ).fetchall()
         from json import loads
 
-        return {loads(metadata)[key]: pose_id for pose_id, metadata in pairs}
+        return dict(
+            sorted(
+                {loads(metadata)[key]: pose_id for pose_id, metadata in pairs}.items()
+            )
+        )
 
     ### COUNTING
 
