@@ -1148,7 +1148,7 @@ class HIPPO:
                                         )
                                         from json import dumps
 
-                                        dumps(close_matches, indent=2),
+                                        dumps(matches, indent=2),
 
                                     else:
 
@@ -1170,8 +1170,8 @@ class HIPPO:
                                                 inspiration_close_match_cutoff,
                                             )
                                             logger.var(
-                                                "close_matches",
-                                                dumps(close_matches, indent=2),
+                                                "matches",
+                                                dumps(matches, indent=2),
                                             )
                                             logger.var(
                                                 "inspiration_map",
