@@ -3,38 +3,82 @@
 Loading Syndirella outputs
 ==========================
 
-Syndirella has been developed to produce a HIPPO-friendly pickled SDF output following the syntax:
+Syndirella has been developed to produce a machine/program friendly output:
+
+1. `final_output.csv` which summarises all the elaboration series per scaffold
+
+2. HIPPO-friendly pickled dataframes for each scaffold in the syntax:
 
 ::
 
-	{inchikey}_{reaction_uuid}_to_hippo.pkl.gz
+    {inchikey}_{reaction_uuid}_to_hippo.pkl.gz
 
-Loading base compounds/compound scaffolds
-=========================================
+Parsing the summary csv
+=======================
 
-If a single pickled DataFrame is available of all base compounds, then the method :meth:`.HIPPO.add_syndirella_bases` can be used. However, as this is not always the case this page documents using the :meth:`.HIPPO.add_syndirella_elabs` method with the ``base_only=True`` keyword argument:
-
-::
-
-	animal.add_syndirella_elabs(path, base_only=True)
-
-Using the inspiration_map argument
-----------------------------------
-
-Often the inspiration fragments are referenced using the observation long-code, in order to map to a :prop:`.Pose.id` in a performant manner an ``inspiration_map`` can be used. For example it could be a dictionary:
+To get the reference structures construct a mapping between the pickle paths and the shortcode:
 
 ::
 
-	inspiration_map = {
-		"CHIKV_MacB-x1203_A_501_CHIKV_MacB-x0300+A+401+1": 10,
-		...
-	}
+    import pandas as pd
+    import numpy as np
 
-If there is a reliable syntax, a function can be passed instead:
+    df = pd.read_csv("/path/to/final_output.csv")
+
+    ref_lookup = {}
+
+    for i, row in df.iterrows():
+        to_hippo, template = row["to_hippo"], row["template"]
+        if to_hippo is np.nan:
+            continue
+
+        # reconstruct the shortcode from the longcode
+        ref_lookup[to_hippo] = Path(template).name.split("_")[0].replace("x", "")
+
+Loading the base/scaffold compounds from each pickle
+====================================================
 
 ::
 
-	def inspiration_map(longcode):
-	    crystal_dataset = longcode.removeprefix('CHIKV_MacB-')[:5]
-	    return animal.poses[f'c{crystal_dataset}a'].id
+    for to_hippo, template in ref_lookup.items():
+        df = animal.add_syndirella_elabs(to_hippo, base_only=True, check_chemistry=True, reference=animal.poses[template])
 
+
+Loading all the elaboration series
+==================================
+
+Due to the large number of molecules this is best submitted as a batch job on a cluster. Example python script:
+
+::
+
+    import hippo
+    import pandas as pd
+    from pathlib import Path
+    import os
+    import numpy as np
+
+    from mlog import setup_logger
+    logger = setup_logger('CHIKV_prod2')
+
+    os.system("cp -v CHIKV_prod1.sqlite CHIKV_prod2.sqlite")
+
+    animal = hippo.HIPPO("CHIKV_prod2", "CHIKV_prod2.sqlite")
+
+    df = pd.read_csv(
+        "/opt/xchem-fragalysis-2/kfieseler/CHIKV-Mac-syndirella-run/sept9_syndirella_final_output.csv"
+    )
+
+    ref_lookup = {}
+
+    for i, row in df.iterrows():
+        to_hippo, template = row["to_hippo"], row["template"]
+        if to_hippo is np.nan:
+            continue
+        ref_lookup[to_hippo] = Path(template).name.split("_")[0].replace("x", "")
+
+    for i, (to_hippo, template) in enumerate(ref_lookup.items()):
+        logger.title(i)
+        logger.reading(to_hippo)
+        df = animal.add_syndirella_elabs(to_hippo, reference=animal.poses[template])
+
+    animal.db.close()
