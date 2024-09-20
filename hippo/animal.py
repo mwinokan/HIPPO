@@ -357,10 +357,10 @@ class HIPPO:
 
             # create the molecule / pose
             compound_id = self.db.insert_compound(
-                # name=crystal_name,
                 smiles=smiles,
                 tags=["hits"],
                 warn_duplicate=debug,
+                commit=False,
             )
 
             if not compound_id:
@@ -387,8 +387,6 @@ class HIPPO:
             if not len(meta_row):
                 assert observation_longname
                 meta_row = meta_df[meta_df["Long code"] == observation_longname]
-
-            # logger.var('observation_longname',observation_longname)
 
             assert len(meta_row)
 
