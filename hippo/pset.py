@@ -153,7 +153,7 @@ class PoseTable:
 
         """
 
-        if inverse:
+        if not inverse:
 
             values = self.db.select_where(
                 query="tag_pose", table="tag", key="name", value=tag, multiple=True
