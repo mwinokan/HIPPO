@@ -13,8 +13,43 @@ from .reaction import Reaction
 
 
 class ReactionTable:
-    """Object representing the 'reaction' table in the :class:`.Database`."""
+ 
+    """Class representing all :class:`.Reaction` objects in the 'reaction' table of the :class:`.Database`.
 
+    .. attention::
+
+            :class:`.ReactionTable` objects should not be created directly. Instead use the :meth:`.HIPPO.reactions` property. See :doc:`getting_started`.
+
+    Use as an iterable
+    ==================
+
+    Iterate through :class:`.Reaction` objects in the table:
+
+    ::
+
+            for reaction in animal.reactions:
+                ...
+
+
+    Selecting reactions in the table
+    ================================
+
+    The :class:`.ReactionTable` can be indexed with :class:`.Reaction` ID, or list/sets/tuples/slices thereof:
+
+    ::
+
+            rtable = animal.reactions
+
+            # indexing individual compounds
+            reaction = rtable[13]                            # using the ID
+
+            # getting a subset of compounds
+            rset = rtable[13,15,18]      # using IDs (tuple)
+            rset = rtable[[13,15,18]]    # using IDs (list)
+            rset = rtable[set(13,15,18)] # using IDs (set)
+            rset = rtable[13:18]         # using a slice
+
+    """
     _name = "all reactions"
 
     def __init__(
@@ -29,13 +64,13 @@ class ReactionTable:
     ### PROPERTIES
 
     @property
-    def db(self):
+    def db(self) -> "Database":
         """Returns the associated :class:`.Database`"""
         return self._db
 
     @property
-    def table(self):
-        """ """
+    def table(self) -> str:
+        """Returns the name of the :class:`.Database` table"""
         return self._table
 
     @property
@@ -44,29 +79,35 @@ class ReactionTable:
         return self._name
 
     @property
-    def types(self):
-        """ """
+    def types(self) -> list[str]:
+        """Returns a list of the unique reaction types present in the table"""
         result = self.db.select(
             table=self.table, query="DISTINCT reaction_type", multiple=True
         )
         return [q for q, in result]
 
     @property
-    def ids(self):
+    def ids(self) -> list[int]:
         """Returns the IDs of child reactions"""
         result = self.db.select(table=self.table, query="reaction_id", multiple=True)
         return [q for q, in result]
 
     ### METHODS
 
-    def interactive(self):
-        """ """
+    def interactive(self) -> None:
+        """Interactive widget to navigate reactions in the table
+
+        .. attention::
+
+                This method instantiates a :class:`.ReactionSet` containing all poses, it is recommended to instead select a subset for display. This method is only intended for use within a Jupyter Notebook.
+
+        """
         return self[self.ids].interactive()
 
-    def get_by_type(self, reaction_type: str):
-        """
+    def get_by_type(self, reaction_type: str) -> "ReactionSet":
+        """Get all child reactions of the given type
 
-        :param reaction_type: str:
+        :param reaction_type: reaction type to filter by
 
         """
         result = self.db.select_where(
@@ -76,13 +117,15 @@ class ReactionTable:
             value=reaction_type,
             multiple=True,
         )
-        return self[[q for q, in result]]
+        rset = self[[q for q, in result]]
+        rset._name = f"all {reaction_type} reactions"
+        return rset
 
-    def get_df(self, smiles=True, mols=True, **kwargs):
+    def get_df(self, *, smiles: bool = True, mols: bool = True) -> "pandas.DataFrame":
         """Construct a pandas.DataFrame of all reactions in the database
 
-        :param smiles:  (Default value = True)
-        :param mols:  (Default value = True)
+        :param smiles: Include smiles column (Default value = True)
+        :param mols: Include `rdkit.Chem.Mol` column (Default value = True)
 
         """
 
@@ -174,7 +217,12 @@ class ReactionTable:
 
     ### DUNDERS
 
-    def __getitem__(self, key) -> Reaction:
+    def __getitem__(self, key) -> "Reaction | ReactionSet | None":
+        """Get a member :class:`.Reaction` object or subset :class:`.ReactionSet` thereof.
+
+        :param key: Can be an integer ID, negative integer index, list/set/tuple of IDs, or slice of IDs
+
+        """
 
         match key:
 
@@ -223,15 +271,61 @@ class ReactionTable:
         return s
 
     def __len__(self) -> int:
+        """Number of reactions in this set"""
         return self.db.count(self.table)
 
     def __iter__(self):
+        """Iterate through poses in this set"""
         return iter(self[i + 1] for i in range(len(self)))
 
 
 class ReactionSet:
-    """Object representing a subset of the 'reaction' table in the :class:`.Database`."""
+    
+    """Object representing a subset of the 'reaction' table in the :class:`.Database`.
 
+    .. attention::
+
+            :class:`.ReactionSet` objects should not be created directly. Instead use the :meth:`.HIPPO.reactions` property. See :doc:`getting_started` and :doc:`insert_elaborations`.
+
+    Use as an iterable
+    ==================
+
+    Iterate through :class:`.Reaction` objects in the set:
+
+    ::
+
+            rset = animal.reactions[:100]
+
+            for reaction in rset:
+                    ...
+
+    Check membership
+    ================
+
+    To determine if a :class:`.Reaction` is present in the set:
+
+    ::
+
+            is_member = reaction in cset
+
+    Selecting compounds in the set
+    ==============================
+
+    The :class:`.ReactionSet` can be indexed like standard Python lists by their indices
+
+    ::
+
+            rset = animal.reactions[1:100]
+
+            # indexing individual compounds
+            reaction = rset[0]  # get the first reaction
+            reaction = rset[1]  # get the second reaction
+            reaction = rset[-1] # get the last reaction
+
+            # getting a subset of compounds using a slice
+            rset2 = rset[13:18] # using a slice
+
+    """
     _table = "reaction"
 
     def __init__(
@@ -241,7 +335,7 @@ class ReactionSet:
         *,
         sort: bool = True,
         name: str | None = None,
-    ):
+    ) -> None:
 
         self._db = db
         indices = indices or []
@@ -261,13 +355,13 @@ class ReactionSet:
     ### PROPERTIES
 
     @property
-    def db(self):
+    def db(self) -> Database:
         """Returns the associated :class:`.Database`"""
         return self._db
 
     @property
-    def table(self):
-        """ """
+    def table(self) -> str:
+        """Returns the name of the :class:`.Database` table"""
         return self._table
 
     @property
@@ -276,22 +370,22 @@ class ReactionSet:
         return self._name
 
     @property
-    def indices(self):
-        """ """
+    def indices(self) -> list[int]:
+        """Returns the ids of poses in this set"""
         return self._indices
 
     @property
-    def ids(self):
-        """ """
+    def ids(self) -> list[int]:
+        """Returns the ids of poses in this set"""
         return self._indices
 
     @property
-    def str_ids(self):
-        """ """
+    def str_ids(self) -> str:
+        """Return an SQL formatted tuple string of the :class:`.Compound` IDs"""
         return str(tuple(self.ids)).replace(",)", ")")
 
     @property
-    def products(self):
+    def products(self) -> "CompoundSet":
         """Get all product compounds that can be synthesised with these reactions (no intermediates)"""
         from .cset import CompoundSet
 
@@ -304,10 +398,13 @@ class ReactionSet:
             AND compound_id NOT IN {intermediates.str_ids}
         """
         ).fetchall()
-        return CompoundSet(self.db, [i for i, in product_ids])
+        cset = CompoundSet(self.db, [i for i, in product_ids])
+        if self.name:
+            cset._name = f"products of {self}"
+        return cset
 
     @property
-    def intermediates(self):
+    def intermediates(self) -> "CompoundSet":
         """Get all intermediate compounds that can be synthesised with these reactions"""
         from .cset import CompoundSet
 
@@ -319,17 +416,20 @@ class ReactionSet:
         """
         # print(sql)
         intermediate_ids = self.db.execute(sql).fetchall()
-        return CompoundSet(self.db, [i for i, in intermediate_ids])
+        cset = CompoundSet(self.db, [i for i, in intermediate_ids])
+        if self.name:
+            cset._name = f"products of {self}"
+        return cset
 
     ### METHODS
 
-    def add(self, r):
-        """
+    def add(self, r: Reaction) -> None:
+        """Add a :class:`.Reaction` to this set
 
-        :param r:
+        :param r: :class:`.Reaction` to be added
 
         """
-        assert r._table == "reaction"
+        assert isinstance(r, Reaction)
         if (id := r.id) not in self._indices:
             self._indices.append(id)
 
@@ -421,11 +521,12 @@ class ReactionSet:
 
         display(ui, out)
 
-    def get_df(self, smiles=True, mols=True, **kwargs):
+    def get_df(self, smiles=True, mols=True, **kwargs) -> "pandas.DataFrame":
         """Construct a pandas.DataFrame of this ReactionSet
 
-        :param smiles:  (Default value = True)
-        :param mols:  (Default value = True)
+        :param smiles: Include smiles column (Default value = True)
+        :param mols: Include `rdkit.Chem.Mol` column (Default value = True)
+        :param kwargs: keyword arguments are passed on to :meth:`.Reaction.get_dict:
 
         """
 
@@ -441,25 +542,25 @@ class ReactionSet:
 
         return DataFrame(data)
 
-    def copy(self):
-        """ """
-        return ReactionSet(self.db, self.ids, sort=False)
+    def copy(self) -> "ReactionSet":
+        """Return a copy of this set"""
+        return ReactionSet(self.db, self.ids, sort=False, name=self.name)
 
-    def get_recipes(self, amounts=1):
-        """
+    def get_recipes(self, amounts: float | list[float] = 1.0, **kwargs) -> "Recipe | list[Recipe]":
+        """Get the :class:`.Recipe` object(s) from this set of recipes
 
-        :param amounts:  (Default value = 1)
+        :param amounts: float or list/generator of product amounts in mg, (Default value = 1.0)
+        :param kwargs: keyword arguments are passed on to :meth:`.Recipe.from_reactions:
 
         """
         from .recipe import Recipe
+        return Recipe.from_reactions(db=self.db, reactions=self, amounts=1, **kwargs)
 
-        return Recipe.from_reactions(db=self.db, reactions=self, amounts=1)
-
-    def reverse(self):
-        """ """
+    def reverse(self) -> None:
+        """In-place reversal of indices"""
         self._indices = list(reversed(self._indices))
 
-    def get_dict(self):
+    def get_dict(self) -> dict[str]:
         """Serializable dictionary"""
         return dict(db=str(self.db), indices=self.indices)
 
@@ -493,7 +594,9 @@ class ReactionSet:
             raise
         return self.db.get_reaction(id=index)
 
-    def __add__(self, other):
-        for reaction in other:
-            self.add(reaction)
+    def __add__(self, other) -> "ReactionSet":
+        if other:
+            for reaction in other:
+                self.add(reaction)
+            self._name = None
         return self
