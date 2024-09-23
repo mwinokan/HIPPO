@@ -427,10 +427,10 @@ class Pose:
     @property
     def num_atoms_added(self) -> int:
         """Calculate the number of atoms added relative to the base or inspirations"""
-        if b_id := self.base_id:
-            return self.num_atoms_added_wrt_base
-        else:
-            return self.num_atoms_added_wrt_inspirations
+        # if b_id := self.base_id:
+            # return self.num_atoms_added_wrt_base
+        # else:
+        return self.num_atoms_added_wrt_inspirations
 
     # @property
     # def num_atoms_added_wrt_base(self) -> int | None:
