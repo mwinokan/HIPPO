@@ -124,7 +124,9 @@ class CompoundTable:
         ids = [q for q, in ids]
         from .cset import CompoundSet
 
-        return CompoundSet(self.db, ids)
+        cset = CompoundSet(self.db, ids)
+        cset._name = "all reactants"
+        return cset
 
     @property
     def products(self) -> "CompoundSet":
@@ -135,7 +137,9 @@ class CompoundTable:
         ids = [q for q, in ids]
         from .cset import CompoundSet
 
-        return CompoundSet(self.db, ids)
+        cset = CompoundSet(self.db, ids)
+        cset._name = "all products"
+        return cset
 
     @property
     def intermediates(self) -> "CompoundSet":
@@ -146,7 +150,9 @@ class CompoundTable:
         ids = [q for q, in ids]
         from .cset import CompoundSet
 
-        return CompoundSet(self.db, ids)
+        cset = CompoundSet(self.db, ids)
+        cset._name = "all intermediates"
+        return cset
 
     @property
     def num_reactants(self) -> int:
@@ -180,7 +186,9 @@ class CompoundTable:
         ids = [q for q, in ids]
         from .cset import CompoundSet
 
-        return CompoundSet(self.db, ids)
+        cset = CompoundSet(self.db, ids)
+        cset._name = "all elaborations"
+        return cset
 
     @property
     def bases(self) -> "CompoundSet":
@@ -195,7 +203,9 @@ class CompoundTable:
         ids = [q for q, in ids]
         from .cset import CompoundSet
 
-        return CompoundSet(self.db, ids)
+        cset = CompoundSet(self.db, ids)
+        cset._name = "all bases"
+        return cset
 
     @property
     def num_elabs(self) -> int:
@@ -226,7 +236,9 @@ class CompoundTable:
             return None
 
         ids = [v for v, in values if v]
-        return self[ids]
+        cset = self[ids]
+        cset._name = f"compounds tagged {tag}"
+        return cset
 
     def get_by_metadata(
         self,
@@ -244,11 +256,16 @@ class CompoundTable:
         )
         if value is None:
             ids = [i for i, d in results if d and f'"{key}":' in d]
+            name = f"compounds with {key} in metadata"
         else:
             if isinstance(value, str):
                 value = f'"{value}"'
             ids = [i for i, d in results if d and f'"{key}": {value}' in d]
-        return self[ids]
+            name = f"compounds with metadata[{key}] == {value}"
+
+        cset = self[ids]
+        cset._name = name
+        return cset
 
     def get_by_base(
         self,
@@ -272,7 +289,9 @@ class CompoundTable:
             multiple=True,
         )
         ids = [v for v, in values if v]
-        return self[ids]
+        cset = self[ids]
+        cset._name = "elaborations of C{base}"
+        return cset
 
     def summary(self) -> None:
         """Print a summary of this compound set"""
