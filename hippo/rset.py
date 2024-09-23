@@ -13,7 +13,6 @@ from .reaction import Reaction
 
 
 class ReactionTable:
- 
     """Class representing all :class:`.Reaction` objects in the 'reaction' table of the :class:`.Database`.
 
     .. attention::
@@ -50,6 +49,7 @@ class ReactionTable:
             rset = rtable[13:18]         # using a slice
 
     """
+
     _name = "all reactions"
 
     def __init__(
@@ -280,7 +280,6 @@ class ReactionTable:
 
 
 class ReactionSet:
-    
     """Object representing a subset of the 'reaction' table in the :class:`.Database`.
 
     .. attention::
@@ -326,6 +325,7 @@ class ReactionSet:
             rset2 = rset[13:18] # using a slice
 
     """
+
     _table = "reaction"
 
     def __init__(
@@ -546,7 +546,9 @@ class ReactionSet:
         """Return a copy of this set"""
         return ReactionSet(self.db, self.ids, sort=False, name=self.name)
 
-    def get_recipes(self, amounts: float | list[float] = 1.0, **kwargs) -> "Recipe | list[Recipe]":
+    def get_recipes(
+        self, amounts: float | list[float] = 1.0, **kwargs
+    ) -> "Recipe | list[Recipe]":
         """Get the :class:`.Recipe` object(s) from this set of recipes
 
         :param amounts: float or list/generator of product amounts in mg, (Default value = 1.0)
@@ -554,6 +556,7 @@ class ReactionSet:
 
         """
         from .recipe import Recipe
+
         return Recipe.from_reactions(db=self.db, reactions=self, amounts=1, **kwargs)
 
     def reverse(self) -> None:
