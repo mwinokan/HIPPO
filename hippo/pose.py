@@ -100,6 +100,9 @@ class Pose:
         else:
             self._mol = mol
 
+        self._total_changes = db.total_changes
+        self._num_atoms_added_wrt_inspirations = None
+
     ### FACTORIES
 
     ### PROPERTIES
@@ -428,7 +431,7 @@ class Pose:
     def num_atoms_added(self) -> int:
         """Calculate the number of atoms added relative to the base or inspirations"""
         # if b_id := self.base_id:
-            # return self.num_atoms_added_wrt_base
+        # return self.num_atoms_added_wrt_base
         # else:
         return self.num_atoms_added_wrt_inspirations
 
@@ -447,20 +450,25 @@ class Pose:
     def num_atoms_added_wrt_inspirations(self) -> int | None:
         """Calculate the number of atoms added relative to its inspirations"""
 
-        inspirations = self.inspirations
+        if self._num_atoms_added_wrt_inspirations is None or self._db_changed:
 
-        if not inspirations:
-            logger.error(f"{self} has no inspirations")
-            return None
+            sql = f"""
+            WITH inspirations AS (
+                SELECT SUM(mol_num_hvyatms(compound_mol)) AS sum, inspiration_derivative FROM inspiration
+                INNER JOIN pose ON inspiration_original = pose_id
+                INNER JOIN compound ON pose_compound = compound_id
+                WHERE inspiration_derivative = {self.id}
+            )
+            SELECT mol_num_hvyatms(compound_mol) - sum FROM inspirations
+            INNER JOIN pose ON inspiration_derivative = pose_id
+            INNER JOIN compound ON compound_id = pose_compound
+            """
 
-        count = 0
-        for i in inspirations:
-            count += i.num_heavy_atoms
+            (diff,) = self.db.execute(sql).fetchone()
 
-        if (self_count := self.num_heavy_atoms) is None:
-            return None
+            self._num_atoms_added_wrt_inspirations = diff
 
-        return self.num_heavy_atoms - count
+        return self._num_atoms_added_wrt_inspirations
 
     # @property
     # def base_id(self) -> int:
@@ -519,6 +527,11 @@ class Pose:
             subsite_tags.append(subsite_tag)
 
         return subsite_tags
+
+    @property
+    def _db_changed(self) -> bool:
+        """Has the database changed?"""
+        return self._total_changes != self.db.total_changes
 
     ### METHODS
 
