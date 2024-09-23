@@ -332,15 +332,40 @@ class CompoundTable:
         *,
         tag: str = None,
         base: int | Compound = None,
-    ) -> "CompoundSet":
-        """Filter compounds by a given tag or base. See :meth:`.CompoundTable.get_by_tag` and :meth:`.CompoundTable.get_by_base`"""
+        smiles: str | None = None,
+    ) -> "CompoundSet | Compound | None":
+        """Filter compounds by a given tag, base, or it's SMILES string. See :meth:`.CompoundTable.get_by_tag` and :meth:`.CompoundTable.get_by_base`
+
+        :param tag: optional tag to filter by
+        :param base: optional :class:`.Compound` ID or object to filter by
+        :param base: optional SMILES string to filter by
+        :returns: :class:`.CompoundSet` if searching by tag or base, else :class:`.Compound` object
+
+        """
 
         if tag:
             return self.get_by_tag(tag)
         elif base:
             return self.get_by_base(base)
+        elif smiles:
+            from .tools import inchikey_from_smiles, sanitise_smiles, SanitisationError
+
+            assert isinstance(smiles, str), f"Non-string {smiles=}"
+            try:
+                smiles = sanitise_smiles(smiles, sanitisation_failed="error")
+            except SanitisationError as e:
+                logger.error(f"Could not sanitise {smiles=}")
+                logger.error(str(e))
+                return None
+            except AssertionError:
+                logger.error(f"Could not sanitise {smiles=}")
+                return None
+                return c
+            inchikey = inchikey_from_smiles(smiles)
+            return self[inchikey]
         else:
-            raise NotImplementedError(f"{type(i)=}")
+            logger.error("Must provide one of tag, base, or smiles arguments")
+            return None
 
     def __getitem__(
         self,
