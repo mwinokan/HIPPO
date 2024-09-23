@@ -293,7 +293,7 @@ class PoseTable:
         logger.var("tags", self.tags)
 
     def interactive(self) -> None:
-        """Interactive widget to navigate compounds in the table
+        """Interactive widget to navigate poses in the table
 
         .. attention::
 
