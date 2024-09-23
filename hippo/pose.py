@@ -432,16 +432,16 @@ class Pose:
         else:
             return self.num_atoms_added_wrt_inspirations
 
-    @property
-    def num_atoms_added_wrt_base(self) -> int | None:
-        """Calculate the number of atoms added relative to the base"""
-        if not (b_id := self.base_id):
-            logger.error(f"{self} has no base")
-            return None
+    # @property
+    # def num_atoms_added_wrt_base(self) -> int | None:
+    #     """Calculate the number of atoms added relative to the base"""
+    #     if not (b_id := self.base_id):
+    #         logger.error(f"{self} has no base")
+    #         return None
 
-        n_e = self.num_heavy_atoms
-        n_b = self.db.get_compound_computed_property("num_heavy_atoms", b_id)
-        return n_e - n_b
+    #     n_e = self.num_heavy_atoms
+    #     n_b = self.db.get_compound_computed_property("num_heavy_atoms", b_id)
+    #     return n_e - n_b
 
     @property
     def num_atoms_added_wrt_inspirations(self) -> int | None:
@@ -462,23 +462,18 @@ class Pose:
 
         return self.num_heavy_atoms - count
 
-    @property
-    def base_id(self) -> int:
-        """Get the base compound ID"""
-        if not self._base_id:
-            (val,) = self.db.select_where(
-                table="compound",
-                query="compound_base",
-                key="id",
-                value=self.compound_id,
-            )
-            self._base_id = val
-        return self._base_id
-
     # @property
-    # def fields(self):
-    #   """ """
-    #   return [p for p in dir(self) if not p.startswith('_')]
+    # def base_id(self) -> int:
+    #     """Get the base compound ID"""
+    #     if not self._base_id:
+    #         (val,) = self.db.select_where(
+    #             table="compound",
+    #             query="compound_base",
+    #             key="id",
+    #             value=self.compound_id,
+    #         )
+    #         self._base_id = val
+    #     return self._base_id
 
     @property
     def energy_score(self) -> float | None:
