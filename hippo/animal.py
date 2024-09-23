@@ -2169,5 +2169,35 @@ class HIPPO:
         """Returns a command line representation of this HIPPO"""
         return f'HIPPO("{self.name}")'
 
+    def __getitem__(self, key: str) -> "Compound | Pose | Reaction":
+        """Get a :class:`.Compound`, :class:`.Pose`, or :class:`.Reaction` by its ID
+
+        :param key: shortname of the object, e.g. C100 for :class:`.Compound` with id=100
+        :returns: :class:`.Compound`, :class:`.Pose`, or :class:`.Reaction` object
+        """
+
+        assert isinstance(key, str)
+        assert len(key) > 1
+
+        prefix = key[0]
+        index = key[1:]
+
+        try:
+            index = int(index)
+        except ValueError:
+            logger.error(f"Cannot convert {index} to integer")
+            return None
+
+        match key[0]:
+            case "C":
+                return self.compounds[index]
+            case "P":
+                return self.poses[index]
+            case "R":
+                return self.reactions[index]
+
+        logger.error(f"Unsupported {prefix=}")
+        return None
+
 
 class InvalidRowError(Exception): ...
