@@ -185,7 +185,11 @@ class PoseTable:
         ids = [v for v, in values if v]
 
         pset = self[ids]
-        pset._name = f'poses tagged "{tag}"'
+
+        if inverse:
+            pset._name = f'poses not tagged "{tag}"'
+        else:
+            pset._name = f'poses tagged "{tag}"'
         return pset
 
     def get_by_target(
