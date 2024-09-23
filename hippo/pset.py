@@ -143,16 +143,41 @@ class PoseTable:
     def get_by_tag(
         self,
         tag: str,
+        inverse: bool = False,
     ) -> "PoseSet":
         """Get all child poses with a certain tag
 
         :param tag: tag to search for
+        :param inverse: invert the selection
         :returns: a :class:`.PoseSet` of the subset
 
         """
-        values = self.db.select_where(
-            query="tag_pose", table="tag", key="name", value=tag, multiple=True
-        )
+
+        if inverse:
+
+            values = self.db.select_where(
+                query="tag_pose", table="tag", key="name", value=tag, multiple=True
+            )
+
+        else:
+
+            values = self.db.select_where(
+                query="tag_pose", table="tag", key="name", value=tag, multiple=True
+            )
+
+            if not values:
+                return self
+
+            ids = [v for v, in values if v]
+
+            str_ids = str(tuple(ids)).replace(",)", ")")
+
+            values = self.db.select_where(
+                query="pose_id",
+                table="pose",
+                key=f"pose_id NOT IN {str_ids}",
+                multiple=True,
+            )
 
         if not values:
             return None
