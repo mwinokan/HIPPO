@@ -290,7 +290,7 @@ class CompoundTable:
         )
         ids = [v for v, in values if v]
         cset = self[ids]
-        cset._name = "elaborations of C{base}"
+        cset._name = f"elaborations of C{base}"
         return cset
 
     def summary(self) -> None:
