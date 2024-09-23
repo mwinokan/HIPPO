@@ -2163,13 +2163,7 @@ class HIPPO:
         logger.var("tags", self.tags.unique)
         # logger.var('#products', len(self.products))
 
-    ### DUNDERS
-
-    def __repr__(self) -> str:
-        """Returns a command line representation of this HIPPO"""
-        return f'HIPPO("{self.name}")'
-
-    def __getitem__(self, key: str) -> "Compound | Pose | Reaction":
+    def get_by_shorthand(self, key) -> "Compound | Pose | Reaction":
         """Get a :class:`.Compound`, :class:`.Pose`, or :class:`.Reaction` by its ID
 
         :param key: shortname of the object, e.g. C100 for :class:`.Compound` with id=100
@@ -2198,6 +2192,20 @@ class HIPPO:
 
         logger.error(f"Unsupported {prefix=}")
         return None
+
+    ### DUNDERS
+
+    def __repr__(self) -> str:
+        """Returns a command line representation of this HIPPO"""
+        return f'HIPPO("{self.name}")'
+
+    def __getitem__(self, key: str):
+        """Get a :class:`.Compound`, :class:`.Pose`, or :class:`.Reaction` by its ID. See :meth:`.HIPPO.get_by_shorthand`"""
+        return self.get_by_shorthand(key)
+
+    def __getattr__(self, key: str):
+        """Get a :class:`.Compound`, :class:`.Pose`, or :class:`.Reaction` by its ID. See :meth:`.HIPPO.get_by_shorthand`"""
+        return self.get_by_shorthand(key)
 
 
 class InvalidRowError(Exception): ...
