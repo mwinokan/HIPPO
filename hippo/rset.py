@@ -15,6 +15,8 @@ from .reaction import Reaction
 class ReactionTable:
     """Object representing the 'reaction' table in the :class:`.Database`."""
 
+    _name = "all reactions"
+
     def __init__(
         self,
         db: Database,
@@ -35,6 +37,11 @@ class ReactionTable:
     def table(self):
         """ """
         return self._table
+
+    @property
+    def name(self) -> str | None:
+        """Returns the name of set"""
+        return self._name
 
     @property
     def types(self):
@@ -202,7 +209,18 @@ class ReactionTable:
         return None
 
     def __repr__(self) -> str:
-        return f"{mcol.bold}{mcol.underline}set(R x {len(self)}){mcol.unbold}{mcol.ununderline}"
+        """Formatted string representation"""
+
+        s = f"{mcol.bold}{mcol.underline}"
+
+        if self.name:
+            s += f"{self.name}: "
+
+        s += "{" f"R x {len(self)}" "}"
+
+        s += f"{mcol.unbold}{mcol.ununderline}"
+
+        return s
 
     def __len__(self) -> int:
         return self.db.count(self.table)
@@ -222,6 +240,7 @@ class ReactionSet:
         indices: list = None,
         *,
         sort: bool = True,
+        name: str | None = None,
     ):
 
         self._db = db
@@ -237,6 +256,8 @@ class ReactionSet:
         else:
             self._indices = list(set(indices))
 
+        self._name = name
+
     ### PROPERTIES
 
     @property
@@ -248,6 +269,11 @@ class ReactionSet:
     def table(self):
         """ """
         return self._table
+
+    @property
+    def name(self) -> str | None:
+        """Returns the name of set"""
+        return self._name
 
     @property
     def indices(self):
@@ -440,13 +466,18 @@ class ReactionSet:
     ### DUNDERS
 
     def __repr__(self) -> str:
-        return (
-            f"{mcol.bold}{mcol.underline}"
-            "{"
-            f"R x {len(self)}"
-            "}"
-            f"{mcol.unbold}{mcol.ununderline}"
-        )
+        """Formatted string representation"""
+
+        s = f"{mcol.bold}{mcol.underline}"
+
+        if self.name:
+            s += f"{self.name}: "
+
+        s += "{" f"R x {len(self)}" "}"
+
+        s += f"{mcol.unbold}{mcol.ununderline}"
+
+        return s
 
     def __len__(self) -> int:
         return len(self.indices)

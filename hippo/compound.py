@@ -503,7 +503,12 @@ class Compound:
         if permitted_reactions:
             reaction_ids = [i for i in reaction_ids if i in permitted_reactions]
 
-        return ReactionSet(self.db, reaction_ids)
+        rset = ReactionSet(self.db, reaction_ids)
+
+        if not permitted_reactions:
+            rset._name = f"reactions resulting in {str(self)}"
+
+        return rset
 
     def get_poses(self) -> "PoseSet":
         """Get the associated :class:`.Pose` objects."""
