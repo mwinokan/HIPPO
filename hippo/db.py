@@ -219,21 +219,21 @@ class Database:
         logger.debug("HIPPO.Database.create_table_compound()")
 
         sql = """CREATE TABLE compound(
-			compound_id INTEGER PRIMARY KEY,
-			compound_inchikey TEXT,
-			compound_alias TEXT,
-			compound_smiles TEXT,
-			compound_base INTEGER,
-			compound_mol MOL,
-			compound_pattern_bfp bits(2048),
-			compound_morgan_bfp bits(2048),
-			compound_metadata TEXT,
-			FOREIGN KEY (compound_base) REFERENCES compound(compound_id),
-			CONSTRAINT UC_compound_inchikey UNIQUE (compound_inchikey)
-			CONSTRAINT UC_compound_alias UNIQUE (compound_alias)
-			CONSTRAINT UC_compound_smiles UNIQUE (compound_smiles)
-		);
-		"""
+            compound_id INTEGER PRIMARY KEY,
+            compound_inchikey TEXT,
+            compound_alias TEXT,
+            compound_smiles TEXT,
+            compound_base INTEGER,
+            compound_mol MOL,
+            compound_pattern_bfp bits(2048),
+            compound_morgan_bfp bits(2048),
+            compound_metadata TEXT,
+            FOREIGN KEY (compound_base) REFERENCES compound(compound_id),
+            CONSTRAINT UC_compound_inchikey UNIQUE (compound_inchikey)
+            CONSTRAINT UC_compound_alias UNIQUE (compound_alias)
+            CONSTRAINT UC_compound_smiles UNIQUE (compound_smiles)
+        );
+        """
         self.execute(sql)
 
     def create_table_inspiration(self) -> None:
@@ -241,13 +241,13 @@ class Database:
         logger.debug("HIPPO.Database.create_table_inspiration()")
 
         sql = """CREATE TABLE inspiration(
-			inspiration_original INTEGER,
-			inspiration_derivative INTEGER,
-			FOREIGN KEY (inspiration_original) REFERENCES pose(pose_id),
-			FOREIGN KEY (inspiration_derivative) REFERENCES pose(pose_id),
-			CONSTRAINT UC_inspiration UNIQUE (inspiration_original, inspiration_derivative)
-		);
-		"""
+            inspiration_original INTEGER,
+            inspiration_derivative INTEGER,
+            FOREIGN KEY (inspiration_original) REFERENCES pose(pose_id),
+            FOREIGN KEY (inspiration_derivative) REFERENCES pose(pose_id),
+            CONSTRAINT UC_inspiration UNIQUE (inspiration_original, inspiration_derivative)
+        );
+        """
 
         self.execute(sql)
 
@@ -271,13 +271,13 @@ class Database:
         logger.debug("HIPPO.Database.create_table_reaction()")
 
         sql = """CREATE TABLE reaction(
-			reaction_id INTEGER PRIMARY KEY,
-			reaction_type TEXT,
-			reaction_product INTEGER,
-			reaction_product_yield REAL,
-			FOREIGN KEY (reaction_product) REFERENCES compound(compound_id)
-		);
-		"""
+            reaction_id INTEGER PRIMARY KEY,
+            reaction_type TEXT,
+            reaction_product INTEGER,
+            reaction_product_yield REAL,
+            FOREIGN KEY (reaction_product) REFERENCES compound(compound_id)
+        );
+        """
 
         self.execute(sql)
 
@@ -286,14 +286,14 @@ class Database:
         logger.debug("HIPPO.Database.create_table_reactant()")
 
         sql = """CREATE TABLE reactant(
-			reactant_amount REAL,
-			reactant_reaction INTEGER,
-			reactant_compound INTEGER,
-			FOREIGN KEY (reactant_reaction) REFERENCES reaction(reaction_id),
-			FOREIGN KEY (reactant_compound) REFERENCES compound(compound_id),
-			CONSTRAINT UC_reactant UNIQUE (reactant_reaction, reactant_compound)
-		);
-		"""
+            reactant_amount REAL,
+            reactant_reaction INTEGER,
+            reactant_compound INTEGER,
+            FOREIGN KEY (reactant_reaction) REFERENCES reaction(reaction_id),
+            FOREIGN KEY (reactant_compound) REFERENCES compound(compound_id),
+            CONSTRAINT UC_reactant UNIQUE (reactant_reaction, reactant_compound)
+        );
+        """
 
         self.execute(sql)
 
@@ -302,24 +302,24 @@ class Database:
         logger.debug("HIPPO.Database.create_table_pose()")
 
         sql = """CREATE TABLE pose(
-			pose_id INTEGER PRIMARY KEY,
-			pose_inchikey TEXT,
-			pose_alias TEXT,
-			pose_smiles TEXT,
-			pose_reference INTEGER,
-			pose_path TEXT,
-			pose_compound INTEGER,
-			pose_target INTEGER,
-			pose_mol BLOB,
-			pose_fingerprint BLOB,
-			pose_energy_score REAL,
-			pose_distance_score REAL,
-			pose_metadata TEXT,
-			FOREIGN KEY (pose_compound) REFERENCES compound(compound_id),
-			CONSTRAINT UC_pose_alias UNIQUE (pose_alias)
-			CONSTRAINT UC_pose_path UNIQUE (pose_path)
-		);
-		"""
+            pose_id INTEGER PRIMARY KEY,
+            pose_inchikey TEXT,
+            pose_alias TEXT,
+            pose_smiles TEXT,
+            pose_reference INTEGER,
+            pose_path TEXT,
+            pose_compound INTEGER,
+            pose_target INTEGER,
+            pose_mol BLOB,
+            pose_fingerprint BLOB,
+            pose_energy_score REAL,
+            pose_distance_score REAL,
+            pose_metadata TEXT,
+            FOREIGN KEY (pose_compound) REFERENCES compound(compound_id),
+            CONSTRAINT UC_pose_alias UNIQUE (pose_alias)
+            CONSTRAINT UC_pose_path UNIQUE (pose_path)
+        );
+        """
 
         ### snippet to convert python metadata dictionary with JSON
         # json.dumps(variables).encode('utf-8')
@@ -332,15 +332,15 @@ class Database:
         logger.debug("HIPPO.Database.create_table_tag()")
 
         sql = """CREATE TABLE tag(
-			tag_name TEXT,
-			tag_compound INTEGER,
-			tag_pose INTEGER,
-			FOREIGN KEY (tag_compound) REFERENCES compound(compound_id),
-			FOREIGN KEY (tag_pose) REFERENCES pose(pose_id),
-			CONSTRAINT UC_tag_compound UNIQUE (tag_name, tag_compound)
-			CONSTRAINT UC_tag_pose UNIQUE (tag_name, tag_pose)
-		);
-		"""
+            tag_name TEXT,
+            tag_compound INTEGER,
+            tag_pose INTEGER,
+            FOREIGN KEY (tag_compound) REFERENCES compound(compound_id),
+            FOREIGN KEY (tag_pose) REFERENCES pose(pose_id),
+            CONSTRAINT UC_tag_compound UNIQUE (tag_name, tag_compound)
+            CONSTRAINT UC_tag_pose UNIQUE (tag_name, tag_pose)
+        );
+        """
 
         self.execute(sql)
 
@@ -349,22 +349,22 @@ class Database:
         logger.debug("HIPPO.Database.create_table_quote()")
 
         sql = """CREATE TABLE quote(
-			quote_id INTEGER PRIMARY KEY,
-			quote_smiles TEXT,
-			quote_amount REAL,
-			quote_supplier TEXT,
-			quote_catalogue TEXT,
-			quote_entry TEXT,
-			quote_lead_time INTEGER,
-			quote_price REAL,
-			quote_currency TEXT,
-			quote_purity REAL,
-			quote_date TEXT,
-			quote_compound INTEGER,
-			FOREIGN KEY (quote_compound) REFERENCES compound(compound_id),
-			CONSTRAINT UC_quote UNIQUE (quote_amount, quote_supplier, quote_catalogue, quote_entry)
-		);
-		"""
+            quote_id INTEGER PRIMARY KEY,
+            quote_smiles TEXT,
+            quote_amount REAL,
+            quote_supplier TEXT,
+            quote_catalogue TEXT,
+            quote_entry TEXT,
+            quote_lead_time INTEGER,
+            quote_price REAL,
+            quote_currency TEXT,
+            quote_purity REAL,
+            quote_date TEXT,
+            quote_compound INTEGER,
+            FOREIGN KEY (quote_compound) REFERENCES compound(compound_id),
+            CONSTRAINT UC_quote UNIQUE (quote_amount, quote_supplier, quote_catalogue, quote_entry)
+        );
+        """
 
         self.execute(sql)
 
@@ -372,12 +372,12 @@ class Database:
         """Create the target table"""
         logger.debug("HIPPO.Database.create_table_target()")
         sql = """CREATE TABLE target(
-			target_id INTEGER PRIMARY KEY,
-			target_name TEXT,
-			target_metadata TEXT,
-			CONSTRAINT UC_target UNIQUE (target_name)
-		);
-		"""
+            target_id INTEGER PRIMARY KEY,
+            target_name TEXT,
+            target_metadata TEXT,
+            CONSTRAINT UC_target UNIQUE (target_name)
+        );
+        """
 
         self.execute(sql)
 
@@ -385,16 +385,16 @@ class Database:
         """Create the feature table"""
         logger.debug("HIPPO.Database.create_table_feature()")
         sql = """CREATE TABLE feature(
-			feature_id INTEGER PRIMARY KEY,
-			feature_family TEXT,
-			feature_target INTEGER,
-			feature_chain_name TEXT,
-			feature_residue_name TEXT,
-			feature_residue_number INTEGER,
-			feature_atom_names TEXT,
-			CONSTRAINT UC_feature UNIQUE (feature_family, feature_target, feature_chain_name, feature_residue_number, feature_residue_name, feature_atom_names)
-		);
-		"""
+            feature_id INTEGER PRIMARY KEY,
+            feature_family TEXT,
+            feature_target INTEGER,
+            feature_chain_name TEXT,
+            feature_residue_name TEXT,
+            feature_residue_number INTEGER,
+            feature_atom_names TEXT,
+            CONSTRAINT UC_feature UNIQUE (feature_family, feature_target, feature_chain_name, feature_residue_number, feature_residue_name, feature_atom_names)
+        );
+        """
 
         self.execute(sql)
 
@@ -402,10 +402,10 @@ class Database:
         """Create the route table"""
         logger.debug("HIPPO.Database.create_table_route()")
         sql = """CREATE TABLE route(
-			route_id INTEGER PRIMARY KEY,
-			route_product INTEGER
-		);
-		"""
+            route_id INTEGER PRIMARY KEY,
+            route_product INTEGER
+        );
+        """
 
         self.execute(sql)
 
@@ -413,13 +413,13 @@ class Database:
         """Create the component table"""
         logger.debug("HIPPO.Database.create_table_component()")
         sql = """CREATE TABLE component(
-			component_id INTEGER PRIMARY KEY,
-			component_route INTEGER,
-			component_type INTEGER,
-			component_ref INTEGER,
-			CONSTRAINT UC_component UNIQUE (component_route, component_ref, component_type)
-		);
-		"""
+            component_id INTEGER PRIMARY KEY,
+            component_route INTEGER,
+            component_type INTEGER,
+            component_ref INTEGER,
+            CONSTRAINT UC_component UNIQUE (component_route, component_ref, component_type)
+        );
+        """
 
         self.execute(sql)
 
@@ -439,20 +439,20 @@ class Database:
         if debug:
             logger.debug(f"HIPPO.Database.create_table_interaction({table=})")
         sql = f"""CREATE TABLE {table}(
-			interaction_id INTEGER PRIMARY KEY,
-			interaction_feature INTEGER NOT NULL,
-			interaction_pose INTEGER NOT NULL,
-			interaction_type TEXT NOT NULL,
-			interaction_family TEXT NOT NULL,
-			interaction_atom_ids TEXT NOT NULL,
-			interaction_prot_coord TEXT NOT NULL,
-			interaction_lig_coord TEXT NOT NULL,
-			interaction_distance REAL NOT NULL,
-			interaction_angle REAL,
-			interaction_energy REAL,
-			CONSTRAINT UC_interaction UNIQUE (interaction_feature, interaction_pose, interaction_family, interaction_atom_ids)
-		);
-		"""
+            interaction_id INTEGER PRIMARY KEY,
+            interaction_feature INTEGER NOT NULL,
+            interaction_pose INTEGER NOT NULL,
+            interaction_type TEXT NOT NULL,
+            interaction_family TEXT NOT NULL,
+            interaction_atom_ids TEXT NOT NULL,
+            interaction_prot_coord TEXT NOT NULL,
+            interaction_lig_coord TEXT NOT NULL,
+            interaction_distance REAL NOT NULL,
+            interaction_angle REAL,
+            interaction_energy REAL,
+            CONSTRAINT UC_interaction UNIQUE (interaction_feature, interaction_pose, interaction_family, interaction_atom_ids)
+        );
+        """
 
         self.execute(sql)
 
@@ -516,9 +516,9 @@ class Database:
         inchikey = inchikey or inchikey_from_smiles(smiles)
 
         sql = """
-		INSERT INTO compound(compound_inchikey, compound_smiles, compound_mol, compound_pattern_bfp, compound_morgan_bfp, compound_alias)
-		VALUES(?1, ?2, mol_from_smiles(?2), mol_pattern_bfp(mol_from_smiles(?2), 2048), mol_morgan_bfp(mol_from_smiles(?2), 2, 2048), ?3)
-		"""
+        INSERT INTO compound(compound_inchikey, compound_smiles, compound_mol, compound_pattern_bfp, compound_morgan_bfp, compound_alias)
+        VALUES(?1, ?2, mol_from_smiles(?2), mol_pattern_bfp(mol_from_smiles(?2), 2048), mol_morgan_bfp(mol_from_smiles(?2), 2, 2048), ?3)
+        """
 
         try:
             self.execute(sql, (inchikey, smiles, alias))
@@ -584,9 +584,9 @@ class Database:
         """
 
         sql = """
-		INSERT INTO compound_pattern_bfp(compound_id, fp)
-		VALUES(?1, ?2)
-		"""
+        INSERT INTO compound_pattern_bfp(compound_id, fp)
+        VALUES(?1, ?2)
+        """
 
         (bfp,) = self.select_where(
             "compound_pattern_bfp", "compound", "id", compound_id
@@ -663,9 +663,9 @@ class Database:
                 raise
 
         sql = """
-		INSERT INTO pose(pose_inchikey, pose_alias, pose_smiles, pose_compound, pose_target, pose_path, pose_reference, pose_energy_score, pose_distance_score)
-		VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
-		"""
+        INSERT INTO pose(pose_inchikey, pose_alias, pose_smiles, pose_compound, pose_target, pose_path, pose_reference, pose_energy_score, pose_distance_score)
+        VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+        """
 
         try:
             self.execute(
@@ -743,9 +743,9 @@ class Database:
         ), "Exactly one of compound or pose arguments must have a value"
 
         sql = """
-		INSERT INTO tag(tag_name, tag_compound, tag_pose)
-		VALUES(?1, ?2, ?3)
-		"""
+        INSERT INTO tag(tag_name, tag_compound, tag_pose)
+        VALUES(?1, ?2, ?3)
+        """
 
         try:
             self.execute(sql, (name, compound, pose))
@@ -792,9 +792,9 @@ class Database:
         ), "Must pass an integer ID or Pose object (derivative)"
 
         sql = """
-		INSERT INTO inspiration(inspiration_original, inspiration_derivative)
-		VALUES(?1, ?2)
-		"""
+        INSERT INTO inspiration(inspiration_original, inspiration_derivative)
+        VALUES(?1, ?2)
+        """
 
         try:
             self.execute(sql, (original, derivative))
@@ -892,9 +892,9 @@ class Database:
         assert isinstance(type, str), f"incompatible {type=}"
 
         sql = """
-		INSERT INTO reaction(reaction_type, reaction_product, reaction_product_yield)
-		VALUES(?1, ?2, ?3)
-		"""
+        INSERT INTO reaction(reaction_type, reaction_product, reaction_product_yield)
+        VALUES(?1, ?2, ?3)
+        """
 
         try:
             self.execute(sql, (type, product, product_yield))
@@ -935,9 +935,9 @@ class Database:
         assert isinstance(reaction, Reaction), f"incompatible {reaction=}"
 
         sql = """
-		INSERT INTO reactant(reactant_amount, reactant_reaction, reactant_compound)
-		VALUES(?1, ?2, ?3)
-		"""
+        INSERT INTO reactant(reactant_amount, reactant_reaction, reactant_compound)
+        VALUES(?1, ?2, ?3)
+        """
 
         try:
             self.execute(sql, (amount, reaction.id, compound.id))
@@ -998,21 +998,21 @@ class Database:
         smiles = smiles or ""
 
         sql = """
-		INSERT or REPLACE INTO quote(
-			quote_smiles,
-			quote_amount,
-			quote_supplier,
-			quote_catalogue,
-			quote_entry,
-			quote_lead_time,
-			quote_price,
-			quote_currency,
-			quote_purity,
-			quote_compound,
-			quote_date
-		)
-		VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, date());
-		"""
+        INSERT or REPLACE INTO quote(
+            quote_smiles,
+            quote_amount,
+            quote_supplier,
+            quote_catalogue,
+            quote_entry,
+            quote_lead_time,
+            quote_price,
+            quote_currency,
+            quote_purity,
+            quote_compound,
+            quote_date
+        )
+        VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, date());
+        """
 
         try:
             self.execute(
@@ -1071,9 +1071,9 @@ class Database:
         """
 
         sql = """
-		INSERT INTO target(target_name)
-		VALUES(?1)
-		"""
+        INSERT INTO target(target_name)
+        VALUES(?1)
+        """
 
         try:
             self.execute(sql, (name,))
@@ -1127,9 +1127,9 @@ class Database:
         assert family in FEATURE_FAMILIES, f"Unsupported {family=}"
 
         sql = """
-		INSERT INTO feature(feature_family, feature_target, feature_chain_name, feature_residue_name, feature_residue_number, feature_atom_names)
-		VALUES(?1, ?2, ?3, ?4, ?5, ?6)
-		"""
+        INSERT INTO feature(feature_family, feature_target, feature_chain_name, feature_residue_name, feature_residue_number, feature_atom_names)
+        VALUES(?1, ?2, ?3, ?4, ?5, ?6)
+        """
 
         atom_names = " ".join(atom_names)
 
@@ -1188,9 +1188,9 @@ class Database:
         """
 
         sql = """
-		INSERT INTO route(route_product)
-		VALUES(?1)
-		"""
+        INSERT INTO route(route_product)
+        VALUES(?1)
+        """
 
         product_id = int(product_id)
 
@@ -1233,9 +1233,9 @@ class Database:
         """
 
         sql = """
-		INSERT INTO component(component_route, component_type, component_ref)
-		VALUES(?1, ?2, ?3)
-		"""
+        INSERT INTO component(component_route, component_type, component_ref)
+        VALUES(?1, ?2, ?3)
+        """
 
         route = int(route)
         ref = int(ref)
@@ -1352,20 +1352,20 @@ class Database:
         # insertion
 
         sql = f"""
-		INSERT INTO {table}(
-			interaction_feature,
-			interaction_pose,
-			interaction_type,
-			interaction_family,
-			interaction_atom_ids,
-			interaction_prot_coord,
-			interaction_lig_coord,
-			interaction_distance,
-			interaction_angle,
-			interaction_energy
-		)
-		VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
-		"""
+        INSERT INTO {table}(
+            interaction_feature,
+            interaction_pose,
+            interaction_type,
+            interaction_family,
+            interaction_atom_ids,
+            interaction_prot_coord,
+            interaction_lig_coord,
+            interaction_distance,
+            interaction_angle,
+            interaction_energy
+        )
+        VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+        """
 
         try:
             self.execute(
@@ -1749,10 +1749,10 @@ class Database:
         """
 
         sql = f"""
-		UPDATE {table}
-		SET {key} = ?
-		WHERE {table}_id = {id};
-		"""
+        UPDATE {table}
+        SET {key} = ?
+        WHERE {table}_id = {id};
+        """
 
         try:
             self.execute(sql, (value,))
@@ -1783,9 +1783,9 @@ class Database:
         """
 
         sql = f"""
-		UPDATE {table}
-		SET {key} = ?
-		"""
+        UPDATE {table}
+        SET {key} = ?
+        """
 
         try:
             self.execute(sql, (value,))
@@ -2299,19 +2299,19 @@ class Database:
 
         result = self.execute(
             f"""
-			WITH possible_reactants AS 
-			(
-				SELECT reactant_reaction, CASE WHEN reactant_compound IN {compound_ids_str} THEN reactant_compound END AS [possible_reactant] FROM reactant
-			)
+            WITH possible_reactants AS 
+            (
+                SELECT reactant_reaction, CASE WHEN reactant_compound IN {compound_ids_str} THEN reactant_compound END AS [possible_reactant] FROM reactant
+            )
 
-			, possible_reactions AS (
-				SELECT reactant_reaction, COUNT(CASE WHEN possible_reactant IS NULL THEN 1 END) AS [count_null] FROM possible_reactants
-				GROUP BY reactant_reaction
-			)
-			
-			SELECT reactant_reaction FROM possible_reactions
-			WHERE count_null = 0
-		"""
+            , possible_reactions AS (
+                SELECT reactant_reaction, COUNT(CASE WHEN possible_reactant IS NULL THEN 1 END) AS [count_null] FROM possible_reactants
+                GROUP BY reactant_reaction
+            )
+            
+            SELECT reactant_reaction FROM possible_reactions
+            WHERE count_null = 0
+        """
         ).fetchall()
 
         return [q for q, in result]
@@ -2437,14 +2437,14 @@ class Database:
 
         (price,) = self.execute(
             f"""
-		WITH unit_prices AS 
-		(
-			SELECT quote_compound, MIN(quote_price/quote_amount) AS unit_price FROM quote 
-			WHERE quote_compound IN {reactants.str_ids}
-			GROUP BY quote_compound
-		)
-		SELECT SUM(unit_price) FROM unit_prices
-		"""
+        WITH unit_prices AS 
+        (
+            SELECT quote_compound, MIN(quote_price/quote_amount) AS unit_price FROM quote 
+            WHERE quote_compound IN {reactants.str_ids}
+            GROUP BY quote_compound
+        )
+        SELECT SUM(unit_price) FROM unit_prices
+        """
         ).fetchone()
 
         return price
