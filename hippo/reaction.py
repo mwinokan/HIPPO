@@ -22,12 +22,12 @@ class Reaction:
 
     def __init__(
         self,
-        db,
+        db: "Database",
         id: int,
         type: str,
         product: int,
         product_yield: float,
-    ):
+    ) -> None:
 
         self._db = db
         self._id = id
@@ -35,22 +35,20 @@ class Reaction:
         self._product = product
         self._product_yield = product_yield
 
-    ### FACTORIES
-
     ### PROPERTIES
 
     @property
     def id(self) -> int:
-        """Returns the reaction ID"""
+        """Returns the :class:`.Reaction` ID"""
         return self._id
 
     @property
     def type(self) -> str:
-        """Returns the reaction tyoe"""
+        """Returns the :class:`.Reaction` tyoe"""
         return self._type
 
     @property
-    def product(self):
+    def product(self) -> "Compound":
         """Returns the reaction's product :class:`.Compound`"""
         if isinstance(self._product, int):
             self._product = self.db.get_compound(id=self._product)
@@ -62,12 +60,12 @@ class Reaction:
         return self._product_yield
 
     @property
-    def db(self):
+    def db(self) -> "Database":
         """Returns a pointer to the parent database"""
         return self._db
 
     @property
-    def reactants(self):
+    def reactants(self) -> "CompoundSet":
         """Returns a :class:`.CompoundSet` of the reactants"""
         from .cset import CompoundSet
 
@@ -81,52 +79,52 @@ class Reaction:
         return s
 
     @property
-    def reactant_ids(self) -> set:
+    def reactant_ids(self) -> set[int]:
         """Returns a set of reactant ID's"""
         return set(v for v in self.get_reactant_ids())
 
     @property
-    def reactant_str_ids(self):
-        """ """
+    def reactant_str_ids(self) -> str:
+        """Return an SQL formatted tuple string of the reactant :class:`.Compound` IDs"""
         return str(tuple(self.reactant_ids)).replace(",)", ")")
 
     @property
     def product_id(self) -> int:
-        """Returns the product ID"""
+        """Returns the product :class:`.Compound` ID"""
         return self.product.id
 
     @property
-    def product_smiles(self):
-        """ """
+    def product_smiles(self) -> str:
+        """Product :class:`.Compound` SMILES string"""
         return self.product.smiles
 
     @property
-    def reactant_smiles(self):
-        """ """
+    def reactant_smiles(self) -> list[str]:
+        """List of reactant :class:`.Compound` SMILES strings"""
         return [r.smiles for r in self.reactants]
 
     @property
     def product_mol(self):
-        """ """
+        """Product :class:`.Compound` ``rdkit.Chem.Mol`` object"""
         return self.product.mol
 
     @property
     def reactant_mols(self):
-        """ """
+        """List of reactant :class:`.Compound` ``rdkit.Chem.Mol`` object"""
         return [r.mol for r in self.reactants]
 
     @property
-    def price_estimate(self):
-        """ """
+    def price_estimate(self) -> float:
+        """Estimate the price of this :class:`.Reaction`"""
         return self.db.get_reaction_price_estimate(reaction=self)
 
     ### METHODS
 
-    def get_reactant_amount_pairs(self, compound_object=True) -> list[Compound]:
+    def get_reactant_amount_pairs(self, compound_object: bool = True) -> list[tuple]:
         """Returns pairs of reactants and their amounts
 
-        :param compound_object:  (Default value = True)
-
+        :param compound_object: return :class:`.Compound` object instead of ID, (Default value = True)
+        :returns: list of tuples containing :class:`.Compound` ID/object and amount in mg
         """
 
         compound_ids = self.db.select_where(
@@ -147,8 +145,11 @@ class Reaction:
         else:
             return []
 
-    def get_reactant_ids(self) -> list[Compound]:
-        """ """
+    def get_reactant_ids(self) -> list[int]:
+        """Returns list of reactants :class:`.Compound` IDs
+
+        :returns: list of :class:`.Compound` IDs
+        """
 
         compound_ids = self.db.select_where(
             query="reactant_compound",
@@ -168,16 +169,17 @@ class Reaction:
         amount: float = 1,  # in mg
         debug: bool = False,
         pick_cheapest: bool = False,
-        permitted_reactions=None,
+        permitted_reactions: "None | ReactionSet" = None,
         supplier: str | None = None,
-    ):
+    ) -> "Recipe | list[Recipe]":
         """Get a :class:`.Recipe` describing how to make the product
 
-        :param amount: float:  (Default value = 1)
-        :param debug: bool:  (Default value = False)
-        :param pick_cheapest: bool:  (Default value = False)
-        :param permitted_reactions:  (Default value = None)
-        :param supplier: str | None:  (Default value = None)
+        :param amount: Amount in ``mg``, defaults to ``1``
+        :param debug: Increase verbosity, (Default value = False)
+        :param pick_cheapest: pick the cheapest :class:`.Recipe`, (Default value = False)
+        :param permitted_reactions: Limit the reactions to consider to members of this set, (Default value = None)
+        :param supplier: Limit to reactants from this supplier (Default value = None)
+        :returns: :class:`.Recipe` object or list thereof
 
         """
 
@@ -192,11 +194,13 @@ class Reaction:
             supplier=supplier,
         )
 
-    def summary(self, amount=1, draw=True):
+    def summary(
+        self,
+        draw: bool = True,
+    ) -> None:
         """Print a summary of this reaction's information
 
-        :param amount:  (Default value = 1)
-        :param draw:  (Default value = True)
+        :param draw: draw the reaction compounds (Default value = True)
 
         """
 
@@ -210,16 +214,10 @@ class Reaction:
 
         print(f"price_estimate={self.price_estimate}")
 
-        # print(f'Ingredients for {amount} mg of product:')
-        # ingredients = self.get_ingredients(amount=amount)
-        # print(ingredients)
-
         if draw:
             self.draw()
 
-        # return self.get_recipe(amount)
-
-    def draw(self):
+    def draw(self) -> None:
         """Draw the molecules involved in this reaction"""
 
         from molparse.rdkit import draw_grid
@@ -237,23 +235,27 @@ class Reaction:
         drawing = draw_grid(mols, labels=labels, highlightAtomLists=None)
         display(drawing)
 
-    def check_chemistry(self, debug=False):
-        """
+    def check_chemistry(
+        self,
+        debug: bool = False,
+    ) -> bool:
+        """Sanity check the chemistry of this reaction
 
-        :param debug:  (Default value = False)
-
+        :param debug: increase verbosity (Default value = False)
         """
         from .chem import check_chemistry
 
         return check_chemistry(self.type, self.reactants, self.product, debug=debug)
 
     def check_reactant_availability(
-        self, supplier: None | str = None, debug: bool = False
-    ):
-        """
+        self,
+        supplier: None | str = None,
+        debug: bool = False,
+    ) -> bool:
+        """Check the availability of reactant compounds
 
-        :param supplier: None | str:  (Default value = None)
-        :param debug: bool:  (Default value = False)
+        :param supplier: Limit to quotes from this supplier (Default value = None)
+        :param debug: increase verbosity (Default value = False)
 
         """
 
@@ -315,11 +317,15 @@ class Reaction:
 
         return True
 
-    def get_dict(self, smiles=True, mols=True):
-        """Returns a dictionary representing this Reaction
+    def get_dict(
+        self,
+        smiles: bool = True,
+        mols: bool = True,
+    ) -> dict[str]:
+        """Returns a dictionary representing this :class:`.Reaction`
 
-        :param smiles:  (Default value = True)
-        :param mols:  (Default value = True)
+        :param smiles: include smiles string (Default value = True)
+        :param mols: include ``rdkit.Chem.Mol`` (Default value = True)
 
         """
 
@@ -341,13 +347,19 @@ class Reaction:
 
     ### DUNDERS
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """Unformatted string representation"""
         return f"R{self.id}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """Formatted string representation"""
         return f"{mcol.bold}{mcol.underline}{self}: {self.reaction_str} via {self.type}{mcol.unbold}{mcol.ununderline}"
 
-    def __eq__(self, other):
+    def __eq__(
+        self,
+        other: "int | Reaction",
+    ) -> bool:
+        """compare this reaction to a :class:`.Reaction` object or ID"""
 
         match other:
             case int():
@@ -369,5 +381,6 @@ class Reaction:
             case _:
                 raise NotImplementedError
 
-    def __hash__(self):
+    def __hash__(self) -> int:
+        """Integer hash from ID"""
         return self.id

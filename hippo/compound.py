@@ -898,13 +898,17 @@ class Compound:
 
     ### DUNDERS
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """Unformatted string representation"""
         return f"C{self.id}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """Formatted string representation"""
         return f'{mcol.bold}{mcol.underline}{self} "{self.name}"{mcol.unbold}{mcol.ununderline}'
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
+        """Compare compounds"""
+        assert isinstance(other, Compound)
         return self.id == other.id
 
 
