@@ -1068,6 +1068,15 @@ class Pose:
 
         draw_mols(mols)
 
+    def draw2d(
+        self,
+    ) -> None:
+        """Draw a 2D drawing of this pose"""
+        from rdkit.Chem import MolFromSmiles
+
+        mol = MolFromSmiles(self.smiles)
+        display(mol)
+
     def render(
         self,
         protein="cartoon",
