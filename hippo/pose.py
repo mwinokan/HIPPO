@@ -75,7 +75,7 @@ class Pose:
         self._energy_score = energy_score
         self._distance_score = distance_score
 
-        self._base_id = None
+        self._base_ids = None
         self._num_heavy_atoms = None
 
         self._has_fingerprint = False
@@ -470,18 +470,21 @@ class Pose:
 
         return self._num_atoms_added_wrt_inspirations
 
-    # @property
-    # def base_id(self) -> int:
-    #     """Get the base compound ID"""
-    #     if not self._base_id:
-    #         (val,) = self.db.select_where(
-    #             table="compound",
-    #             query="compound_base",
-    #             key="id",
-    #             value=self.compound_id,
-    #         )
-    #         self._base_id = val
-    #     return self._base_id
+    @property
+    def base_ids(self) -> list[int] | None:
+        """Get the base :class:`.Compound` IDs"""
+        if self._base_ids is None:
+            records = self.db.select_where(
+                table="scaffold",
+                query="scaffold_base",
+                key="superstructure",
+                value=self.compound_id,
+                multiple=True,
+                none="quiet",
+            )
+            records = [i for i, in records]
+            self._base_ids = records
+        return self._base_ids
 
     @property
     def energy_score(self) -> float | None:
