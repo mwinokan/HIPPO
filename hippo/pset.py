@@ -1538,7 +1538,15 @@ class PoseSet:
             )
             ui = VBox([a, ui1, ui2])
 
-            def widget(i, name=True, summary=True, grid=True, draw=True, metadata=True):
+            def widget(
+                i,
+                name=True,
+                summary=True,
+                grid=True,
+                draw2d=True,
+                draw=True,
+                metadata=True,
+            ):
                 pose = self[i]
                 if name:
                     print(repr(pose))
@@ -1547,6 +1555,8 @@ class PoseSet:
                     pose.summary(metadata=False)
                 if grid:
                     pose.grid()
+                if draw2d:
+                    pose.draw2d()
                 if draw:
                     pose.draw()
                 if metadata:
@@ -1555,7 +1565,15 @@ class PoseSet:
 
             out = interactive_output(
                 widget,
-                {"i": a, "name": b, "summary": c, "grid": d, "draw": e, "metadata": f},
+                {
+                    "i": a,
+                    "name": b,
+                    "summary": c,
+                    "grid": d,
+                    "draw2d": e,
+                    "draw": e,
+                    "metadata": f,
+                },
             )
 
             display(ui, out)
