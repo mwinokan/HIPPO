@@ -1528,11 +1528,15 @@ class PoseSet:
             f = Checkbox(description="3D", value=True)
             g = Checkbox(description="Metadata", value=False)
 
-            ui = GridBox(
-                [b, c, d, e, f, g],
-                layout=Layout(grid_template_columns="repeat(5, 100px)"),
+            ui1 = GridBox(
+                [b, c, d],
+                layout=Layout(grid_template_columns="repeat(3, 100px)"),
             )
-            ui = VBox([a, ui])
+            ui2 = GridBox(
+                [e, f, g],
+                layout=Layout(grid_template_columns="repeat(3, 100px)"),
+            )
+            ui = VBox([a, ui1, ui2])
 
             def widget(i, name=True, summary=True, grid=True, draw=True, metadata=True):
                 pose = self[i]
