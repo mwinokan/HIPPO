@@ -293,7 +293,7 @@ class CompoundTable:
         cset._name = f"elaborations of C{base}"
         return cset
 
-    def get_by_smiles(self, smiles: str) -> 'Compound | None':
+    def get_by_smiles(self, smiles: str) -> "Compound | None":
         """Get a member compound by its smiles"""
 
         from .tools import inchikey_from_smiles, sanitise_smiles, SanitisationError

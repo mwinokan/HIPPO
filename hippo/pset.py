@@ -215,7 +215,7 @@ class PoseTable:
         pset._name = f'poses for "{target}"'
         return pset
 
-    def get_by_smiles(self, smiles:str) -> "Pose | PoseSet | None":
+    def get_by_smiles(self, smiles: str) -> "Pose | PoseSet | None":
         """Get a member pose by it's smiles"""
 
         from .tools import inchikey_from_smiles, sanitise_smiles, SanitisationError
@@ -230,21 +230,25 @@ class PoseTable:
             logger.error(f"Could not sanitise {smiles=}")
             return None
             return c
-        
+
         # get the compound
-            
+
         flat_inchikey = inchikey_from_smiles(flat_smiles)
 
-        comp_id = self.db.select_id_where(table='compound', key='inchikey', value=flat_inchikey)
+        comp_id = self.db.select_id_where(
+            table="compound", key="inchikey", value=flat_inchikey
+        )
 
         if not comp_id:
             return None
 
-        comp_id, = comp_id
+        (comp_id,) = comp_id
 
         # get the poses
 
-        pose_ids = self.db.select_id_where(table='pose', key='compound', value=comp_id, multiple=True)
+        pose_ids = self.db.select_id_where(
+            table="pose", key="compound", value=comp_id, multiple=True
+        )
 
         if not pose_ids:
             return None
@@ -262,8 +266,8 @@ class PoseTable:
                 matches.add(pose.id)
         matches = list(matches)
 
-        if not matches:    
-            logger.error(f'Did not find pose matching stereochemistry (C{comp_id})')
+        if not matches:
+            logger.error(f"Did not find pose matching stereochemistry (C{comp_id})")
             return None
 
         if len(matches) == 1:
