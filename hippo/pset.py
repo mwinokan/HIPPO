@@ -215,6 +215,62 @@ class PoseTable:
         pset._name = f'poses for "{target}"'
         return pset
 
+    def get_by_smiles(self, smiles:str) -> "Pose | PoseSet | None":
+        """Get a member pose by it's smiles"""
+
+        from .tools import inchikey_from_smiles, sanitise_smiles, SanitisationError
+
+        try:
+            flat_smiles = sanitise_smiles(smiles, sanitisation_failed="error")
+        except SanitisationError as e:
+            logger.error(f"Could not sanitise {smiles=}")
+            logger.error(str(e))
+            return None
+        except AssertionError:
+            logger.error(f"Could not sanitise {smiles=}")
+            return None
+            return c
+        
+        # get the compound
+            
+        flat_inchikey = inchikey_from_smiles(flat_smiles)
+
+        comp_id = self.db.select_id_where(table='compound', key='inchikey', value=flat_inchikey)
+
+        if not comp_id:
+            return None
+
+        comp_id, = comp_id
+
+        # get the poses
+
+        pose_ids = self.db.select_id_where(table='pose', key='compound', value=comp_id, multiple=True)
+
+        if not pose_ids:
+            return None
+
+        pose_ids = [i for i, in pose_ids]
+        pset = self[pose_ids]
+
+        # identify the pose
+
+        inchikey = inchikey_from_smiles(smiles)
+
+        matches = set()
+        for pose in pset:
+            if pose.inchikey == inchikey:
+                matches.add(pose.id)
+        matches = list(matches)
+
+        if not matches:    
+            logger.error(f'Did not find pose matching stereochemistry (C{comp_id})')
+            return None
+
+        if len(matches) == 1:
+            return self[matches[0]]
+
+        return self[matches]
+
     def get_by_subsite(
         self,
         *,
@@ -308,9 +364,10 @@ class PoseTable:
     def __call__(
         self,
         *,
-        tag: str = None,
-        target: int = None,
-        subsite: int = None,
+        tag: str | None = None,
+        target: int | None = None,
+        subsite: int | None = None,
+        smiles: str | None = None,
     ) -> "PoseSet":
         """Filter poses by a given tag, subsite ID, or target ID. See :meth:`.PoseTable.get_by_tag`, :meth:`.PoseTable.get_by_target`, amd :meth:`.PoseTable.get_by_subsite`"""
 
@@ -320,6 +377,8 @@ class PoseTable:
             return self.get_by_target(id=target)
         elif subsite:
             return self.get_by_subsite(id=subsite)
+        elif smiles:
+            return self.get_by_smiles(smiles=smiles)
         else:
             raise NotImplementedError
 
