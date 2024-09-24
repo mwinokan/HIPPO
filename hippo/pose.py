@@ -430,21 +430,32 @@ class Pose:
     @property
     def num_atoms_added(self) -> int:
         """Calculate the number of atoms added relative to the base or inspirations"""
-        # if b_id := self.base_id:
-        # return self.num_atoms_added_wrt_base
-        # else:
-        return self.num_atoms_added_wrt_inspirations
+        if self.num_bases == 1:
+            return self.num_atoms_added_wrt_bases
+        else:
+            return self.num_atoms_added_wrt_inspirations
 
-    # @property
-    # def num_atoms_added_wrt_base(self) -> int | None:
-    #     """Calculate the number of atoms added relative to the base"""
-    #     if not (b_id := self.base_id):
-    #         logger.error(f"{self} has no base")
-    #         return None
+    @property
+    def num_atoms_added_wrt_bases(self) -> int | list[int] | None:
+        """Calculate the number of atoms added relative to the base"""
 
-    #     n_e = self.num_heavy_atoms
-    #     n_b = self.db.get_compound_computed_property("num_heavy_atoms", b_id)
-    #     return n_e - n_b
+        match self.num_bases:
+            case 0:
+                logger.error(f"{self} has no base")
+                return None
+            case 1:
+                b_id = self.base_ids[0]
+                n_e = self.num_heavy_atoms
+                n_b = self.db.get_compound_computed_property("num_heavy_atoms", b_id)
+                return n_e - n_b
+            case _:
+                logger.warning(f"{self} has multiple bases")
+                n_e = self.num_heavy_atoms
+                return [
+                    n_e
+                    - self.db.get_compound_computed_property("num_heavy_atoms", b_id)
+                    for b_id in self.base_ids
+                ]
 
     @property
     def num_atoms_added_wrt_inspirations(self) -> int | None:
@@ -469,6 +480,11 @@ class Pose:
             self._num_atoms_added_wrt_inspirations = diff
 
         return self._num_atoms_added_wrt_inspirations
+
+    @property
+    def num_bases(self) -> int:
+        """Get the number of base scaffolds"""
+        return len(self.base_ids)
 
     @property
     def base_ids(self) -> list[int] | None:
