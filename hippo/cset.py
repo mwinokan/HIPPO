@@ -293,6 +293,25 @@ class CompoundTable:
         cset._name = f"elaborations of C{base}"
         return cset
 
+    def get_by_smiles(self, smiles: str) -> "Compound | None":
+        """Get a member compound by its smiles"""
+
+        from .tools import inchikey_from_smiles, sanitise_smiles, SanitisationError
+
+        assert isinstance(smiles, str), f"Non-string {smiles=}"
+        try:
+            smiles = sanitise_smiles(smiles, sanitisation_failed="error")
+        except SanitisationError as e:
+            logger.error(f"Could not sanitise {smiles=}")
+            logger.error(str(e))
+            return None
+        except AssertionError:
+            logger.error(f"Could not sanitise {smiles=}")
+            return None
+            return c
+        inchikey = inchikey_from_smiles(smiles)
+        return self[inchikey]
+
     def summary(self) -> None:
         """Print a summary of this compound set"""
         logger.header("CompoundTable()")
@@ -348,21 +367,7 @@ class CompoundTable:
         elif base:
             return self.get_by_base(base)
         elif smiles:
-            from .tools import inchikey_from_smiles, sanitise_smiles, SanitisationError
-
-            assert isinstance(smiles, str), f"Non-string {smiles=}"
-            try:
-                smiles = sanitise_smiles(smiles, sanitisation_failed="error")
-            except SanitisationError as e:
-                logger.error(f"Could not sanitise {smiles=}")
-                logger.error(str(e))
-                return None
-            except AssertionError:
-                logger.error(f"Could not sanitise {smiles=}")
-                return None
-                return c
-            inchikey = inchikey_from_smiles(smiles)
-            return self[inchikey]
+            return self.get_by_smiles(smiles)
         else:
             logger.error("Must provide one of tag, base, or smiles arguments")
             return None
