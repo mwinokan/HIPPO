@@ -1523,12 +1523,14 @@ class PoseSet:
 
             b = Checkbox(description="Name", value=True)
             c = Checkbox(description="Summary", value=False)
-            d = Checkbox(description="2D", value=False)
-            e = Checkbox(description="3D", value=True)
-            f = Checkbox(description="Metadata", value=False)
+            d = Checkbox(description="2D (Compound)", value=False)
+            e = Checkbox(description="2D (Pose)", value=False)
+            f = Checkbox(description="3D", value=True)
+            g = Checkbox(description="Metadata", value=False)
 
             ui = GridBox(
-                [b, c, d, e, f], layout=Layout(grid_template_columns="repeat(5, 100px)")
+                [b, c, d, e, f, g],
+                layout=Layout(grid_template_columns="repeat(5, 100px)"),
             )
             ui = VBox([a, ui])
 
