@@ -2170,11 +2170,14 @@ class HIPPO:
         :returns: :class:`.Compound`, :class:`.Pose`, or :class:`.Reaction` object
         """
 
-        assert isinstance(key, str)
-        assert len(key) > 1
+        assert isinstance(key, str), f"'HIPPO' object has no attribute '{key}'"
+        assert len(key) > 1, f"'HIPPO' object has no attribute '{key}'"
 
         prefix = key[0]
         index = key[1:]
+
+        if prefix not in "CPR":
+            raise AttributeError(f"'HIPPO' object has no attribute '{key}'")
 
         try:
             index = int(index)
