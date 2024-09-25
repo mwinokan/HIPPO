@@ -922,7 +922,7 @@ class CompoundSet:
         variances = [v for v, in variances]
 
         if debug:
-            return variances
+            logger.debug(f"{variances=}")
 
         return mean(variances)
 
