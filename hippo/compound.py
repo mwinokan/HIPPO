@@ -698,6 +698,7 @@ class Compound:
         amount: float,
         max_lead_time: float = None,
         supplier: str = None,
+        get_quote: bool = True,
     ) -> "Ingredient":
         """Convert this compound into an :class:`.Ingredient` object with an associated amount (in ``mg``) and :class:`.Quote` if available.
 
@@ -706,15 +707,19 @@ class Compound:
         :param max_lead_time: Only search for quotes with lead times less than this (in days), defaults to ``None``
         """
 
-        quote = self.get_quotes(
-            pick_cheapest=True,
-            min_amount=amount,
-            max_lead_time=max_lead_time,
-            supplier=supplier,
-            none="quiet",
-        )
+        if get_quote:
+            quote = self.get_quotes(
+                pick_cheapest=True,
+                min_amount=amount,
+                max_lead_time=max_lead_time,
+                supplier=supplier,
+                none="quiet",
+            )
 
-        if not quote:
+            if not quote:
+                quote = None
+
+        else:
             quote = None
 
         return Ingredient(

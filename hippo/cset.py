@@ -1836,8 +1836,12 @@ class IngredientSet:
             supplier = ingredient.supplier
             max_lead_time = ingredient.max_lead_time
 
-            quote_id = q.id
-            quoted_amount = q.amount
+            if q is None:
+                quote_id = None
+                quoted_amount = None
+            else:
+                quote_id = q.id
+                quoted_amount = q.amount
 
         else:
             assert compound_id
