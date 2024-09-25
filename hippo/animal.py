@@ -1282,9 +1282,14 @@ class HIPPO:
         *,
         orig_name_col: str = "Customer Code",
         # orig_name_col: str = 'Diamond ID (Molecule Name)',
-        entry_col="Catalog ID",
-        stop_after=None,
+        price_col: str | None = None,
+        fixed_amount: float | None = None,
+        fixed_lead_time: float | None = None,
+        entry_col: str = "Catalog ID",
+        catalogue_col: str = "Collection",
+        stop_after: None | int = None,
         orig_name_is_hippo_id: bool = False,
+        allow_no_catalogue_col: bool = False,
     ):
         """
         Load an Enamine quote provided as an excel file
@@ -1292,6 +1297,10 @@ class HIPPO:
         :param path: Path to the excel file
         :param orig_name_col: Column name of the original alias, defaults to 'Customer Code'
         :param entry_col: Column name of the catalogue ID/entry, defaults to 'Catalog ID'
+        :param price_col: Column name of the price, defaults to 'Price, EUR' or 'Price, USD' if present
+        :param catalogue_col: Column name of the price, defaults to 'Price, EUR' or 'Price, USD' if present
+        :param fixed_amount: Optionally use a fixed amount for all quotes (in mg)
+        :param fixed_lead_time: Optionally use a fixed lead time for all quotes (in days)
         :param stop_after: Stop after given number of rows, defaults to ``None``
         :param orig_name_is_hippo_id: Set to ``True`` if ``orig_name_col`` is the original HIPPO :class:``hippo.compound.Compound`` ID, defaults to ``False``
         :returns: An :class:`.IngredientSet` of the quoted molecules
@@ -1302,23 +1311,43 @@ class HIPPO:
         smiles_col = "SMILES"
         purity_col = "Purity, %"
         amount_col = "Amount, mg"
-        catalogue_col = "Collection"
         lead_time_col = "Lead time"
 
-        assert smiles_col in df.columns, "Unexpected Excel format (smiles_col)"
-        assert orig_name_col in df.columns, "Unexpected Excel format (orig_name_col)"
-        assert entry_col in df.columns, "Unexpected Excel format (entry_col)"
-        assert purity_col in df.columns, "Unexpected Excel format (purity_col)"
-        assert amount_col in df.columns, "Unexpected Excel format (amount_col)"
-        assert catalogue_col in df.columns, "Unexpected Excel format (catalogue_col)"
-        assert (
-            "Price, EUR" in df.columns or "Price, USD" in df.columns
-        ), "Unexpected Excel format (price_col)"
-        assert lead_time_col in df.columns, "Unexpected Excel format (lead_time_col)"
+        def unexpected_column(key, value) -> str:
+            return (
+                f"Unexpected Excel format ({key}='{value}') \n\nfirst row:\n{df.loc[0]}"
+            )
 
-        price_cols = [c for c in df.columns if c.startswith("Price")]
-        assert len(price_cols) == 1
-        price_col = price_cols[0]
+        assert smiles_col in df.columns, unexpected_column("smiles_col", smiles_col)
+        assert orig_name_col in df.columns, unexpected_column(
+            "orig_name_col", orig_name_col
+        )
+        assert entry_col in df.columns, unexpected_column("entry_col", entry_col)
+        assert purity_col in df.columns, unexpected_column("purity_col", purity_col)
+
+        if fixed_amount is None:
+            assert amount_col in df.columns, unexpected_column("amount_col", amount_col)
+
+        if fixed_lead_time is None:
+            assert lead_time_col in df.columns, unexpected_column(
+                "lead_time_col", lead_time_col
+            )
+
+        if not allow_no_catalogue_col:
+            assert catalogue_col in df.columns, unexpected_column(
+                "catalogue_col", catalogue_col
+            )
+
+        assert (
+            "Price, EUR" in df.columns
+            or "Price, USD" in df.columns
+            or price_col in df.columns
+        ), unexpected_column("Price", "")
+
+        if price_col is None:
+            price_cols = [c for c in df.columns if c.startswith("Price")]
+            assert len(price_cols) == 1
+            price_col = price_cols[0]
         currency = price_col.split(", ")[-1]
 
         ingredients = IngredientSet(self.db)
@@ -1352,26 +1381,36 @@ class HIPPO:
                 except ValueError:
                     pass
 
-            if (catalogue := row[catalogue_col]) == "No starting material":
+            if (catalogue := row[catalogue_col]) in [
+                "No starting material",
+                "Out of stock",
+            ]:
                 continue
 
             if (price := row[price_col]) == 0.0:
                 continue
 
-            if not isinstance(row[lead_time_col], str):
-                continue
-
-            if "week" in row[lead_time_col]:
-                lead_time = int(row[lead_time_col].split()[0].split("-")[-1]) * 5
+            if fixed_amount is None:
+                amount = row[amount_col]
             else:
-                raise NotImplementedError
+                amount = fixed_amount
+
+            if fixed_lead_time is None:
+                if not isinstance(row[lead_time_col], str):
+                    continue
+                if "week" in row[lead_time_col]:
+                    lead_time = int(row[lead_time_col].split()[0].split("-")[-1]) * 5
+                else:
+                    raise NotImplementedError
+            else:
+                lead_time = fixed_lead_time
 
             quote_data = dict(
                 compound=compound,
                 supplier="Enamine",
                 catalogue=catalogue,
                 entry=row[entry_col],
-                amount=row[amount_col],
+                amount=amount,
                 purity=row[purity_col] / 100,
                 lead_time=lead_time,
                 price=price,
@@ -1383,8 +1422,8 @@ class HIPPO:
 
             ingredients.add(
                 compound_id=compound.id,
-                amount=row[amount_col],
-                quoted_amount=row[amount_col],
+                amount=amount,
+                quoted_amount=amount,
                 quote_id=q_id,
                 supplier="Enamine",
                 max_lead_time=None,
