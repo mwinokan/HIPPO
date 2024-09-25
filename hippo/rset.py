@@ -380,6 +380,18 @@ class ReactionSet:
         return self._indices
 
     @property
+    def types(self) -> list[str]:
+        """Returns the types of poses in this set"""
+        pairs = self.db.select_where(
+            table="reaction",
+            key=f"reaction_id IN {self.str_ids}",
+            query="reaction_id, reaction_type",
+            multiple=True,
+        )
+        lookup = {i: t for i, t in pairs}
+        return [lookup[i] for i in self.ids]
+
+    @property
     def str_ids(self) -> str:
         """Return an SQL formatted tuple string of the :class:`.Compound` IDs"""
         return str(tuple(self.ids)).replace(",)", ")")
