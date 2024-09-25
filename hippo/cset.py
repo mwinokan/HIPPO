@@ -746,13 +746,10 @@ class CompoundSet:
         """Measure of how evenly elaborations are distributed across bases in this set"""
 
         sql = f"""
-        SELECT COUNT(1) FROM compound
-        WHERE compound_id IN {self.str_ids}
-        AND compound_base IS NOT NULL
-        GROUP BY compound_base
+        SELECT COUNT(1) FROM scaffold
+        WHERE scaffold_superstructure IN {self.str_ids}
+        GROUP BY scaffold_base
         """
-
-        raise NotImplementedError
 
         counts = self.db.execute(sql).fetchall()
 
