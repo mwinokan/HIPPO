@@ -987,6 +987,7 @@ class Ingredient:
         self._amount = amount
         self._max_lead_time = max_lead_time
         self._supplier = supplier
+        self._total_changes = db.total_changes
 
     ### PROPERTIES
 
@@ -1052,7 +1053,7 @@ class Ingredient:
     def quote(self) -> Quote:
         """Returns the associated :class:`.Quote`"""
 
-        if not self._quote:
+        if self._quote is None and self._db_changed:
             if q_id := self.quote_id:
                 self._quote = self.db.get_quote(id=self.quote_id)
 
@@ -1098,6 +1099,12 @@ class Ingredient:
             return self.quote.lead_time
         else:
             return None
+
+    @property
+    def _db_changed(self) -> bool:
+        """Has the database changed?"""
+        return self._total_changes != self.db.total_changes
+
 
     ### METHODS
 
