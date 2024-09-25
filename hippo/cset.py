@@ -1740,7 +1740,9 @@ class IngredientSet:
 
     ### METHODS
 
-    def get_price(self, supplier: str | list[str] = None) -> "Price":
+    def get_price(
+        self, supplier: str | list[str] = None, none: str = "Error"
+    ) -> "Price":
         """Calculate the price with a given supplier
 
         :param supplier: supplier to use for all quoting, (Default value = ``None``)
@@ -1763,6 +1765,7 @@ class IngredientSet:
                     table="quote",
                     key=f'quote_id in {quote_id_str} AND quote_supplier = "{supplier}"',
                     multiple=True,
+                    none=none,
                 )
             else:
                 result = self.db.select_where(
@@ -1770,6 +1773,7 @@ class IngredientSet:
                     table="quote",
                     key=f"quote_id in {quote_id_str}",
                     multiple=True,
+                    none=none,
                 )
 
             prices = [Price(a, b) for a, b in result]
