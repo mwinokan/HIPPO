@@ -140,11 +140,6 @@ class Recipe:
                     return []
 
         def get_reactant_amount_pairs(reaction):
-            """
-
-            :param reaction:
-
-            """
             if reaction_reactant_cache and reaction.id in reaction_reactant_cache:
                 print("reaction_reactant_cache used")
                 return reaction_reactant_cache[reaction.id]
@@ -154,8 +149,8 @@ class Recipe:
                     reaction_reactant_cache[reaction.id] = pairs
                 return pairs
 
-        # logger.debug(f'get_reactant_amount_pairs({reaction.id})')
-        # pairs = reaction.get_reactant_amount_pairs()
+        if debug:
+            logger.debug(f"get_reactant_amount_pairs({reaction.id})")
         pairs = get_reactant_amount_pairs(reaction)
 
         for reactant, reactant_amount in pairs:
@@ -228,6 +223,8 @@ class Recipe:
                 recipe.reactions.reverse()
 
         if pick_cheapest:
+            if debug:
+                logger.debug("Picking cheapest")
             priced = [r for r in recipes if r.get_price(supplier=supplier)]
             # priced = [r for r in recipes if r.price]
             if not priced:
@@ -374,9 +371,8 @@ class Recipe:
 
         options = []
 
-        if debug:
-            logger.var("#compounds", n_comps)
-            logger.info("Solving individual compound recipes...")
+        logger.var("#compounds", n_comps)
+        logger.info("Solving individual compound recipes...")
 
         if n_comps > 1:
             generator = tqdm(zip(compounds, amount), total=n_comps)
@@ -425,8 +421,7 @@ class Recipe:
 
         from itertools import product
 
-        if debug:
-            logger.info("Solving recipe combinations...")
+        logger.info("Solving recipe combinations...")
         combinations = list(product(*options))
 
         if not solve_combinations:
@@ -435,8 +430,7 @@ class Recipe:
         if pick_first:
             combinations = [combinations[0]]
 
-        if debug:
-            logger.info("Combining recipes...")
+        logger.info("Combining recipes...")
 
         solutions = []
 
@@ -464,8 +458,7 @@ class Recipe:
             return solutions[0]
 
         if pick_cheapest:
-            if debug:
-                logger.info("Picking cheapest...")
+            logger.info("Picking cheapest...")
             priced = [r for r in solutions if r.price]
             if not priced:
                 logger.error("0 recipes with prices, can't choose cheapest")
