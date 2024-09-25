@@ -59,6 +59,7 @@ class Recipe:
         reaction_checking_cache=None,
         reaction_reactant_cache=None,
         inner=False,
+        get_ingredient_quotes: bool = True,
     ):
         """
 
@@ -104,7 +105,14 @@ class Recipe:
         recipe = cls.__new__(cls)
         recipe.__init__(
             db,
-            products=IngredientSet(db, [reaction.product.as_ingredient(amount=amount)]),
+            products=IngredientSet(
+                db,
+                [
+                    reaction.product.as_ingredient(
+                        amount=amount, get_quotes=get_ingredient_quotes
+                    )
+                ],
+            ),
             reactants=IngredientSet(db, [], supplier=supplier),
             intermediates=IngredientSet(db, []),
             reactions=ReactionSet(db, [reaction.id], sort=False),
@@ -327,6 +335,7 @@ class Recipe:
         unavailable_reaction="error",
         reaction_checking_cache=None,
         reaction_reactant_cache=None,
+        **kwargs,
     ):
         """
 
@@ -394,6 +403,7 @@ class Recipe:
                     unavailable_reaction=unavailable_reaction,
                     reaction_checking_cache=reaction_checking_cache,
                     reaction_reactant_cache=reaction_reactant_cache,
+                    **kwargs,
                 )
 
                 if pick_cheapest_inner_routes:
