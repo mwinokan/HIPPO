@@ -765,12 +765,10 @@ class CompoundSet:
 
         """
 
-        raise NotImplementedError
-
         (count,) = self.db.execute(
             f"""
-                SELECT COUNT(DISTINCT compound_base) FROM compound
-                WHERE compound_id IN {self.str_ids}  
+                SELECT COUNT(DISTINCT scaffold_base) FROM scaffold
+                WHERE scaffold_superstructure IN {self.str_ids}  
             """
         ).fetchone()
 
