@@ -438,24 +438,7 @@ class Pose:
     @property
     def num_atoms_added_wrt_bases(self) -> int | list[int] | None:
         """Calculate the number of atoms added relative to the base"""
-
-        match self.num_bases:
-            case 0:
-                logger.error(f"{self} has no base")
-                return None
-            case 1:
-                b_id = self.base_ids[0]
-                n_e = self.num_heavy_atoms
-                n_b = self.db.get_compound_computed_property("num_heavy_atoms", b_id)
-                return n_e - n_b
-            case _:
-                logger.warning(f"{self} has multiple bases")
-                n_e = self.num_heavy_atoms
-                return [
-                    n_e
-                    - self.db.get_compound_computed_property("num_heavy_atoms", b_id)
-                    for b_id in self.base_ids
-                ]
+        return self.compound.num_atoms_added
 
     @property
     def num_atoms_added_wrt_inspirations(self) -> int | None:

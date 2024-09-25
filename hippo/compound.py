@@ -155,12 +155,25 @@ class Compound:
         return formula_to_atomtype_dict(self.formula)
 
     @property
-    def num_atoms_added(self) -> int:
+    def num_atoms_added(self) -> int | list[int] | None:
         """Calculate the number of atoms added relative to the base compound"""
-        assert (b_id := self._base_id), f"{self} has no base defined"
-        n_e = self.num_heavy_atoms
-        n_b = self.db.get_compound_computed_property("num_heavy_atoms", b_id)
-        return n_e - n_b
+        match self.num_bases:
+            case 0:
+                logger.error(f"{self} has no base")
+                return None
+            case 1:
+                b_id = self.bases.ids[0]
+                n_e = self.num_heavy_atoms
+                n_b = self.db.get_compound_computed_property("num_heavy_atoms", b_id)
+                return n_e - n_b
+            case _:
+                logger.warning(f"{self} has multiple bases")
+                n_e = self.num_heavy_atoms
+                return [
+                    n_e
+                    - self.db.get_compound_computed_property("num_heavy_atoms", b_id)
+                    for b_id in self.bases.ids
+                ]
 
     @property
     def metadata(self) -> "MetaData":
@@ -221,6 +234,11 @@ class Compound:
                 )
                 self._total_changes = self.db.total_changes
         return self._bases
+
+    @property
+    def num_bases(self) -> int:
+        """Get the number of base compounds for this elaboration"""
+        return len(self.bases)
 
     @property
     def elabs(self):
