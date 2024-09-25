@@ -1542,7 +1542,7 @@ class Database:
         key: str,
         value: str | None = None,
         multiple: bool = False,
-        none: str | None = "error",
+        none: str | None = "exception",
         sort: str = None,
     ) -> tuple | list[tuple]:
         """Select entries where ``key == value``
@@ -1620,6 +1620,11 @@ class Database:
         if not result and none == "error":
             logger.error(f"No entry in {table} with {where_str}")
             return None
+        elif not result and none == "exception":
+            raise ValueError(f"No entry in {table} with {where_str}")
+        
+        # if not result:
+        #     raise ValueError(f"No entry in {table} with {where_str}")
 
         return result
 

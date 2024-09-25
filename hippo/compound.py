@@ -1105,7 +1105,6 @@ class Ingredient:
         """Has the database changed?"""
         return self._total_changes != self.db.total_changes
 
-
     ### METHODS
 
     def get_cheapest_quote_id(
