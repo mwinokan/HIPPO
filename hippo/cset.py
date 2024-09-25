@@ -1782,21 +1782,21 @@ class IngredientSet:
         unquoted_price = Price.null()
 
         for i in unquoted:
-        
+
             ingredient = self[i]
-        
+
             p = ingredient.price
-        
+
             unquoted_price += p
 
             quote = ingredient.quote
-            
-            assert quote, f'NULL Quote: {ingredient=}'
+
+            assert quote, f"NULL Quote: {ingredient=}"
 
             self.df.loc[i, "quote_id"] = quote.id
-            
+
             assert quote.amount
-            
+
             self.df.loc[i, "quoted_amount"] = quote.amount
 
         return quoted + unquoted_price
