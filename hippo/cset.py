@@ -1512,7 +1512,7 @@ class IngredientSet:
     def __init__(
         self,
         db: "Database",
-        ingredients="None | list[Ingredient]",
+        ingredients: "None | list[Ingredient]" = None,
         supplier: str | list | None = None,
     ) -> None:
 
@@ -1548,7 +1548,6 @@ class IngredientSet:
 
         for col in cls._columns:
             if col not in df.columns:
-                logger.debug(f"Adding column {col}")
                 df[col] = None
 
         self._db = db
@@ -1736,7 +1735,7 @@ class IngredientSet:
     ### METHODS
 
     def get_price(
-        self, supplier: str | list[str] = None, none: str = "Error"
+        self, supplier: str | list[str] = None, none: str = "error"
     ) -> "Price":
         """Calculate the price with a given supplier
 
@@ -1781,14 +1780,23 @@ class IngredientSet:
         unquoted = [i for i, q in pairs.items() if q is None or isnan(q)]
 
         unquoted_price = Price.null()
+
         for i in unquoted:
+        
             ingredient = self[i]
+        
             p = ingredient.price
+        
             unquoted_price += p
 
             quote = ingredient.quote
+            
+            assert quote, f'NULL Quote: {ingredient=}'
+
             self.df.loc[i, "quote_id"] = quote.id
+            
             assert quote.amount
+            
             self.df.loc[i, "quoted_amount"] = quote.amount
 
         return quoted + unquoted_price
