@@ -699,6 +699,7 @@ class Compound:
         max_lead_time: float = None,
         supplier: str = None,
         get_quote: bool = True,
+        quote_none: str = "quiet",
     ) -> "Ingredient":
         """Convert this compound into an :class:`.Ingredient` object with an associated amount (in ``mg``) and :class:`.Quote` if available.
 
@@ -713,7 +714,7 @@ class Compound:
                 min_amount=amount,
                 max_lead_time=max_lead_time,
                 supplier=supplier,
-                none="quiet",
+                none=quote_none,
             )
 
             if not quote:
@@ -1053,7 +1054,8 @@ class Ingredient:
     def quote(self) -> Quote:
         """Returns the associated :class:`.Quote`"""
 
-        if self._quote is None and self._db_changed:
+        if self._quote is None:
+
             if q_id := self.quote_id:
                 self._quote = self.db.get_quote(id=self.quote_id)
 
