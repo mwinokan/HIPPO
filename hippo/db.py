@@ -1542,7 +1542,7 @@ class Database:
         key: str,
         value: str | None = None,
         multiple: bool = False,
-        none: str | None = "exception",
+        none: str | None = "error",
         sort: str = None,
     ) -> tuple | list[tuple]:
         """Select entries where ``key == value``
@@ -1622,7 +1622,7 @@ class Database:
             return None
         elif not result and none == "exception":
             raise ValueError(f"No entry in {table} with {where_str}")
-        
+
         # if not result:
         #     raise ValueError(f"No entry in {table} with {where_str}")
 
