@@ -845,6 +845,10 @@ class Database:
             superstructure, int
         ), f"Must pass an integer ID or Compound object (superstructure) {superstructure=} {type(superstructure)}"
 
+        if base == superstructure:
+            logger.warning(f"Skipped self-referential scaffold assignment (C{base})")
+            return None
+
         sql = """
         INSERT INTO scaffold(scaffold_base, scaffold_superstructure)
         VALUES(?1, ?2)
