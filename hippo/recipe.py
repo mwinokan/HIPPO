@@ -109,7 +109,7 @@ class Recipe:
                 db,
                 [
                     reaction.product.as_ingredient(
-                        amount=amount, get_quotes=get_ingredient_quotes
+                        amount=amount, get_quote=get_ingredient_quotes
                     )
                 ],
             ),
