@@ -2342,8 +2342,8 @@ class Database:
 
         # print(product_ids)
 
-        for product_id in product_ids:
-            all_reactants.add(product_id)
+        # for product_id in product_ids:
+        #     all_reactants.add(product_id)
 
         for i in range(300):
 
