@@ -739,34 +739,7 @@ class CompoundSet:
 
         """
 
-        raise NotImplementedError
-
-        variances = self.db.execute(
-            f"""
-                WITH nums AS (
-                    SELECT B.compound_id as base, A.compound_id AS elab, 
-                    mol_num_hvyatms(A.compound_mol) - mol_num_hvyatms(B.compound_mol) AS diff 
-                    FROM compound A, compound B
-                    WHERE A.compound_base = B.compound_id
-                    AND A.compound_id IN {self.str_ids}
-                ),
-
-                means AS (  
-                    SELECT base, AVG(diff) AS mean FROM nums
-                    GROUP BY base
-                )
-
-                SELECT AVG((nums.diff - mean)*(nums.diff - mean)) var FROM nums
-                LEFT JOIN means
-                ON nums.base = means.base
-                GROUP BY nums.base
-                
-            """
-        ).fetchall()
-
-        variances = [v for v, in variances]
-
-        return mean(variances)
+        return self.get_risk_diversity()
 
     @property
     def elaboration_balance(self) -> float:
@@ -912,6 +885,46 @@ class CompoundSet:
             product_ids=self.ids, debug=debug
         )
         return all_reactions
+
+    def get_risk_diversity(self, debug: bool = False) -> float:
+        """Calculate the average spread of risk (#atoms added) for each base in this set
+
+        :returns: average of the standard deviations of number of atoms added for each base
+
+        """
+
+        variances = self.db.execute(
+            f"""
+        WITH nums AS (
+            SELECT scaffold_base AS base, scaffold_superstructure AS elab, 
+            mol_num_hvyatms(c2.compound_mol) - mol_num_hvyatms(c1.compound_mol) AS diff
+            FROM scaffold
+            INNER JOIN compound AS c1 ON scaffold_base = c1.compound_id
+            INNER JOIN compound AS c2 ON scaffold_superstructure = c2.compound_id
+            WHERE scaffold_superstructure IN {self.str_ids}
+        ),
+
+        means AS (  
+            SELECT base, AVG(diff) AS mean FROM nums
+            GROUP BY base
+        )
+
+        SELECT AVG((nums.diff - mean)*(nums.diff - mean)) var FROM nums
+        LEFT JOIN means
+        ON nums.base = means.base
+        GROUP BY nums.base
+        """
+        ).fetchall()
+
+        if not variances:
+            return None
+
+        variances = [v for v, in variances]
+
+        if debug:
+            return variances
+
+        return mean(variances)
 
     def count_by_tag(
         self,
