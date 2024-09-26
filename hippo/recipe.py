@@ -86,14 +86,10 @@ class Recipe:
         from .rset import ReactionSet
 
         if debug:
-            logger.debug(f"Recipe.from_reaction({amount=}, {pick_cheapest=})")
-        if debug:
-            logger.debug(f"{reaction.id=}")
-        if debug:
+            logger.debug(
+                f"Recipe.from_reaction(R{reaction.id}, {amount=}, {pick_cheapest=})"
+            )
             logger.debug(f"{reaction.product.id=}")
-        if debug:
-            logger.debug(f"{amount=}")
-        if debug:
             logger.debug(f"{reaction.reactants.ids=}")
 
         if permitted_reactions:
@@ -230,7 +226,15 @@ class Recipe:
             if not priced:
                 logger.error("0 recipes with prices, can't choose cheapest")
                 return recipes
-            return sorted(priced, key=lambda r: r.get_price(supplier=supplier))[0]
+            sorted_recipes = sorted(
+                priced, key=lambda r: r.get_price(supplier=supplier)
+            )
+
+            if debug:
+                for recipe in recipes:
+                    logger.debug(f"{recipe}, {recipe.price}")
+
+            return sorted_recipes[0]
             # return sorted(priced, key=lambda r: r.price)[0]
 
         return recipes
@@ -409,13 +413,26 @@ class Recipe:
                     assert isinstance(sol, list)
                     comp_options += sol
 
-            if warn_multiple_solutions and len(comp_options) > 1:
-                logger.warning(f"Multiple solutions for compound={comp}")
-
             if not comp_options:
                 logger.error(f"No solutions for compound={comp}")
+                continue
+
+            if pick_cheapest and len(comp_options) > 1:
+                if warn_multiple_solutions:
+                    logger.warning(f"Multiple solutions for compound={comp}")
+                if debug:
+                    logger.debug("Picking cheapest...")
+                priced = [r for r in comp_options if r.price]
+                comp_options = sorted(priced, key=lambda r: r.price)[:1]
+
+            if warn_multiple_solutions and len(comp_options) > 1:
+                logger.warning(f"Multiple solutions for compound={comp}")
+                if debug:
+                    logger.debug(f"{comp_options=}")
             else:
-                options.append(comp_options)
+                logger.success(f"Found solution for compound={comp}")
+
+            options.append(comp_options)
 
         assert all(options)
 
@@ -446,7 +463,9 @@ class Recipe:
 
             solution = combo[0]
 
-            for recipe in combo[1:]:
+            for i, recipe in enumerate(combo[1:]):
+                if debug:
+                    logger.debug(i + 1)
                 solution += recipe
 
             solutions.append(solution)

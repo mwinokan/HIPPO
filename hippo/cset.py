@@ -1514,6 +1514,7 @@ class IngredientSet:
         db: "Database",
         ingredients: "None | list[Ingredient]" = None,
         supplier: str | list | None = None,
+        debug: bool = False,
     ) -> None:
 
         from pandas import DataFrame
@@ -1524,10 +1525,19 @@ class IngredientSet:
 
         self._data = DataFrame(columns=self._columns, dtype=object)
 
+        if debug:
+            logger.debug(self._data)
+
         self._supplier = supplier
 
         for ingredient in ingredients:
             self.add(ingredient)
+
+        for col in self._columns:
+            assert col in self._data.columns, f"{col} not in df.columns"
+
+        if debug:
+            logger.debug(self._data)
 
     @classmethod
     def from_ingredient_df(
@@ -1548,6 +1558,7 @@ class IngredientSet:
 
         for col in cls._columns:
             if col not in df.columns:
+                raise Exception(f"{col} not in df.columns")
                 df[col] = None
 
         self._db = db
@@ -1855,6 +1866,9 @@ class IngredientSet:
             assert amount
 
         if quote_id:
+            # if not quoted_amount:
+            #     logger.warning(f'Requoting C{compound_id}...')
+
             assert quoted_amount
 
         supplier = self.supplier
@@ -1868,6 +1882,7 @@ class IngredientSet:
                         quote_id=quote_id,
                         supplier=supplier,
                         max_lead_time=max_lead_time,
+                        quoted_amount=quoted_amount,
                     )
                 ],
                 dtype=object,
@@ -2020,6 +2035,7 @@ class IngredientSet:
                 quote_id=row.quote_id,
                 supplier=row.supplier,
                 max_lead_time=row.max_lead_time,
+                quoted_amount=row.quoted_amount,
             )
 
         return self
