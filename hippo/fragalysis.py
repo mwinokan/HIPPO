@@ -1,7 +1,4 @@
-import logging
-
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 
 def generate_header(

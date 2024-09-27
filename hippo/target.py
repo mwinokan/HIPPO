@@ -1,8 +1,6 @@
 import mcol
 
-import logging
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 
 class Target:

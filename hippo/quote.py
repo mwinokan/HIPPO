@@ -1,9 +1,7 @@
 import mcol
 from .price import Price
 
-import logging
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 
 class Quote:

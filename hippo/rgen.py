@@ -8,9 +8,7 @@ import json
 
 from .tools import dt_hash
 
-import logging
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 
 class RandomRecipeGenerator:
