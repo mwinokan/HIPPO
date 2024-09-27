@@ -823,7 +823,7 @@ class Recipe:
                     id=reactant.id,
                     smiles=reactant.smiles,
                     amount=ingredient.amount,
-                    price=ingredient.price,
+                    price=str(ingredient.price),
                     lead_time=ingredient.lead_time,
                 )
 
@@ -843,7 +843,7 @@ class Recipe:
                 id=product.id,
                 smiles=product.smiles,
                 amount=ingredient.amount,
-                price=ingredient.price,
+                price=str(ingredient.price),
                 lead_time=ingredient.lead_time,
             )
 
@@ -1010,7 +1010,10 @@ class Recipe:
 
         if not title:
             # title = f"Recipe<br><sup>price={self.price}, lead-time={self.lead_time}</sup>"
-            title = f"Recipe<br><sup>price={self.price}</sup>"
+            try:
+                title = f"Recipe<br><sup>price={self.price}</sup>"
+            except AssertionError:
+                title = f"Recipe"
 
         fig.update_layout(title=title)
 
@@ -1040,7 +1043,7 @@ class Recipe:
         if price:
             price = self.price
             if price:
-                logger.var("\nprice", price[0], dict(unit=price[1]))
+                logger.var("\nprice", price.amount, dict(unit=price.currency))
                 # logger.var('lead-time', self.lead_time, dict(unit='working days'))
 
         logger.var("\n#products", len(self.products))
@@ -1301,13 +1304,18 @@ class Recipe:
     ### DUNDERS
 
     def __repr__(self):
-        if self.score:
-            return f"Recipe_{self.hash}({self.reactants} --> {self.intermediates} --> {self.products} via {self.reactions}, score={self.score:.3f})"
-        elif self.hash:
-            return f"Recipe_{self.hash}({self.reactants} --> {self.intermediates} --> {self.products} via {self.reactions})"
+        if self.intermediates:
+            s = f"{self.reactants} --> {self.intermediates} --> {self.products} via {self.reactions}"
         else:
-            return f"Recipe({self.reactants} --> {self.intermediates} --> {self.products} via {self.reactions})"
-        # return f'Recipe()'
+            s = f"{self.reactants} --> {self.products} via {self.reactions}"
+
+        if self.score:
+            s += f", score={self.score:.3f}"
+
+        if self.hash:
+            return f"Recipe_{self.hash}({s})"
+
+        return f"Recipe({s})"
 
     def __add__(self, other):
         result = self.copy()
