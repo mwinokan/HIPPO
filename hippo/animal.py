@@ -15,8 +15,6 @@ from .pycule import Quoter
 from .db import Database
 from pathlib import Path
 
-from tqdm import tqdm
-
 from .tools import inchikey_from_smiles, sanitise_smiles, SanitisationError
 
 import mrich as logger
@@ -513,7 +511,7 @@ class HIPPO:
         n_poses = self.num_poses
         n_comps = self.num_compounds
 
-        for i, row in tqdm(df.iterrows()):
+        for i, row in logger.track(df.iterrows(), prefix="Reading SDF rows..."):
 
             name = row[name_col].strip()
 
@@ -709,7 +707,9 @@ class HIPPO:
 
         # loop over rows
 
-        for i, row in tqdm(df.iterrows()):
+        for i, row in logger.track(
+            df.iterrows(), prefix="Processing DataFrame rows..."
+        ):
 
             # determine number of steps
 
@@ -943,7 +943,9 @@ class HIPPO:
         if base_only:
             generator = df.iterrows()
         else:
-            generator = tqdm(df.iterrows())
+            generator = logger.track(
+                df.iterrows(), prefix="Processing DataFrame rows..."
+            )
 
         n_comps = len(self.compounds)
         n_poses = len(self.poses)
@@ -1364,7 +1366,7 @@ class HIPPO:
         ingredients = IngredientSet(self.db)
 
         if len(df) > 100:
-            generator = tqdm(df.iterrows(), total=len(df))
+            generator = logger.track(df.iterrows(), prefix="Loading quotes...")
         else:
             generator = df.iterrows()
 
@@ -1496,7 +1498,7 @@ class HIPPO:
 
         ingredients = IngredientSet(self.db)
 
-        for i, row in tqdm(df.iterrows()):
+        for i, row in logger.track(df.iterrows(), prefix="Loading quotes..."):
             smiles = row[smiles_col]
 
             if not isinstance(smiles, str):
