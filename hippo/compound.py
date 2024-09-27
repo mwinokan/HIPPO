@@ -634,6 +634,31 @@ class Compound:
 
         return data
 
+    def get_recipes(
+        self,
+        *,
+        amount: float = 1,
+        debug: bool = False,
+        pick_cheapest: bool = False,
+        quoted_only: bool = False,
+        supplier: None | str = None,
+        **kwargs,
+    ):
+        """Get :class:`.Recipe` objects that result in this compound. See :meth:`.Recipe.from_compounds`"""
+
+        from .recipe import Recipe
+        from .cset import CompoundSet
+
+        return Recipe.from_compounds(
+            CompoundSet(self.db, [self.id]),
+            amount=amount,
+            debug=debug,
+            pick_cheapest=pick_cheapest,
+            quoted_only=quoted_only,
+            supplier=supplier,
+            **kwargs,
+        )
+
     def get_base_ids(self) -> list[int]:
         """Get a list of :class:`.Compound` ID's that this object is a superstructure of"""
         ids = self.db.select_where(
@@ -822,15 +847,15 @@ class Compound:
         logger.var("num_rings", self.num_rings)
         logger.var("formula", self.formula)
 
-        poses = self.poses
-        logger.var("#poses", len(poses))
-        if poses:
-            logger.var("targets", poses.targets)
-
         logger.var("#reactions (product)", self.num_reactions)
         logger.var("#reactions (reactant)", self.num_reactant)
 
         logger.var("tags", self.tags)
+
+        poses = self.poses
+        logger.var("#poses", len(poses))
+        if poses:
+            logger.var("targets", poses.targets)
 
         if metadata:
             logger.var("metadata", str(self.metadata))
@@ -1163,3 +1188,7 @@ class Ingredient:
             return False
 
         return self.amount == other.amount
+
+    def __getattr__(self, key: str):
+        """For missing attributes try getting from associated :class:`.Compound`"""
+        return getattr(self.compound, key)
