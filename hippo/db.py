@@ -216,8 +216,6 @@ class Database:
         self.create_table_subsite()
         self.create_table_subsite_tag()
         self.create_table_scaffold()
-        self.create_table_route()
-        self.create_table_component()
         self.commit()
 
     def create_table_compound(self) -> None:
