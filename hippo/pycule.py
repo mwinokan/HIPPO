@@ -45,9 +45,7 @@ ENAMINE_V2_LEAD_TIME = {
     },
 }
 
-import logging
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 
 class Quoter:

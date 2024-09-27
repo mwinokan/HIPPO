@@ -6,9 +6,7 @@ import mcol
 
 from tqdm import tqdm
 
-import logging
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 
 # @dataclass

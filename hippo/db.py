@@ -17,9 +17,7 @@ from .tools import inchikey_from_smiles
 
 from pathlib import Path
 
-import logging
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 CHEMICALITE_COMPOUND_PROPERTY_MAP = {
     "num_heavy_atoms": "mol_num_hvyatms",
@@ -257,24 +255,24 @@ class Database:
     def create_blank_db(self) -> None:
         """Create a blank database"""
 
-        logger.out("Creating blank database...")
-        self.create_table_compound()
-        self.create_table_inspiration()
-        self.create_table_reaction()
-        self.create_table_reactant()
-        self.create_table_pose()
-        self.create_table_tag()
-        self.create_table_quote()
-        self.create_table_target()
-        self.create_table_pattern_bfp()
-        self.create_table_feature()
-        self.create_table_route()
-        self.create_table_component()
-        self.create_table_interaction()
-        self.create_table_subsite()
-        self.create_table_subsite_tag()
-        self.create_table_scaffold()
-        self.commit()
+        with logger.loading("Creating blank database..."):
+            self.create_table_compound()
+            self.create_table_inspiration()
+            self.create_table_reaction()
+            self.create_table_reactant()
+            self.create_table_pose()
+            self.create_table_tag()
+            self.create_table_quote()
+            self.create_table_target()
+            self.create_table_pattern_bfp()
+            self.create_table_feature()
+            self.create_table_route()
+            self.create_table_component()
+            self.create_table_interaction()
+            self.create_table_subsite()
+            self.create_table_subsite_tag()
+            self.create_table_scaffold()
+            self.commit()
 
     def create_table_compound(self) -> None:
         """Create the compound table"""

@@ -5,9 +5,7 @@ import mcol
 import os
 from numpy import int64
 
-import logging
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 from .reaction import Reaction
 
