@@ -166,6 +166,10 @@ class RandomRecipeGenerator:
 
 		"""
 
+        if "route" not in self.db.table_names:
+            logger.error("route table not in Database")
+            raise NotImplementedError
+
         assert self.suppliers_str
         if self.max_lead_time:
             raise NotImplementedError
