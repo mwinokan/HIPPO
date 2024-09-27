@@ -11,9 +11,7 @@ import pickle
 
 from pathlib import Path
 
-import logging
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 from molparse.rdkit.features import (
     FEATURE_FAMILIES,

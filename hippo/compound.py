@@ -11,9 +11,7 @@ from .tags import TagSet
 from .target import Target
 from .quote import Quote
 
-import logging
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 
 class Compound:

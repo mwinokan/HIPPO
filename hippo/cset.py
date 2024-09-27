@@ -11,9 +11,7 @@ import mcol
 
 import os
 
-import logging
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 
 class CompoundTable:

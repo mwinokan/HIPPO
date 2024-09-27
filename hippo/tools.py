@@ -8,9 +8,7 @@ import mout
 from datetime import datetime
 from string import ascii_uppercase
 
-from mlog import setup_logger
-
-logger = setup_logger("HIPPO")
+import mrich as logger
 
 
 def df_row_to_dict(df_row):
