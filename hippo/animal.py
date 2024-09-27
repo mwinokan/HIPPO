@@ -2018,36 +2018,38 @@ class HIPPO:
     def register_route(
         self,
         *,
-        route,
-        commit=True,
+        recipe: "Recipe",
+        commit: bool = True,
     ) -> int:
         """
-        Insert a :class:`.Route` (single-product :class:`.Recipe`) into the :class:`.Database`.
+        Insert a single-product :class:`.Recipe` into the :class:`.Database`.
 
-        :param route: The :class:`.Route` object to be registered
+        :param recipe: The :class:`.Recipe` object to be registered
         :param commit: Commit the changes to the :class:`.Database`, defaults to ``True``
         :returns: The :class:`.Route` ID
         """
 
+        assert recipe.num_products == 1
+
         # register the route
-        route_id = self.db.insert_route(product_id=route.product.id, commit=False)
+        route_id = self.db.insert_route(product_id=recipe.product.id, commit=False)
 
         assert route_id
 
         # reactions
-        for ref in route.reactions.ids:
+        for ref in recipe.reactions.ids:
             self.db.insert_component(
                 component_type=1, ref=ref, route=route_id, commit=False
             )
 
         # reactants
-        for ref in route.reactants.compound_ids:
+        for ref in recipe.reactants.compound_ids:
             self.db.insert_component(
                 component_type=2, ref=ref, route=route_id, commit=False
             )
 
         # intermediates
-        for ref in route.intermediates.compound_ids:
+        for ref in recipe.intermediates.compound_ids:
             self.db.insert_component(
                 component_type=3, ref=ref, route=route_id, commit=False
             )
