@@ -5,9 +5,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 import pandas as pd
 
-import logging
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 
 class Scorer:

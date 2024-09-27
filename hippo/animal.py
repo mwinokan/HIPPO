@@ -19,9 +19,7 @@ from tqdm import tqdm
 
 from .tools import inchikey_from_smiles, sanitise_smiles, SanitisationError
 
-from mlog import setup_logger
-
-logger = setup_logger("HIPPO")
+import mrich as logger
 
 from rdkit.Chem import Mol
 
@@ -50,18 +48,16 @@ class HIPPO:
         update_legacy: bool = False,
     ):
 
-        logger.header("Creating HIPPO animal")
+        logger.bold("Creating HIPPO animal")
 
         self._name = name
-        # self._target_name = target
 
-        logger.var("name", name, dict(color="arg"))
-        # logger.var('target', target, dict(color='arg'))
+        logger.var("name", name, color="arg")
 
         if not isinstance(db_path, Path):
             db_path = Path(db_path)
 
-        logger.var("db_path", db_path, dict(color="file"))
+        logger.var("db_path", db_path, color="file")
 
         self._db_path = db_path
         self._db = Database(self.db_path, animal=self, update_legacy=update_legacy)
@@ -293,7 +289,9 @@ class HIPPO:
 
         logger.var("curated_tag_cols", curated_tag_cols)
 
-        for path in tqdm(list(aligned_directory.iterdir())):
+        for path in logger.track(
+            list(aligned_directory.iterdir()), prefix="Adding hits..."
+        ):
 
             if not path.is_dir():
                 continue

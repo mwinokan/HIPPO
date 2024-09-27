@@ -1,8 +1,6 @@
 from mout import debug_log
 
-import logging
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 """
 

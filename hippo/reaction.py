@@ -3,9 +3,7 @@ import mcol
 from .compound import Compound
 from .recipe import Recipe
 
-from mlog import setup_logger
-
-logger = setup_logger("HIPPO")
+import mrich as logger
 
 
 class Reaction:
