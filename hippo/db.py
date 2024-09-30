@@ -108,7 +108,9 @@ class Database:
         animal: "HIPPO",
         update_legacy: bool = False,
         overwrite_existing: bool = False,
+        pages: int = 10000,
     ) -> None:
+        """Create a :class:`.Database` from an existing one"""
 
         source = Path(source)
 
@@ -130,7 +132,7 @@ class Database:
         src = sqlite3.connect(source)
         dst = sqlite3.connect(destination)
         with dst:
-            src.backup(dst, pages=1, progress=progress)
+            src.backup(dst, pages=pages, progress=progress)
         dst.close()
         src.close()
 
