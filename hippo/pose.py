@@ -1182,7 +1182,7 @@ class Pose:
     def plain_repr(self) -> str:
         """Unformatted detailed string representation"""
         if self.name:
-            return f"{self.compound}->{self}: {self.name}"
+            return f'{self.compound}->{self}: "{self.name}"'
         else:
             return f"{self.compound}->{self}"
 
@@ -1228,8 +1228,12 @@ class Pose:
         return f"P{self.id}"
 
     def __repr__(self) -> str:
-        """Formatted string representation"""
+        """ANSI Formatted string representation"""
         return f"{mcol.bold}{mcol.underline}{self.plain_repr()}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Formatted string representation"""
+        return f"[bold underline]{self.plain_repr()}"
 
     def __eq__(self, other: "Pose") -> bool:
         """Compare this pose with another instance"""

@@ -103,13 +103,12 @@ class Price:
         return f"{self.symbol}{self.amount:.2f} {self.currency}"
 
     def __repr__(self) -> str:
-        """Formatted string representation"""
-        if self.currency is None:
-            return (
-                f"{mcol.bold}{mcol.underline}Null Price{mcol.unbold}{mcol.ununderline}"
-            )
-
+        """ANSI Formatted string representation"""
         return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self}"
 
     def __add__(self, other: "Price") -> "Price":
         """Add two :class:`.Price` objects

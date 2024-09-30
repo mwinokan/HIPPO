@@ -452,19 +452,24 @@ class PoseTable:
 
         return None
 
-    def __repr__(self) -> str:
-        """Formatted string representation"""
-
-        s = f"{mcol.bold}{mcol.underline}"
-
+    def __str__(self):
+        """Unformatted string representation"""
         if self.name:
-            s += f"{self.name}: "
+            s = f"{self.name}: "
+        else:
+            s = ""
 
-        s += "{" f"P x {len(self)}" "}"
-
-        s += f"{mcol.unbold}{mcol.ununderline}"
+        s += "{" f"P × {len(self)}" "}"
 
         return s
+
+    def __repr__(self) -> str:
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self}"
 
     def __len__(self) -> int:
         """Total number of compounds"""
@@ -1653,19 +1658,24 @@ class PoseSet:
 
     ### DUNDERS
 
-    def __repr__(self) -> str:
-        """Formatted string representation"""
-
-        s = f"{mcol.bold}{mcol.underline}"
-
+    def __str__(self):
+        """Unformatted string representation"""
         if self.name:
-            s += f"{self.name}: "
+            s = f"{self.name}: "
+        else:
+            s = ""
 
-        s += "{" f"P x {len(self)}" "}"
-
-        s += f"{mcol.unbold}{mcol.ununderline}"
+        s += "{" f"P × {len(self)}" "}"
 
         return s
+
+    def __repr__(self) -> str:
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self}"
 
     def __len__(self) -> int:
         """The number of poses in this set"""

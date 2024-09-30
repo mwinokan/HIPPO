@@ -53,6 +53,18 @@ class InteractionTable:
         """The total number of interactions"""
         return self.db.count(self.table)
 
+    def __str__(self) -> str:
+        """Unformatted command-line representation"""
+        return "{" f"I × {len(self)}" "}"
+
+    def __repr__(self) -> str:
+        """ANSI formatted command-line representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich formatted command-line representation"""
+        return f"[bold underline]{self}"
+
 
 class InteractionSet:
     """Class representing a subset of the :class:`.Interaction` objects in the 'interaction' table of the :class:`.Database`.
@@ -538,15 +550,17 @@ class InteractionSet:
         """The number of interactions in this set"""
         return len(self.indices)
 
+    def __str__(self) -> str:
+        """Unformatted command-line representation"""
+        return "{" f"I × {len(self)}" "}"
+
     def __repr__(self) -> str:
-        """Formatted command-line representation"""
-        return (
-            f"{mcol.bold}{mcol.underline}"
-            "{"
-            f"I x {len(self)}"
-            "}"
-            f"{mcol.unbold}{mcol.ununderline}"
-        )
+        """ANSI formatted command-line representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich formatted command-line representation"""
+        return f"[bold underline]{self}"
 
     def __iter__(self):
         """Iterate through interactions in this set"""

@@ -387,3 +387,15 @@ class RandomRecipeGenerator:
 
     def __call__(self, *args, **kwargs):
         return self.generate(*args, **kwargs)
+
+    def __str__(self) -> str:
+        """Unformatted string representation"""
+        return f"RandomRecipeGenerator({recipe_dir=})"
+
+    def __repr__(self) -> str:
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self}"
