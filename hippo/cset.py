@@ -2028,7 +2028,7 @@ class IngredientSet:
 
     def __str__(self) -> str:
         """Unformatted string representation"""
-        return "{" f"I × {len(self)}" "}"
+        return "{" f"Ingredient × {len(self)}" "}"
 
     def __repr__(self) -> str:
         """ANSI ormatted string representation"""

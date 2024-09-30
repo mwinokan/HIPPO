@@ -88,11 +88,15 @@ class Subsite:
 
     def __str__(self):
         """Unformatted string representation"""
-        return f"{self.target.name}->{self.name}"
+        return f"S{self.id}: {self.target.name}->{self.name}"
 
-    def __repr__(self):
-        """Formatted string representation"""
-        return f'{mcol.bold}{mcol.underline}S{self.id} "{self}"{mcol.unbold}{mcol.ununderline}'
+    def __repr__(self) -> str:
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self}"
 
 
 class SubsiteTag:
@@ -166,6 +170,10 @@ class SubsiteTag:
         """Unformatted string representation"""
         return self.name
 
-    def __repr__(self):
-        """Formatted string representation"""
+    def __repr__(self) -> str:
+        """ANSI Formatted string representation"""
         return f'{mcol.bold}{mcol.underline}"{self}"{mcol.unbold}{mcol.ununderline}'
+
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f'[bold underline]"{self}"'

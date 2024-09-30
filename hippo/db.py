@@ -2913,11 +2913,15 @@ class Database:
 
     def __str__(self):
         """Unformatted string representation"""
-        return str(self.path.resolve())
+        return f"Database @ {self.path.resolve()}"
 
     def __repr__(self):
-        """Formatted string representation"""
-        return f"{mcol.bold}{mcol.underline}Database(path={self}){mcol.clear}"
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.clear}"
+
+    def __rich__(self) -> str:
+        """Representation for mrich"""
+        return f"[bold underline]{self}"
 
 
 class LegacyDatabaseError(Exception): ...

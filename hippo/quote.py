@@ -205,18 +205,24 @@ class Quote:
 
     ### DUNDERS
 
-    def __repr__(self) -> str:
-        """Formatted string representation of this Quote"""
-
+    def __str__(self):
+        """Unformatted string representation"""
         if self.purity:
             purity = f" @ {self.purity:.0%}"
         else:
             purity = ""
 
         if self.supplier == "Stock":
-            return f"{mcol.bold}{mcol.underline}C{self.compound} In Stock: {self.amount:}mg{purity}{mcol.unbold}{mcol.ununderline}"
-
-        if self.type:
-            return f"{mcol.bold}{mcol.underline}C{self.compound} {self.entry_str} {self.amount:}mg{purity} = {self.price:} ({self.lead_time} days) {self.smiles} [{self.type}]{mcol.unbold}{mcol.ununderline}"
+            return f"C{self.compound} In Stock: {self.amount:}mg{purity}"
+        elif self.type:
+            return f"C{self.compound} {self.entry_str} {self.amount:}mg{purity} = {self.price:} ({self.lead_time} days) {self.smiles} [{self.type}]"
         else:
-            return f"{mcol.bold}{mcol.underline}C{self.compound} {self.entry_str} {self.amount:}mg{purity} = {self.price:} ({self.lead_time} days) {self.smiles}{mcol.unbold}{mcol.ununderline}"
+            return f"C{self.compound} {self.entry_str} {self.amount:}mg{purity} = {self.price:} ({self.lead_time} days) {self.smiles}"
+
+    def __repr__(self) -> str:
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self}"

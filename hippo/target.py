@@ -134,8 +134,12 @@ class Target:
 
     def __str__(self) -> str:
         """Unformatted string representation"""
-        return f"T{self.id}"
+        return f'T{self.id} "{self.name}"'
 
     def __repr__(self) -> str:
-        """Formatted string representation"""
-        return f'{mcol.bold}{mcol.underline}{self} "{self.name}"{mcol.unbold}{mcol.ununderline}'
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self}"

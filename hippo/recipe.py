@@ -1301,7 +1301,8 @@ class Recipe:
 
     ### DUNDERS
 
-    def __repr__(self):
+    def __str__(self) -> str:
+        """Unformatted string representation"""
         if self.intermediates:
             s = f"{self.reactants} --> {self.intermediates} --> {self.products} via {self.reactions}"
         else:
@@ -1314,6 +1315,14 @@ class Recipe:
             return f"Recipe_{self.hash}({s})"
 
         return f"Recipe({s})"
+
+    def __repr__(self) -> str:
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self}"
 
     def __add__(self, other):
         result = self.copy()
@@ -1430,8 +1439,17 @@ class Route(Recipe):
 
     ### DUNDERS
 
-    def __repr__(self):
-        return f"{mcol.bold}{mcol.underline}Route #{self.id}: {repr(self.product_compound)}"  #' {self.reactants} --> {self.intermediates} --> {self.product_compound} via {self.reactions})'
+    def __str__(self) -> str:
+        """Unformatted string representation"""
+        return f"Route #{self.id}: {self.product_compound}"
+
+    def __repr__(self) -> str:
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self}"
 
 
 class RouteSet:
@@ -1574,16 +1592,17 @@ class RouteSet:
     def __len__(self):
         return len(self.data)
 
+    def __str__(self) -> str:
+        """Unformatted string representation"""
+        return "{" f"Route × {len(self)}" "}"
+
     def __repr__(self) -> str:
-        """Formatted string representation"""
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
 
-        s = f"{mcol.bold}{mcol.underline}"
-
-        s += "{" f"Route x {len(self)}" "}"
-
-        s += f"{mcol.unbold}{mcol.ununderline}"
-
-        return s
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self}"
 
 
 class RecipeSet:
@@ -1708,3 +1727,15 @@ class RecipeSet:
 
     def __iter__(self):
         return iter(self._recipes.values())
+
+    def __str__(self) -> str:
+        """Unformatted string representation"""
+        return "{" f"Recipe × {len(self)}" "}"
+
+    def __repr__(self) -> str:
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self}"

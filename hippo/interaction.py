@@ -171,5 +171,9 @@ class Interaction:
         return f"I{self.id}"
 
     def __repr__(self) -> str:
-        """Formatted string representation"""
-        return f"{mcol.bold}{mcol.underline}{str(self)}{mcol.unbold}{mcol.ununderline}"
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich formatted string representation"""
+        return f"[bold underline]{self}"
