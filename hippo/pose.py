@@ -1144,6 +1144,8 @@ class Pose:
         logger.var("reference", self.reference)
         logger.var("tags", self.tags)
         logger.var("num_heavy_atoms", self.num_heavy_atoms)
+        logger.var("distance_score", self.distance_score)
+        logger.var("energy_score", self.energy_score)
         if inspirations := self.inspirations:
             logger.var("inspirations", self.inspirations.names)
             logger.var("num_atoms_added", self.num_atoms_added)
