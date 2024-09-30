@@ -221,11 +221,11 @@ class Database:
             if "cannot open shared object file" in str(e):
                 logger.error("chemicalite package not installed correctly")
             else:
-                logger.exception(e)
+                logger.error(e)
             raise
 
         except Error as e:
-            logger.exception(e)
+            logger.error(e)
             raise
 
         self._connection = conn
@@ -604,12 +604,12 @@ class Database:
                         f'Skipping compound with existing morgan binary fingerprint "{smiles}"'
                     )
             else:
-                logger.exception(e)
+                logger.error(e)
 
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         compound_id = self.cursor.lastrowid
         if commit:
@@ -657,7 +657,7 @@ class Database:
             self.execute(sql, (compound_id, bfp))
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         bfp_id = self.cursor.lastrowid
         if commit:
@@ -756,11 +756,11 @@ class Database:
                         f'Could not insert pose with duplicate alias "{alias}"'
                     )
             else:
-                logger.exception(e)
+                logger.error(e)
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
             raise
 
         pose_id = self.cursor.lastrowid
@@ -815,7 +815,7 @@ class Database:
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         tag_id = self.cursor.lastrowid
         if commit:
@@ -868,7 +868,7 @@ class Database:
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         inspiration_id = self.cursor.lastrowid
 
@@ -924,7 +924,7 @@ class Database:
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         scaffold_id = self.cursor.lastrowid
 
@@ -965,7 +965,7 @@ class Database:
             self.execute(sql, (type, product, product_yield))
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         reaction_id = self.cursor.lastrowid
         if commit:
@@ -1011,7 +1011,7 @@ class Database:
             logger.warning(f"Skipping existing reactant: {reaction=} {compound=}")
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         reactant_id = self.cursor.lastrowid
 
@@ -1115,7 +1115,7 @@ class Database:
             raise
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
             return None
 
         quote_id = self.cursor.lastrowid
@@ -1148,7 +1148,7 @@ class Database:
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         target_id = self.cursor.lastrowid
         self.commit()
@@ -1208,7 +1208,7 @@ class Database:
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         feature_id = self.cursor.lastrowid
         if commit:
@@ -1263,7 +1263,7 @@ class Database:
             self.execute(sql, (product_id,))
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         route_id = self.cursor.lastrowid
 
@@ -1470,7 +1470,7 @@ class Database:
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         interaction_id = self.cursor.lastrowid
 
@@ -1504,7 +1504,7 @@ class Database:
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         subsite_id = self.cursor.lastrowid
         if commit:
@@ -1564,7 +1564,7 @@ class Database:
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         subsite_tag_id = self.cursor.lastrowid
         if commit:
