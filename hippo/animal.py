@@ -17,6 +17,7 @@ from pathlib import Path
 
 from .tools import inchikey_from_smiles, sanitise_smiles, SanitisationError
 
+import mcol
 import mrich as logger
 
 from rdkit.Chem import Mol
@@ -2241,7 +2242,11 @@ class HIPPO:
 
     def __repr__(self) -> str:
         """Returns a command line representation of this HIPPO"""
-        return f'HIPPO("{self.name}")'
+        return f'{mcol.bold}{mcol.underline}HIPPO("{self.name}"){mcol.clear}'
+
+    def __rich__(self) -> str:
+        """Representation for mrich"""
+        return f'[bold underline]HIPPO("{self.name}")'
 
     def __getitem__(self, key: str):
         """Get a :class:`.Compound`, :class:`.Pose`, or :class:`.Reaction` by its ID. See :meth:`.HIPPO.get_by_shorthand`"""
