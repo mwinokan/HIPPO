@@ -1353,7 +1353,7 @@ class CompoundSet:
         for i in self.indices:
             self.db.insert_tag(name=tag, compound=i, commit=False)
 
-        logger.info(f'Tagged {self} w/ "{tag}"')
+        logger.print(f'Tagged {self} w/ "{tag}"')
 
         self.db.commit()
 
