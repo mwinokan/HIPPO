@@ -374,7 +374,7 @@ class Recipe:
         options = []
 
         logger.var("#compounds", n_comps)
-        logger.info("Solving individual compound recipes...")
+        logger.print("Solving individual compound recipes...")
 
         if n_comps > 1:
             generator = tqdm(zip(compounds, amount), total=n_comps)
@@ -436,7 +436,7 @@ class Recipe:
 
         from itertools import product
 
-        logger.info("Solving recipe combinations...")
+        logger.print("Solving recipe combinations...")
         combinations = list(product(*options))
 
         if not solve_combinations:
@@ -445,7 +445,7 @@ class Recipe:
         if pick_first:
             combinations = [combinations[0]]
 
-        logger.info("Combining recipes...")
+        logger.print("Combining recipes...")
 
         solutions = []
 
@@ -475,7 +475,7 @@ class Recipe:
             return solutions[0]
 
         if pick_cheapest:
-            logger.info("Picking cheapest...")
+            logger.print("Picking cheapest...")
             priced = [r for r in solutions if r.price]
             if not priced:
                 logger.error("0 recipes with prices, can't choose cheapest")
@@ -626,7 +626,7 @@ class Recipe:
                 return None
 
         if debug:
-            logger.info(f'Recipe was generated at: {data["timestamp"]}')
+            logger.print(f'Recipe was generated at: {data["timestamp"]}')
         price = data["price"]
 
         # IngredientSets
