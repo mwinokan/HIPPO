@@ -93,7 +93,7 @@ def download_target(
         "trans_matrix_info": False,
     }
 
-    logger.info("Requesting download...")
+    logger.print("Requesting download...")
 
     url = root + "/api/download_structures/"
 
