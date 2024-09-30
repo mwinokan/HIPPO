@@ -579,6 +579,13 @@ class ReactionSet:
         """Serializable dictionary"""
         return dict(db=str(self.db), indices=self.indices)
 
+    def summary(self) -> None:
+        """Print a summary of the Reactions"""
+
+        logger.header(self)
+        for reaction in self:
+            print(repr(reaction))
+
     ### DUNDERS
 
     def __repr__(self) -> str:
