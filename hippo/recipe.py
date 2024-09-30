@@ -1576,6 +1576,17 @@ class RouteSet:
     def __len__(self):
         return len(self.data)
 
+    def __repr__(self) -> str:
+        """Formatted string representation"""
+
+        s = f"{mcol.bold}{mcol.underline}"
+
+        s += "{" f"Route x {len(self)}" "}"
+
+        s += f"{mcol.unbold}{mcol.ununderline}"
+
+        return s
+
 
 class RecipeSet:
     """
