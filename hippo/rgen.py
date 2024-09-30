@@ -311,7 +311,7 @@ class RandomRecipeGenerator:
             # Break if product pool depleted
             if not len(pool):
                 pbar.update(1)
-                logger.info("Product pool depleted")
+                logger.print("Product pool depleted")
                 pbar.close()
                 break
 
@@ -323,13 +323,13 @@ class RandomRecipeGenerator:
 
             if len(recipe.reactions) > max_reactions:
                 pbar.close()
-                logger.info("Max #reactions exceeded")
+                logger.print("Max #reactions exceeded")
                 # recipe = old_recipe.copy()
                 break
 
             if len(recipe.products) > max_products:
                 pbar.close()
-                logger.info("Max #products exceeded")
+                logger.print("Max #products exceeded")
                 # recipe = old_recipe.copy()
                 break
 
