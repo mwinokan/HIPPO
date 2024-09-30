@@ -37,7 +37,9 @@ class Database:
 
     """
 
-    def __init__(self, path: Path, animal, update_legacy: bool = False) -> None:
+    def __init__(
+        self, path: Path, animal: "HIPPO", update_legacy: bool = False
+    ) -> None:
 
         assert isinstance(path, Path)
 
@@ -97,6 +99,46 @@ class Database:
         if "route" not in self.table_names:
             self.create_table_route()
             self.create_table_component()
+
+    @classmethod
+    def copy_from(
+        self,
+        source: Path,
+        destination: Path,
+        animal: "HIPPO",
+        update_legacy: bool = False,
+        overwrite_existing: bool = False,
+    ) -> None:
+
+        source = Path(source)
+
+        assert source.exists()
+
+        if destination.exists():
+            if overwrite_existing:
+                logger.warning(f"Overwriting {destination}")
+            else:
+                logger.error(f"Will not overwrite {destination}")
+                logger.error(f"Set overwrite_existing=True to override")
+                raise Exception("Set overwrite_existing=True to override")
+
+        logger.header(f"Copying {source} --> {destination}")
+
+        def progress(status, remaining, total):
+            logger.debug(f"Copied {total-remaining} of {total} pages...")
+
+        src = sqlite3.connect(source)
+        dst = sqlite3.connect(destination)
+        with dst:
+            src.backup(dst, pages=1, progress=progress)
+        dst.close()
+        src.close()
+
+        self = cls.__new__(cls)
+
+        self.__init__(path=destination, animal=animal, update_legacy=update_legacy)
+
+        return self
 
     ### PROPERTIES
 

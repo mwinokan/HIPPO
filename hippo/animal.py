@@ -40,6 +40,7 @@ class HIPPO:
 
     :param project_name: give this :class:`.HIPPO` a name
     :param db_path: path where the :class:`.Database` will be stored
+    :param copy_from: optionally initialise this animal by copying the :class:`.Database` at this given path, defaults to None
     :returns: :class:`.HIPPO` object
     """
 
@@ -47,6 +48,8 @@ class HIPPO:
         self,
         name: str,
         db_path: str | Path,
+        copy_from: str | Path | None = None,
+        overwrite_existing: bool = False,
         update_legacy: bool = False,
     ):
 
@@ -64,7 +67,17 @@ class HIPPO:
         logger.var("db_path", db_path, dict(color="file"))
 
         self._db_path = db_path
-        self._db = Database(self.db_path, animal=self, update_legacy=update_legacy)
+
+        if copy_from:
+            self._db = Database.copy_from(
+                source=copy_from,
+                destination=self.db_path,
+                animal=self,
+                update_legacy=update_legacy,
+                overwrite_existing=overwrite_existing,
+            )
+        else:
+            self._db = Database(self.db_path, animal=self, update_legacy=update_legacy)
 
         self._compounds = CompoundTable(self.db)
         self._poses = PoseTable(self.db)
