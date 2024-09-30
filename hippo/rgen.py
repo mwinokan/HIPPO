@@ -267,6 +267,8 @@ class RandomRecipeGenerator:
         # get the RouteSet
         pool = self.route_pool.copy()
 
+        assert len(pool), "Route pool is empty!"
+
         if shuffle:
             logger.debug("Shuffling Route pool")
             pool.shuffle()
