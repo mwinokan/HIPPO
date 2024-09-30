@@ -102,7 +102,7 @@ class Database:
 
     @classmethod
     def copy_from(
-        self,
+        cls,
         source: Path,
         destination: Path,
         animal: "HIPPO",
