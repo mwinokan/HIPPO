@@ -610,7 +610,7 @@ class ReactionSet:
         try:
             index = self.indices[key]
         except IndexError:
-            logger.exception(f"list index out of range: {key=} for {self}")
+            logger.error(f"list index out of range: {key=} for {self}")
             raise
         return self.db.get_reaction(id=index)
 
