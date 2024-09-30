@@ -64,7 +64,7 @@ class RandomRecipeGenerator:
     ### FACTORIES
 
     @classmethod
-    def from_json(cls, db, path):
+    def from_json(cls, db: "Database", path: "Path | str"):
         """Construct the RandomRecipeGenerator from a JSON file
 
         :param db:
@@ -82,7 +82,10 @@ class RandomRecipeGenerator:
         self._suppliers = data["suppliers"]
 
         self._starting_recipe = Recipe.from_json(
-            db=db, path=None, data=data["starting_recipe"]
+            db=db,
+            path=None,
+            data=data["starting_recipe"],
+            allow_db_mismatch=True,
         )
 
         logger.var("database", self.db_path)
