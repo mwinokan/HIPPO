@@ -90,6 +90,7 @@ class Database:
                 logger.error(
                     "Re-initialise HIPPO object with update_legacy=True to fix"
                 )
+                raise LegacyDatabaseError("hippo-db < 0.3.25")
             else:
                 logger.warning("This is a legacy format database (hippo-db < 0.3.25)")
                 logger.warning("Migrating compound_base values to scaffold table...")
@@ -99,6 +100,19 @@ class Database:
         if "route" not in self.table_names:
             self.create_table_route()
             self.create_table_component()
+
+        elif "component_amount" not in self.column_names("component"):
+            if not update_legacy:
+                logger.error("This is a legacy format database (hippo-db < 0.3.29)")
+                logger.error(
+                    "Re-initialise HIPPO object with update_legacy=True to fix"
+                )
+                raise LegacyDatabaseError("hippo-db < 0.3.29")
+            else:
+                logger.warning("This is a legacy format database (hippo-db < 0.3.29)")
+                logger.warning("Updating legacy routes...")
+
+            self.update_legacy_routes()
 
     @classmethod
     def copy_from(
@@ -465,6 +479,7 @@ class Database:
             component_route INTEGER,
             component_type INTEGER,
             component_ref INTEGER,
+            component_amount REAL,
             CONSTRAINT UC_component UNIQUE (component_route, component_ref, component_type)
         );
         """
@@ -1265,6 +1280,7 @@ class Database:
         route: int,
         ref: int,
         component_type: int,
+        amount: float = 1.0,
         commit: bool = True,
     ) -> int:
         """
@@ -1285,16 +1301,30 @@ class Database:
         """
 
         sql = """
-        INSERT INTO component(component_route, component_type, component_ref)
-        VALUES(?1, ?2, ?3)
+        INSERT INTO component(component_route, component_type, component_ref, component_amount)
+        VALUES(:component_route, :component_type, :component_ref, :component_amount)
         """
 
         route = int(route)
         ref = int(ref)
         component_type = int(component_type)
 
+        if component_type == 1:
+            component_amount = None
+        else:
+            component_amount = float(amount)
+            assert component_amount > 0
+
         try:
-            self.execute(sql, (route, component_type, ref))
+            self.execute(
+                sql,
+                dict(
+                    component_route=route,
+                    component_type=component_type,
+                    component_ref=ref,
+                    component_amount=component_amount,
+                ),
+            )
 
         except sqlite3.IntegrityError as e:
 
@@ -1305,9 +1335,6 @@ class Database:
                 return None
             else:
                 raise
-
-        except Exception as e:
-            logger.exception(e)
 
         component_id = self.cursor.lastrowid
 
@@ -1911,6 +1938,30 @@ class Database:
 
         return cursor.lastrowid
 
+    def update_legacy_routes(self) -> None:
+        """Update legacy component entries"""
+
+        # add column
+
+        sql = """
+        ALTER TABLE component
+        ADD component_amount REAL;
+        """
+
+        self.execute(sql)
+
+        # set values
+
+        sql = """
+        UPDATE component
+        SET component_amount = :component_amount
+        WHERE component_type = :component_type;
+        """
+
+        self.execute(sql, dict(component_amount=None, component_type=1))
+        self.execute(sql, dict(component_amount=1.0, component_type=2))
+        self.execute(sql, dict(component_amount=1.0, component_type=3))
+
     ### GETTERS
 
     def get_compound(
@@ -2249,25 +2300,29 @@ class Database:
         if debug:
             logger.var("product_id", product_id)
 
-        pairs = self.select_where(
+        triples = self.select_where(
             table="component",
-            query="component_ref, component_type",
+            query="component_ref, component_type, component_amount",
             key=f"component_route IS {id} ORDER BY component_id",
             multiple=True,
         )
 
         reaction_ids = []
         reactant_ids = []
+        reactant_amounts = []
         intermediate_ids = []
+        intermediate_amounts = []
 
-        for ref, c_type in pairs:
+        for ref, c_type, amount in triples:
             match c_type:
                 case 1:
                     reaction_ids.append(ref)
                 case 2:
                     reactant_ids.append(ref)
+                    reactant_amounts.append(amount)
                 case 3:
                     intermediate_ids.append(ref)
+                    intermediate_amounts.append(amount)
                 case _:
                     raise ValueError(f"Unknown component type {c_type}")
 
@@ -2279,8 +2334,12 @@ class Database:
         intermediates = CompoundSet(self, intermediate_ids)
 
         products = IngredientSet.from_compounds(compounds=products, amount=1)
-        reactants = IngredientSet.from_compounds(compounds=reactants, amount=1)
-        intermediates = IngredientSet.from_compounds(compounds=intermediates, amount=1)
+        reactants = IngredientSet.from_compounds(
+            compounds=reactants, amount=reactant_amounts
+        )
+        intermediates = IngredientSet.from_compounds(
+            compounds=intermediates, amount=intermediate_amounts
+        )
 
         reactions = ReactionSet(self, reaction_ids)
 
@@ -2940,7 +2999,7 @@ class Database:
             # commit the changes
             self.commit()
 
-    ### PRINTING
+    ### TABLE INFO
 
     def print_table(
         self,
@@ -2954,6 +3013,24 @@ class Database:
 
         self.execute(f"SELECT * FROM {table}")
         pprint(self.cursor.fetchall())
+
+    def table_info(
+        self,
+        table: str,
+    ) -> list[tuple]:
+        """Print a table's schema
+
+        :param table: the table to print
+
+        """
+
+        self.execute(f"PRAGMA table_info({table})")
+        return self.cursor.fetchall()
+
+    def column_names(self, table: str) -> list[str]:
+        """Get the column names of the given table"""
+        table_info = self.table_info(table)
+        return [i[1] for i in table_info]
 
     ### DUNDERS
 
