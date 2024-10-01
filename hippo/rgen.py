@@ -187,7 +187,13 @@ class RandomRecipeGenerator:
 		),
 
 		route_reactants AS (
-			SELECT route_id, route_product, COUNT(CASE WHEN count_valid = 0 THEN 1 END) AS [count_unavailable] FROM route
+			SELECT route_id, route_product, 
+            COUNT(
+                CASE 
+                    WHEN count_valid = 0 THEN 1 
+                    WHEN count_valid IS NULL THEN 1 
+                END) 
+            AS [count_unavailable] FROM route
 			INNER JOIN component ON component_route = route_id
 			LEFT JOIN possible_reactants ON quote_compound = component_ref
 			WHERE component_type = 2
