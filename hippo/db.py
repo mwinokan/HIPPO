@@ -1266,6 +1266,7 @@ class Database:
         route: int,
         ref: int,
         component_type: int,
+        amount: float = 1.0,
         commit: bool = True,
     ) -> int:
         """
@@ -1286,16 +1287,27 @@ class Database:
         """
 
         sql = """
-        INSERT INTO component(component_route, component_type, component_ref)
-        VALUES(?1, ?2, ?3)
+        INSERT INTO component(component_route, component_type, component_ref, component_amount)
+        VALUES(:component_route, :component_type, :component_ref, :component_amount)
         """
 
         route = int(route)
         ref = int(ref)
         component_type = int(component_type)
+        component_amount = float(amount)
+
+        assert component_amount > 0
 
         try:
-            self.execute(sql, (route, component_type, ref))
+            self.execute(
+                sql,
+                dict(
+                    component_route=component_route,
+                    component_type=component_type,
+                    component_ref=component_ref,
+                    component_amount=component_amount,
+                ),
+            )
 
         except sqlite3.IntegrityError as e:
 
