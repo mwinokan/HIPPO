@@ -2964,7 +2964,7 @@ class Database:
             # commit the changes
             self.commit()
 
-    ### PRINTING
+    ### TABLE INFO
 
     def print_table(
         self,
@@ -2979,17 +2979,18 @@ class Database:
         self.execute(f"SELECT * FROM {table}")
         pprint(self.cursor.fetchall())
 
-    def column_names(self, table: str) -> list[str]:
-        """Get the column names of the given table"""
-        sql = """
-        SELECT *
-        FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_NAME = :table_name
+    def table_info(
+        self,
+        table: str,
+    ) -> list[tuple]:
+        """Print a table's schema
+
+        :param table: the table to print
+
         """
 
-        results = self.execute(sql, dict(table_name=table)).fetchall()
-
-        print(results)
+        self.execute(f"PRAGMA table_info({table})")
+        return self.cursor.fetchall()
 
     ### DUNDERS
 
