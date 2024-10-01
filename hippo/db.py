@@ -465,6 +465,7 @@ class Database:
             component_route INTEGER,
             component_type INTEGER,
             component_ref INTEGER,
+            component_amount REAL,
             CONSTRAINT UC_component UNIQUE (component_route, component_ref, component_type)
         );
         """
