@@ -2060,15 +2060,15 @@ class HIPPO:
             )
 
         # reactants
-        for ref in recipe.reactants.compound_ids:
+        for ref, amount in recipe.reactants.id_amount_pairs:
             self.db.insert_component(
-                component_type=2, ref=ref, route=route_id, commit=False
+                component_type=2, ref=ref, route=route_id, amount=amount, commit=False
             )
 
         # intermediates
-        for ref in recipe.intermediates.compound_ids:
+        for ref, amount in recipe.intermediates.id_amount_pairs:
             self.db.insert_component(
-                component_type=3, ref=ref, route=route_id, commit=False
+                component_type=3, ref=ref, route=route_id, amount=amount, commit=False
             )
 
         if commit:

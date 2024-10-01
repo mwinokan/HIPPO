@@ -1734,6 +1734,13 @@ class IngredientSet:
         return self.compound_ids
 
     @property
+    def id_amount_pairs(self) -> list[tuple]:
+        """Get a list of compound ID and amount pairs"""
+        return [
+            (id, amount) for id, amount in self.df[["compound_id", "amount"]].values
+        ]
+
+    @property
     def str_compound_ids(self) -> str:
         """Return an SQL formatted tuple string of the :class:`.Compound` IDs"""
         return str(tuple(self.df["compound_id"].values)).replace(",)", ")")
