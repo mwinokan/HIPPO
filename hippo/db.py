@@ -2992,6 +2992,11 @@ class Database:
         self.execute(f"PRAGMA table_info({table})")
         return self.cursor.fetchall()
 
+    def column_names(self, table: str) -> list[str]:
+        """Get the column names of the given table"""
+        table_info = self.table_info(table)
+        return [i[1] for i in table_info]
+
     ### DUNDERS
 
     def __str__(self):
