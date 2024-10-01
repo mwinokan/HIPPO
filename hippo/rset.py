@@ -300,6 +300,24 @@ class ReactionTable:
         """Iterate through poses in this set"""
         return iter(self[i + 1] for i in range(len(self)))
 
+    def __call__(
+        self,
+        *,
+        type: str = None,
+    ) -> "ReactionSet":
+        """Filter reactions by a given type
+
+        :param type: reaction type to filter by
+        :returns: :class:`.ReactionSet`
+
+        """
+
+        if type:
+            return self.get_by_type(type)
+        else:
+            logger.error("Must provide type argument")
+            return None
+
 
 class ReactionSet:
     """Object representing a subset of the 'reaction' table in the :class:`.Database`.
