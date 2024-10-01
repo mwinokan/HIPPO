@@ -2979,6 +2979,18 @@ class Database:
         self.execute(f"SELECT * FROM {table}")
         pprint(self.cursor.fetchall())
 
+    def column_names(self, table: str) -> list[str]:
+        """Get the column names of the given table"""
+        sql = """
+        SELECT *
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_NAME = :table_name
+        """
+
+        results = self.execute(sql, dict(table_name=table)).fetchall()
+
+        print(results)
+
     ### DUNDERS
 
     def __str__(self):
