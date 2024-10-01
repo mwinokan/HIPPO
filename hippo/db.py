@@ -1294,9 +1294,12 @@ class Database:
         route = int(route)
         ref = int(ref)
         component_type = int(component_type)
-        component_amount = float(amount)
 
-        assert component_amount > 0
+        if component_type == 1:
+            component_amount = None
+        else:
+            component_amount = float(amount)
+            assert component_amount > 0
 
         try:
             self.execute(
@@ -2262,25 +2265,29 @@ class Database:
         if debug:
             logger.var("product_id", product_id)
 
-        pairs = self.select_where(
+        triples = self.select_where(
             table="component",
-            query="component_ref, component_type",
+            query="component_ref, component_type, component_amount",
             key=f"component_route IS {id} ORDER BY component_id",
             multiple=True,
         )
 
         reaction_ids = []
         reactant_ids = []
+        reactant_amounts = []
         intermediate_ids = []
+        intermediate_amounts = []
 
-        for ref, c_type in pairs:
+        for ref, c_type, amount in triples:
             match c_type:
                 case 1:
                     reaction_ids.append(ref)
                 case 2:
                     reactant_ids.append(ref)
+                    reactant_amounts.append(ref)
                 case 3:
                     intermediate_ids.append(ref)
+                    intermediate_amounts.append(ref)
                 case _:
                     raise ValueError(f"Unknown component type {c_type}")
 
@@ -2292,8 +2299,12 @@ class Database:
         intermediates = CompoundSet(self, intermediate_ids)
 
         products = IngredientSet.from_compounds(compounds=products, amount=1)
-        reactants = IngredientSet.from_compounds(compounds=reactants, amount=1)
-        intermediates = IngredientSet.from_compounds(compounds=intermediates, amount=1)
+        reactants = IngredientSet.from_compounds(
+            compounds=reactants, amount=reactant_amounts
+        )
+        intermediates = IngredientSet.from_compounds(
+            compounds=intermediates, amount=intermediate_amounts
+        )
 
         reactions = ReactionSet(self, reaction_ids)
 
