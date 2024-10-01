@@ -1319,9 +1319,9 @@ class Database:
             self.execute(
                 sql,
                 dict(
-                    component_route=component_route,
+                    component_route=route,
                     component_type=component_type,
-                    component_ref=component_ref,
+                    component_ref=ref,
                     component_amount=component_amount,
                 ),
             )
