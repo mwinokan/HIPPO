@@ -1944,7 +1944,18 @@ class Database:
     def update_legacy_routes(self) -> None:
         """Update legacy component entries"""
 
-        sql = f"""
+        # add column
+
+        sql = """
+        ALTER TABLE component
+        ADD component_amount REAL;
+        """
+
+        self.execute(sql)
+
+        # set values
+
+        sql = """
         UPDATE component
         SET component_amount = :component_amount
         WHERE component_type = :component_type;
