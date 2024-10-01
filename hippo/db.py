@@ -1336,9 +1336,6 @@ class Database:
             else:
                 raise
 
-        except Exception as e:
-            logger.exception(e)
-
         component_id = self.cursor.lastrowid
 
         if commit:
