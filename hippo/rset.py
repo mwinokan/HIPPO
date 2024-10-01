@@ -232,8 +232,8 @@ class ReactionTable:
         self.db.execute(
             sql,
             dict(
-                reaction_product_yield=reaction_product_yield,
-                reaction_type=reaction_type,
+                reaction_product_yield=product_yield,
+                reaction_type=type,
             ),
         )
 
