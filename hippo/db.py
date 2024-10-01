@@ -1950,9 +1950,9 @@ class Database:
         WHERE component_type = :component_type;
         """
 
-        self.db.execute(sql, dict(component_amount=None, component_type=1))
-        self.db.execute(sql, dict(component_amount=1.0, component_type=2))
-        self.db.execute(sql, dict(component_amount=1.0, component_type=3))
+        self.execute(sql, dict(component_amount=None, component_type=1))
+        self.execute(sql, dict(component_amount=1.0, component_type=2))
+        self.execute(sql, dict(component_amount=1.0, component_type=3))
 
     ### GETTERS
 
