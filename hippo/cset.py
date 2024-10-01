@@ -2087,3 +2087,7 @@ class IngredientSet:
 
         else:
             raise NotImplementedError
+
+    def __getattr__(self, key: str):
+        """For missing attributes try getting from associated :class:`.CompoundSet`"""
+        return getattr(self.compounds, key)
