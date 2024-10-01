@@ -1746,6 +1746,10 @@ class HIPPO:
 
         ### INSERT A NEW REACTION
 
+        assert (
+            product_yield > 0 and product_yield <= 1.0
+        ), f"{product_yield=} out of range (0,1)"
+
         reaction_id = self.db.insert_reaction(
             type=type, product=product, commit=commit, product_yield=product_yield
         )

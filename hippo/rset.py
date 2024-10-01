@@ -215,6 +215,28 @@ class ReactionTable:
         data = data.values()
         return DataFrame(data)
 
+    def set_product_yields(self, *, type: str, product_yield: float) -> None:
+        """Set the product_yield for all member :class:`.Reaction` entries with given type
+
+        :param type: the :class:`.Reaction` type to filter by
+        :param product_yield: the :class:`.Reaction` product_yield to assign
+
+        """
+
+        sql = f"""
+        UPDATE reaction
+        SET reaction_product_yield = :reaction_product_yield
+        WHERE reaction_type = :reaction_type;
+        """
+
+        animal.db.execute(
+            sql,
+            dict(
+                reaction_product_yield=reaction_product_yield,
+                reaction_type=reaction_type,
+            ),
+        )
+
     ### DUNDERS
 
     def __getitem__(self, key) -> "Reaction | ReactionSet | None":
