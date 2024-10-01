@@ -305,7 +305,13 @@ class RandomRecipeGenerator:
                 logger.var("#recipe.reactants", len(recipe.reactants))
 
             # calculate the new price
-            new_price = recipe.price
+            try:
+                new_price = recipe.price
+            except AssertionError:
+                logger.error(
+                    f"Something went wrong while calculating the price after adding {candidate_route=} to recipe"
+                )
+                raise
 
             if debug:
                 logger.var("new price", new_price)
