@@ -90,6 +90,7 @@ class Database:
                 logger.error(
                     "Re-initialise HIPPO object with update_legacy=True to fix"
                 )
+                raise LegacyDatabaseError("hippo-db < 0.3.25")
             else:
                 logger.warning("This is a legacy format database (hippo-db < 0.3.25)")
                 logger.warning("Migrating compound_base values to scaffold table...")
@@ -99,6 +100,19 @@ class Database:
         if "route" not in self.table_names:
             self.create_table_route()
             self.create_table_component()
+
+        elif "component_amount" not in self.column_names("component"):
+            if not update_legacy:
+                logger.error("This is a legacy format database (hippo-db < 0.3.29)")
+                logger.error(
+                    "Re-initialise HIPPO object with update_legacy=True to fix"
+                )
+                raise LegacyDatabaseError("hippo-db < 0.3.29")
+            else:
+                logger.warning("This is a legacy format database (hippo-db < 0.3.29)")
+                logger.warning("Updating legacy routes...")
+
+            self.update_legacy_routes()
 
     @classmethod
     def copy_from(
@@ -1926,6 +1940,19 @@ class Database:
         self.commit()
 
         return cursor.lastrowid
+
+    def update_legacy_routes(self) -> None:
+        """Update legacy component entries"""
+
+        sql = f"""
+        UPDATE component
+        SET component_amount = :component_amount
+        WHERE component_type = :component_type;
+        """
+
+        self.db.execute(sql, dict(component_amount=None, component_type=1))
+        self.db.execute(sql, dict(component_amount=1.0, component_type=2))
+        self.db.execute(sql, dict(component_amount=1.0, component_type=3))
 
     ### GETTERS
 
