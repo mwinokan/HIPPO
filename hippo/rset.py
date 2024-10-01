@@ -229,7 +229,7 @@ class ReactionTable:
         WHERE reaction_type = :reaction_type;
         """
 
-        animal.db.execute(
+        self.db.execute(
             sql,
             dict(
                 reaction_product_yield=reaction_product_yield,
