@@ -2322,10 +2322,10 @@ class Database:
                     reaction_ids.append(ref)
                 case 2:
                     reactant_ids.append(ref)
-                    reactant_amounts.append(ref)
+                    reactant_amounts.append(amount)
                 case 3:
                     intermediate_ids.append(ref)
-                    intermediate_amounts.append(ref)
+                    intermediate_amounts.append(amount)
                 case _:
                     raise ValueError(f"Unknown component type {c_type}")
 
