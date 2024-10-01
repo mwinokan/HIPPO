@@ -215,6 +215,28 @@ class ReactionTable:
         data = data.values()
         return DataFrame(data)
 
+    def set_product_yields(self, *, type: str, product_yield: float) -> None:
+        """Set the product_yield for all member :class:`.Reaction` entries with given type
+
+        :param type: the :class:`.Reaction` type to filter by
+        :param product_yield: the :class:`.Reaction` product_yield to assign
+
+        """
+
+        sql = f"""
+        UPDATE reaction
+        SET reaction_product_yield = :reaction_product_yield
+        WHERE reaction_type = :reaction_type;
+        """
+
+        self.db.execute(
+            sql,
+            dict(
+                reaction_product_yield=product_yield,
+                reaction_type=type,
+            ),
+        )
+
     ### DUNDERS
 
     def __getitem__(self, key) -> "Reaction | ReactionSet | None":
@@ -277,6 +299,24 @@ class ReactionTable:
     def __iter__(self):
         """Iterate through poses in this set"""
         return iter(self[i + 1] for i in range(len(self)))
+
+    def __call__(
+        self,
+        *,
+        type: str = None,
+    ) -> "ReactionSet":
+        """Filter reactions by a given type
+
+        :param type: reaction type to filter by
+        :returns: :class:`.ReactionSet`
+
+        """
+
+        if type:
+            return self.get_by_type(type)
+        else:
+            logger.error("Must provide type argument")
+            return None
 
 
 class ReactionSet:
@@ -578,6 +618,13 @@ class ReactionSet:
     def get_dict(self) -> dict[str]:
         """Serializable dictionary"""
         return dict(db=str(self.db), indices=self.indices)
+
+    def summary(self) -> None:
+        """Print a summary of the Reactions"""
+
+        logger.header(self)
+        for reaction in self:
+            print(repr(reaction))
 
     ### DUNDERS
 
