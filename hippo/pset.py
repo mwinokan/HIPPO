@@ -790,6 +790,18 @@ class PoseSet:
         return self._interactions
 
     @property
+    def num_fingerprinted(self) -> int:
+        """Count the number of fingerprinted poses in this set"""
+        return self.db.count_where(
+            table="pose", key=f"pose_id IN {self.str_ids} AND pose_fingerprint = 1"
+        )
+
+    @property
+    def fraction_fingerprinted(self) -> float:
+        """Return the fraction of fingerprinted poses in this set"""
+        return self.num_fingerprinted / len(self)
+
+    @property
     def num_subsites(self) -> int:
         """Count the number of subsites that poses in this set come into contact with"""
         (count,) = self.db.select_where(
