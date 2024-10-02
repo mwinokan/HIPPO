@@ -377,6 +377,7 @@ class RandomRecipeGenerator:
             "gen_shuffle": shuffle,
             "gen_iterations": i,
             "gen_stop_reason": stop_reason,
+            "gen_recipe_path": out_file,
         }
 
         # write the Recipe JSON
