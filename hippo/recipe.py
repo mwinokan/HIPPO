@@ -1095,7 +1095,7 @@ class Recipe:
         self.reactants.df["amount"] += amount
 
     def write_json(self, file, *, extra: dict | None = None, indent="\t", **kwargs):
-        r"""Serialise this recipe object and write it to disk
+        """Serialise this recipe object and write it to disk
 
         :param file:
         :param extra:
@@ -1608,6 +1608,7 @@ class RecipeSet:
     def __init__(self, db, directory, pattern="*.json"):
 
         from pathlib import Path
+        from json import JSONDecodeError
 
         self._db = db
         self._json_directory = Path(directory)
@@ -1623,13 +1624,17 @@ class RecipeSet:
 
         self._recipes = {}
         for key, path in tqdm(self._json_paths.items()):
-            recipe = Recipe.from_json(
-                db=self.db,
-                path=path,
-                allow_db_mismatch=True,
-                debug=False,
-                db_mismatch_warning=False,
-            )
+            try:
+                recipe = Recipe.from_json(
+                    db=self.db,
+                    path=path,
+                    allow_db_mismatch=True,
+                    debug=False,
+                    db_mismatch_warning=False,
+                )
+            except JSONDecodeError:
+                logger.error(f"Bad JSON in {path}")
+                continue
             recipe._hash = key
             self._recipes[key] = recipe
 
