@@ -325,7 +325,8 @@ class RandomRecipeGenerator:
             # Break if product pool depleted
             if not len(pool):
                 pbar.update(1)
-                logger.info("Product pool depleted")
+                stop_reason = "Product pool depleted"
+                logger.info(stop_reason)
                 pbar.close()
                 break
 
@@ -337,14 +338,14 @@ class RandomRecipeGenerator:
 
             if len(recipe.reactions) > max_reactions:
                 pbar.close()
-                logger.info("Max #reactions exceeded")
-                # recipe = old_recipe.copy()
+                stop_reason = "Max #reactions exceeded"
+                logger.info(stop_reason)
                 break
 
             if len(recipe.products) > max_products:
                 pbar.close()
-                logger.info("Max #products exceeded")
-                # recipe = old_recipe.copy()
+                stop_reason = "Max #products exceeded"
+                logger.info(stop_reason)
                 break
 
             # accept change
@@ -354,15 +355,32 @@ class RandomRecipeGenerator:
             # pbar.set_postfix(dict(price=str(price)))
 
         else:
-            logger.warning("Max #iterations reached")
+            stop_reason = "Max #iterations reached"
+            logger.warning(stop_reason)
             pbar.close()
 
         ### recalculate the products to see if any extra can be had for free?
 
         logger.success(f"Completed after {i} iterations")
 
+        metadict = {
+            "rgen_data_path": str(self.data_path.resolve()),
+            "rgen_db_path": str(self.db_path.resolve()),
+            "rgen_recipe_dir": str(self.recipe_dir.resolve()),
+            "rgen_max_lead_time": self.max_lead_time,
+            "rgen_suppliers": self.suppliers,
+            "gen_budget": budget,
+            "gen_currency": currency,
+            "gen_max_products": max_products,
+            "gen_max_reactions": max_reactions,
+            "gen_max_iter": max_iter,
+            "gen_shuffle": shuffle,
+            "gen_iterations": i,
+            "gen_stop_reason": stop_reason,
+        }
+
         # write the Recipe JSON
-        recipe.write_json(out_file)
+        recipe.write_json(out_file, extra=metadict)
 
         return recipe
 

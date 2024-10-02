@@ -1094,16 +1094,21 @@ class Recipe:
         """
         self.reactants.df["amount"] += amount
 
-    def write_json(self, file, *, indent="\t", **kwargs):
+    def write_json(self, file, *, extra: dict | None = None, indent="\t", **kwargs):
         r"""Serialise this recipe object and write it to disk
 
         :param file:
+        :param extra:
         :param indent:  (Default value = '\t')
 
         """
         import json
 
         data = self.get_dict(serialise_price=True, **kwargs)
+
+        if extra:
+            data = extra.update(data)
+
         logger.writing(file)
         json.dump(data, open(file, "wt"), indent=indent)
 
