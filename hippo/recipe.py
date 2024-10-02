@@ -1514,6 +1514,13 @@ class RouteSet:
         return [i for i, in ids]
 
     @property
+    def products(self) -> "CompoundSet":
+        """Return a :class:`.CompoundSet` of all the route products"""
+        from .cset import CompoundSet
+
+        return CompoundSet(self.db, self.product_ids)
+
+    @property
     def str_ids(self):
         """Return an SQL formatted tuple string of the :class:`.Route` ID's"""
         return str(tuple(self.ids)).replace(",)", ")")

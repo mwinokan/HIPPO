@@ -105,7 +105,6 @@ class Target:
         """
 
         if reference_id and reference_id in self._feature_cache:
-            # logger.debug(f'Using cached {reference_id=}')
             return self._feature_cache[reference_id]
 
         else:
