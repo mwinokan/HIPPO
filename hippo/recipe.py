@@ -1043,35 +1043,33 @@ class Recipe:
         if price:
             price = self.price
             if price:
-                logger.var("\nprice", price.amount, dict(unit=price.currency))
+                print("\nprice", price.amount, dict(unit=price.currency))
                 # logger.var('lead-time', self.lead_time, dict(unit='working days'))
 
         logger.var("\n#products", len(self.products))
-        for product in self.products:
-            print(str(product.compound), f"{product.amount:.2f}", dict(unit="mg"))
-            # break
+
+        if len(self.products) < 100:
+            for product in self.products:
+                print(str(product.compound), f"{product.amount:.2f}", dict(unit="mg"))
 
         logger.var("\n#intermediates", len(self.intermediates))
-        for intermediate in self.intermediates:
-            print(
-                str(intermediate.compound),
-                f"{intermediate.amount:.2f}",
-                dict(unit="mg"),
-            )
-            # break
+        if len(self.intermediates) < 100:
+            for intermediate in self.intermediates:
+                print(
+                    str(intermediate.compound),
+                    f"{intermediate.amount:.2f}",
+                    dict(unit="mg"),
+                )
 
         logger.var("\n#reactants", len(self.reactants))
-        for reactant in self.reactants:
-            print(
-                str(reactant.compound), f"{reactant.amount:.2f}", dict(unit="mg")
-            )
-            # break
-            # logger.out(f'{mcol.varName}{reactant}{mcol.clear} = {reactant.amount:.2f} {mcol.varType}mg{mcol.clear}, {self.get_reactant_reactions(reactant)}')
+        if len(self.reactants) < 100:
+            for reactant in self.reactants:
+                print(str(reactant.compound), f"{reactant.amount:.2f}", dict(unit="mg"))
 
         logger.var("\n#reactions", len(self.reactions))
-        for reaction in self.reactions:
-            print(str(reaction), reaction.reaction_str, dict(unit=reaction.type))
-            # break
+        if len(self.reactions) < 100:
+            for reaction in self.reactions:
+                print(str(reaction), reaction.reaction_str, dict(unit=reaction.type))
 
     def get_ingredient(self, id):
         """Get an ingredient by its compound ID
