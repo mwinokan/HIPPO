@@ -34,6 +34,7 @@ PI_STACK_F2F_CUTOFF = 4.5
 PI_STACK_E2F_CUTOFF = 6.0
 MUTATION_WARNING_DIST = 15
 
+
 class Pose:
     """A :class:`.Pose` is a particular conformer of a :class:`.Compound` within a protein environment. A pose will have its own (stereochemical) smiles string, and must have a path to a coordinate file. Poses can have *inspirations* that can be used to trace fragment-derived scaffolds in merges and expansions.
 
@@ -814,8 +815,13 @@ class Pose:
 
                 if prot_residue.name != prot_feature.residue_name:
                     com = prot_residue.centre_of_mass()
-                    if any(np.linalg.norm(com - cf.position) < MUTATION_WARNING_DIST for cf in comp_features):
-                        mutation_warnings.add(f"{prot_residue.name} {prot_residue.number} -> {prot_feature.residue_name} {prot_feature.residue_number}")
+                    if any(
+                        np.linalg.norm(com - cf.position) < MUTATION_WARNING_DIST
+                        for cf in comp_features
+                    ):
+                        mutation_warnings.add(
+                            f"{prot_residue.name} {prot_residue.number} -> {prot_feature.residue_name} {prot_feature.residue_number}"
+                        )
                         mutation_count += 1
                     continue
 
@@ -944,7 +950,9 @@ class Pose:
                         )
 
             if mutation_warnings:
-                logger.warning(f"Skipped {mutation_count} protein features because the residue was mutated:")
+                logger.warning(
+                    f"Skipped {mutation_count} protein features because the residue was mutated:"
+                )
                 for mutation in mutation_warnings:
                     logger.warning(mutation)
 
@@ -1207,7 +1215,13 @@ class Pose:
         """Update the database to reflect this pose's has_fingerprint property"""
         assert isinstance(fp, bool)
         self._has_fingerprint = fp
-        self.db.update(table="pose", id=self.id, key=f"pose_fingerprint", value=int(fp), commit=commit)
+        self.db.update(
+            table="pose",
+            id=self.id,
+            key=f"pose_fingerprint",
+            value=int(fp),
+            commit=commit,
+        )
 
     ### DUNDERS
 
