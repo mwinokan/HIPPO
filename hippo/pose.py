@@ -32,7 +32,7 @@ INTERACTION_CUTOFF = {
 PI_STACK_MIN_CUTOFF = 3.8
 PI_STACK_F2F_CUTOFF = 4.5
 PI_STACK_E2F_CUTOFF = 6.0
-
+MUTATION_WARNING_DIST = 15
 
 class Pose:
     """A :class:`.Pose` is a particular conformer of a :class:`.Compound` within a protein environment. A pose will have its own (stereochemical) smiles string, and must have a path to a coordinate file. Poses can have *inspirations* that can be used to trace fragment-derived scaffolds in merges and expansions.
@@ -383,13 +383,7 @@ class Pose:
 
     @has_fingerprint.setter
     def has_fingerprint(self, fp):
-
-        assert isinstance(fp, bool)
-
-        self._has_fingerprint = fp
-
-        # store in the database
-        self.db.update(table="pose", id=self.id, key=f"pose_fingerprint", value=int(fp))
+        self.set_has_fingerprint(fp)
 
     @property
     def tags(self) -> "TagSet":
@@ -696,6 +690,7 @@ class Pose:
         force: bool = False,
         debug: bool = False,
         commit: bool = True,
+        mutation_warnings: bool = True,
     ) -> None:
         """Enumerate all valid interactions between this ligand and the protein
 
@@ -705,6 +700,7 @@ class Pose:
         :param force: Force a recalculation even if the pose has already been fingerprinted
         :param debug: Increase verbosity for debugging
         :param commit: commit the changes to the database (Default value = True)
+        :param mutation_warnings: warn when there has been a mutation in the protein (Default value = True)
 
         """
 
@@ -748,7 +744,7 @@ class Pose:
             self.db.delete_where(
                 table="interaction", key="pose", value=self.id, commit=commit
             )
-            self.has_fingerprint = False
+            self.set_has_fingerprint(False, commit=commit)
 
             ### create temporary table
 
@@ -797,6 +793,9 @@ class Pose:
             ### protein chain names
             chains = protein_system.chain_names
 
+            mutation_warnings = set()
+            mutation_count = 0
+
             # loop over protein features
             for prot_feature in protein_features:
 
@@ -814,7 +813,10 @@ class Pose:
                     continue
 
                 if prot_residue.name != prot_feature.residue_name:
-                    logger.warning(f"Feature {repr(prot_feature)}")
+                    com = prot_residue.centre_of_mass()
+                    if any(np.linalg.norm(com - cf.position) < MUTATION_WARNING_DIST for cf in comp_features):
+                        mutation_warnings.add(f"{prot_residue.name} {prot_residue.number} -> {prot_feature.residue_name} {prot_feature.residue_number}")
+                        mutation_count += 1
                     continue
 
                 ### calculate protein coordinate
@@ -941,7 +943,10 @@ class Pose:
                             table="temp_interaction",
                         )
 
-            self.has_fingerprint = True
+            if mutation_warnings:
+                logger.warning(f"Skipped {mutation_count} protein features because the residue was mutated:")
+                for mutation in mutation_warnings:
+                    logger.warning(mutation)
 
             if resolve:
                 from .iset import InteractionSet
@@ -952,6 +957,7 @@ class Pose:
 
             ### transfer interactions from temporary table
             self.db.copy_temp_interactions()
+            self.set_has_fingerprint(True, commit=commit)
 
             ### delete temporary table
 
@@ -1196,6 +1202,12 @@ class Pose:
             features = self.features
 
         return mp.go.plot3d(atoms=group.atoms, features=features, **kwargs)
+
+    def set_has_fingerprint(self, fp: bool, commit: bool = True) -> None:
+        """Update the database to reflect this pose's has_fingerprint property"""
+        assert isinstance(fp, bool)
+        self._has_fingerprint = fp
+        self.db.update(table="pose", id=self.id, key=f"pose_fingerprint", value=int(fp), commit=commit)
 
     ### DUNDERS
 
