@@ -752,6 +752,10 @@ class Pose:
 
             ### create temporary table
 
+            if "temp_interaction" in self.db.table_names:
+                logger.warning("Deleting existing temp_interaction table")
+                self.db.execute("DROP TABLE temp_interaction")
+
             self.db.create_table_interaction(table="temp_interaction", debug=False)
 
             ### load the ligand structure
