@@ -1048,26 +1048,30 @@ class Recipe:
 
         logger.var("\n#products", len(self.products))
         for product in self.products:
-            logger.var(str(product.compound), f"{product.amount:.2f}", dict(unit="mg"))
+            print(str(product.compound), f"{product.amount:.2f}", dict(unit="mg"))
+            # break
 
         logger.var("\n#intermediates", len(self.intermediates))
         for intermediate in self.intermediates:
-            logger.var(
+            print(
                 str(intermediate.compound),
                 f"{intermediate.amount:.2f}",
                 dict(unit="mg"),
             )
+            # break
 
         logger.var("\n#reactants", len(self.reactants))
         for reactant in self.reactants:
-            logger.var(
+            print(
                 str(reactant.compound), f"{reactant.amount:.2f}", dict(unit="mg")
             )
+            # break
             # logger.out(f'{mcol.varName}{reactant}{mcol.clear} = {reactant.amount:.2f} {mcol.varType}mg{mcol.clear}, {self.get_reactant_reactions(reactant)}')
 
         logger.var("\n#reactions", len(self.reactions))
         for reaction in self.reactions:
-            logger.var(str(reaction), reaction.reaction_str, dict(unit=reaction.type))
+            print(str(reaction), reaction.reaction_str, dict(unit=reaction.type))
+            # break
 
     def get_ingredient(self, id):
         """Get an ingredient by its compound ID
