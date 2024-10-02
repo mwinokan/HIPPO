@@ -197,6 +197,29 @@ class Database:
             self.connection.close()
         mout.success(f"Closed connection to {mcol.file}{self.path}")
 
+    def backup(self, destination: Path | str | None = None) -> None:
+        """Create a backup of the database"""
+
+        from .tools import dt_hash
+
+        if not destination:
+            destination = str(self.path.resolve()).replace(
+                ".sqlite", f"_{dt_hash()}.sqlite"
+            )
+
+        destination = Path(destination)
+
+        with logger.spinnger(f"Copying {source} --> {destination}..."):
+
+            def progress(status, remaining, total):
+                logger.debug(f"Copied {total-remaining} of {total} pages...")
+
+            src = self.connection()
+            dst = sqlite3.connect(destination)
+            with dst:
+                src.backup(dst, pages=pages, progress=progress)
+            dst.close()
+
     ### GENERAL SQL
 
     def connect(self) -> None:

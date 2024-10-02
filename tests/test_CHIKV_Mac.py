@@ -28,6 +28,9 @@ class TestCHIKV_Mac(unittest.TestCase):
             aligned_directory="targets/CHIKV_Mac/aligned_files",
         )
 
+    def test_backup(self):
+        self.animal.db.backup()
+
         # self.assertEqual(len(self.animal.compounds), 84)
         # self.assertEqual(len(self.animal.poses), 107)
 
