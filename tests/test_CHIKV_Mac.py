@@ -19,6 +19,7 @@ class TestCHIKV_Mac(unittest.TestCase):
         download_target("CHIKV_Mac", destination="targets", overwrite=True, unzip=True)
 
         os.system("rm test_CHIKV_Mac.sqlite")
+
         self.animal = HIPPO("TestCHIKV_Mac", "test_CHIKV_Mac.sqlite")
 
     def test_add_hits(self):
