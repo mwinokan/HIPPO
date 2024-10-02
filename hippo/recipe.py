@@ -1107,7 +1107,7 @@ class Recipe:
         data = self.get_dict(serialise_price=True, **kwargs)
 
         if extra:
-            data = extra.update(data)
+            data.update(extra)
 
         logger.writing(file)
         json.dump(data, open(file, "wt"), indent=indent)
