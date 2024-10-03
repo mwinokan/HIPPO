@@ -285,9 +285,9 @@ class InteractionSet:
         WHERE interaction_id IN {self.str_ids}
         GROUP BY interaction_feature
         """
-        ).fetchone()
+        ).fetchall()
 
-        counts = [c for c, in counts]
+        counts = [count for f_id, count in counts]
 
         from numpy import std
 
