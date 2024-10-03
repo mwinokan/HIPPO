@@ -45,7 +45,7 @@ class Scorer:
         self._db = db
         self._recipes = recipes
 
-        self._sorted_keys = None
+        self._sorted_df = None
         self._scores = None
 
         self._attributes = {}
@@ -153,27 +153,8 @@ class Scorer:
         return self._scores
 
     @property
-    def sorted_keys(self):
-
-        if self._sorted_keys is None:
-            logger.debug("Scorer.sorted_keys")
-            self._sorted_keys = [
-                t[0]
-                for t in sorted(
-                    [t for t in self.scores.items()], key=lambda t: t[0], reverse=True
-                )
-            ]
-
-        return self._sorted_keys
-
-    @property
-    def sorted(self):
-        return [self.recipes[key] for key in self.sorted_keys]
-
-    @property
     def best(self):
-        key = self.sorted_keys[0]
-        return self.recipes[key]
+        return self.top(1)[0]
 
     ### METHODS
 
@@ -229,10 +210,6 @@ class Scorer:
             logger.debug("Updating Scorer.recipes._recipes")
         self.recipes._recipes[key] = recipe
 
-        if debug: 
-            logger.debug("Clearing Scorer._df")
-        self._df = None
-
         for attribute in self.attributes:
             if debug: 
                 logger.debug(f"Clearing {attribute} stats")
@@ -255,6 +232,8 @@ class Scorer:
         if debug: 
             logger.debug(f"__check_integrity")
         assert self.__check_integrity()
+
+        self.__flag_modification()
 
     def score(
         self,
@@ -350,9 +329,26 @@ class Scorer:
 
         return self._df
 
+    def get_sorted_df(self, budget: float | None = None):
+        
+        if self._sorted_df is None:
+
+            df = self.get_df(serialise_price=True)
+
+            self._sorted_df = df.sort_values(by="score", ascending=False)
+
+        df = self._sorted_df
+
+        if budget:
+            df = df[df["price"] < budget]
+
+        return df
+
+
     def plot(
         self,
         keys: str | list[str],
+        budget: float | None = None,
         **kwargs,
     ):
 
@@ -371,6 +367,9 @@ class Scorer:
         if "price" in df.columns:
             df["price"] = df.apply(lambda x: x["price"].amount, axis=1)
 
+        if budget:
+            df = df[df["price"] < budget]
+
         # logger.debug(df["price"].values)
 
         df = df.drop(columns=["reaction_ids", "reactants", "intermediates", "products"])
@@ -379,8 +378,9 @@ class Scorer:
             df, x=keys[0], y=keys[1], color="score", hover_data=df.columns
         )
 
-    def top(self, n):
-        return [self.recipes[key] for key in self.sorted_keys[:n]]
+    def top(self, n: int, budget: float | None = None):
+        keys = self.get_sorted_df()["hash"][:n]
+        return [self.recipes[key] for key in keys]
 
     ### INTERNALS
 
@@ -388,7 +388,7 @@ class Scorer:
         self._df = None
         self._df_params = None
         self._scores = None
-        self._sorted_keys = None
+        self._sorted_df = None
 
     def summary(self):
 
