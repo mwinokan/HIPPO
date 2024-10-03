@@ -141,7 +141,12 @@ class Scorer:
     def scores(self):
         if self._scores is None:
             logger.debug("Scorer.scores")
-            self._scores = {k: self.score(r) for k, r in self.recipes.items()}
+
+            scores = {}
+            for k, r in tqdm(self.recipes.items()):
+                scores[k] = self.score(r)
+
+            self._scores = scores
 
         return self._scores
 
@@ -579,7 +584,7 @@ DEFAULT_ATTRIBUTES = {
         weight=1.0,
         function=lambda r: r.product_compounds.elaboration_balance,
         description="A measure for how evenly base compounds have been elaborated",
-    ),
+    ),  ### REALLY UNPERFORMANT?
     "num_inspirations": dict(
         type="custom",
         weight=1.0,
