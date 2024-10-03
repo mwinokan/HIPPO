@@ -208,7 +208,12 @@ class Scorer:
         debug: bool = False,
     ) -> float:
 
-        score = sum([a(recipe) for a in self.attributes])
+        score = 0.0
+
+        for attribute in self.attributes:
+            recipe_score = attribute(recipe)
+            score += recipe_score
+            # score = sum([a(recipe) for a in self.attributes])
 
         if debug:
             print_data = []
@@ -298,16 +303,24 @@ class Scorer:
 
         import plotly.express as px
 
-        df = self.get_df(**kwargs)
-
-        if isinstance(keys, str):
-            return px.histogram(df, x=keys)
-
         if len(keys) != 2:
             logger.error("Only two keys supported")
             return None
 
-        return px.scatter(df, x=keys[0], y=keys[1], color="score")
+        df = self.get_df(**kwargs).copy()
+
+        if isinstance(keys, str):
+            return px.histogram(df, x=keys)
+
+        # serialise price
+        if "price" in df.columns:
+            df["price"] = df.apply(lambda x: x["price"].amount, axis=1)
+
+        # logger.debug(df["price"].values)
+
+        df = df.drop(columns=["reaction_ids", "reactants", "intermediates", "products"])
+
+        return px.scatter(df, x=keys[0], y=keys[1], color="score", hover_data=df.columns)
 
     def top(self, n):
         return [self.recipes[key] for key in self.sorted_keys[:n]]
@@ -531,21 +544,21 @@ class CustomAttribute(Attribute):
 
     ### PROPERTIES
 
-    @property
-    def values(self):
+    # @property
+    # def values(self):
 
-        if self._values is None:
+    #     if self._values is None:
 
-            from tqdm import tqdm
+    #         from tqdm import tqdm
 
-            logger.debug(f"CustomAttribute(key={self.key}).values")
+    #         logger.debug(f"CustomAttribute(key={self.key}).values")
 
-            self._values = []
-            for recipe in tqdm(self.scorer.recipes):
-                value = self.get_value(recipe)
-                self._values.append(value)
+    #         self._values = []
+    #         for recipe in tqdm(self.scorer.recipes):
+    #             value = self.get_value(recipe)
+    #             self._values.append(value)
 
-        return self._values
+    #     return self._values
 
     ### METHODS
 
@@ -561,6 +574,19 @@ class CustomAttribute(Attribute):
         fig.update_layout(xaxis_title=self.key, yaxis_title="count")
 
         return fig
+
+    @property
+    def value_dict(self):
+        if not self._value_dict:
+            logger.debug(f"CustomAttribute(key={self.key}).value_dict")
+            from tqdm import tqdm
+            for recipe in tqdm(self.scorer.recipes):
+                self._value_dict[recipe.hash] = self.get_value(recipe)
+        return self._value_dict
+
+    @property
+    def values(self):
+        return list(self.value_dict.values())
 
 
 DEFAULT_ATTRIBUTES = {
