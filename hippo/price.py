@@ -136,6 +136,11 @@ class Price:
     def __eq__(self, other: "Price") -> bool:
         """Compare two :class:`.Price` objects"""
 
+        if isinstance(other, int) or isinstance(other, float):
+            if self.is_null:
+                return other == 0
+            return self.amount == other
+
         if self.is_null and other.is_null:
             return True
 
@@ -153,6 +158,11 @@ class Price:
     def __lt__(self, other: "Price") -> bool:
         """Compare two :class:`.Price` objects"""
 
+        if isinstance(other, int) or isinstance(other, float):
+            if self.is_null:
+                return False
+            return self.amount > other
+
         if self.is_null and other.is_null:
             return False
 
@@ -169,6 +179,11 @@ class Price:
 
     def __gt__(self, other: "Price") -> bool:
         """Compare two :class:`.Price` objects"""
+
+        if isinstance(other, int) or isinstance(other, float):
+            if self.is_null:
+                return False
+            return self.amount < other
 
         if self.is_null and other.is_null:
             return False

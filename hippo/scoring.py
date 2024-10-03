@@ -154,7 +154,7 @@ class Scorer:
 
     @property
     def best(self):
-        return self.top(1)[0]
+        return self.top(1)
 
     ### METHODS
 
@@ -196,40 +196,40 @@ class Scorer:
             return
 
         recipe = Recipe.from_json(self._db, path, allow_db_mismatch=True)
-        
+
         recipe._hash = key
 
-        if debug: 
+        if debug:
             logger.debug(recipe)
 
-        if debug: 
+        if debug:
             logger.debug("Updating Scorer.recipes._json_paths")
         self.recipes._json_paths[key] = path.resolve()
 
-        if debug: 
+        if debug:
             logger.debug("Updating Scorer.recipes._recipes")
         self.recipes._recipes[key] = recipe
 
         for attribute in self.attributes:
-            if debug: 
+            if debug:
                 logger.debug(f"Clearing {attribute} stats")
             attribute._mean = None
             attribute._std = None
             attribute._min = None
             attribute._max = None
-            if debug: 
+            if debug:
                 logger.debug(f"Updating {attribute}._value_dict")
             attribute._value_dict[key] = attribute.get_value(recipe)
 
-        if debug: 
+        if debug:
             logger.debug(f"Calculating score")
         score = self.score(recipe)
 
-        if debug: 
+        if debug:
             logger.debug(f"Updating Scorer._scores")
         self._scores[key] = score
 
-        if debug: 
+        if debug:
             logger.debug(f"__check_integrity")
         assert self.__check_integrity()
 
@@ -324,17 +324,21 @@ class Scorer:
                         key=attribute.key, serialise_price=serialise_price
                     )
 
+            if serialise_price:
+                df["price"] = df.apply(lambda x: x["price"].amount, axis=1)
+
             self._df = df
             self._df_params = params
 
         return self._df
 
     def get_sorted_df(self, budget: float | None = None):
-        
+
         if self._sorted_df is None:
 
             df = self.get_df(serialise_price=True)
 
+            logger.debug("Sorting DataFrame...")
             self._sorted_df = df.sort_values(by="score", ascending=False)
 
         df = self._sorted_df
@@ -343,7 +347,6 @@ class Scorer:
             df = df[df["price"] < budget]
 
         return df
-
 
     def plot(
         self,
@@ -364,8 +367,8 @@ class Scorer:
             return px.histogram(df, x=keys)
 
         # serialise price
-        if "price" in df.columns:
-            df["price"] = df.apply(lambda x: x["price"].amount, axis=1)
+        # if "price" in df.columns:
+        #     df["price"] = df.apply(lambda x: x["price"].amount, axis=1)
 
         if budget:
             df = df[df["price"] < budget]
@@ -378,9 +381,16 @@ class Scorer:
             df, x=keys[0], y=keys[1], color="score", hover_data=df.columns
         )
 
+    def top_keys(self, n: int, budget: float | None = None):
+        keys = self.get_sorted_df(budget=budget)["hash"][:n]
+        return keys
+
     def top(self, n: int, budget: float | None = None):
-        keys = self.get_sorted_df()["hash"][:n]
-        return [self.recipes[key] for key in keys]
+        keys = self.top_keys(n=n, budget=budget)
+        if n == 1:
+            return [self.recipes[key] for key in keys][0]
+        else:
+            return [self.recipes[key] for key in keys]
 
     ### INTERNALS
 
@@ -404,7 +414,7 @@ class Scorer:
 
         for attribute in self.attributes:
             assert len(attribute._value_dict) == n_recipes
-        
+
         assert len(self._scores) == n_recipes
 
         return True
