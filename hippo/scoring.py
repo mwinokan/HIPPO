@@ -67,6 +67,7 @@ class Scorer:
         db: "Database",
         directory: "Path | str",
         pattern: str = "*.json",
+        skip: list[str] | None = None,
     ):
 
         from .recipe import RecipeSet
@@ -85,6 +86,9 @@ class Scorer:
         for key, attribute in [
             (k, v) for k, v in DEFAULT_ATTRIBUTES.items() if v["type"] == "custom"
         ]:
+
+            if skip and key in skip:
+                continue
 
             # print(key, attribute)
 
