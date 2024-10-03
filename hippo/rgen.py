@@ -279,10 +279,12 @@ class RandomRecipeGenerator:
             logger.debug("Shuffling Route pool")
             pool.shuffle()
 
+        old_recipe = None
+
         logger.var("route pool", len(pool))
         logger.var("max_iter", max_iter)
 
-        pbar = tqdm()
+        pbar = tqdm(total=max_iter)
 
         for i in range(max_iter):
 
@@ -290,7 +292,7 @@ class RandomRecipeGenerator:
                 logger.title(f"Iteration {i}")
 
             price = recipe.price
-            pbar.set_postfix(dict(price=str(price)))
+            pbar.set_postfix(dict(price=str(price), num_products=len(recipe.products)))
 
             if debug:
                 logger.var("price", price)
@@ -333,7 +335,8 @@ class RandomRecipeGenerator:
             # check breaking conditions
             if new_price > budget:
                 pbar.update(1)
-                recipe = old_recipe.copy()
+                if old_recipe is not None:
+                    recipe = old_recipe.copy()
                 continue
 
             if len(recipe.reactions) > max_reactions:
