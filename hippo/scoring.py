@@ -142,6 +142,8 @@ class Scorer:
         if self._scores is None:
             logger.debug("Scorer.scores")
 
+            from tqdm import tqdm
+
             scores = {}
             for k, r in tqdm(self.recipes.items()):
                 scores[k] = self.score(r)
