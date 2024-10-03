@@ -839,7 +839,10 @@ class PoseSet:
             query="inspiration_derivative",
             key=f"inspiration_original IN {self.str_ids}",
             multiple=True,
+            none='quiet',
         )
+        if not ids:
+            return None
         ids = [i for i, in ids]
         pset = PoseSet(self.db, ids, name=f"derivatives of {self}")
         return pset

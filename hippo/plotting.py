@@ -108,7 +108,13 @@ def plot_tag_statistics(
             data = dict(tag=tag, number=num_poses, type="poses")
             plot_data.append(data)
 
-    fig = px.bar(plot_data, x="tag", y="number", color=color, log_y=log_y)
+    from pandas import DataFrame
+
+    df = DataFrame(plot_data)
+
+    df.sort_values(by="tag", inplace=True)
+
+    fig = px.bar(df, x="tag", y="number", color=color, log_y=log_y)
 
     title = "Tag Statistics"
 
