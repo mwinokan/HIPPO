@@ -279,7 +279,7 @@ class RandomRecipeGenerator:
             logger.debug("Shuffling Route pool")
             pool.shuffle()
 
-        old_recipe = None
+        old_recipe = recipe.copy()
 
         logger.var("route pool", len(pool))
         logger.var("max_iter", max_iter)
@@ -335,8 +335,7 @@ class RandomRecipeGenerator:
             # check breaking conditions
             if new_price > budget:
                 pbar.update(1)
-                if old_recipe is not None:
-                    recipe = old_recipe.copy()
+                recipe = old_recipe.copy()
                 continue
 
             if len(recipe.reactions) > max_reactions:

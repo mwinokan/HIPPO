@@ -1729,3 +1729,18 @@ class RecipeSet:
 
     def __iter__(self):
         return iter(self._recipes.values())
+
+    def __contains__(self, key):
+        assert isinstance(key, str)
+        return key in self._recipes
+
+    def __repr__(self) -> str:
+        """Formatted string representation"""
+
+        s = f"{mcol.bold}{mcol.underline}"
+
+        s += "{" f"Recipes x {len(self)}" "}"
+
+        s += f"{mcol.unbold}{mcol.ununderline}"
+
+        return s
