@@ -201,6 +201,61 @@ class Scorer:
 
         return self._attributes[key]
 
+    def add_recipe(self, json_path: "str | Path", debug: bool = False):
+
+        from pathlib import Path
+        from .recipe import Recipe
+
+        path = Path(json_path)
+
+        key = path.name.removeprefix("Recipe_").removesuffix(".json")
+
+        if key in self.recipes:
+            logger.warning(f"Skipping duplicate {path}")
+            return
+
+        recipe = Recipe.from_json(self._db, path, allow_db_mismatch=True)
+        
+        recipe._hash = key
+
+        if debug: 
+            logger.debug(recipe)
+
+        if debug: 
+            logger.debug("Updating Scorer.recipes._json_paths")
+        self.recipes._json_paths[key] = path.resolve()
+
+        if debug: 
+            logger.debug("Updating Scorer.recipes._recipes")
+        self.recipes._recipes[key] = recipe
+
+        if debug: 
+            logger.debug("Clearing Scorer._df")
+        self._df = None
+
+        for attribute in self.attributes:
+            if debug: 
+                logger.debug(f"Clearing {attribute} stats")
+            attribute._mean = None
+            attribute._std = None
+            attribute._min = None
+            attribute._max = None
+            if debug: 
+                logger.debug(f"Updating {attribute}._value_dict")
+            attribute._value_dict[key] = attribute.get_value(recipe)
+
+        if debug: 
+            logger.debug(f"Calculating score")
+        score = self.score(recipe)
+
+        if debug: 
+            logger.debug(f"Updating Scorer._scores")
+        self._scores[key] = score
+
+        if debug: 
+            logger.debug(f"__check_integrity")
+        assert self.__check_integrity()
+
     def score(
         self,
         recipe: "Recipe",
@@ -342,6 +397,17 @@ class Scorer:
             logger.out(
                 f"{repr(attribute)} min={attribute.min:.3g}, mean={attribute.mean:.3g}, std={attribute.std:.3g}, max={attribute.max:.3g}"
             )
+
+    def __check_integrity(self):
+
+        n_recipes = len(self.recipes)
+
+        for attribute in self.attributes:
+            assert len(attribute._value_dict) == n_recipes
+        
+        assert len(self._scores) == n_recipes
+
+        return True
 
     ### DUNDERS
 
