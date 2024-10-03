@@ -931,6 +931,7 @@ class PoseSet:
 
         if len(self) > 100:
             from tqdm import tqdm
+
             gen = tqdm(self)
         else:
             gen = self
