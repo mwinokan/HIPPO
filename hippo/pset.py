@@ -929,7 +929,13 @@ class PoseSet:
 
         data = []
 
-        for pose in self:
+        if len(self) > 100:
+            from tqdm import tqdm
+            gen = tqdm(self)
+        else:
+            gen = self
+
+        for pose in gen:
             d = pose.get_dict(**kwargs)
 
             if skip_no_mol and not d["mol"]:
