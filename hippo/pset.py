@@ -839,7 +839,7 @@ class PoseSet:
             query="inspiration_derivative",
             key=f"inspiration_original IN {self.str_ids}",
             multiple=True,
-            none='quiet',
+            none="quiet",
         )
         if not ids:
             return None

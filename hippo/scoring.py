@@ -320,7 +320,9 @@ class Scorer:
 
         df = df.drop(columns=["reaction_ids", "reactants", "intermediates", "products"])
 
-        return px.scatter(df, x=keys[0], y=keys[1], color="score", hover_data=df.columns)
+        return px.scatter(
+            df, x=keys[0], y=keys[1], color="score", hover_data=df.columns
+        )
 
     def top(self, n):
         return [self.recipes[key] for key in self.sorted_keys[:n]]
@@ -580,6 +582,7 @@ class CustomAttribute(Attribute):
         if not self._value_dict:
             logger.debug(f"CustomAttribute(key={self.key}).value_dict")
             from tqdm import tqdm
+
             for recipe in tqdm(self.scorer.recipes):
                 self._value_dict[recipe.hash] = self.get_value(recipe)
         return self._value_dict
