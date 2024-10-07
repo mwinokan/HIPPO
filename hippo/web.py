@@ -5,7 +5,7 @@ import logging
 logger = logging.getLogger("HIPPO")
 
 
-class ProposalPage:
+class ProjectPage:
     """
     Recipe proposal web page
 

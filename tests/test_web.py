@@ -19,9 +19,9 @@ class TestCHIKV_Mac(unittest.TestCase):
 
     def test_web(self):
 
-        from hippo.web import ProposalPage
+        from hippo.web import ProjectPage
 
-        page = ProposalPage(
+        page = ProjectPage(
             output_dir="/Users/tfb64483/Software/HIPPO/tests",
             animal=self.animal,
         )
