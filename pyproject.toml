@@ -24,6 +24,7 @@ dependencies = [
     "pycule",
     "chardet",
     "pandas",
+    "yattag",
 ]
 [project.urls]
 "Homepage" = "https://hippo.winokan.com"
