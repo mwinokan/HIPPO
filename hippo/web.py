@@ -16,11 +16,11 @@ class ProposalPage:
         output_dir: str | Path,
         *,
         animal: "HIPPO",
-        # scaffolds: "CompoundSet",
-        # suppliers: list[str],
-        # starting_recipe: "Recipe",
-        # rgen: "RandomRecipeGenerator",
-        # scorer: "Scorer",
+        scaffolds: "CompoundSet | None" = None,
+        suppliers: list[str] | None = None,
+        starting_recipe: "Recipe | None" = None,
+        rgen: "RandomRecipeGenerator | None" = None,
+        scorer: "Scorer | None" = None,
         title: str | None = None,
     ):
 
@@ -30,11 +30,11 @@ class ProposalPage:
 
         # project objects
         self._animal = animal
-        # self._scaffolds = scaffolds
-        # self._suppliers = suppliers
-        # self._starting_recipe = starting_recipe
-        # self._rgen = rgen
-        # self._scorer = scorer
+        self._scaffolds = scaffolds
+        self._suppliers = suppliers
+        self._starting_recipe = starting_recipe
+        self._rgen = rgen
+        self._scorer = scorer
 
         self._title = title or animal.name
 
@@ -95,6 +95,11 @@ class ProposalPage:
         return self._output_dir
 
     @property
+    def resource_dir(self) -> "Path":
+        """Output directory"""
+        return self.output_dir / "web_resources"
+
+    @property
     def index_path(self) -> "Path":
         """index.html Path"""
         return self.output_dir / "index.html"
@@ -120,8 +125,8 @@ class ProposalPage:
         logger.writing(self.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        logger.writing(self.output_dir / "web_resources")
-        (self.output_dir / "web_resources").mkdir(parents=True, exist_ok=True)
+        logger.writing(self.resource_dir)
+        (self.resource_dir).mkdir(parents=True, exist_ok=True)
 
     def setup_page(self) -> None:
         """Create the yattag page content"""
@@ -222,6 +227,43 @@ class ProposalPage:
             function()
         # self.doc.stag("br")
 
+    def plotly_graph(self, figure, filename):
+
+        # from plotly.offline import plot
+
+        f"""<div> 
+            <iframe src="iter1b_go/scoring_newfeat_coverage.html" width="100%" height="500" style="border:none;"></iframe>
+        </div>"""
+
+        path = self.resource_dir / filename
+        rel_path = Path(self.resource_dir.name) / filename
+
+        # write the html file
+        from molparse import write
+
+        logger.writing(path)
+        write(path, figure, verbosity=0)
+
+        # embed the graph
+        with self.tag("div"):
+            with self.tag(
+                "iframe",
+                src=str(rel_path),
+                width="100%",
+                height="500",
+                style="border:none",
+            ):
+                ...
+
+    def table(self, data, **kwargs):
+        """Embed some data as a table"""
+        from pandas import DataFrame
+
+        df = DataFrame(data)
+        html = df.to_html(**kwargs, classes="w3-table-all", index=False, escape=False)
+        self.doc.asis(html)
+        self.doc.asis("<br>")
+
     ### SECTION CONTENT
 
     def sec_targets(self) -> None:
@@ -261,5 +303,32 @@ class ProposalPage:
         with self.tag("ul"):
             self.var("#compounds", len(hit_compounds), tag="li")
             self.var("#observations", len(hit_poses), tag="li")
+
+        from .animal import GENERATED_TAG_COLS
+
+        # tag statistics
+        fig = self.animal.plot_tag_statistics(
+            show_compounds=False,
+            poses=hit_poses,
+            logo=None,
+            title="Tags",
+            skip=["Pose", "hits"] + GENERATED_TAG_COLS,
+        )
+
+        self.plotly_graph(fig, "hit_tags.html")
+
+        # files
+        self.section_header("Downloads", "h3")
+        path = self.resource_dir / "hit_poses.sdf"
+        rel_path = Path(self.resource_dir.name) / "hit_poses.sdf"
+        hit_poses.write_sdf(path, inspirations=False)
+        table_data = [
+            dict(
+                Name="hit_poses.sdf",
+                Description="SDF of the experimental hits",
+                Download=f'<a href="{rel_path}" download>SDF</a>',
+            )
+        ]
+        self.table(table_data)
 
     ### DUNDERS
