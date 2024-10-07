@@ -139,13 +139,35 @@ class ProposalPage:
 
             with self.tag("body", klass="w3-content", style="max-width:none"):
 
-                with self.tag("div", klass="w3-container w3-teal"):
-                    with self.tag("h1"):
-                        self.text(self.title)
+                with self.tag("div", klass="w3-bar w3-teal"):
+                    with self.tag("div", klass="w3-bar-item"):
+                        src = "https://github.com/mwinokan/HIPPO/raw/main/logos/hippo_assets-02.png?raw=true"
+                        self.doc.stag(
+                            "img", src=src, style="max-height:75px"
+                        )  # , klass="w3-image")
 
-                with self.tag("div", klass="w3-container w3-padding"):
+                    with self.tag("div", klass="w3-bar-item"):
+                        with self.tag("h1"):
+                            self.text(self.title)
+
+                with self.tag("div", klass="w3-container w3-dark-gray w3-padding"):
                     self.section(self.sec_targets)
                     self.section(self.sec_hits)
+
+                    # placeholders
+                    self.section(self.sec_scaffolds)
+                    self.section(self.sec_elaborations)
+                    self.section(self.sec_quoting)
+                    self.section(self.sec_product_pool)
+                    self.section(self.sec_route_pool)
+                    self.section(self.sec_rgen)
+                    self.section(self.sec_scorer)
+                    self.section(self.sec_proposals)
+
+                with self.tag("div", klass="w3-container w3-teal w3-padding"):
+                    with self.tag("div", klass="w3-center"):
+                        src = "https://github.com/mwinokan/HIPPO/raw/main/logos/hippo_logo_tightcrop.png?raw=true"
+                        self.doc.stag("img", src=src, style="max-height:150px")
 
     def header(self) -> None:
         """Create the page header"""
@@ -221,11 +243,8 @@ class ProposalPage:
 
     def section(self, function) -> None:
         """create section div"""
-
-        with self.tag("div", klass="w3-panel w3-border"):
-            # with self.tag("div", klass="w3-border w3-padding"):
+        with self.tag("div", klass="w3-panel w3-border w3-white"):
             function()
-        # self.doc.stag("br")
 
     def plotly_graph(self, figure, filename):
 
@@ -330,5 +349,53 @@ class ProposalPage:
             )
         ]
         self.table(table_data)
+
+    def sec_scaffolds(self) -> None:
+        """Section on scaffolds"""
+
+        title = "Scaffolds"
+        self.section_header(title)
+
+    def sec_elaborations(self) -> None:
+        """Section on elaborations"""
+
+        title = "Elaborations"
+        self.section_header(title)
+
+    def sec_quoting(self) -> None:
+        """Section on quoting"""
+
+        title = "Quoting"
+        self.section_header(title)
+
+    def sec_product_pool(self) -> None:
+        """Section on product_pool"""
+
+        title = "product_pool"
+        self.section_header(title)
+
+    def sec_route_pool(self) -> None:
+        """Section on route_pool"""
+
+        title = "route_pool"
+        self.section_header(title)
+
+    def sec_rgen(self) -> None:
+        """Section on rgen"""
+
+        title = "rgen"
+        self.section_header(title)
+
+    def sec_scorer(self) -> None:
+        """Section on scorer"""
+
+        title = "scorer"
+        self.section_header(title)
+
+    def sec_proposals(self) -> None:
+        """Section on proposals"""
+
+        title = "proposals"
+        self.section_header(title)
 
     ### DUNDERS
