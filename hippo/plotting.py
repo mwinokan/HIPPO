@@ -116,13 +116,15 @@ def plot_tag_statistics(
 
         if show_compounds:
             num_compounds = len(compounds.get_by_tag(tag=tag))
-            data = dict(tag=tag, number=num_compounds, type="compounds")
-            plot_data.append(data)
+            if num_compounds:
+                data = dict(tag=tag, number=num_compounds, type="compounds")
+                plot_data.append(data)
 
         if show_poses:
             num_poses = len(poses.get_by_tag(tag=tag))
-            data = dict(tag=tag, number=num_poses, type="poses")
-            plot_data.append(data)
+            if num_poses:
+                data = dict(tag=tag, number=num_poses, type="poses")
+                plot_data.append(data)
 
     from pandas import DataFrame
 
