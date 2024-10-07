@@ -81,7 +81,16 @@ def hippo_graph(func):
 
 @hippo_graph
 def plot_tag_statistics(
-    animal, color="type", subtitle=None, log_y=False, compounds=True, poses=True
+    animal,
+    color="type",
+    subtitle=None,
+    log_y=False,
+    show_compounds=True,
+    show_poses=True,
+    compounds=None,
+    poses=None,
+    title: str | None = None,
+    skip: list[str] | None = None,
 ):
     """
 
@@ -94,17 +103,24 @@ def plot_tag_statistics(
 
     """
 
+    compounds = compounds or animal.compounds
+    poses = poses or animal.poses
+    skip = skip or []
+
     plot_data = []
 
     for tag in animal.tags.unique:
 
-        if compounds:
-            num_compounds = len(animal.compounds.get_by_tag(tag=tag))
+        if tag in skip:
+            continue
+
+        if show_compounds:
+            num_compounds = len(compounds.get_by_tag(tag=tag))
             data = dict(tag=tag, number=num_compounds, type="compounds")
             plot_data.append(data)
 
-        if poses:
-            num_poses = len(animal.poses.get_by_tag(tag=tag))
+        if show_poses:
+            num_poses = len(poses.get_by_tag(tag=tag))
             data = dict(tag=tag, number=num_poses, type="poses")
             plot_data.append(data)
 
@@ -116,12 +132,13 @@ def plot_tag_statistics(
 
     fig = px.bar(df, x="tag", y="number", color=color, log_y=log_y)
 
-    title = "Tag Statistics"
+    if not title:
+        title = "Tag Statistics"
 
-    if subtitle:
-        title = f"<b>{animal.name}</b>: {title}<br><sup><i>{subtitle}</i></sup>"
-    else:
-        title = f"<b>{animal.name}</b>: {title}"
+        if subtitle:
+            title = f"<b>{animal.name}</b>: {title}<br><sup><i>{subtitle}</i></sup>"
+        else:
+            title = f"<b>{animal.name}</b>: {title}"
 
     fig.update_layout(
         title=title, title_automargin=False, title_yref="container", barmode="group"
