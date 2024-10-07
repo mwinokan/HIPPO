@@ -82,6 +82,9 @@ class Target:
             query="subsite_id, subsite_name",
         )
 
+        if not records:
+            return []
+
         subsites = []
         for record in records:
             id, name = record
