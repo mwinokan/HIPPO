@@ -295,6 +295,13 @@ class HIPPO:
             "CrystalformSites alias",
             "Quatassemblies alias",
             "Crystalforms alias",
+            "ConformerSites upload name",
+            "CanonSites upload name",
+            "CrystalformSites upload name",
+            "Quatassemblies upload name",
+            "Crystalforms upload name",
+            "Centroid res",
+            "Experiment code",
         ]
         curated_tag_cols = [
             c
