@@ -41,11 +41,12 @@ class ProposalPage:
         # yattag setup
         from yattag import Doc
 
-        doc, tag, text = Doc().tagtext()
+        doc, tag, text, line = Doc().ttl()
 
         self._doc = doc
         self._tag = tag
         self._text = text
+        self._line = line
 
         self.setup_page()
 
@@ -77,6 +78,11 @@ class ProposalPage:
     def text(self) -> "yattag.text":
         """yattag.text"""
         return self._text
+
+    @property
+    def line(self) -> "yattag.line":
+        """yattag.line"""
+        return self._line
 
     @property
     def title(self) -> str:
@@ -126,12 +132,15 @@ class ProposalPage:
 
             self.header()
 
-            with self.tag("body"):
+            with self.tag("body", klass="w3-content", style="max-width:none"):
 
-                with self.tag("h1"):
-                    self.text(self.title)
+                with self.tag("div", klass="w3-container w3-teal"):
+                    with self.tag("h1"):
+                        self.text(self.title)
 
-                self.text("Hello world!")
+                with self.tag("div", klass="w3-container w3-padding"):
+                    self.section(self.sec_targets)
+                    self.section(self.sec_hits)
 
     def header(self) -> None:
         """Create the page header"""
@@ -177,5 +186,80 @@ class ProposalPage:
             self.doc.asis(
                 """h1,h2,h3,h4,h5,h6 {font-family: "Oswald"}body {font-family: "Open Sans"}"""
             )
+
+    def section_header(self, title: str, tag: str = "h2") -> None:
+        """section header"""
+        with self.tag(tag):
+            self.text(str(title))
+
+    def accordion(self) -> None:
+        """sub-content accordion"""
+        # https://www.w3schools.com/w3css/w3css_accordions.asp
+        raise NotImplementedError
+
+    def sidebar(self) -> None:
+        # https://www.w3schools.com/w3css/w3css_sidebar.asp
+        raise NotImplementedError
+
+    def var(self, key, value, tag=None, separator=": ") -> None:
+        """sub-content accordion"""
+        text = f"{key}{separator}{value}"
+
+        if not tag:
+            with self.tag("b"):
+                self.text(key)
+            self.text(separator)
+            self.text(str(value))
+        else:
+            with self.tag(tag):
+                self.var(key, value, separator=separator)
+
+    def section(self, function) -> None:
+        """create section div"""
+
+        with self.tag("div", klass="w3-panel w3-border"):
+            # with self.tag("div", klass="w3-border w3-padding"):
+            function()
+        # self.doc.stag("br")
+
+    ### SECTION CONTENT
+
+    def sec_targets(self) -> None:
+        """Section on targets"""
+
+        title = "Protein Target"
+        targets = self.animal.targets
+
+        if len(targets) > 1:
+            title += "s"
+
+        self.section_header(title)
+
+        for target in targets:
+            self.section_header(target.name, "h3")
+
+            self.var("name", target.name)
+
+            subsites = target.subsites
+
+            if subsites:
+
+                self.section_header("Subsites", "h4")
+                with self.tag("ul"):
+                    for subsite in subsites:
+                        self.var(f"Site {subsite.id}", subsite.name, tag="li")
+
+    def sec_hits(self) -> None:
+        """Section on experimental hits"""
+
+        title = "Experimental hits"
+        hit_compounds = self.animal.compounds(tag="hits")
+        hit_poses = self.animal.poses(tag="hits")
+
+        self.section_header(title)
+
+        with self.tag("ul"):
+            self.var("#compounds", len(hit_compounds), tag="li")
+            self.var("#observations", len(hit_poses), tag="li")
 
     ### DUNDERS
