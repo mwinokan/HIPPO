@@ -289,26 +289,12 @@ class HIPPO:
         count_poses_registered = 0
 
         meta_df = pd.read_csv(metadata_csv)
-        generated_tag_cols = [
-            "ConformerSites alias",
-            "CanonSites alias",
-            "CrystalformSites alias",
-            "Quatassemblies alias",
-            "Crystalforms alias",
-            "ConformerSites upload name",
-            "CanonSites upload name",
-            "CrystalformSites upload name",
-            "Quatassemblies upload name",
-            "Crystalforms upload name",
-            "Centroid res",
-            "Experiment code",
-        ]
         curated_tag_cols = [
             c
             for c in meta_df.columns
             if c
             not in ["Code", "Long code", "Compound code", "Smiles", "Downloaded"]
-            + generated_tag_cols
+            + GENERATED_TAG_COLS
         ]
 
         logger.var("curated_tag_cols", curated_tag_cols)
@@ -2274,6 +2260,22 @@ class HIPPO:
     def __getattr__(self, key: str):
         """Get a :class:`.Compound`, :class:`.Pose`, or :class:`.Reaction` by its ID. See :meth:`.HIPPO.get_by_shorthand`"""
         return self.get_by_shorthand(key)
+
+
+GENERATED_TAG_COLS = [
+    "ConformerSites alias",
+    "CanonSites alias",
+    "CrystalformSites alias",
+    "Quatassemblies alias",
+    "Crystalforms alias",
+    "ConformerSites upload name",
+    "CanonSites upload name",
+    "CrystalformSites upload name",
+    "Quatassemblies upload name",
+    "Crystalforms upload name",
+    "Centroid res",
+    "Experiment code",
+]
 
 
 class InvalidRowError(Exception): ...
