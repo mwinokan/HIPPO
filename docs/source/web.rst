@@ -1,7 +1,7 @@
 
-==================
-Create static HTML
-==================
+===
+Web
+===
 
 .. autoclass:: hippo.web.ProjectPage
     :members:
