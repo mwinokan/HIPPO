@@ -21,6 +21,7 @@ class ProjectPage:
         starting_recipe: "Recipe | None" = None,
         rgen: "RandomRecipeGenerator | None" = None,
         scorer: "Scorer | None" = None,
+        proposals: "list[Recipe] | None" = None,
         title: str | None = None,
     ):
 
@@ -35,6 +36,7 @@ class ProjectPage:
         self._starting_recipe = starting_recipe
         self._rgen = rgen
         self._scorer = scorer
+        self._proposals = proposals
 
         self._title = title or animal.name
 
@@ -49,6 +51,7 @@ class ProjectPage:
         self._line = line
 
         self.setup_page()
+        self.write_html()
 
     ### FACTORIES
 
@@ -104,6 +107,30 @@ class ProjectPage:
         """index.html Path"""
         return self.output_dir / "index.html"
 
+    @property
+    def proposals(self):
+        return self._proposals
+
+    @property
+    def scaffolds(self):
+        return self._scaffolds
+
+    @property
+    def suppliers(self):
+        return self._suppliers
+
+    @property
+    def starting_recipe(self):
+        return self._starting_recipe
+
+    @property
+    def rgen(self):
+        return self._rgen
+
+    @property
+    def scorer(self):
+        return self._scorer
+
     ### METHODS
 
     def write_html(self) -> None:
@@ -155,14 +182,15 @@ class ProjectPage:
                     self.section(self.sec_hits)
 
                     # placeholders
-                    self.section(self.sec_scaffolds)
-                    self.section(self.sec_elaborations)
-                    self.section(self.sec_quoting)
-                    self.section(self.sec_product_pool)
-                    self.section(self.sec_route_pool)
-                    self.section(self.sec_rgen)
-                    self.section(self.sec_scorer)
-                    self.section(self.sec_proposals)
+                    if self.scaffolds:
+                        self.section(self.sec_scaffolds)
+                    # if self.elaborations: self.section(self.sec_elaborations)
+                    # if self.quoting: self.section(self.sec_quoting)
+                    # if self.product_pool: self.section(self.sec_product_pool)
+                    # if self.route_pool: self.section(self.sec_route_pool)
+                    # if self.rgen: self.section(self.sec_rgen)
+                    # if self.scorer: self.section(self.sec_scorer)
+                    # if self.proposals: self.section(self.sec_proposals)
 
                 with self.tag("div", klass="w3-container w3-teal w3-padding"):
                     with self.tag("div", klass="w3-center"):
