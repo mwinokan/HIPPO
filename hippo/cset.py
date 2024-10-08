@@ -794,6 +794,28 @@ class CompoundSet:
 
         return CompoundSet(self.db, ids)
 
+    @property
+    def id_num_poses_dict(self) -> dict[int, int]:
+        """Get a dictionary mapping compound ids to the number of poses"""
+
+        sql = f"""
+            SELECT pose_compound, COUNT(1) FROM pose
+            WHERE pose_compound IN {self.str_ids}
+            GROUP BY pose_compound
+        """
+
+        records = self.db.execute(sql)
+
+        assert records
+
+        lookup = {k: v for k, v in records}
+
+        for id in self.ids:
+            if id not in lookup:
+                lookup[id] = 0
+
+        return lookup
+
     ### FILTERING
 
     def get_by_tag(
@@ -1154,6 +1176,9 @@ class CompoundSet:
         bases: bool = False,
         elabs: bool = False,
         tags: bool = False,
+        num_poses: bool = False,
+        num_routes: bool = False,
+        alias: bool = True,
         **kwargs,
     ) -> "DataFrame":
         """Get a DataFrame representation of this set
@@ -1190,7 +1215,20 @@ class CompoundSet:
             )
             data.append(d)
 
-        return DataFrame(data)
+        if num_poses:
+
+            lookup = self.id_num_poses_dict
+
+            for d in data:
+                comp_id = d["id"]
+                d["num_poses"] = lookup.get(comp_id, 0)
+
+        df = DataFrame(data)
+
+        if not alias:
+            df.drop(columns=["alias"], inplace=True)
+
+        return df
 
     def get_quoted(
         self,

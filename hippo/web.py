@@ -3,6 +3,7 @@ from pathlib import Path
 import logging
 
 logger = logging.getLogger("HIPPO")
+logging.getLogger("PIL").setLevel(logging.WARNING)
 
 
 class ProjectPage:
@@ -103,6 +104,16 @@ class ProjectPage:
         return self.output_dir / "web_resources"
 
     @property
+    def mol_image_dir(self) -> "Path":
+        """Output directory"""
+        return self.resource_dir / "mol_images"
+
+    @property
+    def pose_sdf_dir(self) -> "Path":
+        """Output directory"""
+        return self.resource_dir / "pose_sdfs"
+
+    @property
     def index_path(self) -> "Path":
         """index.html Path"""
         return self.output_dir / "index.html"
@@ -155,6 +166,12 @@ class ProjectPage:
         logger.writing(self.resource_dir)
         (self.resource_dir).mkdir(parents=True, exist_ok=True)
 
+        logger.writing(self.mol_image_dir)
+        (self.mol_image_dir).mkdir(parents=True, exist_ok=True)
+
+        logger.writing(self.pose_sdf_dir)
+        (self.pose_sdf_dir).mkdir(parents=True, exist_ok=True)
+
     def setup_page(self) -> None:
         """Create the yattag page content"""
 
@@ -184,13 +201,17 @@ class ProjectPage:
                     # placeholders
                     if self.scaffolds:
                         self.section(self.sec_scaffolds)
-                    # if self.elaborations: self.section(self.sec_elaborations)
+                    if self.scaffolds:
+                        self.section(self.sec_elaborations)
                     # if self.quoting: self.section(self.sec_quoting)
                     # if self.product_pool: self.section(self.sec_product_pool)
                     # if self.route_pool: self.section(self.sec_route_pool)
-                    # if self.rgen: self.section(self.sec_rgen)
-                    # if self.scorer: self.section(self.sec_scorer)
-                    # if self.proposals: self.section(self.sec_proposals)
+                    if self.rgen:
+                        self.section(self.sec_rgen)
+                    if self.scorer:
+                        self.section(self.sec_scorer)
+                    if self.proposals:
+                        self.section(self.sec_proposals)
 
                 with self.tag("div", klass="w3-container w3-teal w3-padding"):
                     with self.tag("div", klass="w3-center"):
@@ -228,6 +249,12 @@ class ProjectPage:
             )
 
             with self.tag("script", src="https://cdn.plot.ly/plotly-latest.min.js"):
+                ...
+
+            with self.tag("script", src="https://3Dmol.org/build/3Dmol-min.js"):
+                ...
+
+            with self.tag("script", src="https://3Dmol.org/build/3Dmol.ui-min.js"):
                 ...
 
             self.style()
@@ -302,14 +329,226 @@ class ProjectPage:
             ):
                 ...
 
-    def table(self, data, **kwargs):
+    def table(self, data, style: str = "w3-table-all", **kwargs):
         """Embed some data as a table"""
         from pandas import DataFrame
 
         df = DataFrame(data)
-        html = df.to_html(**kwargs, classes="w3-table-all", index=False, escape=False)
+        html = df.to_html(**kwargs, classes=style, index=False, escape=False)
         self.doc.asis(html)
         self.doc.asis("<br>")
+
+    # def mol_grid_svg(self, cset, **kwargs):
+
+    #     mols = [c.mol for c in cset]
+
+    #     from rdkit.Chem.Draw import MolsToGridImage
+
+    #     return MolsToGridImage(mols,
+    #         molsPerRow=3,
+    #         subImgSize=(200,
+    #         200),
+    #         legends=None,
+    #         # highlightAtomLists=None,
+    #         # highlightBondLists=None,
+    #         useSVG=True,
+    #         returnPNG=False,
+    #         **kwargs)
+
+    def save_compound_image(self, compound):
+        from rdkit.Chem.Draw import MolToImage
+
+        image = MolToImage(compound.mol)
+        path = self.mol_image_dir / f"C{compound.id}.png"
+        logger.writing(path)
+        image.save(path)
+
+    def save_pose_sdf(self, pose):
+        path = self.pose_sdf_dir / f"P{pose.id}.sdf"
+        self.animal.poses([pose.id]).write_sdf(path, inspirations=False)
+
+    def save_pset_sdf(self, name, pset):
+        path = self.pose_sdf_dir / f"{name}.sdf"
+        pset.write_sdf(path, inspirations=False)
+
+    def compound_image(self, compound, max_height="250px"):
+        self.save_compound_image(compound)
+
+        src = str(
+            Path(self.resource_dir.name)
+            / Path(self.mol_image_dir.name)
+            / f"C{compound.id}.png"
+        )
+
+        self.doc.stag("img", src=src, style=f"max-height:{max_height}")
+
+    def pose_3d_view(self, pose):
+
+        self.save_pose_sdf(compound)
+
+        src = str(
+            Path(self.resource_dir.name)
+            / Path(self.mol_image_dir.name)
+            / f"C{compound.id}.png"
+        )
+
+        self.doc.stag("img", src=src, style=f"max-height:{max_height}")
+
+    def compound_grid(self, compounds, style="w3-center", pose_modal: bool = False):
+
+        id_num_poses_dict = compounds.id_num_poses_dict
+
+        with self.tag("div", klass="w3-row"):
+            for compound in compounds:
+
+                with self.tag("div", klass=f"w3-col s12 m6 l4 {style}"):
+                    with self.tag("p"):
+                        with self.tag("b"):
+                            self.text(f"{compound}")
+
+                    self.compound_image(compound)
+
+                    with self.tag("p", klass="w3-small w3-monospace"):
+                        self.text(f"{compound.inchikey}")
+                        self.doc.asis("<br>")
+                        self.text(f"{compound.smiles}")
+
+                    num_poses = id_num_poses_dict[compound.id]
+                    self.button(f"{num_poses} poses", disable=num_poses == 0)
+
+                    if pose_modal:
+                        poses = compound.poses
+
+                        modal_name = f"modal_c{compound.id}_poses"
+
+                        # MOLECULE MODAL
+                        self.modal_button(
+                            f"view {len(poses)} poses",
+                            modal_name,
+                            disable=len(poses) == 0,
+                        )
+
+                        if poses:
+
+                            self.save_pset_sdf(modal_name, poses)
+
+                            def modal_content():
+                                with self.tag("p"):
+                                    self.text("TEXT TEXT TEXT")
+
+                            self.modal(modal_name, modal_content)
+
+    def modal_button(
+        self, text, modal_name, disable: bool = False, style: str = "w3-teal"
+    ):
+        onclick = f"document.getElementById('{modal_name}').style.display='block'"
+        self.button(text, style=style, onclick=onclick, disable=disable)
+
+    def button(
+        self, text: str, onclick: str = "", style="w3-teal", disable: bool = False
+    ):
+
+        assert text
+
+        klass = f"w3-btn {style}"
+
+        if disable:
+            klass += " w3-disabled"
+            onclick = ""
+
+        with self.tag("button", klass=klass, onclick=onclick):
+            self.text(text)
+
+    def modal(self, modal_name, content_function):
+        with self.tag("div", id=modal_name, klass="w3-modal"):
+            with self.tag("div", klass="w3-modal-content"):
+                with self.tag("div", klass="w3-container"):
+                    with self.tag(
+                        "span",
+                        onclick=f"document.getElementById('{modal_name}').style.display='none'",
+                        klass="w3-button w3-display-topright",
+                    ):
+                        self.doc.asis("&times")
+                    content_function()
+
+    def recipe_subsection(self, recipe, title, sankey: bool = False):
+
+        self.section_header(title, "h3")
+
+        recipe_name = title.lower().replace(" ", "_")
+
+        if sankey:
+            fig = recipe.sankey()
+            self.plotly_graph(fig, f"{recipe_name}.html")
+
+        # self.section_header("Products", "h4")
+
+        df = recipe.products.compounds.get_df()
+
+        def modal_content():
+            self.table(df, style="w3-table-all w3-small")
+
+        modal_name = f"{recipe_name}_products"
+        self.modal_button("products", modal_name)
+        self.modal(modal_name, modal_content)
+
+        if intermediates := recipe.intermediates:
+            # self.section_header("Intermediates", "h4")
+            df = intermediates.compounds.get_df()
+
+            def modal_content():
+                self.table(df, style="w3-table-all w3-small")
+
+            modal_name = f"{recipe_name}_intermediates"
+            self.modal_button("intermediates", modal_name)
+            self.modal(modal_name, modal_content)
+
+        # self.section_header("Reactants", "h4")
+
+        df = recipe.reactants.df
+
+        def modal_content():
+            self.table(df, style="w3-table-all w3-small")
+
+        modal_name = f"{recipe_name}_reactants"
+        self.modal_button("reactants", modal_name)
+        self.modal(modal_name, modal_content)
+
+        # self.section_header("Reactions", "h4")
+
+        df = recipe.reactions.get_df(mols=False)
+
+        def modal_content():
+            self.table(df, style="w3-table-all w3-small")
+
+        modal_name = f"{recipe_name}_reactions"
+        self.modal_button("reactions", modal_name)
+        self.modal(modal_name, modal_content)
+
+    def scorer_attribute(self, attribute, histogram: bool = True):
+
+        from .scoring import DEFAULT_ATTRIBUTES
+
+        key = attribute.key
+
+        self.section_header(f'{attribute._type}: "{key}"')
+
+        with self.tag("ul"):
+            self.var("weight", attribute.weight, tag="li")
+            self.var("inverse", attribute.inverse, tag="li")
+            self.var("min", attribute.min, tag="li")
+            self.var("max", attribute.max, tag="li")
+            self.var("mean", attribute.mean, tag="li")
+            self.var("std", attribute.std, tag="li")
+
+            if key in DEFAULT_ATTRIBUTES:
+                self.var(
+                    "Description", DEFAULT_ATTRIBUTES[key]["description"], tag="li"
+                )
+
+        if histogram:
+            fig = attribute.histogram(progress=True)
+            self.plotly_graph(fig, f"attribute_{key}_hist.html")
 
     ### SECTION CONTENT
 
@@ -384,11 +623,78 @@ class ProjectPage:
         title = "Scaffolds"
         self.section_header(title)
 
+        self.section_header("All scaffolds", "h3")
+
+        cset = self.animal.compounds(tag="Syndirella base")
+
+        with self.tag("ul"):
+            self.var("#compounds", len(cset), tag="li")
+
+        # route dict?
+        df = cset.get_df(mol=False, num_poses=True)  # , routes=True)
+
+        def modal_content():
+            self.table(df, style="w3-table-all w3-small")
+
+        modal_name = "all_scaffolds_modal"
+        self.modal_button(f"all scaffolds table", modal_name)
+        self.modal(modal_name, modal_content)
+
+        # quoting?
+
+        self.section_header("Selected scaffolds", "h3")
+
+        cset = self.scaffolds
+
+        self.compound_grid(cset, pose_modal=False)
+
+        # files
+        self.section_header("Downloads", "h3")
+
+        table_data = []
+
+        path = self.resource_dir / "all_scaffold_smiles.csv"
+        rel_path = Path(self.resource_dir.name) / path.name
+        cset.write_smiles_csv(path)
+        table_data.append(
+            dict(
+                Name="All scaffolds",
+                Description="CSV of scaffold SMILES",
+                Download=f'<a href="{rel_path}" download>CSV</a>',
+            )
+        )
+
+        path = self.resource_dir / "selected_scaffold_smiles.csv"
+        rel_path = Path(self.resource_dir.name) / path.name
+        cset.write_smiles_csv(path)
+        table_data.append(
+            dict(
+                Name="Selected scaffolds",
+                Description="CSV of scaffold SMILES",
+                Download=f'<a href="{rel_path}" download>CSV</a>',
+            )
+        )
+
+        self.table(table_data)
+
     def sec_elaborations(self) -> None:
         """Section on elaborations"""
 
+        elabs = self.scaffolds.elabs
+
+        if not elabs:
+            logger.warning("No elaborations")
+            return None
+
+        self._elaborations = elabs
+
         title = "Elaborations"
         self.section_header(title)
+
+        fig = self.animal.plot_reaction_funnel(
+            title="Syndirella elaboration space", logo=False
+        )
+        self.plotly_graph(fig, "reaction_funnel.html")
 
     def sec_quoting(self) -> None:
         """Section on quoting"""
@@ -411,19 +717,49 @@ class ProjectPage:
     def sec_rgen(self) -> None:
         """Section on rgen"""
 
-        title = "rgen"
+        title = "Random Recipe Generation"
         self.section_header(title)
+
+        rgen = self.rgen
+
+        with self.tag("ul"):
+            self.var("suppliers", rgen.suppliers, tag="li")
+            self.var("max_lead_time", rgen.max_lead_time, tag="li")
+            self.var("route_pool", len(rgen.route_pool), tag="li")
+
+        self.recipe_subsection(rgen.starting_recipe, "Starting Recipe", sankey=False)
 
     def sec_scorer(self) -> None:
         """Section on scorer"""
 
-        title = "scorer"
+        title = "Recipe Selection"
         self.section_header(title)
+
+        scorer = self.scorer
+
+        with self.tag("ul"):
+            self.var("#recipes", len(scorer.recipes), tag="li")
+            self.var("#attributes", len(scorer.attributes), tag="li")
+
+        fig = scorer.plot(["price", "score"])
+        self.plotly_graph(fig, "scorer_scatter.html")
+
+        for attribute in scorer.attributes:
+            self.scorer_attribute(attribute)
 
     def sec_proposals(self) -> None:
         """Section on proposals"""
 
         title = "proposals"
         self.section_header(title)
+
+        for proposal in proposals:
+
+            self.section_header(str(proposal), "h3")
+
+            from .plotting import plot_compound_tsnee
+
+            fig = plot_compound_tsnee(proposal.products.compounds)
+            self.plotly_graph(fig, f"proposal_{proposal.hash}.html")
 
     ### DUNDERS

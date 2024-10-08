@@ -1414,6 +1414,53 @@ def plot_pose_interactions(
     return fig
 
 
+@hippo_graph
+def plot_compound_tsnee(
+    compounds,
+    title: str | None = None,
+    subtitle: str | None = None,
+    **kwargs,
+) -> "plotly.graph_objects.Figure":
+
+    from .pca import get_cfps
+    from sklearn.decomposition import PCA
+    import numpy as np
+
+    df = compounds.get_df(mol=True)
+
+    df["FP"] = df["mol"].map(get_cfps)
+
+    X = np.array([x.fp for x in df["FP"]])
+
+    pca = PCA(n_components=2, random_state=0)
+    pca_fit = pca.fit_transform(X)
+
+    df["PC1"] = pca_fit.T[0]
+    df["PC2"] = pca_fit.T[1]
+
+    hover_data = [
+        "id",
+        "smiles",
+        # "alias",
+        "inchikey",
+        "PC1",
+        "PC2",
+    ]
+
+    fig = px.scatter(df, x="PC1", y="PC2", hover_data=hover_data, **kwargs)
+
+    subtitle = subtitle or f"#compounds={len(compounds)}"
+
+    title = title or f"{compounds} PCA<br>"
+
+    if subtitle:
+        title = f"{title}<br><sup><i>{subtitle}</i></sup>"
+
+    fig.update_layout(title=title)
+
+    return fig
+
+
 def add_hippo_logo(fig, in_plot=True, position="top right"):
     """
 
