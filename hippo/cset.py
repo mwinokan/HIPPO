@@ -2109,7 +2109,10 @@ class IngredientSet:
             # get the ingredient with the matching compound ID
             matches = self.df[self.df["compound_id"] == compound_id]
 
-            if len(matches) != 1:
+            if len(matches) == 0:
+                return None
+            
+            elif len(matches) != 1:
 
                 logger.warning(f"Multiple ingredients in set with {compound_id=}")
                 # print(matches)
