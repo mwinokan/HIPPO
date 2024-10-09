@@ -750,10 +750,10 @@ class ProjectPage:
     def sec_proposals(self) -> None:
         """Section on proposals"""
 
-        title = "proposals"
+        title = "Proposal Recipes"
         self.section_header(title)
 
-        for proposal in proposals:
+        for proposal in self.proposals:
 
             self.section_header(str(proposal), "h3")
 
