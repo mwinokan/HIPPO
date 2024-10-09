@@ -139,6 +139,7 @@ class Reaction:
         if compound_ids:
             if compound_object:
                 return [
+                    # (self.db.get_compound(id=id), amount/self.product_yield) for id, amount in compound_ids
                     (self.db.get_compound(id=id), amount) for id, amount in compound_ids
                 ]
             else:
