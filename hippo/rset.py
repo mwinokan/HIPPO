@@ -466,11 +466,25 @@ class ReactionSet:
             INNER JOIN reactant ON compound_id = reactant_compound
             WHERE reactant_reaction IN {self.str_ids}
         """
-        # print(sql)
         intermediate_ids = self.db.execute(sql).fetchall()
         cset = CompoundSet(self.db, [i for i, in intermediate_ids])
         if self.name:
-            cset._name = f"products of {self}"
+            cset._name = f"intermediates of {self}"
+        return cset
+
+    @property
+    def reactants(self) -> "CompoundSet":
+        """Get all reactant compounds that are used by these reactions"""
+        from .cset import CompoundSet
+
+        sql = f"""
+            SELECT DISTINCT reactant_compound FROM reactant
+            WHERE reactant_reaction IN {self.str_ids}
+        """
+        reactant_ids = self.db.execute(sql).fetchall()
+        cset = CompoundSet(self.db, [i for i, in reactant_ids])
+        if self.name:
+            cset._name = f"reactants of {self}"
         return cset
 
     ### METHODS
