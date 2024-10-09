@@ -215,7 +215,9 @@ class ReactionTable:
         data = data.values()
         return DataFrame(data)
 
-    def set_product_yields(self, *, type: str, product_yield: float, commit: bool = True) -> None:
+    def set_product_yields(
+        self, *, type: str, product_yield: float, commit: bool = True
+    ) -> None:
         """Set the product_yield for all member :class:`.Reaction` entries with given type
 
         :param type: the :class:`.Reaction` type to filter by

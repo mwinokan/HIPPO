@@ -2111,7 +2111,7 @@ class IngredientSet:
 
             if len(matches) == 0:
                 return None
-            
+
             elif len(matches) != 1:
 
                 logger.warning(f"Multiple ingredients in set with {compound_id=}")

@@ -1312,20 +1312,24 @@ class Recipe:
 
         reaction_products = self.reactions.products
         reaction_reactants = self.reactions.reactants
-        
+
         # all products should have a reaction
         for product in self.products:
             if product not in reaction_products:
                 logger.error(f"Product: {product} does not have associated reaction")
                 return False
-        
+
         # all intermediates should be the product of a reaction and the reactant of a reaction
         for intermediate in self.intermediates:
             if intermediate not in reaction_products:
-                logger.error(f"Intermediate: {intermediate} is not the product of any included reactions")
+                logger.error(
+                    f"Intermediate: {intermediate} is not the product of any included reactions"
+                )
                 return False
             if intermediate not in reaction_reactants:
-                logger.error(f"Intermediate: {intermediate} is not a reactant of any included reactions")
+                logger.error(
+                    f"Intermediate: {intermediate} is not a reactant of any included reactions"
+                )
                 return False
 
         # all reactions should have enough reactant
@@ -1336,7 +1340,7 @@ class Recipe:
 
             if product_ingredient is None:
                 product_ingredient = self.intermediates(compound_id=reaction.product_id)
-            
+
             for reactant in reaction.reactants:
 
                 reactant_ingredient = self.intermediates(compound_id=reactant.id)
@@ -1344,10 +1348,12 @@ class Recipe:
                 if reactant_ingredient is None:
                     reactant_ingredient = self.reactants(compound_id=reactant.id)
 
-                required_amount = product_ingredient.amount/reaction.product_yield
+                required_amount = product_ingredient.amount / reaction.product_yield
 
                 if reactant_ingredient.amount < required_amount:
-                    logger.error(f"Not enough of {reactant_ingredient.compound}: {reactant_ingredient.amount} < {required_amount}")
+                    logger.error(
+                        f"Not enough of {reactant_ingredient.compound}: {reactant_ingredient.amount} < {required_amount}"
+                    )
                     return False
 
         return True
