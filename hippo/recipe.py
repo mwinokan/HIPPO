@@ -1160,10 +1160,14 @@ class Recipe:
             data["timestamp"] = str(datetime.now())
 
         # Recipe properties
-        if price and serialise_price:
-            data["price"] = self.price.get_dict()
-        elif price:
-            data["price"] = self.price
+        try:
+            if price and serialise_price:
+                data["price"] = self.price.get_dict()
+            elif price:
+                data["price"] = self.price
+        except AssertionError as e:
+            logger.warning(f"Could not get price: {e}")
+            data["price"] = None
 
         if reactant_supplier:
             data["reactant_supplier"] = self.reactants.supplier
@@ -1308,7 +1312,7 @@ class Recipe:
         self._product_compounds = None
         self._product_poses = None
 
-    def check_integrity(self) -> bool:
+    def check_integrity(self, debug: bool = False) -> bool:
 
         reaction_products = self.reactions.products
         reaction_reactants = self.reactions.reactants
@@ -1341,12 +1345,16 @@ class Recipe:
             if product_ingredient is None:
                 product_ingredient = self.intermediates(compound_id=reaction.product_id)
 
+            if debug and reaction.product_yield < 1.0:
+                logger.debug(f"{reaction}.product_yield={reaction.product_yield}")
+
             for reactant in reaction.reactants:
 
                 reactant_ingredient = self.intermediates(compound_id=reactant.id)
 
                 if reactant_ingredient is None:
                     reactant_ingredient = self.reactants(compound_id=reactant.id)
+
 
                 required_amount = product_ingredient.amount / reaction.product_yield
 
