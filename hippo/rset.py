@@ -225,6 +225,10 @@ class ReactionTable:
 
         """
 
+        assert isinstance(product_yield, float)
+        assert product_yield > 0
+        assert product_yield <= 1.0
+
         sql = f"""
         UPDATE reaction
         SET reaction_product_yield = :reaction_product_yield
@@ -278,7 +282,7 @@ class ReactionTable:
 
             case _:
                 logger.error(
-                    f"Unsupported type for ReactionSet.__getitem__(): {key=} {type(key)}"
+                    f"Unsupported type for ReactionTable.__getitem__(): {key=} {type(key)}"
                 )
 
         return None
@@ -667,13 +671,31 @@ class ReactionSet:
     def __iter__(self):
         return iter(self.db.get_reaction(id=i) for i in self.indices)
 
-    def __getitem__(self, key) -> Reaction:
-        try:
-            index = self.indices[key]
-        except IndexError:
-            logger.exception(f"list index out of range: {key=} for {self}")
-            raise
-        return self.db.get_reaction(id=index)
+    def __getitem__(self, key) -> "Reaction | ReactionSet":
+
+        match key:
+            case int():
+                try:
+                    index = self.indices[key]
+                except IndexError:
+                    logger.exception(f"list index out of range: {key=} for {self}")
+                    raise
+                return self.db.get_reaction(id=index)
+            case slice():
+                ids = self.ids[key]
+                return ReactionSet(self.db, ids)
+            case key if isinstance(key, list) or isinstance(key, tuple) or isinstance(
+                key, set
+            ):
+                ids = self.ids[key]
+                return ReactionSet(self.db, ids)
+            case _:
+                logger.error(
+                    f"Unsupported type for ReactionSet.__getitem__(): {key=} {type(key)}"
+                )
+
+        return None
+
 
     def __add__(self, other) -> "ReactionSet":
         if other:
