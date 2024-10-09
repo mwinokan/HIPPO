@@ -2400,6 +2400,11 @@ class Database:
 
         return recipe
 
+    def get_route_id_product_dict(self) -> dict[int, int]:
+        """Get a dictionary mapping route ID's to their product :class:`.Compound`"""
+        records = self.execute("SELECT route_id, route_product FROM route").fetchall()
+        return {route_id:route_product for route_id, route_product in records}
+
     def get_interaction(self, *, id: int, table: str = "interaction") -> "Interaction":
         """Fetch the :class:`.Interaction` object with given ID
 
