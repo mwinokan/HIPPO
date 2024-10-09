@@ -32,7 +32,8 @@ class Reaction:
         self._db = db
         self._id = id
         self._type = type
-        self._product = product
+        self._product_id = product
+        self._product = None
         self._product_yield = product_yield
 
     ### PROPERTIES
@@ -50,8 +51,8 @@ class Reaction:
     @property
     def product(self) -> "Compound":
         """Returns the reaction's product :class:`.Compound`"""
-        if isinstance(self._product, int):
-            self._product = self.db.get_compound(id=self._product)
+        if self._product is None:
+            self._product = self.db.get_compound(id=self.product_id)
         return self._product
 
     @property
@@ -91,7 +92,7 @@ class Reaction:
     @property
     def product_id(self) -> int:
         """Returns the product :class:`.Compound` ID"""
-        return self.product.id
+        return self.product_id
 
     @property
     def product_smiles(self) -> str:
@@ -268,29 +269,29 @@ class Reaction:
 
             triples = self.db.execute(
                 f"""
-				SELECT reactant_compound, SUM(quote_id), SUM(reaction_id) FROM reactant 
-				LEFT JOIN quote ON quote_compound = reactant_compound
-				LEFT JOIN reaction ON reaction_product = reactant_compound 
-				WHERE reactant_reaction = {self.id}
-				GROUP BY reactant_compound
-			"""
+                SELECT reactant_compound, SUM(quote_id), SUM(reaction_id) FROM reactant 
+                LEFT JOIN quote ON quote_compound = reactant_compound
+                LEFT JOIN reaction ON reaction_product = reactant_compound 
+                WHERE reactant_reaction = {self.id}
+                GROUP BY reactant_compound
+            """
             ).fetchall()
 
         else:
 
             triples = self.db.execute(
                 f"""
-				WITH filtered_quotes AS
-				(
-					SELECT * FROM quote
-					WHERE quote_supplier = "{supplier}"
-				)
-				SELECT reactant_compound, SUM(quote_id), SUM(reaction_id) FROM reactant 
-				LEFT JOIN filtered_quotes ON quote_compound = reactant_compound
-				LEFT JOIN reaction ON reaction_product = reactant_compound 
-				WHERE reactant_reaction = {self.id}
-				GROUP BY reactant_compound
-			"""
+                WITH filtered_quotes AS
+                (
+                    SELECT * FROM quote
+                    WHERE quote_supplier = "{supplier}"
+                )
+                SELECT reactant_compound, SUM(quote_id), SUM(reaction_id) FROM reactant 
+                LEFT JOIN filtered_quotes ON quote_compound = reactant_compound
+                LEFT JOIN reaction ON reaction_product = reactant_compound 
+                WHERE reactant_reaction = {self.id}
+                GROUP BY reactant_compound
+            """
             ).fetchall()
 
         for reactant_compound, has_quote, has_reaction in triples:
