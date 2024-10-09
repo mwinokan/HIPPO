@@ -696,7 +696,6 @@ class ReactionSet:
 
         return None
 
-
     def __add__(self, other) -> "ReactionSet":
         if other:
             for reaction in other:

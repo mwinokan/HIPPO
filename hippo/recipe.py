@@ -1355,7 +1355,6 @@ class Recipe:
                 if reactant_ingredient is None:
                     reactant_ingredient = self.reactants(compound_id=reactant.id)
 
-
                 required_amount = product_ingredient.amount / reaction.product_yield
 
                 if reactant_ingredient.amount < required_amount:
