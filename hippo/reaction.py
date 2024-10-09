@@ -92,7 +92,7 @@ class Reaction:
     @property
     def product_id(self) -> int:
         """Returns the product :class:`.Compound` ID"""
-        return self.product_id
+        return self._product_id
 
     @property
     def product_smiles(self) -> str:
