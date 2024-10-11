@@ -528,7 +528,10 @@ class Pose:
     @property
     def _db_changed(self) -> bool:
         """Has the database changed?"""
-        return self._total_changes != self.db.total_changes
+        if self._total_changes != self.db.total_changes:
+            self._total_changes = self.db.total_changes
+            return True
+        return False
 
     ### METHODS
 

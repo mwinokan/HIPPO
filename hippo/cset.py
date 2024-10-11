@@ -775,6 +775,24 @@ class CompoundSet:
         return count
 
     @property
+    def bases(self) -> "CompoundSet":
+        """Get the base compounds that have at least one elaboration in this set
+
+        :returns: :class:`.CompoundSet`
+
+        """
+
+        base_ids = self.db.execute(
+            f"""
+                SELECT DISTINCT scaffold_base FROM scaffold
+                WHERE scaffold_superstructure IN {self.str_ids}  
+            """
+        ).fetchall()
+
+        base_ids = [i for i, in base_ids]
+        return CompoundSet(self.db, base_ids)
+
+    @property
     def elabs(self) -> "CompoundSet":
         """Returns a :class:`.CompoundSet` of all compounds that are a an elaboration of an existing base"""
 
