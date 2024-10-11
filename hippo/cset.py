@@ -536,6 +536,7 @@ class CompoundSet:
             self._indices = list(set(indices))
 
         self._name = name
+        self._total_changes = db.total_changes
 
     ### PROPERTIES
 
@@ -815,6 +816,14 @@ class CompoundSet:
                 lookup[id] = 0
 
         return lookup
+
+    @property
+    def _db_changed(self) -> bool:
+        """Has the database changed?"""
+        if self._total_changes != self.db.total_changes:
+            self._total_changes = self.db.total_changes
+            return True
+        return False
 
     ### FILTERING
 
@@ -1486,6 +1495,18 @@ class CompoundSet:
 
             case _:
                 raise NotImplementedError
+
+    def __str__(self) -> str:
+        """Unformatted string representation"""
+
+        s = ""
+
+        if self.name:
+            s += f"{self.name}: "
+
+        s += "{" f"C x {len(self)}" "}"
+
+        return s
 
     def __repr__(self) -> str:
         """Formatted string representation"""
