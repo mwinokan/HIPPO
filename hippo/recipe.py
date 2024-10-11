@@ -1367,6 +1367,16 @@ class Recipe:
 
     ### DUNDERS
 
+    def __str__(self):
+
+        if self.score:
+            s = f"score={self.score:.3f}"
+        else:
+            s = ""
+
+        if self.hash:
+            return f"Recipe_{self.hash}({s})"
+
     def __repr__(self):
         if self.intermediates:
             s = f"{self.reactants} --> {self.intermediates} --> {self.products} via {self.reactions}"

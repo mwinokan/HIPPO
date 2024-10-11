@@ -24,6 +24,7 @@ class ProjectPage:
         scorer: "Scorer | None" = None,
         proposals: "list[Recipe] | None" = None,
         title: str | None = None,
+        scaffold_tag: str = "Syndirella base",
     ):
 
         # setup directories
@@ -38,6 +39,15 @@ class ProjectPage:
         self._rgen = rgen
         self._scorer = scorer
         self._proposals = proposals
+
+        self._all_scaffolds = self.animal.compounds(tag=scaffold_tag)
+
+        logger.debug(f"{len(self.all_scaffolds)=}")
+
+        self._all_scaffold_poses = None
+        self._all_elabs = None
+        self._all_elab_poses = None
+        self._scaffold_poses = None
 
         self._title = title or animal.name
 
@@ -141,6 +151,40 @@ class ProjectPage:
     @property
     def scorer(self):
         return self._scorer
+
+    @property
+    def all_scaffolds(self):
+        return self._all_scaffolds
+
+    @property
+    def all_elabs(self):
+        if self._all_elabs is None:
+            self._all_elabs = self.all_scaffolds.elabs
+        return self._all_elabs
+
+    @property
+    def all_elab_poses(self):
+        if self._all_elab_poses is None:
+            self._all_elab_poses = self.all_elabs.poses
+        return self._all_elab_poses
+
+    @property
+    def scaffold_poses(self):
+        if self._scaffold_poses is None:
+            self._scaffold_poses = self.scaffolds.poses
+        return self._scaffold_poses
+
+    @property
+    def all_scaffold_poses(self):
+        if self._all_scaffold_poses is None:
+            self._all_scaffold_poses = self.all_scaffolds.poses
+        return self._all_scaffold_poses
+
+    @property
+    def proposal(self):
+        if len(self.proposals) != 1:
+            logger.warning(f"{len(self.proposals)=}")
+        return self._proposals[0]
 
     ### METHODS
 
@@ -304,6 +348,7 @@ class ProjectPage:
     def plotly_graph(self, figure, filename):
 
         # from plotly.offline import plot
+        from hippo_plot import write_html
 
         f"""<div> 
             <iframe src="iter1b_go/scoring_newfeat_coverage.html" width="100%" height="500" style="border:none;"></iframe>
@@ -312,11 +357,7 @@ class ProjectPage:
         path = self.resource_dir / filename
         rel_path = Path(self.resource_dir.name) / filename
 
-        # write the html file
-        from molparse import write
-
-        logger.writing(path)
-        write(path, figure, verbosity=0)
+        write_html(path, figure)
 
         # embed the graph
         with self.tag("div"):
@@ -577,6 +618,12 @@ class ProjectPage:
                     for subsite in subsites:
                         self.var(f"Site {subsite.id}", subsite.name, tag="li")
 
+        # try:
+        fig = self.funnel()
+        self.plotly_graph(fig, "project_funnel.html")
+        # except Exception as e:
+        # logger.error(e)
+
     def sec_hits(self) -> None:
         """Section on experimental hits"""
 
@@ -625,13 +672,11 @@ class ProjectPage:
 
         self.section_header("All scaffolds", "h3")
 
-        cset = self.animal.compounds(tag="Syndirella base")
-
         with self.tag("ul"):
-            self.var("#compounds", len(cset), tag="li")
+            self.var("#compounds", len(self.all_scaffolds), tag="li")
 
         # route dict?
-        df = cset.get_df(mol=False, num_poses=True)  # , routes=True)
+        df = self.all_scaffolds.get_df(mol=False, num_poses=True)  # , routes=True)
 
         def modal_content():
             self.table(df, style="w3-table-all w3-small")
@@ -644,9 +689,7 @@ class ProjectPage:
 
         self.section_header("Selected scaffolds", "h3")
 
-        cset = self.scaffolds
-
-        self.compound_grid(cset, pose_modal=False)
+        self.compound_grid(self.scaffolds, pose_modal=False)
 
         # files
         self.section_header("Downloads", "h3")
@@ -655,7 +698,7 @@ class ProjectPage:
 
         path = self.resource_dir / "all_scaffold_smiles.csv"
         rel_path = Path(self.resource_dir.name) / path.name
-        cset.write_smiles_csv(path)
+        self.scaffolds.write_smiles_csv(path)
         table_data.append(
             dict(
                 Name="All scaffolds",
@@ -666,7 +709,7 @@ class ProjectPage:
 
         path = self.resource_dir / "selected_scaffold_smiles.csv"
         rel_path = Path(self.resource_dir.name) / path.name
-        cset.write_smiles_csv(path)
+        self.scaffolds.write_smiles_csv(path)
         table_data.append(
             dict(
                 Name="Selected scaffolds",
@@ -759,7 +802,79 @@ class ProjectPage:
 
             from .plotting import plot_compound_tsnee
 
-            fig = plot_compound_tsnee(proposal.products.compounds)
+            fig = plot_compound_tsnee(
+                proposal.products.compounds,
+                logo=False,
+                legend=False,
+                title="Product Clustering",
+            )
             self.plotly_graph(fig, f"proposal_{proposal.hash}.html")
+
+    ### GRAPHS
+
+    def funnel(
+        self,
+        log_y: bool = True,
+        scaffolds: "CompoundSet | None" = None,
+        num_inspirations: int | None = None,
+        num_inspiration_sets: int | None = None,
+    ) -> "plotly.graph_objects.Figure":
+
+        if scaffolds is None:
+            scaffolds = self.all_scaffolds
+            scaffold_poses = self.all_scaffold_poses
+            elabs = self.all_elabs
+        else:
+            scaffold_poses = scaffolds.poses
+            elabs = scaffolds.elabs
+
+        import plotly.express as px
+        from numpy import log as np_log
+        from pandas import DataFrame
+
+        data = dict(
+            number=[
+                num_inspirations or scaffold_poses.num_inspirations,
+                num_inspiration_sets or scaffold_poses.num_inspiration_sets,
+                len(scaffolds),
+                len(elabs),
+                len(self.rgen.route_pool),
+                len(self.proposal.products),
+            ],
+            category=[
+                "Fragments",
+                "Fragment Sets",
+                "Scaffolds",
+                "Elaborations",
+                "Accessible Products",
+                "Selected Products",
+            ],
+        )
+
+        df = DataFrame(data)
+
+        if log_y:
+            y = "log_y"
+            df["log_y"] = df.apply(lambda x: np_log(x["number"]), axis=1)
+        else:
+            y = "number"
+
+        fig = px.funnel(df, x="category", y=y, text="number", log_y=False)
+
+        fig.data[0].texttemplate = "%{text}"
+        fig.update_layout(
+            xaxis={"side": "top"},
+        )
+
+        fig.layout.xaxis.title.text = ""
+
+        # title = title or f"<b>{animal.name}</b>: Reaction statistics"
+
+        # if subtitle:
+        #     title = f"{title}<br><sup><i>{subtitle}</i></sup>"
+
+        # fig.update_layout(title=title, title_automargin=False, title_yref="container")
+
+        return fig
 
     ### DUNDERS

@@ -1427,7 +1427,6 @@ def plot_compound_tsnee(
     from sklearn.decomposition import PCA
     import numpy as np
 
-
     df = compounds.get_df(mol=True, bases=True)
 
     df["FP"] = df["mol"].map(get_cfps)
@@ -1475,7 +1474,15 @@ def plot_compound_tsnee(
 
     # logger.debug(df.columns)
 
-    fig = px.scatter(df, x="PC1", y="PC2", hover_data=hover_data, color="cluster", symbol="type", **kwargs)
+    fig = px.scatter(
+        df,
+        x="PC1",
+        y="PC2",
+        hover_data=hover_data,
+        color="cluster",
+        symbol="type",
+        **kwargs,
+    )
 
     subtitle = subtitle or f"#compounds={len(compounds)}"
 
