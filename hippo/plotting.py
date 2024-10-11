@@ -1419,6 +1419,7 @@ def plot_compound_tsnee(
     compounds,
     title: str | None = None,
     subtitle: str | None = None,
+    legend: bool = False,
     **kwargs,
 ) -> "plotly.graph_objects.Figure":
 
@@ -1426,9 +1427,31 @@ def plot_compound_tsnee(
     from sklearn.decomposition import PCA
     import numpy as np
 
-    df = compounds.get_df(mol=True)
+
+    df = compounds.get_df(mol=True, bases=True)
 
     df["FP"] = df["mol"].map(get_cfps)
+
+    def get_cluster(row):
+
+        bases = row["bases"]
+
+        if bases is None:
+            return row["id"]
+
+        if len(bases) == 1:
+            return bases[0]
+        return tuple(bases)
+
+    def get_type(row):
+
+        if row["bases"] is None:
+            return "base"
+
+        return "elaboration"
+
+    df["cluster"] = df.apply(get_cluster, axis=1)
+    df["type"] = df.apply(get_type, axis=1)
 
     X = np.array([x.fp for x in df["FP"]])
 
@@ -1445,9 +1468,14 @@ def plot_compound_tsnee(
         "inchikey",
         "PC1",
         "PC2",
+        "bases",
+        "cluster",
+        "type",
     ]
 
-    fig = px.scatter(df, x="PC1", y="PC2", hover_data=hover_data, **kwargs)
+    # logger.debug(df.columns)
+
+    fig = px.scatter(df, x="PC1", y="PC2", hover_data=hover_data, color="cluster", symbol="type", **kwargs)
 
     subtitle = subtitle or f"#compounds={len(compounds)}"
 
@@ -1457,6 +1485,9 @@ def plot_compound_tsnee(
         title = f"{title}<br><sup><i>{subtitle}</i></sup>"
 
     fig.update_layout(title=title)
+
+    if not legend:
+        fig.update_layout(showlegend=False)
 
     return fig
 
