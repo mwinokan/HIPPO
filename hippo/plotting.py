@@ -1472,6 +1472,8 @@ def plot_compound_tsnee(
         "type",
     ]
 
+    df["cluster"] = df["cluster"].astype(str)
+
     # logger.debug(df.columns)
 
     fig = px.scatter(
