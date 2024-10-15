@@ -97,6 +97,10 @@ class Scorer:
             )
 
         # weights
+        wsum = sum(abs(d["weight"]) for d in DEFAULT_ATTRIBUTES.values())
+        for attribute in self.attributes:
+            d = DEFAULT_ATTRIBUTES[attribute.key]
+            attribute.weight = d["weight"] / wsum
 
         return self
 
@@ -221,19 +225,21 @@ class Scorer:
                 logger.debug(f"Updating {attribute}._value_dict")
             attribute._value_dict[key] = attribute.get_value(recipe)
 
-        if debug:
-            logger.debug(f"Calculating score")
-        score = self.score(recipe)
+        if self._scores is not None:
 
-        if debug:
-            logger.debug(f"Updating Scorer._scores")
-        self._scores[key] = score
+            if debug:
+                logger.debug(f"Calculating score")
+            score = self.score(recipe)
+
+            if debug:
+                logger.debug(f"Updating Scorer._scores")
+            self._scores[key] = score
 
         if debug:
             logger.debug(f"__check_integrity")
         assert self.__check_integrity()
 
-        self.__flag_modification()
+        self.__flag_modification(keep_scores=True)
 
     def score(
         self,
@@ -394,11 +400,13 @@ class Scorer:
 
     ### INTERNALS
 
-    def __flag_modification(self):
+    def __flag_modification(self, keep_scores: bool = False):
         self._df = None
         self._df_params = None
-        self._scores = None
         self._sorted_df = None
+
+        if not keep_scores:
+            self._scores = None
 
     def summary(self):
 
@@ -733,6 +741,18 @@ DEFAULT_ATTRIBUTES = {
         weight=1.0,
         function=lambda r: r.product_poses.subsite_balance,
         description="Count the number of subsites that poses in this set come into contact with",
+    ),
+    "avg_distance_score": dict(
+        type="custom",
+        weight=-1.0,
+        function=lambda r: r.product_poses.avg_distance_score,
+        description="Average distance score (e.g. RMSD to fragment inspirations) for poses in this set",
+    ),
+    "avg_energy_score": dict(
+        type="custom",
+        weight=-1.0,
+        function=lambda r: r.product_poses.avg_energy_score,
+        description="Average energy score (e.g. binding ddG) for poses in this set",
     ),
     # "reaction_risk": dict(type='custom', weight=1.0, function=None),
     # "pockets?": dict(type='custom', weight=1.0, function=None),
