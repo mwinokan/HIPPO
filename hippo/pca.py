@@ -2,7 +2,7 @@
 
 import numpy as np
 from rdkit import DataStructs
-from rdkit.Chem import AllChem
+from rdkit.Chem import AllChem, rdFingerprintGenerator
 
 
 class FP:
@@ -62,10 +62,21 @@ def get_cfps(
         )
         DataStructs.ConvertToNumpyArray(fp, arr)
     else:
+
+        # https://greglandrum.github.io/rdkit-blog/posts/2023-01-18-fingerprint-generator-tutorial.html#additional-information-explaining-bits
+        fmgen = rdFingerprintGenerator.GetMorganGenerator(
+            radius=radius,
+            fpSize=nBits,
+            atomInvariantsGenerator=rdFingerprintGenerator.GetMorganFeatureAtomInvGen(),
+        )
+
+        assert not useFeatures
+
         DataStructs.ConvertToNumpyArray(
-            AllChem.GetMorganFingerprintAsBitVect(
-                mol, radius, nBits=nBits, useFeatures=useFeatures
-            ),
+            fmgen.GetFingerprint(mol),
+            # AllChem.GetMorganFingerprintAsBitVect(
+            #     mol, radius, nBits=nBits, useFeatures=useFeatures
+            # ),
             arr,
         )
     return FP(arr, range(nBits))
