@@ -2171,3 +2171,15 @@ class IngredientSet:
     def __getattr__(self, key: str):
         """For missing attributes try getting from associated :class:`.CompoundSet`"""
         return getattr(self.compounds, key)
+
+    def __contains__(self, other: Compound | Ingredient | int):
+        """Check if compound or ingredient is a member of this set"""
+        match other:
+            case Compound():
+                id = other.id
+            case Ingredient():
+                id = other.compound_id
+            case int():
+                id = other
+
+        return id in set(self.compound_ids)
