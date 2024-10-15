@@ -833,6 +833,34 @@ class PoseSet:
         return -std(counts)
 
     @property
+    def avg_energy_score(self) -> float:
+        """Average energy score of poses in this set"""
+
+        from numpy import mean
+
+        sql = f"""
+        SELECT pose_energy_score FROM pose
+        WHERE pose_id IN {self.str_ids}
+        """
+
+        scores = self.db.execute(sql).fetchall()
+        return mean([s for s, in scores])
+
+    @property
+    def avg_distance_score(self) -> float:
+        """Average distance score of poses in this set"""
+
+        from numpy import mean
+
+        sql = f"""
+        SELECT pose_distance_score FROM pose
+        WHERE pose_id IN {self.str_ids}
+        """
+
+        scores = self.db.execute(sql).fetchall()
+        return mean([s for s, in scores])
+
+    @property
     def derivatives(self) -> "PoseSet":
         ids = self.db.select_where(
             table="inspiration",
