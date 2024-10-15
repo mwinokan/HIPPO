@@ -201,7 +201,7 @@ class RandomRecipeGenerator:
 		)
 
 		SELECT route_id FROM route_reactants
-		WHERE count_unavailable = 0 AND route_product NOT IN {self.starting_recipe.products.str_compound_ids}
+		WHERE count_unavailable = 0
 		"""
         ).fetchall()
 
@@ -304,6 +304,9 @@ class RandomRecipeGenerator:
                 logger.var("candidate_route", candidate_route)
             if debug:
                 logger.var("candidate_route.reactants", candidate_route.reactants.ids)
+
+            if candidate_route.product in recipe.products:
+                continue
 
             # add the route to the recipe
             if debug:
