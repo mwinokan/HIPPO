@@ -1,4 +1,5 @@
 from pathlib import Path
+import shutil
 
 import logging
 
@@ -25,6 +26,7 @@ class ProjectPage:
         proposals: "list[Recipe] | None" = None,
         title: str | None = None,
         scaffold_tag: str = "Syndirella base",
+        extra_recipe_dir: str | Path = None,
     ):
 
         # setup directories
@@ -39,6 +41,7 @@ class ProjectPage:
         self._rgen = rgen
         self._scorer = scorer
         self._proposals = proposals
+        self._extra_recipe_dir = extra_recipe_dir
 
         self._all_scaffolds = self.animal.compounds(tag=scaffold_tag)
 
@@ -185,6 +188,10 @@ class ProjectPage:
         if len(self.proposals) != 1:
             logger.warning(f"{len(self.proposals)=}")
         return self._proposals[0]
+
+    @property
+    def extra_recipe_dir(self):
+        return self._extra_recipe_dir
 
     ### METHODS
 
@@ -512,9 +519,12 @@ class ProjectPage:
                         self.doc.asis("&times")
                     content_function()
 
-    def recipe_subsection(self, recipe, title, sankey: bool = False):
+    def recipe_subsection(
+        self, recipe, title, sankey: bool = False, title_style="h3", show_title=True
+    ):
 
-        self.section_header(title, "h3")
+        if show_title:
+            self.section_header(title, title_style)
 
         recipe_name = title.lower().replace(" ", "_")
 
@@ -809,6 +819,76 @@ class ProjectPage:
                 title="Product Clustering",
             )
             self.plotly_graph(fig, f"proposal_{proposal.hash}.html")
+
+            self.recipe_subsection(
+                proposal, f"Recipe {proposal.hash}", sankey=False, show_title=False
+            )
+
+        # files
+        self.section_header("Downloads", "h3")
+
+        table_data = []
+
+        for proposal in self.proposals:
+
+            # JSON
+            filename = f"Recipe_{proposal.hash}.json"
+            original = self.rgen.recipe_dir / filename
+            if not original.exists and self.extra_recipe_dir:
+                original = Path(self.extra_recipe_dir) / filename
+            shutil.copyfile(original, self.resource_dir / filename)
+
+            path = self.resource_dir / filename
+            rel_path = Path(self.resource_dir.name) / filename
+
+            table_data.append(
+                dict(
+                    Name=str(proposal),
+                    Description="Recipe JSON",
+                    Download=f'<a href="{rel_path}" download>JSON</a>',
+                )
+            )
+
+            # SDF
+            filename = f"Recipe_{proposal.hash}_poses.sdf"
+            original = self.rgen.recipe_dir / filename
+            if not original.exists and self.extra_recipe_dir:
+                original = Path(self.extra_recipe_dir) / filename
+
+            logger.debug(f"{original=}, {original.exists}, {self.extra_recipe_dir}")
+
+            shutil.copyfile(original, self.resource_dir / filename)
+
+            path = self.resource_dir / filename
+            rel_path = Path(self.resource_dir.name) / filename
+
+            table_data.append(
+                dict(
+                    Name=str(proposal),
+                    Description="Recipe product poses (Fragalysis compatible)",
+                    Download=f'<a href="{rel_path}" download>SDF</a>',
+                )
+            )
+
+            # CAR CSVs
+
+            filename = f"Recipe_{proposal.hash}_CAR"
+            path = self.resource_dir / f"{filename}.csv"
+            proposal.write_CAR_csv(path)
+
+            for file in Path(self.resource_dir).glob(f"{filename}*.csv"):
+
+                rel_path = Path(self.resource_dir.name) / file.name
+
+                table_data.append(
+                    dict(
+                        Name=str(proposal),
+                        Description=f"CAR input file [{file.name}]",
+                        Download=f'<a href="{rel_path}" download>CSV</a>',
+                    )
+                )
+
+        self.table(table_data)
 
     ### GRAPHS
 
