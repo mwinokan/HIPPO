@@ -679,12 +679,14 @@ class Recipe:
     def product_poses(self) -> "PoseSet":
         if self._product_poses is None:
             self._product_poses = self.product_compounds.poses
+            self._product_poses._name = f"product poses of {self}"
         return self._product_poses
 
     @property
     def product_compounds(self) -> "CompoundSet":
         if self._product_compounds is None:
             self._product_compounds = self.products.compounds
+            self._product_compounds._name = f"products of {self}"
         return self._product_compounds
 
     @property
