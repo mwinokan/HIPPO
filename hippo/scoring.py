@@ -635,7 +635,17 @@ class Scorer:
 
             raise ValueError("JSON columns don't match expectation")
 
-        assert len(cached) == len(self._data)
+        cached_keys = set(cached.index.values)
+        self_keys = set(self._data.index.values)
+
+        if difference := cached_keys - self_keys:
+            logger.warning("JSON has extra Recipes:")
+            logger.warning(difference)
+
+        if difference := self_keys - cached_keys:
+            logger.erro("JSON is missing Recipes:")
+            logger.error(difference)
+            raise ValueError("JSON is missing Recipes")
 
         cached.replace({np.nan: None}, inplace=True),
 
@@ -807,9 +817,7 @@ class Attribute:
 
         import plotly.graph_objects as go
 
-        values = self.scorer.recipes.get_values(
-            self.key, progress=progress, serialise_price=True
-        )
+        values = self.values
 
         fig = go.Figure(go.Histogram(x=values))
 
@@ -863,10 +871,6 @@ class CustomAttribute(Attribute):
             return cached
 
         return value
-
-    @property
-    def values(self):
-        return list(self.value_dict.values())
 
 
 DEFAULT_ATTRIBUTES = {
