@@ -11,6 +11,7 @@ logger = logging.getLogger("HIPPO")
 
 DATA_COLUMNS = [
     "score",
+    "price",
     "product_compound_ids",
     "product_pose_ids",
     "product_interaction_ids",
@@ -62,8 +63,6 @@ class Scorer:
             attribute = Attribute(self, key)
             self._attributes[key] = attribute
 
-        self.weights = 1.0
-
         self._data = pd.DataFrame(
             index=recipes.keys(), 
             columns=DATA_COLUMNS+self.attribute_keys,
@@ -78,6 +77,8 @@ class Scorer:
                 self._populate_query_cache()
 
             self._populate_recipe_child_sets()
+
+        self.weights = 1.0
 
     ### FACTORIES
 
@@ -163,7 +164,7 @@ class Scorer:
     @weights.setter
     def weights(self, ws):
 
-        self.__flag_weight_modification()
+        self._flag_weight_modification()
 
         if isinstance(ws, float):
             ws = [ws] * self.num_attributes
@@ -183,7 +184,7 @@ class Scorer:
 
         if null.sum():
             logger.debug("Calculating scores...")
-            for key in null.index.values:
+            for key in col[null].index.values:
                 recipe = self.recipes[key]
                 score = self.score(recipe)
                 self._data.at[key,"score"] = score
@@ -222,7 +223,7 @@ class Scorer:
 
         if key not in self._attributes:
 
-            # self.__flag_weight_modification()
+            # self._flag_weight_modification()
 
             self._attributes[key] = ca
 
@@ -237,62 +238,42 @@ class Scorer:
 
         return self._attributes[key]
 
-    def add_recipe(self, json_path: "str | Path", debug: bool = False):
-
-        raise NotImplementedError
+    def add_recipes(self, json_paths: "list", debug: bool = False):
 
         from pathlib import Path
         from .recipe import Recipe
 
-        path = Path(json_path)
+        for json_path in json_paths:
 
-        key = path.name.removeprefix("Recipe_").removesuffix(".json")
+            path = Path(json_path)
 
-        if key in self.recipes:
-            logger.warning(f"Skipping duplicate {path}")
-            return
+            key = path.name.removeprefix("Recipe_").removesuffix(".json")
 
-        recipe = Recipe.from_json(self._db, path, allow_db_mismatch=True)
+            if key in self.recipes:
+                logger.warning(f"Skipping duplicate {path}")
+                continue
 
-        recipe._hash = key
+            recipe = Recipe.from_json(self._db, path, allow_db_mismatch=True)
 
-        if debug:
-            logger.debug(recipe)
-
-        if debug:
-            logger.debug("Updating Scorer.recipes._json_paths")
-        self.recipes._json_paths[key] = path.resolve()
-
-        if debug:
-            logger.debug("Updating Scorer.recipes._recipes")
-        self.recipes._recipes[key] = recipe
-
-        for attribute in self.attributes:
-            if debug:
-                logger.debug(f"Clearing {attribute} stats")
-            attribute._mean = None
-            attribute._std = None
-            attribute._min = None
-            attribute._max = None
-            if debug:
-                logger.debug(f"Updating {attribute}._value_dict")
-            attribute._value_dict[key] = attribute.get_value(recipe)
-
-        if self._scores is not None:
+            recipe._hash = key
 
             if debug:
-                logger.debug(f"Calculating score")
-            score = self.score(recipe)
+                logger.debug(recipe)
 
             if debug:
-                logger.debug(f"Updating Scorer._scores")
-            self._scores[key] = score
+                logger.debug("Updating Scorer.recipes._json_paths")
+            self.recipes._json_paths[key] = path.resolve()
 
-        if debug:
-            logger.debug(f"__check_integrity")
-        assert self.__check_integrity()
+            if debug:
+                logger.debug("Updating Scorer.recipes._recipes")
+            self.recipes._recipes[key] = recipe
 
-        # self.__flag_weight_modification(keep_scores=True)
+            self._data.loc[key] = None
+
+        self._data.replace({np.nan: None}, inplace=True),
+        self._populate_query_cache()
+        self._populate_recipe_child_sets()
+        self._flag_weight_modification()
 
     def score(
         self,
@@ -424,7 +405,8 @@ class Scorer:
             logger.error("Only two keys supported")
             return None
 
-        # df = self.get_df(**kwargs).copy()
+        # calculate scores
+        self.scores
 
         df = self._data.drop(columns=[
             "product_compound_ids",
@@ -443,14 +425,8 @@ class Scorer:
                 if key not in df.columns:
                     raise KeyError(f"no attribute/column named \"{key}\"")
         
-        # serialise price
-        # if "price" in df.columns:
-        #     df["price"] = df.apply(lambda x: x["price"].amount, axis=1)
-
         if budget:
             df = df[df["price"] < budget]
-
-        # logger.debug(df["price"].values)
 
         return px.scatter(
             df, x=keys[0], y=keys[1], color="score", hover_data=df.columns
@@ -469,7 +445,7 @@ class Scorer:
 
     ### INTERNALS
 
-    def __flag_weight_modification(self):
+    def _flag_weight_modification(self):
         
         self._data["score"] = None
 
@@ -505,7 +481,8 @@ class Scorer:
 
         ### Recipe prices
 
-        self._data["price"] = [recipe.price.amount for recipe in self.recipes]
+        for recipe in self.recipes:
+            self._data.at[recipe.hash, "price"] = recipe.price.amount
 
         ### Product Compound IDs
 
@@ -515,7 +492,8 @@ class Scorer:
         # populate missing product compound ids
         if null.sum():
             logger.debug(f"Populating _data[\"{col}\"]...")
-            for key in null.index.values:
+            assert len(df[null]) == null.sum()
+            for key in df[null].index.values:
                 recipe = self.recipes[key]
                 df.at[key,col] = recipe.products.compound_ids
 
@@ -528,7 +506,7 @@ class Scorer:
         if null.sum():
 
             compound_ids = set()
-            for ids in df["product_compound_ids"]:
+            for ids in df[null]["product_compound_ids"]:
                 for id in ids:
                     compound_ids.add(id)
 
@@ -538,7 +516,8 @@ class Scorer:
             pose_map = self.db.get_compound_id_pose_ids_dict(cset)
 
             logger.debug(f"Populating _data[\"{col}\"]...")
-            for key in null.index.values:
+            for key in df[null].index.values:
+                assert len(df[null]) == null.sum()
                 recipe = self.recipes[key]
                 comp_ids = df["product_compound_ids"][key]
 
@@ -561,7 +540,7 @@ class Scorer:
         if null.sum():
 
             pose_ids = set()
-            for ids in df["product_pose_ids"]:
+            for ids in df[null]["product_pose_ids"]:
                 for id in ids:
                     pose_ids.add(id)
 
@@ -571,7 +550,8 @@ class Scorer:
             interaction_map = self.db.get_pose_id_interaction_ids_dict(pset)
 
             logger.debug(f"Populating _data[\"{col}\"]...")
-            for key in null.index.values:
+            for key in df[null].index.values:
+                assert len(df[null]) == null.sum()
                 recipe = self.recipes[key]
                 pose_ids = df["product_pose_ids"][key]
 
@@ -678,11 +658,6 @@ class Attribute:
 
         self._value_dict = {}
 
-        self._mean = None
-        self._std = None
-        self._min = None
-        self._max = None
-
         self._bins = bins
 
         self._percentile_interpolator = None
@@ -713,7 +688,7 @@ class Attribute:
 
         if null.sum():
             from tqdm import tqdm
-            for key in tqdm(null.index.values):
+            for key in tqdm(df[null].index.values):
                 recipe = self.scorer.recipes[key]
                 self.get_value(recipe, force=True)
             self.scorer._dump_json()
@@ -726,27 +701,19 @@ class Attribute:
 
     @property
     def mean(self):
-        if self._mean is None:
-            self._mean = np.mean(self.values)
-        return self._mean
+        return np.mean(self.values)
 
     @property
     def std(self):
-        if self._std is None:
-            self._std = np.std(self.values)
-        return self._std
+        return np.std(self.values)
 
     @property
     def max(self):
-        if self._max is None:
-            self._max = max(self.values)
-        return self._max
+        return max(self.values)
 
     @property
     def min(self):
-        if self._min is None:
-            self._min = min(self.values)
-        return self._min
+        return min(self.values)
 
     @property
     def weight(self):
@@ -754,7 +721,7 @@ class Attribute:
 
     @weight.setter
     def weight(self, w):
-        self.scorer.__flag_weight_modification()
+        self.scorer._flag_weight_modification()
         self._weight = abs(w)
         self._reverse = w < 0
 
@@ -811,7 +778,7 @@ class Attribute:
             value = getattr(recipe, self.key)
             if serialise_price and self.key == "price":
                 value = value.amount
-            self.scorer._data[self.key][recipe.hash] = value
+            self.scorer._data.at[recipe.hash,self.key] = value
         else:
             return cached
 
@@ -875,7 +842,7 @@ class CustomAttribute(Attribute):
 
             if serialise_price and self.key == "price":
                 value = value.amount
-            self.scorer._data[self.key][recipe.hash] = value
+            self.scorer._data.at[recipe.hash,self.key] = value
         else:
             return cached
 
