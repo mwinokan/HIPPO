@@ -1226,47 +1226,55 @@ class Recipe:
 
         rows = []
 
-        for product in tqdm(self.products):
+        routes = self.products.get_routes(permitted_reactions=self.reactions)
 
-            prod_cset = CompoundSet(self.db, [product.id])
+        # return routes
 
-            sub_recipes = prod_cset.get_recipes(permitted_reactions=self.reactions)
+        # for product in tqdm(self.products):
 
-            for sub_recipe in sub_recipes:
+            # prod_cset = CompoundSet(self.db, [product.id])
 
-                row = {
-                    "target-names": str(product.compound),
-                    "no-steps": 0,
-                    "concentration-required-mM": None,
-                    "amount-required-uL": None,
-                    "batch-tag": None,
-                }
+            # sub_recipes = prod_cset.get_routes(permitted_reactions=self.reactions)
 
-                for i, reaction in enumerate(sub_recipe.reactions):
+            # sub_recipes = prod_cset.get_recipes(permitted_reactions=self.reactions)
 
-                    i = i + 1
+        for sub_recipe in routes:
 
-                    row["no-steps"] += 1
+            product=sub_recipe.product
 
-                    match len(reaction.reactants):
-                        case 1:
-                            row[f"reactant-1-{i}"] = reaction.reactants[0].smiles
-                            row[f"reactant-2-{i}"] = None
-                        case 2:
-                            row[f"reactant-1-{i}"] = reaction.reactants[0].smiles
-                            row[f"reactant-2-{i}"] = reaction.reactants[1].smiles
-                        case _:
-                            raise NotImplementedError(
-                                f"Unsupported number of reactants for {reaction=}: {len(reaction.reactants)}"
-                            )
+            row = {
+                "target-names": str(product.compound),
+                "no-steps": 0,
+                "concentration-required-mM": None,
+                "amount-required-uL": None,
+                "batch-tag": None,
+            }
 
-                    row[f"reaction-product-smiles-{i}"] = reaction.product.smiles
-                    row[f"reaction-name-{i}"] = reaction.type
-                    row[f"reaction-recipe-{i}"] = None
-                    row[f"reaction-groupby-column-{i}"] = None
-                    # row[f'reaction-id-{i}'] = int(reaction.id)
+            for i, reaction in enumerate(sub_recipe.reactions):
 
-                rows.append(row)
+                i = i + 1
+
+                row["no-steps"] += 1
+
+                match len(reaction.reactants):
+                    case 1:
+                        row[f"reactant-1-{i}"] = reaction.reactants[0].smiles
+                        row[f"reactant-2-{i}"] = None
+                    case 2:
+                        row[f"reactant-1-{i}"] = reaction.reactants[0].smiles
+                        row[f"reactant-2-{i}"] = reaction.reactants[1].smiles
+                    case _:
+                        raise NotImplementedError(
+                            f"Unsupported number of reactants for {reaction=}: {len(reaction.reactants)}"
+                        )
+
+                row[f"reaction-product-smiles-{i}"] = reaction.product.smiles
+                row[f"reaction-name-{i}"] = reaction.type
+                row[f"reaction-recipe-{i}"] = None
+                row[f"reaction-groupby-column-{i}"] = None
+                # row[f'reaction-id-{i}'] = int(reaction.id)
+
+            rows.append(row)
 
         df = DataFrame(rows)
 
@@ -1669,6 +1677,9 @@ class RouteSet:
         s += f"{mcol.unbold}{mcol.ununderline}"
 
         return s
+
+    def __iter__(self):
+        return iter(self.data.values())
 
 
 class RecipeSet:
