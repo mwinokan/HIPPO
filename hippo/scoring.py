@@ -9,6 +9,12 @@ import logging
 
 logger = logging.getLogger("HIPPO")
 
+DATA_COLUMNS = [
+    "score",
+    "product_compound_ids",
+    "product_pose_ids",
+    "product_interaction_ids",
+]
 
 class Scorer:
     """
@@ -40,13 +46,15 @@ class Scorer:
         db: "Database",
         recipes: "RecipeSet",
         attributes: list[str],
+        populate: bool = True,
+        load_cache: bool = True,
     ) -> None:
+
+        from .recipe import RecipeSet
+        assert isinstance(recipes, RecipeSet)
 
         self._db = db
         self._recipes = recipes
-
-        self._sorted_df = None
-        self._scores = None
 
         self._attributes = {}
 
@@ -56,8 +64,20 @@ class Scorer:
 
         self.weights = 1.0
 
-        self._df = None
-        self._df_params = None
+        self._data = pd.DataFrame(
+            index=recipes.keys(), 
+            columns=DATA_COLUMNS+self.attribute_keys,
+        )
+
+        self._data.replace({np.nan: None}, inplace=True),
+
+        if populate:
+            if load_cache and self.json_path.exists:
+                self._load_json()
+            else:
+                self._populate_query_cache()
+
+            self._populate_recipe_child_sets()
 
     ### FACTORIES
 
@@ -68,6 +88,8 @@ class Scorer:
         directory: "Path | str",
         pattern: str = "*.json",
         skip: list[str] | None = None,
+        load_cache: bool = True,
+        # **kwargs,
     ):
 
         from .recipe import RecipeSet
@@ -80,7 +102,7 @@ class Scorer:
             k for k, v in DEFAULT_ATTRIBUTES.items() if v["type"] == "standard"
         ]
 
-        self.__init__(db=db, recipes=rset, attributes=attributes)
+        self.__init__(db=db, recipes=rset, attributes=attributes, populate=False)
 
         # custom attributes
         for key, attribute in [
@@ -95,6 +117,13 @@ class Scorer:
             self.add_custom_attribute(
                 key, attribute["function"], weight_reset_warning=False
             )
+
+        if load_cache and self.json_path.exists:
+            self._load_json()
+        else:
+            self._populate_query_cache()
+
+        self._populate_recipe_child_sets()
 
         # weights
         wsum = sum(abs(d["weight"]) for d in DEFAULT_ATTRIBUTES.values())
@@ -116,6 +145,10 @@ class Scorer:
         return list(self._attributes.values())
 
     @property
+    def attribute_keys(self):
+        return list(self._attributes.keys())
+
+    @property
     def recipes(self):
         return self._recipes
 
@@ -130,7 +163,7 @@ class Scorer:
     @weights.setter
     def weights(self, ws):
 
-        self.__flag_modification()
+        self.__flag_weight_modification()
 
         if isinstance(ws, float):
             ws = [ws] * self.num_attributes
@@ -142,23 +175,39 @@ class Scorer:
             a.weight = w / wsum
 
     @property
+    def score_dict(self):
+
+        col = self._data["score"]
+
+        null = col.isnull()
+
+        if null.sum():
+            logger.debug("Calculating scores...")
+            for key in null.index.values:
+                recipe = self.recipes[key]
+                score = self.score(recipe)
+                self._data.at[key,"score"] = score
+
+            self._dump_json()
+
+        return col.to_dict()
+
+    @property
     def scores(self):
-        if self._scores is None:
-            logger.debug("Scorer.scores")
-
-            from tqdm import tqdm
-
-            scores = {}
-            for k, r in tqdm(self.recipes.items()):
-                scores[k] = self.score(r)
-
-            self._scores = scores
-
-        return self._scores
+        return list(self.score_dict.values())
 
     @property
     def best(self):
         return self.top(1)
+
+    @property
+    def db(self):
+        return self._db
+
+    @property
+    def json_path(self):
+        from pathlib import Path
+        return Path(self.db.path.name.replace(".sqlite", "_scorer.json"))
 
     ### METHODS
 
@@ -173,7 +222,7 @@ class Scorer:
 
         if key not in self._attributes:
 
-            self.__flag_modification()
+            # self.__flag_weight_modification()
 
             self._attributes[key] = ca
 
@@ -181,12 +230,16 @@ class Scorer:
                 logger.warning("Attribute weights have been reset")
             self.weights = 1.0
 
+            self._data[key] = None
+
         else:
             logger.warning("Existing attribute with {key=}")
 
         return self._attributes[key]
 
     def add_recipe(self, json_path: "str | Path", debug: bool = False):
+
+        raise NotImplementedError
 
         from pathlib import Path
         from .recipe import Recipe
@@ -239,7 +292,7 @@ class Scorer:
             logger.debug(f"__check_integrity")
         assert self.__check_integrity()
 
-        self.__flag_modification(keep_scores=True)
+        # self.__flag_weight_modification(keep_scores=True)
 
     def score(
         self,
@@ -281,6 +334,8 @@ class Scorer:
         debug: bool = True,
         **kwargs,
     ) -> "pandas.DataFrame":
+
+        raise NotImplementedError
 
         from pandas import DataFrame
 
@@ -340,6 +395,8 @@ class Scorer:
 
     def get_sorted_df(self, budget: float | None = None):
 
+        raise NotImplementedError
+
         if self._sorted_df is None:
 
             df = self.get_df(serialise_price=True)
@@ -358,7 +415,7 @@ class Scorer:
         self,
         keys: str | list[str],
         budget: float | None = None,
-        **kwargs,
+        # **kwargs,
     ):
 
         import plotly.express as px
@@ -367,11 +424,25 @@ class Scorer:
             logger.error("Only two keys supported")
             return None
 
-        df = self.get_df(**kwargs).copy()
+        # df = self.get_df(**kwargs).copy()
+
+        df = self._data.drop(columns=[
+            "product_compound_ids",
+            "product_pose_ids",
+            "product_interaction_ids",
+        ])
+
+        df["score"] = pd.to_numeric(df["score"])
 
         if isinstance(keys, str):
+            assert keys in df.columns
             return px.histogram(df, x=keys)
 
+        if not all(key in df.columns for key in keys):
+            for key in keys:
+                if key not in df.columns:
+                    raise KeyError(f"no attribute/column named \"{key}\"")
+        
         # serialise price
         # if "price" in df.columns:
         #     df["price"] = df.apply(lambda x: x["price"].amount, axis=1)
@@ -380,8 +451,6 @@ class Scorer:
             df = df[df["price"] < budget]
 
         # logger.debug(df["price"].values)
-
-        df = df.drop(columns=["reaction_ids", "reactants", "intermediates", "products"])
 
         return px.scatter(
             df, x=keys[0], y=keys[1], color="score", hover_data=df.columns
@@ -400,13 +469,9 @@ class Scorer:
 
     ### INTERNALS
 
-    def __flag_modification(self, keep_scores: bool = False):
-        self._df = None
-        self._df_params = None
-        self._sorted_df = None
-
-        if not keep_scores:
-            self._scores = None
+    def __flag_weight_modification(self):
+        
+        self._data["score"] = None
 
     def summary(self):
 
@@ -425,7 +490,163 @@ class Scorer:
 
         assert len(self._scores) == n_recipes
 
+        assert len(self._data) == n_recipes
+        assert len(self._data.columns) == len(attributes) + len(DATA_COLUMNS)
+
         return True
+
+    def _populate_query_cache(self):
+
+        from .cset import CompoundSet
+        from .pset import PoseSet
+        from tqdm import tqdm
+
+        df = self._data
+
+        ### Recipe prices
+
+        self._data["price"] = [recipe.price.amount for recipe in self.recipes]
+
+        ### Product Compound IDs
+
+        col = "product_compound_ids"
+        null = df[col].isnull()
+
+        # populate missing product compound ids
+        if null.sum():
+            logger.debug(f"Populating _data[\"{col}\"]...")
+            for key in null.index.values:
+                recipe = self.recipes[key]
+                df.at[key,col] = recipe.products.compound_ids
+
+        ### Product Pose IDs
+
+        col = "product_pose_ids"
+        null = df[col].isnull()
+
+        # populate missing product compound ids
+        if null.sum():
+
+            compound_ids = set()
+            for ids in df["product_compound_ids"]:
+                for id in ids:
+                    compound_ids.add(id)
+
+            cset = CompoundSet(self.db, compound_ids, sort=False)
+
+            logger.debug(f"Getting poses for {len(cset)} compounds")
+            pose_map = self.db.get_compound_id_pose_ids_dict(cset)
+
+            logger.debug(f"Populating _data[\"{col}\"]...")
+            for key in null.index.values:
+                recipe = self.recipes[key]
+                comp_ids = df["product_compound_ids"][key]
+
+                row = df.loc[key]
+
+                all_pose_ids = set()
+
+                for comp_id in comp_ids:
+                    pose_ids = pose_map.get(comp_id, set())
+                    all_pose_ids |= pose_ids
+
+                df.at[key,col] = all_pose_ids
+
+        ### Product Interaction IDs
+
+        col = "product_interaction_ids"
+        null = df[col].isnull()
+
+        # populate missing product compound ids
+        if null.sum():
+
+            pose_ids = set()
+            for ids in df["product_pose_ids"]:
+                for id in ids:
+                    pose_ids.add(id)
+
+            pset = PoseSet(self.db, pose_ids, sort=False)
+
+            logger.debug(f"Getting interactions for {len(pset)} poses")
+            interaction_map = self.db.get_pose_id_interaction_ids_dict(pset)
+
+            logger.debug(f"Populating _data[\"{col}\"]...")
+            for key in null.index.values:
+                recipe = self.recipes[key]
+                pose_ids = df["product_pose_ids"][key]
+
+                row = df.loc[key]
+
+                all_interaction_ids = set()
+
+                for pose_id in pose_ids:
+                    interaction_ids = interaction_map.get(pose_id, set())
+                    all_interaction_ids |= interaction_ids
+
+                df.at[key,col] = all_interaction_ids
+
+        # raise NotImplementedError
+
+    def _populate_recipe_child_sets(self):
+
+        from .cset import CompoundSet
+        from .pset import PoseSet
+        from .iset import InteractionSet
+
+        logger.debug("Populating recipe caches")
+        for key, recipe in self.recipes.items():
+
+            row = self._data.loc[key]
+
+            if recipe._product_compounds is None:
+                ids = row["product_compound_ids"]
+                cache = CompoundSet(self.db, ids)
+                cache._name = f"Recipe_{key} products"
+                recipe._product_compounds = cache
+
+            if recipe._product_poses is None:
+                ids = row["product_pose_ids"]
+                cache = PoseSet(self.db, ids)
+                cache._name = f"Recipe_{key} product poses"
+                recipe._product_poses = cache
+
+            if recipe._product_interactions is None:
+                ids = row["product_interaction_ids"]
+                cache = InteractionSet(self.db, ids)
+                cache._name = f"Recipe_{key} product interactions"
+                recipe._product_interactions = cache
+
+    def _dump_json(self):
+        path = self.json_path
+        logger.writing(path)
+        self._data.to_json(path)
+
+    def _load_json(self):
+        path = self.json_path
+        
+        logger.reading(path)
+        cached = pd.read_json(path, orient="columns")
+
+        if (cached_columns := set(cached.columns)) != (self_columns := set(self._data.columns)):
+
+            for col in cached_columns-self_columns:
+                logger.error(f"JSON has unexpected {col}")
+
+            for col in self_columns-cached_columns:
+                logger.error(f"JSON is missing {col}")
+
+            display(cached.head())
+            display(self._data.head())
+
+            raise ValueError("JSON columns don't match expectation")
+
+        assert len(cached) == len(self._data)
+
+        cached.replace({np.nan: None}, inplace=True),
+
+        self._data = cached
+
+        # return cached
 
     ### DUNDERS
 
@@ -486,11 +707,18 @@ class Attribute:
 
     @property
     def value_dict(self):
-        if not self._value_dict:
-            logger.debug(f"Attribute(key={self.key}).value_dict")
-            for recipe in self.scorer.recipes:
-                self._value_dict[recipe.hash] = self.get_value(recipe)
-        return self._value_dict
+        df = self.scorer._data[self.key]
+
+        null = df.isnull()
+
+        if null.sum():
+            from tqdm import tqdm
+            for key in tqdm(null.index.values):
+                recipe = self.scorer.recipes[key]
+                self.get_value(recipe, force=True)
+            self.scorer._dump_json()
+
+        return df.to_dict()
 
     @property
     def values(self):
@@ -526,6 +754,7 @@ class Attribute:
 
     @weight.setter
     def weight(self, w):
+        self.scorer.__flag_weight_modification()
         self._weight = abs(w)
         self._reverse = w < 0
 
@@ -572,10 +801,20 @@ class Attribute:
         self,
         recipe: "Recipe",
         serialise_price: bool = True,
+        force: bool = False,
     ) -> float:
-        value = getattr(recipe, self.key)
-        if serialise_price and self.key == "price":
-            value = value.amount
+
+        if not force:
+            cached = self.scorer._data[self.key][recipe.hash]
+
+        if force or cached is None:
+            value = getattr(recipe, self.key)
+            if serialise_price and self.key == "price":
+                value = value.amount
+            self.scorer._data[self.key][recipe.hash] = value
+        else:
+            return cached
+
         return value
 
     def histogram(
@@ -598,20 +837,11 @@ class Attribute:
     def unweighted(
         self,
         recipe: "Recipe",
-        value: float = None,
-        debug: bool = False,
     ) -> float:
 
-        if value is None:
-            value = self.get_value(recipe)
-
-        if debug:
-            logger.debug(f"{value=}")
+        value = self.get_value(recipe)
 
         score = float(self.percentile_interpolator(value))
-
-        if debug:
-            logger.debug(f"{score=}")
 
         if self.inverse:
             score = 1 - score
@@ -624,52 +854,32 @@ class CustomAttribute(Attribute):
     _type = "CustomAttribute"
 
     def __init__(self, scorer, key, function):
-        self.get_value = function
-        self._values = None
+        self._function = function
         super(CustomAttribute, self).__init__(scorer=scorer, key=key)
-
-    ### PROPERTIES
-
-    # @property
-    # def values(self):
-
-    #     if self._values is None:
-
-    #         from tqdm import tqdm
-
-    #         logger.debug(f"CustomAttribute(key={self.key}).values")
-
-    #         self._values = []
-    #         for recipe in tqdm(self.scorer.recipes):
-    #             value = self.get_value(recipe)
-    #             self._values.append(value)
-
-    #     return self._values
 
     ### METHODS
 
-    def histogram(
+    def get_value(
         self,
-        progress: bool = False,
-    ) -> "plotly.graph_objects.Figure":
+        recipe: "Recipe",
+        serialise_price: bool = True,
+        force: bool = False,
+    ) -> float:
 
-        import plotly.graph_objects as go
+        if not force:
+            cached = self.scorer._data[self.key][recipe.hash]
 
-        fig = go.Figure(go.Histogram(x=self.values))
+        if force or cached is None:
 
-        fig.update_layout(xaxis_title=self.key, yaxis_title="count")
+            value = self._function(recipe)
 
-        return fig
+            if serialise_price and self.key == "price":
+                value = value.amount
+            self.scorer._data[self.key][recipe.hash] = value
+        else:
+            return cached
 
-    @property
-    def value_dict(self):
-        if not self._value_dict:
-            logger.debug(f"CustomAttribute(key={self.key}).value_dict")
-            from tqdm import tqdm
-
-            for recipe in tqdm(self.scorer.recipes):
-                self._value_dict[recipe.hash] = self.get_value(recipe)
-        return self._value_dict
+        return value
 
     @property
     def values(self):
