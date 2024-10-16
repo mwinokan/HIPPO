@@ -428,8 +428,16 @@ class Scorer:
         if budget:
             df = df[df["price"] < budget]
 
+        df["hash"] = df.index.values
+
+        hover_data = [
+            "hash",
+        ]
+
+        hover_data += [c for c in df.columns]
+
         return px.scatter(
-            df, x=keys[0], y=keys[1], color="score", hover_data=df.columns
+            df, x=keys[0], y=keys[1], color="score", hover_data=hover_data
         )
 
     def top_keys(self, n: int, budget: float | None = None):
