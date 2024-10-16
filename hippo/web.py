@@ -834,7 +834,7 @@ class ProjectPage:
             # JSON
             filename = f"Recipe_{proposal.hash}.json"
             original = self.rgen.recipe_dir / filename
-            if not original.exists and self.extra_recipe_dir:
+            if not original.exists() and self.extra_recipe_dir:
                 original = Path(self.extra_recipe_dir) / filename
             shutil.copyfile(original, self.resource_dir / filename)
 
@@ -851,24 +851,27 @@ class ProjectPage:
 
             # SDF
             filename = f"Recipe_{proposal.hash}_poses.sdf"
-            original = self.rgen.recipe_dir / filename
-            if not original.exists and self.extra_recipe_dir:
-                original = Path(self.extra_recipe_dir) / filename
 
-            logger.debug(f"{original=}, {original.exists}, {self.extra_recipe_dir}")
+            try:
+                original = self.rgen.recipe_dir / filename
+                if not original.exists() and self.extra_recipe_dir:
+                    original = Path(self.extra_recipe_dir) / filename
+                shutil.copyfile(original, self.resource_dir / filename)
 
-            shutil.copyfile(original, self.resource_dir / filename)
 
-            path = self.resource_dir / filename
-            rel_path = Path(self.resource_dir.name) / filename
+                path = self.resource_dir / filename
+                rel_path = Path(self.resource_dir.name) / filename
 
-            table_data.append(
-                dict(
-                    Name=str(proposal),
-                    Description="Recipe product poses (Fragalysis compatible)",
-                    Download=f'<a href="{rel_path}" download>SDF</a>',
+                table_data.append(
+                    dict(
+                        Name=str(proposal),
+                        Description="Recipe product poses (Fragalysis compatible)",
+                        Download=f'<a href="{rel_path}" download>SDF</a>',
+                    )
                 )
-            )
+            except FileNotFoundError:
+                # hit_poses.write_sdf(path, inspirations=False)
+                logger.error(f"Could not find pose SDF: {original}")
 
             # CAR CSVs
 
