@@ -852,7 +852,10 @@ class CompoundSet:
         """Get all child compounds with a certain tag"""
 
         values = self.db.select_where(
-            query="tag_compound", table="tag", key=f"tag_name = \"{tag}\" AND tag_compound IN {self.str_ids}", multiple=True
+            query="tag_compound",
+            table="tag",
+            key=f'tag_name = "{tag}" AND tag_compound IN {self.str_ids}',
+            multiple=True,
         )
         ids = [v for v, in values if v and v in self.ids]
         return CompoundSet(self.db, ids)
@@ -982,7 +985,7 @@ class CompoundSet:
         (count,) = self.db.select_where(
             query="COUNT(tag_compound)",
             table="tag",
-            key=f"tag_name = \"{tag}\" AND tag_compound IN {self.str_ids}",
+            key=f'tag_name = "{tag}" AND tag_compound IN {self.str_ids}',
             multiple=False,
         )
         return count

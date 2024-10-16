@@ -17,6 +17,7 @@ DATA_COLUMNS = [
     "product_interaction_ids",
 ]
 
+
 class Scorer:
     """
 
@@ -52,6 +53,7 @@ class Scorer:
     ) -> None:
 
         from .recipe import RecipeSet
+
         assert isinstance(recipes, RecipeSet)
 
         self._db = db
@@ -64,8 +66,8 @@ class Scorer:
             self._attributes[key] = attribute
 
         self._data = pd.DataFrame(
-            index=recipes.keys(), 
-            columns=DATA_COLUMNS+self.attribute_keys,
+            index=recipes.keys(),
+            columns=DATA_COLUMNS + self.attribute_keys,
         )
 
         self._data.replace({np.nan: None}, inplace=True),
@@ -187,7 +189,7 @@ class Scorer:
             for key in col[null].index.values:
                 recipe = self.recipes[key]
                 score = self.score(recipe)
-                self._data.at[key,"score"] = score
+                self._data.at[key, "score"] = score
 
             self._dump_json()
 
@@ -208,6 +210,7 @@ class Scorer:
     @property
     def json_path(self):
         from pathlib import Path
+
         return Path(self.db.path.name.replace(".sqlite", "_scorer.json"))
 
     ### METHODS
@@ -408,11 +411,13 @@ class Scorer:
         # calculate scores
         self.scores
 
-        df = self._data.drop(columns=[
-            "product_compound_ids",
-            "product_pose_ids",
-            "product_interaction_ids",
-        ])
+        df = self._data.drop(
+            columns=[
+                "product_compound_ids",
+                "product_pose_ids",
+                "product_interaction_ids",
+            ]
+        )
 
         df["score"] = pd.to_numeric(df["score"])
 
@@ -423,8 +428,8 @@ class Scorer:
         if not all(key in df.columns for key in keys):
             for key in keys:
                 if key not in df.columns:
-                    raise KeyError(f"no attribute/column named \"{key}\"")
-        
+                    raise KeyError(f'no attribute/column named "{key}"')
+
         if budget:
             df = df[df["price"] < budget]
 
@@ -454,7 +459,7 @@ class Scorer:
     ### INTERNALS
 
     def _flag_weight_modification(self):
-        
+
         self._data["score"] = None
 
     def summary(self):
@@ -499,11 +504,11 @@ class Scorer:
 
         # populate missing product compound ids
         if null.sum():
-            logger.debug(f"Populating _data[\"{col}\"]...")
+            logger.debug(f'Populating _data["{col}"]...')
             assert len(df[null]) == null.sum()
             for key in df[null].index.values:
                 recipe = self.recipes[key]
-                df.at[key,col] = recipe.products.compound_ids
+                df.at[key, col] = recipe.products.compound_ids
 
         ### Product Pose IDs
 
@@ -523,7 +528,7 @@ class Scorer:
             logger.debug(f"Getting poses for {len(cset)} compounds")
             pose_map = self.db.get_compound_id_pose_ids_dict(cset)
 
-            logger.debug(f"Populating _data[\"{col}\"]...")
+            logger.debug(f'Populating _data["{col}"]...')
             for key in df[null].index.values:
                 assert len(df[null]) == null.sum()
                 recipe = self.recipes[key]
@@ -537,7 +542,7 @@ class Scorer:
                     pose_ids = pose_map.get(comp_id, set())
                     all_pose_ids |= pose_ids
 
-                df.at[key,col] = all_pose_ids
+                df.at[key, col] = all_pose_ids
 
         ### Product Interaction IDs
 
@@ -557,7 +562,7 @@ class Scorer:
             logger.debug(f"Getting interactions for {len(pset)} poses")
             interaction_map = self.db.get_pose_id_interaction_ids_dict(pset)
 
-            logger.debug(f"Populating _data[\"{col}\"]...")
+            logger.debug(f'Populating _data["{col}"]...')
             for key in df[null].index.values:
                 assert len(df[null]) == null.sum()
                 recipe = self.recipes[key]
@@ -571,7 +576,7 @@ class Scorer:
                     interaction_ids = interaction_map.get(pose_id, set())
                     all_interaction_ids |= interaction_ids
 
-                df.at[key,col] = all_interaction_ids
+                df.at[key, col] = all_interaction_ids
 
         # raise NotImplementedError
 
@@ -611,16 +616,18 @@ class Scorer:
 
     def _load_json(self):
         path = self.json_path
-        
+
         logger.reading(path)
         cached = pd.read_json(path, orient="columns")
 
-        if (cached_columns := set(cached.columns)) != (self_columns := set(self._data.columns)):
+        if (cached_columns := set(cached.columns)) != (
+            self_columns := set(self._data.columns)
+        ):
 
-            for col in cached_columns-self_columns:
+            for col in cached_columns - self_columns:
                 logger.error(f"JSON has unexpected {col}")
 
-            for col in self_columns-cached_columns:
+            for col in self_columns - cached_columns:
                 logger.error(f"JSON is missing {col}")
 
             display(cached.head())
@@ -696,6 +703,7 @@ class Attribute:
 
         if null.sum():
             from tqdm import tqdm
+
             for key in tqdm(df[null].index.values):
                 recipe = self.scorer.recipes[key]
                 self.get_value(recipe, force=True)
@@ -786,7 +794,7 @@ class Attribute:
             value = getattr(recipe, self.key)
             if serialise_price and self.key == "price":
                 value = value.amount
-            self.scorer._data.at[recipe.hash,self.key] = value
+            self.scorer._data.at[recipe.hash, self.key] = value
         else:
             return cached
 
@@ -850,7 +858,7 @@ class CustomAttribute(Attribute):
 
             if serialise_price and self.key == "price":
                 value = value.amount
-            self.scorer._data.at[recipe.hash,self.key] = value
+            self.scorer._data.at[recipe.hash, self.key] = value
         else:
             return cached
 

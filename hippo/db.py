@@ -2407,8 +2407,10 @@ class Database:
 
     def get_compound_id_pose_ids_dict(self, cset: "CompoundSet") -> dict[int, set]:
         """Get a dictionary mapping :class:`.Compound` ID's to their associated :class:`.Pose` ID's"""
-        records = self.execute(f"SELECT pose_compound, pose_id FROM pose WHERE pose_compound IN {cset.str_ids}").fetchall()
-        
+        records = self.execute(
+            f"SELECT pose_compound, pose_id FROM pose WHERE pose_compound IN {cset.str_ids}"
+        ).fetchall()
+
         d = {}
 
         for comp_id, pose_id in records:
@@ -2418,8 +2420,10 @@ class Database:
 
     def get_pose_id_interaction_ids_dict(self, pset: "PoseSet") -> dict[int, set]:
         """Get a dictionary mapping :class:`.Pose` ID's to their associated :class:`.Interaction` ID's"""
-        records = self.execute(f"SELECT interaction_pose, interaction_id FROM interaction WHERE interaction_pose IN {pset.str_ids}").fetchall()
-        
+        records = self.execute(
+            f"SELECT interaction_pose, interaction_id FROM interaction WHERE interaction_pose IN {pset.str_ids}"
+        ).fetchall()
+
         d = {}
 
         for pose_id, interaction_id in records:
