@@ -1699,7 +1699,7 @@ class RecipeSet:
         logger.reading(f"{directory}/{pattern}")
 
         self._recipes = {}
-        for key, path in tqdm(self._json_paths.items()):
+        for key, path in tqdm(self._json_paths.items(), desc="Loading recipes"):
             try:
                 recipe = Recipe.from_json(
                     db=self.db,
@@ -1769,6 +1769,9 @@ class RecipeSet:
 
     def items(self):
         return self._recipes.items()
+
+    def keys(self):
+        return self._recipes.keys()
 
     ### DUNDERS
 
