@@ -54,16 +54,6 @@ class ProjectPage:
 
         self._title = title or animal.name
 
-        # yattag setup
-        from yattag import Doc
-
-        doc, tag, text, line = Doc().ttl()
-
-        self._doc = doc
-        self._tag = tag
-        self._text = text
-        self._line = line
-
         self.setup_page()
         self.write_html()
 
@@ -225,6 +215,16 @@ class ProjectPage:
 
     def setup_page(self) -> None:
         """Create the yattag page content"""
+
+        # yattag setup
+        from yattag import Doc
+
+        doc, tag, text, line = Doc().ttl()
+
+        self._doc = doc
+        self._tag = tag
+        self._text = text
+        self._line = line
 
         self.doc.asis("<!DOCTYPE html>")
 
