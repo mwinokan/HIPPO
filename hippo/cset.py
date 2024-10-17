@@ -852,7 +852,10 @@ class CompoundSet:
         """Get all child compounds with a certain tag"""
 
         values = self.db.select_where(
-            query="tag_compound", table="tag", key="name", value=tag, multiple=True
+            query="tag_compound",
+            table="tag",
+            key=f'tag_name = "{tag}" AND tag_compound IN {self.str_ids}',
+            multiple=True,
         )
         ids = [v for v, in values if v and v in self.ids]
         return CompoundSet(self.db, ids)
@@ -982,8 +985,7 @@ class CompoundSet:
         (count,) = self.db.select_where(
             query="COUNT(tag_compound)",
             table="tag",
-            key="name",
-            value=tag,
+            key=f'tag_name = "{tag}" AND tag_compound IN {self.str_ids}',
             multiple=False,
         )
         return count
@@ -1166,6 +1168,58 @@ class CompoundSet:
             supplier=supplier,
             **kwargs,
         )
+
+    def get_routes(self,
+        permitted_reactions: "ReactionSet",
+        debug: bool = True,
+    ):
+
+        from tqdm import tqdm
+
+        if "route" not in self.db.table_names:
+            logger.error("route table not in Database")
+            raise NotImplementedError
+
+        sql = f"""
+        SELECT route_id, route_product, component_ref FROM route
+        INNER JOIN component ON route_id = component_route
+        WHERE route_product IN {self.str_ids}
+        AND component_type = 1
+        """
+
+        permitted_reactions = set(permitted_reactions.ids)
+
+        if debug:
+            logger.debug("Querying database for routes")
+        records = self.db.execute(sql).fetchall()
+
+        if debug:
+            logger.debug("Assembling route dictionary")
+
+        routes = {}
+        for route_id, route_product, reaction_id in records:
+            if route_id not in routes:
+                routes[route_id] = dict(product=route_product, reactions=set())
+            assert routes[route_id]["product"] == route_product
+            routes[route_id]["reactions"].add(reaction_id)
+
+        if debug:
+            logger.debug("Checking availability")
+        available_routes = set()
+        for route_id, route_dict in routes.items():
+            product = route_dict["product"]
+            assert product in self
+            reactions = route_dict["reactions"]
+            if all(r in permitted_reactions for r in reactions):
+                available_routes.add(route_id)
+
+        if debug:
+            logger.debug("Getting route objects")
+        routes = [self.db.get_route(id=route_id) for route_id in tqdm(available_routes)]
+
+        from .recipe import RouteSet
+
+        return RouteSet(self.db, routes)
 
     def copy(self) -> "CompoundSet":
         """Returns a copy of this set"""
