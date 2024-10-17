@@ -1445,10 +1445,10 @@ class Recipe:
             def get_scaffold_series():
 
                 if bases := product.bases:
-                    return bases.ids
+                    return bases.ids, False
 
                 else:
-                    return [product.id]
+                    return [product.id], True
 
             poses = pose_map.get(product.id, set())
 
@@ -1463,8 +1463,11 @@ class Recipe:
             d["reactant_dependencies"] = set(
                 sum([route.reactants.ids for route in upstream_routes], [])
             )
+            d["route_ids"] = [route.id for route in upstream_routes]
             d["chemistry_types"] = ", ".join(set(upstream_reactions.types))
-            d["scaffold_series"] = get_scaffold_series()
+            series, is_base = get_scaffold_series()
+            d["is_scaffold"] = is_base
+            d["scaffold_series"] = series
 
             data.append(d)
 
@@ -1501,33 +1504,20 @@ class Recipe:
 
         routes = self.get_routes()
 
-        # present_routes = {}
-
-        # for route in routes:
-        #     if route.product not in self.products:
-        #         continue
-
-        #     key = tuple(r.type for r in route.reactions)
-
-        #     group = present_routes.setdefault(key, [])
-
-        #     group.append(route)
-
-        # return present_routes.keys()
-
-        # for types in present_routes:
-
         route_types = {}
 
         for compound in scaffolds:
 
-            # elabs = self.products.compounds.get_by_base(base=compound, none="quiet") or []
+            elabs = (
+                self.products.compounds.get_by_base(base=compound, none="quiet") or []
+            )
 
             d = dict(
                 product_id=compound.id,
                 smiles=compound.smiles,
                 inchikey=compound.inchikey,
-                # num_elaborations=len(elabs),
+                num_elaborations=len(elabs),
+                is_scaffold=True,
             )
 
             upstream_routes = []
@@ -1535,9 +1525,8 @@ class Recipe:
                 if compound in route.products:
                     upstream_routes.append(route)
 
-            # assert len(upstream_routes) == 1
-
             if not upstream_routes:
+                logger.warning(f"No routes to scaffold={compound}")
                 continue
 
             d["num_routes"] = len(upstream_routes)
@@ -1564,6 +1553,8 @@ class Recipe:
 
             data.append(d)
 
+        missing_bases = {}
+
         for compound in self.products.compounds:
 
             if compound in scaffolds:
@@ -1578,10 +1569,9 @@ class Recipe:
 
             for base in bases:
 
-                # print(base)
-
                 if base.id not in route_types:
-                    # logger.error(base)
+                    group = missing_bases.setdefault(base.id, [])
+                    group.append(compound.id)
                     continue
 
                 else:
@@ -1594,6 +1584,51 @@ class Recipe:
                             raise ValueError(
                                 "Scaffold has route not present in dataframe"
                             )
+
+        for base_id, elab_ids in missing_bases.items():
+
+            compound = self.db.get_compound(id=sorted(elab_ids)[0])
+
+            d = dict(
+                product_id=compound.id,
+                smiles=compound.smiles,
+                inchikey=compound.inchikey,
+                num_elaborations=len(elab_ids),
+                is_scaffold=False,
+            )
+
+            upstream_routes = []
+            for route in routes:
+                if compound in route.products:
+                    upstream_routes.append(route)
+
+            if not upstream_routes:
+                logger.error(f"No routes to elab {compound}")
+                raise ValueError(f"No routes to elab {compound}")
+
+            d["num_routes"] = len(upstream_routes)
+
+            for j, route in enumerate(upstream_routes):
+                d[f"route_{j+1}_num_steps"] = len(route.reactions)
+
+                group = route_types.setdefault(compound.id, set())
+                group.add(tuple([r.type for r in route.reactions]))
+
+                for k, reaction in enumerate(route.reactions):
+                    key = f"route_{j+1}_reaction_{k+1}"
+
+                    product = reaction.product
+
+                    d[f"{key}_type"] = reaction.type
+                    d[f"{key}_product_smiles"] = product.smiles
+                    d[f"{key}_product_id"] = product.id
+                    d[f"{key}_product_yield"] = reaction.product_yield
+
+                    for i, reactant in enumerate(reaction.reactants):
+                        d[f"{key}_reactant_{i+1}_smiles"] = reactant.smiles
+                        d[f"{key}_reactant_{i+1}_id"] = reactant.id
+
+            data.append(d)
 
         df = DataFrame(data)
         logger.writing(file)

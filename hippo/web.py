@@ -924,7 +924,7 @@ class ProjectPage:
 
             # Scaffold/chemistry CSV
 
-            filename = f"Recipe_{proposal.hash}_scaffold_chemistry"
+            filename = f"Recipe_{proposal.hash}_chemistry"
             path = self.resource_dir / f"{filename}.csv"
             proposal.write_chemistry_csv(path)
 
@@ -933,7 +933,7 @@ class ProjectPage:
             table_data.append(
                 dict(
                     Name=str(proposal),
-                    Description=f"Scaffold chemistry overview",
+                    Description=f"Chemistry review file",
                     Download=f'<a href="{rel_path}" download>CSV</a>',
                 )
             )
