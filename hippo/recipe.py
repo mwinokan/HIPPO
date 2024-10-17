@@ -1404,12 +1404,12 @@ class Recipe:
 
         return None
 
-    def write_product_csv(self, file: "str | Path", return_df: bool = True):
-        """Detailed CSV output including reactant information for purchasing and information on the downstream synthetic use"""
+    def write_product_csv(self, file: "str | Path", return_df: bool = False):
+        """Detailed CSV output including product information for selection and synthesis"""
 
         from pandas import DataFrame
 
-        from rich import print
+        # from rich import print
         from .cset import CompoundSet
         from .rset import ReactionSet
 
@@ -1420,7 +1420,6 @@ class Recipe:
         pose_map = self.db.get_compound_id_pose_ids_dict(self.products.compounds)
 
         for product in tqdm(self.products, desc="Constructing product DataFrame"):
-            quote = product.quote
 
             d = dict(
                 hippo_id=product.compound_id,
@@ -1468,6 +1467,133 @@ class Recipe:
             d["scaffold_series"] = get_scaffold_series()
 
             data.append(d)
+
+        df = DataFrame(data)
+        logger.writing(file)
+        df.to_csv(file, index=False)
+
+        if return_df:
+            return df
+
+        return None
+
+    def write_chemistry_csv(self, file: "str | Path", return_df: bool = True):
+        """Detailed CSV output synthetis information for chemistry types in this set"""
+
+        from pandas import DataFrame
+
+        from rich import print
+        from .cset import CompoundSet
+        from .rset import ReactionSet
+
+        data = []
+
+        # get compounds
+
+        scaffolds = CompoundSet(self.db)
+
+        for product in self.products:
+
+            if bases := product.bases:
+                scaffolds += bases
+            else:
+                scaffolds.add(product.compound)
+
+        routes = self.get_routes()
+
+        # present_routes = {}
+
+        # for route in routes:
+        #     if route.product not in self.products:
+        #         continue
+
+        #     key = tuple(r.type for r in route.reactions)
+
+        #     group = present_routes.setdefault(key, [])
+
+        #     group.append(route)
+
+        # return present_routes.keys()
+
+        # for types in present_routes:
+
+        route_types = {}
+
+        for compound in scaffolds:
+
+            # elabs = self.products.compounds.get_by_base(base=compound, none="quiet") or []
+
+            d = dict(
+                product_id=compound.id,
+                smiles=compound.smiles,
+                inchikey=compound.inchikey,
+                # num_elaborations=len(elabs),
+            )
+
+            upstream_routes = []
+            for route in routes:
+                if compound in route.products:
+                    upstream_routes.append(route)
+
+            # assert len(upstream_routes) == 1
+
+            if not upstream_routes:
+                continue
+
+            d["num_routes"] = len(upstream_routes)
+
+            for j, route in enumerate(upstream_routes):
+                d[f"route_{j+1}_num_steps"] = len(route.reactions)
+
+                group = route_types.setdefault(compound.id, set())
+                group.add(tuple([r.type for r in route.reactions]))
+
+                for k, reaction in enumerate(route.reactions):
+                    key = f"route_{j+1}_reaction_{k+1}"
+
+                    product = reaction.product
+
+                    d[f"{key}_type"] = reaction.type
+                    d[f"{key}_product_smiles"] = product.smiles
+                    d[f"{key}_product_id"] = product.id
+                    d[f"{key}_product_yield"] = reaction.product_yield
+
+                    for i, reactant in enumerate(reaction.reactants):
+                        d[f"{key}_reactant_{i+1}_smiles"] = reactant.smiles
+                        d[f"{key}_reactant_{i+1}_id"] = reactant.id
+
+            data.append(d)
+
+        for compound in self.products.compounds:
+
+            if compound in scaffolds:
+                continue
+
+            upstream_routes = []
+            for route in routes:
+                if compound in route.products:
+                    upstream_routes.append(route)
+
+            bases = compound.bases
+
+            for base in bases:
+
+                # print(base)
+
+                if base.id not in route_types:
+                    # logger.error(base)
+                    continue
+
+                else:
+                    for route in upstream_routes:
+                        chem_types = tuple([r.type for r in route.reactions])
+
+                        if chem_types not in route_types[base.id]:
+                            logger.success(base)
+                            logger.success(chem_types)
+                            raise ValueError(
+                                "Scaffold has route not present in dataframe"
+                            )
 
         df = DataFrame(data)
         logger.writing(file)

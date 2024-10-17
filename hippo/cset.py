@@ -885,6 +885,7 @@ class CompoundSet:
     def get_by_base(
         self,
         base: Compound | int,
+        none: str = "error",
     ) -> "CompoundSet":
         """Get all compounds that elaborate the given base compound
 
@@ -901,8 +902,12 @@ class CompoundSet:
             table="scaffold",
             key=f"scaffold_base = {base} AND scaffold_superstructure IN {self.str_ids}",
             multiple=True,
+            none=none,
         )
         ids = [v for v, in values if v]
+
+        if not ids:
+            return None
         return CompoundSet(self.db, ids)
 
     def get_all_possible_reactants(
@@ -1366,7 +1371,7 @@ class CompoundSet:
 
         records = self.db.select_where(
             table=self.table,
-            query="compound_id, compound_smiles",
+            query="co mpound_id, compound_smiles",
             key=f"compound_id IN {self.str_ids}",
             multiple=True,
         )

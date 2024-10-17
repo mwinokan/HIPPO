@@ -922,6 +922,22 @@ class ProjectPage:
                 )
             )
 
+            # Scaffold/chemistry CSV
+
+            filename = f"Recipe_{proposal.hash}_scaffold_chemistry"
+            path = self.resource_dir / f"{filename}.csv"
+            proposal.write_chemistry_csv(path)
+
+            rel_path = Path(self.resource_dir.name) / path.name
+
+            table_data.append(
+                dict(
+                    Name=str(proposal),
+                    Description=f"Scaffold chemistry overview",
+                    Download=f'<a href="{rel_path}" download>CSV</a>',
+                )
+            )
+
         self.table(table_data)
 
     ### GRAPHS
