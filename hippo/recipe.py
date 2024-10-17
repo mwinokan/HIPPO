@@ -1196,7 +1196,9 @@ class Recipe:
     def get_routes(self):
         return self.products.get_routes(permitted_reactions=self.reactions)
 
-    def write_CAR_csv(self, file, return_df=False):
+    def write_CAR_csv(
+        self, file: "str | Path", return_df: bool = False
+    ) -> "DataFrame | None":
         """List of reactions for CAR
 
         Columns:
@@ -1294,7 +1296,9 @@ class Recipe:
 
         return df
 
-    def write_reactant_csv(self, file, return_df=False) -> "DataFrame | None":
+    def write_reactant_csv(
+        self, file: "str | Path", return_df: bool = False
+    ) -> "DataFrame | None":
         """Detailed CSV output including reactant information for purchasing and information on the downstream synthetic use
 
         Reactant
@@ -1380,13 +1384,87 @@ class Recipe:
                 if not bases:
                     bases = downstream_products[0:]
 
-                return bases
+                return bases.ids
 
             d["num_reaction_dependencies"] = len(downstream_reactions)
             d["num_product_dependencies"] = len(downstream_products)
             d["reaction_dependencies"] = downstream_reactions.ids
             d["product_dependencies"] = downstream_products.ids
             d["chemistry_types"] = ", ".join(set(downstream_reactions.types))
+            d["scaffold_series"] = get_scaffold_series()
+
+            data.append(d)
+
+        df = DataFrame(data)
+        logger.writing(file)
+        df.to_csv(file, index=False)
+
+        if return_df:
+            return df
+
+        return None
+
+    def write_product_csv(self, file: "str | Path", return_df: bool = True):
+        """Detailed CSV output including reactant information for purchasing and information on the downstream synthetic use"""
+
+        from pandas import DataFrame
+
+        from rich import print
+        from .cset import CompoundSet
+        from .rset import ReactionSet
+
+        data = []
+
+        routes = self.get_routes()
+
+        pose_map = self.db.get_compound_id_pose_ids_dict(self.products.compounds)
+
+        for product in tqdm(self.products, desc="Constructing product DataFrame"):
+            quote = product.quote
+
+            d = dict(
+                hippo_id=product.compound_id,
+                smiles=product.smiles,
+                inchikey=product.inchikey,
+                required_amount_mg=product.amount,
+            )
+
+            upstream_routes = []
+            upstream_reactions = []
+
+            for route in routes:
+                if product in route.products:
+                    upstream_routes.append(route)
+
+                    for reaction in route.reactions:
+                        upstream_reactions.append(reaction)
+
+            upstream_reactions = ReactionSet(
+                self.db, set(reaction.id for reaction in upstream_reactions)
+            )
+
+            def get_scaffold_series():
+
+                if bases := product.bases:
+                    return bases.ids
+
+                else:
+                    return [product.id]
+
+            poses = pose_map.get(product.id, set())
+
+            d["num_poses"] = len(poses)
+            d["poses"] = poses
+            d["tags"] = product.tags
+            d["num_routes"] = len(upstream_routes)
+            d["num_reaction_steps"] = set(
+                len(route.reactions) for route in upstream_routes
+            )
+            d["reaction_dependencies"] = upstream_reactions.ids
+            d["reactant_dependencies"] = set(
+                sum([route.reactants.ids for route in upstream_routes], [])
+            )
+            d["chemistry_types"] = ", ".join(set(upstream_reactions.types))
             d["scaffold_series"] = get_scaffold_series()
 
             data.append(d)

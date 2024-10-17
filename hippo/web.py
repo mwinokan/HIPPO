@@ -906,6 +906,22 @@ class ProjectPage:
                 )
             )
 
+            # Product CSV
+
+            filename = f"Recipe_{proposal.hash}_products"
+            path = self.resource_dir / f"{filename}.csv"
+            proposal.write_product_csv(path)
+
+            rel_path = Path(self.resource_dir.name) / path.name
+
+            table_data.append(
+                dict(
+                    Name=str(proposal),
+                    Description=f"Product data file",
+                    Download=f'<a href="{rel_path}" download>CSV</a>',
+                )
+            )
+
         self.table(table_data)
 
     ### GRAPHS
