@@ -1193,6 +1193,9 @@ class Recipe:
 
         return data
 
+    def get_routes(self):
+        return self.products.get_routes(permitted_reactions=self.reactions)
+
     def write_CAR_csv(self, file, return_df=False):
         """List of reactions for CAR
 
@@ -1226,21 +1229,21 @@ class Recipe:
 
         rows = []
 
-        routes = self.products.get_routes(permitted_reactions=self.reactions)
+        routes = self.get_routes()
 
         # return routes
 
         # for product in tqdm(self.products):
 
-            # prod_cset = CompoundSet(self.db, [product.id])
+        # prod_cset = CompoundSet(self.db, [product.id])
 
-            # sub_recipes = prod_cset.get_routes(permitted_reactions=self.reactions)
+        # sub_recipes = prod_cset.get_routes(permitted_reactions=self.reactions)
 
-            # sub_recipes = prod_cset.get_recipes(permitted_reactions=self.reactions)
+        # sub_recipes = prod_cset.get_recipes(permitted_reactions=self.reactions)
 
         for sub_recipe in routes:
 
-            product=sub_recipe.product
+            product = sub_recipe.product
 
             row = {
                 "target-names": str(product.compound),
@@ -1290,6 +1293,112 @@ class Recipe:
         df.to_csv(file, index=False)
 
         return df
+
+    def write_reactant_csv(self, file, return_df=False) -> "DataFrame | None":
+        """Detailed CSV output including reactant information for purchasing and information on the downstream synthetic use
+
+        Reactant
+        ========
+
+        - ID
+        - SMILES
+        - Inchikey
+
+        Quote
+        =====
+
+        - Supplier
+        - Catalogue
+        - Entry
+        - Lead-time
+        - Quoted amount
+        - Quote currency
+        - Quote price
+        - Quote purity
+
+        Downstream
+        ==========
+
+        - num_reaction_dependencies
+        - num_product_dependencies
+        - reaction_dependencies
+        - product_dependencies
+
+        """
+        # - remove_with
+
+        from pandas import DataFrame
+
+        # from rich import print
+        from .cset import CompoundSet
+        from .rset import ReactionSet
+
+        data = []
+
+        routes = self.get_routes()
+
+        for reactant in tqdm(self.reactants, desc="Constructing reactant DataFrame"):
+            quote = reactant.quote
+
+            d = dict(
+                hippo_id=reactant.compound_id,
+                smiles=reactant.smiles,
+                inchikey=reactant.inchikey,
+                required_amount_mg=reactant.amount,
+                quoted_amount=quote.amount,
+                quote_currency=quote.currency,
+                quote_price=quote.price.amount,
+                quote_lead_time_days=quote.lead_time,
+                quote_supplier=quote.supplier,
+                quote_catalogue=quote.catalogue,
+                quote_entry=quote.entry,
+                quoted_smiles=quote.smiles,
+                quoted_purity=quote.purity,
+            )
+
+            downstream_routes = []
+            downstream_reactions = []
+
+            for route in routes:
+                if reactant in route.reactants:
+                    downstream_routes.append(route)
+                for reaction in route.reactions:
+                    if reactant in reaction.reactants:
+                        downstream_reactions.append(reaction)
+
+            downstream_products = CompoundSet(
+                self.db, set(route.product.id for route in downstream_routes)
+            )
+            downstream_reactions = ReactionSet(
+                self.db, set(reaction.id for reaction in downstream_reactions)
+            )
+
+            def get_scaffold_series():
+
+                bases = downstream_products.bases
+
+                if not bases:
+                    bases = downstream_products[0:]
+
+                return bases
+
+            d["num_reaction_dependencies"] = len(downstream_reactions)
+            d["num_product_dependencies"] = len(downstream_products)
+            d["reaction_dependencies"] = downstream_reactions.ids
+            d["product_dependencies"] = downstream_products.ids
+            d["chemistry_types"] = ", ".join(set(downstream_reactions.types))
+            d["scaffold_series"] = get_scaffold_series()
+
+            data.append(d)
+
+        df = DataFrame(data)
+        logger.writing(file)
+        df.to_csv(file, index=False)
+
+        if return_df:
+            return df
+
+        return None
 
     def copy(self):
         """ """
@@ -1527,7 +1636,7 @@ class RouteSet:
 
         data = {}
         for route in routes:
-            assert isinstance(route, Route)
+            # assert isinstance(route, Route)
             data[route.id] = route
 
         self._data = data
