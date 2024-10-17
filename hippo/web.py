@@ -274,6 +274,9 @@ class ProjectPage:
 
         with self.tag("head"):
 
+            with self.tag("title"):
+                self.text(self.title)
+
             self.doc.stag("meta", charset="UTF-8")
             self.doc.stag(
                 "meta", name="viewport", content="width=device-width, initial-scale=1"
