@@ -2405,6 +2405,20 @@ class Database:
         records = self.execute("SELECT route_id, route_product FROM route").fetchall()
         return {route_id: route_product for route_id, route_product in records}
 
+    def get_compound_id_pose_ids_dict(self, cset: "CompoundSet") -> dict[int, int]:
+        """Get a dictionary mapping :class:`.Compound` ID's to their associated :class:`.Pose` ID's"""
+        records = self.execute(
+            f"SELECT pose_compound, pose_id FROM pose WHERE pose_compound IN {cset.str_ids}"
+        ).fetchall()
+
+        d = {}
+
+        for comp_id, pose_id in records:
+            s = d.get(comp_id, set())
+            s.add(pose_id)
+
+        return d
+
     def get_interaction(self, *, id: int, table: str = "interaction") -> "Interaction":
         """Fetch the :class:`.Interaction` object with given ID
 
