@@ -1169,7 +1169,8 @@ class CompoundSet:
             **kwargs,
         )
 
-    def get_routes(self,
+    def get_routes(
+        self,
         permitted_reactions: "ReactionSet",
         debug: bool = True,
     ):
@@ -1363,9 +1364,17 @@ class CompoundSet:
         """
         from pandas import DataFrame
 
-        smiles = self.smiles
-        df = DataFrame(dict(smiles=smiles))
-        df.to_csv(file)
+        records = self.db.select_where(
+            table=self.table,
+            query="compound_id, compound_smiles",
+            key=f"compound_id IN {self.str_ids}",
+            multiple=True,
+        )
+
+        data = [dict(id=id, smiles=smiles) for id, smiles in records]
+        df = DataFrame(data)
+        logger.writing(file)
+        df.to_csv(file, index=False)
 
     def write_postera_csv(
         self,
