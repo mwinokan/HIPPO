@@ -1375,7 +1375,7 @@ class CompoundSet:
 
         records = self.db.select_where(
             table=self.table,
-            query="co mpound_id, compound_smiles",
+            query="compound_id, compound_smiles",
             key=f"compound_id IN {self.str_ids}",
             multiple=True,
         )
