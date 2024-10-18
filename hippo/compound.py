@@ -11,9 +11,7 @@ from .tags import TagSet
 from .target import Target
 from .quote import Quote
 
-import logging
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 
 class Compound:
@@ -955,8 +953,12 @@ class Compound:
         return f"C{self.id}"
 
     def __repr__(self) -> str:
-        """Formatted string representation"""
+        """ANSI Formatted string representation"""
         return f'{mcol.bold}{mcol.underline}{self} "{self.name}"{mcol.unbold}{mcol.ununderline}'
+
+    def __rich__(self) -> str:
+        """Representation for mrich"""
+        return f'[bold underline]{self} "{self.name}"'
 
     def __eq__(self, other) -> bool:
         """Compare compounds"""
@@ -1184,8 +1186,12 @@ class Ingredient:
         return f"{self.amount:.2f}mg of C{self._compound_id}"
 
     def __repr__(self) -> str:
-        """Formatted string representation"""
+        """ANSI Formatted string representation"""
         return f"{mcol.bold}{mcol.underline}{str(self)}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Representation for mrich"""
+        return f"[bold underline]{str(self)}"
 
     def __eq__(self, other) -> bool:
         """Equality operator"""

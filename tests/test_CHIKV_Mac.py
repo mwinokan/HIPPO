@@ -19,6 +19,7 @@ class TestCHIKV_Mac(unittest.TestCase):
         download_target("CHIKV_Mac", destination="targets", overwrite=True, unzip=True)
 
         os.system("rm test_CHIKV_Mac.sqlite")
+
         self.animal = HIPPO("TestCHIKV_Mac", "test_CHIKV_Mac.sqlite")
 
     def test_add_hits(self):
@@ -27,6 +28,9 @@ class TestCHIKV_Mac(unittest.TestCase):
             metadata_csv="targets/CHIKV_Mac/metadata.csv",
             aligned_directory="targets/CHIKV_Mac/aligned_files",
         )
+
+    def test_backup(self):
+        self.animal.db.backup()
 
         # self.assertEqual(len(self.animal.compounds), 84)
         # self.assertEqual(len(self.animal.poses), 107)

@@ -17,9 +17,7 @@ from .tools import inchikey_from_smiles
 
 from pathlib import Path
 
-import logging
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 CHEMICALITE_COMPOUND_PROPERTY_MAP = {
     "num_heavy_atoms": "mol_num_hvyatms",
@@ -213,19 +211,19 @@ class Database:
 
         destination = Path(destination)
 
-        logger.debug(f"Backing up {self}...")
+        with logger.spinner(f"Backing up {self.__rich__()}[reset]..."):
 
-        logger.writing(destination)
+            logger.writing(destination)
 
-        def progress(status, remaining, total):
-            logger.debug(f"Copied {total-remaining} of {total} pages...")
+            def progress(status, remaining, total):
+                logger.debug(f"Copied {total-remaining} of {total} pages...")
 
-        src = self.connection
-        dst = sqlite3.connect(destination)
-        with dst:
-            src.backup(dst, pages=pages, progress=progress)
+            src = self.connection
+            dst = sqlite3.connect(destination)
+            with dst:
+                src.backup(dst, pages=pages, progress=progress)
 
-        dst.close()
+            dst.close()
 
     ### GENERAL SQL
 
@@ -251,11 +249,11 @@ class Database:
             if "cannot open shared object file" in str(e):
                 logger.error("chemicalite package not installed correctly")
             else:
-                logger.exception(e)
+                logger.error(e)
             raise
 
         except Error as e:
-            logger.exception(e)
+            logger.error(e)
             raise
 
         self._connection = conn
@@ -285,24 +283,24 @@ class Database:
     def create_blank_db(self) -> None:
         """Create a blank database"""
 
-        logger.out("Creating blank database...")
-        self.create_table_compound()
-        self.create_table_inspiration()
-        self.create_table_reaction()
-        self.create_table_reactant()
-        self.create_table_pose()
-        self.create_table_tag()
-        self.create_table_quote()
-        self.create_table_target()
-        self.create_table_pattern_bfp()
-        self.create_table_feature()
-        self.create_table_route()
-        self.create_table_component()
-        self.create_table_interaction()
-        self.create_table_subsite()
-        self.create_table_subsite_tag()
-        self.create_table_scaffold()
-        self.commit()
+        with logger.loading("Creating blank database..."):
+            self.create_table_compound()
+            self.create_table_inspiration()
+            self.create_table_reaction()
+            self.create_table_reactant()
+            self.create_table_pose()
+            self.create_table_tag()
+            self.create_table_quote()
+            self.create_table_target()
+            self.create_table_pattern_bfp()
+            self.create_table_feature()
+            self.create_table_route()
+            self.create_table_component()
+            self.create_table_interaction()
+            self.create_table_subsite()
+            self.create_table_subsite_tag()
+            self.create_table_scaffold()
+            self.commit()
 
     def create_table_compound(self) -> None:
         """Create the compound table"""
@@ -634,12 +632,12 @@ class Database:
                         f'Skipping compound with existing morgan binary fingerprint "{smiles}"'
                     )
             else:
-                logger.exception(e)
+                logger.error(e)
 
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         compound_id = self.cursor.lastrowid
         if commit:
@@ -687,7 +685,7 @@ class Database:
             self.execute(sql, (compound_id, bfp))
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         bfp_id = self.cursor.lastrowid
         if commit:
@@ -786,11 +784,11 @@ class Database:
                         f'Could not insert pose with duplicate alias "{alias}"'
                     )
             else:
-                logger.exception(e)
+                logger.error(e)
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
             raise
 
         pose_id = self.cursor.lastrowid
@@ -845,7 +843,7 @@ class Database:
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         tag_id = self.cursor.lastrowid
         if commit:
@@ -898,7 +896,7 @@ class Database:
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         inspiration_id = self.cursor.lastrowid
 
@@ -954,7 +952,7 @@ class Database:
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         scaffold_id = self.cursor.lastrowid
 
@@ -995,7 +993,7 @@ class Database:
             self.execute(sql, (type, product, product_yield))
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         reaction_id = self.cursor.lastrowid
         if commit:
@@ -1041,7 +1039,7 @@ class Database:
             logger.warning(f"Skipping existing reactant: {reaction=} {compound=}")
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         reactant_id = self.cursor.lastrowid
 
@@ -1145,7 +1143,7 @@ class Database:
             raise
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
             return None
 
         quote_id = self.cursor.lastrowid
@@ -1178,7 +1176,7 @@ class Database:
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         target_id = self.cursor.lastrowid
         self.commit()
@@ -1238,7 +1236,7 @@ class Database:
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         feature_id = self.cursor.lastrowid
         if commit:
@@ -1293,7 +1291,7 @@ class Database:
             self.execute(sql, (product_id,))
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         route_id = self.cursor.lastrowid
 
@@ -1500,7 +1498,7 @@ class Database:
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         interaction_id = self.cursor.lastrowid
 
@@ -1534,7 +1532,7 @@ class Database:
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         subsite_id = self.cursor.lastrowid
         if commit:
@@ -1594,7 +1592,7 @@ class Database:
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         subsite_tag_id = self.cursor.lastrowid
         if commit:
@@ -3110,11 +3108,15 @@ class Database:
 
     def __str__(self):
         """Unformatted string representation"""
-        return str(self.path.resolve())
+        return f"Database @ {self.path.resolve()}"
 
     def __repr__(self):
-        """Formatted string representation"""
-        return f"{mcol.bold}{mcol.underline}Database(path={self}){mcol.clear}"
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.clear}"
+
+    def __rich__(self) -> str:
+        """Representation for mrich"""
+        return f"[bold underline]{self}"
 
 
 class LegacyDatabaseError(Exception): ...

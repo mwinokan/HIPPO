@@ -5,9 +5,7 @@ import mout
 import plotly.graph_objects as go
 from tqdm import tqdm
 
-import logging
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 """
 

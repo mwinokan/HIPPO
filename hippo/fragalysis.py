@@ -1,7 +1,4 @@
-import logging
-
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 
 def generate_header(
@@ -96,7 +93,7 @@ def download_target(
         "trans_matrix_info": False,
     }
 
-    logger.info("Requesting download...")
+    logger.print("Requesting download...")
 
     url = root + "/api/download_structures/"
 
@@ -105,7 +102,7 @@ def download_target(
     response = requests.post(url, json=payload)
 
     if response.status_code == 200:
-        logger.info("Download is ready.")
+        logger.print("Download is ready.")
     else:
         logger.error(f"Download request failed: {response.status_code=}")
         logger.error(response.text)
@@ -139,7 +136,7 @@ def download_target(
         try:
             import zipfile
 
-            logger.info(f"Unzipping {zip_path}")
+            logger.print(f"Unzipping {zip_path}")
 
             target_dir = destination / Path(file_url).name.removesuffix(".zip")
 

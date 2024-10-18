@@ -11,9 +11,7 @@ import mcol
 
 import os
 
-import logging
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 
 class CompoundTable:
@@ -434,19 +432,25 @@ class CompoundTable:
 
         return None
 
-    def __repr__(self) -> str:
-        """Formatted string representation"""
-
-        s = f"{mcol.bold}{mcol.underline}"
+    def __str__(self) -> str:
+        """Unformatted string representation"""
 
         if self.name:
-            s += f"{self.name}: "
+            s = f"{self.name}: "
+        else:
+            s = ""
 
-        s += "{" f"C x {len(self)}" "}"
-
-        s += f"{mcol.unbold}{mcol.ununderline}"
+        s += "{" f"C × {len(self)}" "}"
 
         return s
+
+    def __repr__(self) -> str:
+        """ANSI ormatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Representation for mrich"""
+        return f"[bold underline]{self}"
 
     def __len__(self) -> int:
         """Total number of compounds"""
@@ -1488,7 +1492,7 @@ class CompoundSet:
         for i in self.indices:
             self.db.insert_tag(name=tag, compound=i, commit=False)
 
-        logger.info(f'Tagged {self} w/ "{tag}"')
+        logger.print(f'Tagged {self} w/ "{tag}"')
 
         self.db.commit()
 
@@ -1585,28 +1589,22 @@ class CompoundSet:
     def __str__(self) -> str:
         """Unformatted string representation"""
 
-        s = ""
-
         if self.name:
-            s += f"{self.name}: "
+            s = f"{self.name}: "
+        else:
+            s = ""
 
-        s += "{" f"C x {len(self)}" "}"
+        s += "{" f"C × {len(self)}" "}"
 
         return s
 
     def __repr__(self) -> str:
-        """Formatted string representation"""
+        """ANSI ormatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
 
-        s = f"{mcol.bold}{mcol.underline}"
-
-        if self.name:
-            s += f"{self.name}: "
-
-        s += "{" f"C x {len(self)}" "}"
-
-        s += f"{mcol.unbold}{mcol.ununderline}"
-
-        return s
+    def __rich__(self) -> str:
+        """Representation for mrich"""
+        return f"[bold underline]{self}"
 
     def __contains__(self, other: Compound | Ingredient | int):
         """Check if compound or ingredient is a member of this set"""
@@ -2168,14 +2166,17 @@ class IngredientSet:
         """The number of ingredients in this set"""
         return len(self._data)
 
-    def __repr__(self):
-        return (
-            f"{mcol.bold}{mcol.underline}"
-            "{"
-            f"I x {len(self)}"
-            "}"
-            f"{mcol.unbold}{mcol.ununderline}"
-        )
+    def __str__(self) -> str:
+        """Unformatted string representation"""
+        return "{" f"Ingredient × {len(self)}" "}"
+
+    def __repr__(self) -> str:
+        """ANSI ormatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Representation for mrich"""
+        return f"[bold underline]{self}"
 
     def __add__(self, other):
         """Add another  :class:`.IngredientSet` this set"""

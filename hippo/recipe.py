@@ -6,9 +6,7 @@ import mcol
 
 from tqdm import tqdm
 
-import logging
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 
 # @dataclass
@@ -376,7 +374,7 @@ class Recipe:
         options = []
 
         logger.var("#compounds", n_comps)
-        logger.info("Solving individual compound recipes...")
+        logger.print("Solving individual compound recipes...")
 
         if n_comps > 1:
             generator = tqdm(zip(compounds, amount), total=n_comps)
@@ -438,7 +436,7 @@ class Recipe:
 
         from itertools import product
 
-        logger.info("Solving recipe combinations...")
+        logger.print("Solving recipe combinations...")
         combinations = list(product(*options))
 
         if not solve_combinations:
@@ -447,7 +445,7 @@ class Recipe:
         if pick_first:
             combinations = [combinations[0]]
 
-        logger.info("Combining recipes...")
+        logger.print("Combining recipes...")
 
         solutions = []
 
@@ -477,7 +475,7 @@ class Recipe:
             return solutions[0]
 
         if pick_cheapest:
-            logger.info("Picking cheapest...")
+            logger.print("Picking cheapest...")
             priced = [r for r in solutions if r.price]
             if not priced:
                 logger.error("0 recipes with prices, can't choose cheapest")
@@ -628,7 +626,7 @@ class Recipe:
                 return None
 
         if debug:
-            logger.info(f'Recipe was generated at: {data["timestamp"]}')
+            logger.print(f'Recipe was generated at: {data["timestamp"]}')
         price = data["price"]
 
         # IngredientSets
@@ -1735,7 +1733,10 @@ class Recipe:
         if self.hash:
             return f"Recipe_{self.hash}({s})"
 
-    def __repr__(self):
+        return f"Recipe({s})"
+
+    def __longstr(self) -> str:
+        """Unformatted string representation"""
         if self.intermediates:
             s = f"{self.reactants} --> {self.intermediates} --> {self.products} via {self.reactions}"
         else:
@@ -1748,6 +1749,14 @@ class Recipe:
             return f"Recipe_{self.hash}({s})"
 
         return f"Recipe({s})"
+
+    def __repr__(self) -> str:
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self.__longstr()}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self.__longstr()}"
 
     def __add__(self, other):
         result = self.copy()
@@ -1864,8 +1873,17 @@ class Route(Recipe):
 
     ### DUNDERS
 
-    def __repr__(self):
-        return f"{mcol.bold}{mcol.underline}Route #{self.id}: {repr(self.product_compound)}"  #' {self.reactants} --> {self.intermediates} --> {self.product_compound} via {self.reactions})'
+    def __str__(self) -> str:
+        """Unformatted string representation"""
+        return f"Route #{self.id}: {self.product_compound}"
+
+    def __repr__(self) -> str:
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self}"
 
 
 class RouteSet:
@@ -2015,16 +2033,17 @@ class RouteSet:
     def __len__(self):
         return len(self.data)
 
+    def __str__(self) -> str:
+        """Unformatted string representation"""
+        return "{" f"Route × {len(self)}" "}"
+
     def __repr__(self) -> str:
-        """Formatted string representation"""
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
 
-        s = f"{mcol.bold}{mcol.underline}"
-
-        s += "{" f"Route x {len(self)}" "}"
-
-        s += f"{mcol.unbold}{mcol.ununderline}"
-
-        return s
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self}"
 
     def __iter__(self):
         return iter(self.data.values())
@@ -2165,13 +2184,14 @@ class RecipeSet:
         assert isinstance(key, str)
         return key in self._recipes
 
+    def __str__(self) -> str:
+        """Unformatted string representation"""
+        return "{" f"Recipe × {len(self)}" "}"
+
     def __repr__(self) -> str:
-        """Formatted string representation"""
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
 
-        s = f"{mcol.bold}{mcol.underline}"
-
-        s += "{" f"Recipes x {len(self)}" "}"
-
-        s += f"{mcol.unbold}{mcol.ununderline}"
-
-        return s
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self}"

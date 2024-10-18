@@ -51,9 +51,17 @@ class TagTable:
 
     ### DUNDERS
 
+    def __str__(self) -> str:
+        """Unformatted representation of this object"""
+        return f"Tags {self.unique}"
+
     def __repr__(self) -> str:
-        """Formatted representation of this object"""
-        return f"{mcol.bold}{mcol.underline}Tags {self.unique}{mcol.clear}"
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self}"
 
 
 class TagSet(MutableSet):
@@ -231,9 +239,17 @@ class TagSet(MutableSet):
         """Is this tag in the set?"""
         return tag in self.tags
 
-    def __repr__(self) -> str:
-        """Formatted representation of this set"""
+    def __str__(self) -> str:
+        """Unformatted representation of this object"""
         return str(self._elements)
+
+    def __repr__(self) -> str:
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self}"
 
     def __len__(self) -> int:
         """Number of tags in this set"""

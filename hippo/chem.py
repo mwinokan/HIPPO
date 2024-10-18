@@ -1,8 +1,6 @@
 from mout import debug_log
 
-import logging
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 """
 
@@ -342,7 +340,7 @@ def check_specific_atomtype_diff(reaction_type, prod, reac, removal=False, debug
                         f"{symbol}: {r_count=} - {p_count=} >= {r_count - p_count}"
                     )
                     logger.error(
-                        f"{reaction_type}: atomtype removal {symbol} x {count} FAIL"
+                        f"{reaction_type}: atomtype removal {symbol} × {count} FAIL"
                     )
                 return False
 
@@ -352,7 +350,7 @@ def check_specific_atomtype_diff(reaction_type, prod, reac, removal=False, debug
                         f"{symbol}: {p_count=} - {r_count=} >= {p_count - r_count}"
                     )
                     logger.error(
-                        f"{reaction_type}: atomtype addition {symbol} x {count} FAIL"
+                        f"{reaction_type}: atomtype addition {symbol} × {count} FAIL"
                     )
                 return False
 
@@ -364,7 +362,7 @@ def check_specific_atomtype_diff(reaction_type, prod, reac, removal=False, debug
                         f"{symbol}: {r_count=} - {p_count=} = {r_count - p_count}"
                     )
                     logger.error(
-                        f"{reaction_type}: atomtype removal {symbol} x {count} FAIL"
+                        f"{reaction_type}: atomtype removal {symbol} × {count} FAIL"
                     )
                 return False
 
@@ -374,7 +372,7 @@ def check_specific_atomtype_diff(reaction_type, prod, reac, removal=False, debug
                         f"{symbol}: {p_count=} - {r_count=} = {p_count - r_count}"
                     )
                     logger.error(
-                        f"{reaction_type}: atomtype addition {symbol} x {count} FAIL"
+                        f"{reaction_type}: atomtype addition {symbol} × {count} FAIL"
                     )
                 return False
 

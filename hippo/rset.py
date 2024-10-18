@@ -5,9 +5,7 @@ import mcol
 import os
 from numpy import int64
 
-import logging
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 from .reaction import Reaction
 
@@ -287,19 +285,25 @@ class ReactionTable:
 
         return None
 
-    def __repr__(self) -> str:
-        """Formatted string representation"""
-
-        s = f"{mcol.bold}{mcol.underline}"
+    def __str__(self) -> str:
+        """Unformatted string representation"""
 
         if self.name:
-            s += f"{self.name}: "
+            s = f"{self.name}: "
+        else:
+            s = ""
 
-        s += "{" f"R x {len(self)}" "}"
-
-        s += f"{mcol.unbold}{mcol.ununderline}"
+        s += "{" f"R × {len(self)}" "}"
 
         return s
+
+    def __repr__(self) -> str:
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self}"
 
     def __len__(self) -> int:
         """Number of reactions in this set"""
@@ -651,19 +655,25 @@ class ReactionSet:
 
     ### DUNDERS
 
-    def __repr__(self) -> str:
-        """Formatted string representation"""
-
-        s = f"{mcol.bold}{mcol.underline}"
+    def __str__(self) -> str:
+        """Unformatted string representation"""
 
         if self.name:
-            s += f"{self.name}: "
+            s = f"{self.name}: "
+        else:
+            s = ""
 
-        s += "{" f"R x {len(self)}" "}"
-
-        s += f"{mcol.unbold}{mcol.ununderline}"
+        s += "{" f"R × {len(self)}" "}"
 
         return s
+
+    def __repr__(self) -> str:
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self}"
 
     def __len__(self) -> int:
         return len(self.indices)
@@ -678,7 +688,7 @@ class ReactionSet:
                 try:
                     index = self.indices[key]
                 except IndexError:
-                    logger.exception(f"list index out of range: {key=} for {self}")
+                    logger.error(f"list index out of range: {key=} for {self}")
                     raise
                 return self.db.get_reaction(id=index)
             case slice():

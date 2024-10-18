@@ -15,13 +15,10 @@ from .pycule import Quoter
 from .db import Database
 from pathlib import Path
 
-from tqdm import tqdm
-
 from .tools import inchikey_from_smiles, sanitise_smiles, SanitisationError
 
-from mlog import setup_logger
-
-logger = setup_logger("HIPPO")
+import mcol
+import mrich as logger
 
 from rdkit.Chem import Mol
 
@@ -53,18 +50,16 @@ class HIPPO:
         update_legacy: bool = False,
     ):
 
-        logger.header("Creating HIPPO animal")
+        logger.bold("Creating HIPPO animal")
 
         self._name = name
-        # self._target_name = target
 
-        logger.var("name", name, dict(color="arg"))
-        # logger.var('target', target, dict(color='arg'))
+        logger.var("name", name, color="arg")
 
         if not isinstance(db_path, Path):
             db_path = Path(db_path)
 
-        logger.var("db_path", db_path, dict(color="file"))
+        logger.var("db_path", db_path, color="file")
 
         self._db_path = db_path
 
@@ -299,7 +294,9 @@ class HIPPO:
 
         logger.var("curated_tag_cols", curated_tag_cols)
 
-        for path in tqdm(list(aligned_directory.iterdir())):
+        for path in logger.track(
+            list(aligned_directory.iterdir()), prefix="Adding hits..."
+        ):
 
             if not path.is_dir():
                 continue
@@ -508,7 +505,7 @@ class HIPPO:
         n_poses = self.num_poses
         n_comps = self.num_compounds
 
-        for i, row in tqdm(df.iterrows()):
+        for i, row in logger.track(df.iterrows(), prefix="Reading SDF rows..."):
 
             name = row[name_col].strip()
 
@@ -704,7 +701,9 @@ class HIPPO:
 
         # loop over rows
 
-        for i, row in tqdm(df.iterrows()):
+        for i, row in logger.track(
+            df.iterrows(), prefix="Processing DataFrame rows..."
+        ):
 
             # determine number of steps
 
@@ -938,7 +937,9 @@ class HIPPO:
         if base_only:
             generator = df.iterrows()
         else:
-            generator = tqdm(df.iterrows())
+            generator = logger.track(
+                df.iterrows(), prefix="Processing DataFrame rows..."
+            )
 
         n_comps = len(self.compounds)
         n_poses = len(self.poses)
@@ -1359,7 +1360,7 @@ class HIPPO:
         ingredients = IngredientSet(self.db)
 
         if len(df) > 100:
-            generator = tqdm(df.iterrows(), total=len(df))
+            generator = logger.track(df.iterrows(), prefix="Loading quotes...")
         else:
             generator = df.iterrows()
 
@@ -1491,7 +1492,7 @@ class HIPPO:
 
         ingredients = IngredientSet(self.db)
 
-        for i, row in tqdm(df.iterrows()):
+        for i, row in logger.track(df.iterrows(), prefix="Loading quotes..."):
             smiles = row[smiles_col]
 
             if not isinstance(smiles, str):
@@ -2251,7 +2252,11 @@ class HIPPO:
 
     def __repr__(self) -> str:
         """Returns a command line representation of this HIPPO"""
-        return f'HIPPO("{self.name}")'
+        return f'{mcol.bold}{mcol.underline}HIPPO("{self.name}"){mcol.clear}'
+
+    def __rich__(self) -> str:
+        """Representation for mrich"""
+        return f'[bold underline]HIPPO("{self.name}")'
 
     def __getitem__(self, key: str):
         """Get a :class:`.Compound`, :class:`.Pose`, or :class:`.Reaction` by its ID. See :meth:`.HIPPO.get_by_shorthand`"""
