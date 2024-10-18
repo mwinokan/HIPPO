@@ -19,7 +19,7 @@ classifiers = [
 dependencies = [
     "rdkit == 2023.9.1",
     "molparse >= 0.0.28",
-    "mpytools >= 0.0.14",
+    "mpytools >= 0.0.15",
     "tqdm",
     "jupyterlab",
     "pycule",

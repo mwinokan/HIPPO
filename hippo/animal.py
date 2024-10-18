@@ -87,7 +87,7 @@ class HIPPO:
         self._bases = None
         self._elabs = None
 
-        logger.success(f"Initialised animal {self}")
+        logger.success("Initialised animal", f"[var_name]{self}")
 
     ### FACTORIES
 
@@ -2250,13 +2250,17 @@ class HIPPO:
 
     ### DUNDERS
 
+    def __str__(self) -> str:
+        """Unformatted string representation of this HIPPO"""
+        return f'HIPPO("{self.name}")'
+
     def __repr__(self) -> str:
         """Returns a command line representation of this HIPPO"""
-        return f'{mcol.bold}{mcol.underline}HIPPO("{self.name}"){mcol.clear}'
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.clear}"
 
     def __rich__(self) -> str:
         """Representation for mrich"""
-        return f'[bold underline]HIPPO("{self.name}")'
+        return f"[bold underline]{self}"
 
     def __getitem__(self, key: str):
         """Get a :class:`.Compound`, :class:`.Pose`, or :class:`.Reaction` by its ID. See :meth:`.HIPPO.get_by_shorthand`"""

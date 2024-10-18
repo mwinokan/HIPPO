@@ -195,7 +195,7 @@ class Database:
         logger.debug("hippo3.Database.close()")
         if self.connection:
             self.connection.close()
-        mout.success(f"Closed connection to {mcol.file}{self.path}")
+        mout.success(f"Closed connection to {self.path}")
 
     def backup(
         self, destination: Path | str | None = None, pages: int = 10_000
@@ -242,7 +242,7 @@ class Database:
             conn.load_extension("chemicalite")
             conn.enable_load_extension(False)
 
-            logger.success(f"Database connected @ {mcol.file}{self.path}")
+            logger.success("Database connected @", f"[file]{self.path}")
 
         except sqlite3.OperationalError as e:
 
