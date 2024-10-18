@@ -610,13 +610,12 @@ class ReactionSet:
         """
 
         from pandas import DataFrame
-        from tqdm import tqdm
         from rdkit.Chem import Mol
 
-        logger.warning("Using slower Reaction.dict rather than direct SQL query")
+        logger.debug("Using slower Reaction.dict rather than direct SQL query...")
 
         data = []
-        for r in tqdm(self):
+        for r in logger.track(self, prefix="ReactionSet --> DataFrame"):
             data.append(r.get_dict(smiles=smiles, mols=mols, **kwargs))
 
         return DataFrame(data)

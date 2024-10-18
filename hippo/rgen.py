@@ -206,7 +206,10 @@ class RandomRecipeGenerator:
         if mini_test:
             route_ids = route_ids[:100]
 
-        routes = [self.db.get_route(id=route_id) for route_id, in tqdm(route_ids)]
+        routes = [
+            self.db.get_route(id=route_id)
+            for route_id, in logger.track(route_ids, prefix="Getting routes")
+        ]
 
         from .recipe import RouteSet
 

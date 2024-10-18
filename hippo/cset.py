@@ -1184,8 +1184,6 @@ class CompoundSet:
         debug: bool = True,
     ):
 
-        from tqdm import tqdm
-
         if "route" not in self.db.table_names:
             logger.error("route table not in Database")
             raise NotImplementedError
@@ -1223,9 +1221,10 @@ class CompoundSet:
             if all(r in permitted_reactions for r in reactions):
                 available_routes.add(route_id)
 
-        if debug:
-            logger.debug("Getting route objects")
-        routes = [self.db.get_route(id=route_id) for route_id in tqdm(available_routes)]
+        routes = [
+            self.db.get_route(id=route_id)
+            for route_id in logger.track(available_routes, prefix="Getting routes")
+        ]
 
         from .recipe import RouteSet
 
@@ -1286,12 +1285,11 @@ class CompoundSet:
 
         """
 
-        from tqdm import tqdm
         from pandas import DataFrame
 
         data = []
 
-        for comp in tqdm(self):
+        for comp in logger.track(self, prefix="Creating compound dataframe"):
             d = comp.get_dict(
                 mol=mol,
                 metadata=metadata,
@@ -1402,14 +1400,13 @@ class CompoundSet:
 
         from datetime import date as dt
         from pandas import DataFrame
-        from tqdm import tqdm
 
         if prefix:
             prefix = f"{prefix}_"
 
         data = []
 
-        for c in tqdm(self, total=len(self)):
+        for c in logger.track(self, prefix="Creating DataFrame"):
 
             # get props
             smiles = c.smiles

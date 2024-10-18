@@ -961,9 +961,7 @@ class PoseSet:
         data = []
 
         if len(self) > 100:
-            from tqdm import tqdm
-
-            gen = tqdm(self)
+            gen = logger.track(self, prefix="PoseSet --> DataFrame")
         else:
             gen = self
 

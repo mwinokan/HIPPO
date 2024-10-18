@@ -644,7 +644,6 @@ class Quoter:
         import time
         from .cset import CompoundSet
         from .tools import flat_inchikey
-        from tqdm import tqdm
 
         db = compounds.db
 
@@ -668,7 +667,7 @@ class Quoter:
         logger.var("#results", len(results))
 
         logger.title("MCule single price queries...")
-        for result in tqdm(results):
+        for result in logger.track(results, prefix="Querying MCule"):
 
             entry = result["mcule_id"]
             smiles = result["smiles"]

@@ -4,8 +4,6 @@ from .compound import Ingredient
 
 import mcol
 
-from tqdm import tqdm
-
 import mrich as logger
 
 
@@ -355,8 +353,6 @@ class Recipe:
 
         """
 
-        from tqdm import tqdm
-
         from .cset import CompoundSet
 
         assert isinstance(compounds, CompoundSet)
@@ -374,10 +370,11 @@ class Recipe:
         options = []
 
         logger.var("#compounds", n_comps)
-        logger.print("Solving individual compound recipes...")
 
         if n_comps > 1:
-            generator = tqdm(zip(compounds, amount), total=n_comps)
+            generator = logger.track(
+                zip(compounds, amount), prefix="Solving individual compound recipes..."
+            )
         else:
             generator = zip(compounds, amount)
 
@@ -445,12 +442,12 @@ class Recipe:
         if pick_first:
             combinations = [combinations[0]]
 
-        logger.print("Combining recipes...")
+        logger.print()
 
         solutions = []
 
         if n_comps > 1:
-            generator = tqdm(combinations)
+            generator = logger.track(combinations, prefix="Combining recipes...")
         else:
             generator = combinations
 
@@ -1223,23 +1220,12 @@ class Recipe:
 
         from .cset import CompoundSet
         from pandas import DataFrame
-        from tqdm import tqdm
 
         # solve each product's reaction
 
         rows = []
 
         routes = self.get_routes()
-
-        # return routes
-
-        # for product in tqdm(self.products):
-
-        # prod_cset = CompoundSet(self.db, [product.id])
-
-        # sub_recipes = prod_cset.get_routes(permitted_reactions=self.reactions)
-
-        # sub_recipes = prod_cset.get_recipes(permitted_reactions=self.reactions)
 
         for sub_recipe in routes:
 
@@ -1339,7 +1325,9 @@ class Recipe:
 
         routes = self.get_routes()
 
-        for reactant in tqdm(self.reactants, desc="Constructing reactant DataFrame"):
+        for reactant in logger.track(
+            self.reactants, prefix="Constructing reactant DataFrame"
+        ):
             quote = reactant.quote
 
             d = dict(
@@ -1417,7 +1405,9 @@ class Recipe:
 
         pose_map = self.db.get_compound_id_pose_ids_dict(self.products.compounds)
 
-        for product in tqdm(self.products, desc="Constructing product DataFrame"):
+        for product in logger.track(
+            self.products, prefix="Constructing product DataFrame"
+        ):
 
             d = dict(
                 hippo_id=product.compound_id,
@@ -1919,7 +1909,7 @@ class RouteSet:
             data = json.load(open(path, "rt"))
 
         new_data = {}
-        for d in tqdm(data["routes"].values()):
+        for d in logger.track(data["routes"].values(), prefix="Loading Routes..."):
             route_id = d["id"]
             new_data[route_id] = Route.from_json(db=db, path=None, data=d)
 
@@ -2077,7 +2067,9 @@ class RecipeSet:
         logger.reading(f"{directory}/{pattern}")
 
         self._recipes = {}
-        for key, path in tqdm(self._json_paths.items(), desc="Loading recipes"):
+        for key, path in logger.track(
+            self._json_paths.items(), prefix="Loading recipes"
+        ):
             try:
                 recipe = Recipe.from_json(
                     db=self.db,
@@ -2115,7 +2107,7 @@ class RecipeSet:
         recipes = self._recipes.values()
 
         if progress:
-            recipes = tqdm(recipes)
+            recipes = logger.track(recipes, prefix=f"Calculating {self} values...")
 
         for recipe in recipes:
             value = getattr(recipe, key)

@@ -486,7 +486,6 @@ class Scorer:
 
         from .cset import CompoundSet
         from .pset import PoseSet
-        from tqdm import tqdm
 
         df = self._data
 
@@ -719,9 +718,9 @@ class Attribute:
         null = df.isnull()
 
         if null.sum():
-            from tqdm import tqdm
-
-            for key in tqdm(df[null].index.values):
+            for key in logger.track(
+                df[null].index.values, f"Constructing value dictionary for {self}"
+            ):
                 recipe = self.scorer.recipes[key]
                 self.get_value(recipe, force=True)
             self.scorer._dump_json()
