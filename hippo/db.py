@@ -1091,72 +1091,46 @@ class Database:
 
         smiles = smiles or ""
 
+        payload = [
+            smiles,
+            amount,
+            supplier,
+            catalogue,
+            entry,
+            lead_time,
+            price,
+            currency,
+            purity,
+            compound,
+        ]
+
         if date:
-
-            sql = """
-            INSERT or REPLACE INTO quote(
-                quote_smiles,
-                quote_amount,
-                quote_supplier,
-                quote_catalogue,
-                quote_entry,
-                quote_lead_time,
-                quote_price,
-                quote_currency,
-                quote_purity,
-                quote_compound,
-                quote_date
-            )
-            VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11);
-            """
-            payload = (
-                smiles,
-                amount,
-                supplier,
-                catalogue,
-                entry,
-                lead_time,
-                price,
-                currency,
-                purity,
-                compound,
-                date,
-            )
-
+            date_str = "?11"
+            payload.append(date)
         else:
-            sql = """
-            INSERT or REPLACE INTO quote(
-                quote_smiles,
-                quote_amount,
-                quote_supplier,
-                quote_catalogue,
-                quote_entry,
-                quote_lead_time,
-                quote_price,
-                quote_currency,
-                quote_purity,
-                quote_compound,
-                quote_date
-            )
-            VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, date());
-            """
-            payload = (
-                smiles,
-                amount,
-                supplier,
-                catalogue,
-                entry,
-                lead_time,
-                price,
-                currency,
-                purity,
-                compound,
-            )
+            date_str = "date()"
+
+        sql = f"""
+        INSERT or REPLACE INTO quote(
+            quote_smiles,
+            quote_amount,
+            quote_supplier,
+            quote_catalogue,
+            quote_entry,
+            quote_lead_time,
+            quote_price,
+            quote_currency,
+            quote_purity,
+            quote_compound,
+            quote_date
+        )
+        VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, {date_str});
+        """
 
         try:
             self.execute(
                 sql,
-                payload,
+                tuple(payload),
             )
 
         except sqlite3.InterfaceError as e:
