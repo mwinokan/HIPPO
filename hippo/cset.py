@@ -220,6 +220,7 @@ class CompoundTable:
     def get_by_tag(
         self,
         tag: str,
+        **kwargs,
     ) -> "CompoundSet":
         """Get all child compounds with a certain tag
 
@@ -227,7 +228,12 @@ class CompoundTable:
 
         """
         values = self.db.select_where(
-            query="tag_compound", table="tag", key="name", value=tag, multiple=True
+            query="tag_compound",
+            table="tag",
+            key="name",
+            value=tag,
+            multiple=True,
+            **kwargs,
         )
 
         if not values:
@@ -291,7 +297,7 @@ class CompoundTable:
         cset._name = f"elaborations of C{base}"
         return cset
 
-    def get_by_smiles(self, smiles: str) -> "Compound | None":
+    def get_by_smiles(self, smiles: str, **kwargs) -> "Compound | None":
         """Get a member compound by its smiles"""
 
         from .tools import inchikey_from_smiles, sanitise_smiles, SanitisationError
@@ -308,7 +314,7 @@ class CompoundTable:
             return None
             return c
         inchikey = inchikey_from_smiles(smiles)
-        return self[inchikey]
+        return self.db.get_compound(inchikey=inchikey, **kwargs)
 
     def summary(self) -> None:
         """Print a summary of this compound set"""
@@ -350,6 +356,7 @@ class CompoundTable:
         tag: str = None,
         base: int | Compound = None,
         smiles: str | None = None,
+        **kwargs,
     ) -> "CompoundSet | Compound | None":
         """Filter compounds by a given tag, base, or it's SMILES string. See :meth:`.CompoundTable.get_by_tag` and :meth:`.CompoundTable.get_by_base`
 
@@ -361,11 +368,11 @@ class CompoundTable:
         """
 
         if tag:
-            return self.get_by_tag(tag)
+            return self.get_by_tag(tag, **kwargs)
         elif base:
-            return self.get_by_base(base)
+            return self.get_by_base(base, **kwargs)
         elif smiles:
-            return self.get_by_smiles(smiles)
+            return self.get_by_smiles(smiles, **kwargs)
         else:
             logger.error("Must provide one of tag, base, or smiles arguments")
             return None

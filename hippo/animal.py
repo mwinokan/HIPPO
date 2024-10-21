@@ -2074,33 +2074,66 @@ class HIPPO:
 
     def quote_compounds(
         self,
-        quoter: Quoter,
+        ref_animal: "HIPPO",
         compounds: CompoundSet,
     ) -> None:
         """Get batch quotes using the hippo.Quoter object supplied and add the quotes to the database
 
-        :param quoter: The :class:`.Quoter` object to use
+        :param ref_animal: The reference :class:`.HIPPO` animal to fetch quotes from (e.g. the one from https://github.com/mwinokan/EnamineCatalogs)
         :param compounds: A :class:`.CompoundSet` containing the compounds to be quoted
         """
 
-        logger.header(
-            f"Getting {quoter.supplier} quotes for {len(compounds)} compounds"
-        )
-        batch_size = quoter.batch_size
-        for i in range(0, len(compounds), batch_size):
-            logger.debug(f"batch {i%batch_size}")
-            batch = compounds[i : i + batch_size]
-            quoter.get_batch_quote(batch)
+        quoted_compound_ids = set()
+        quote_count = self.db.count("quote")
+
+        for compound in logger.track(compounds):
+
+            ref_compound = ref_animal.compounds(smiles=compound.smiles, none="quiet")
+
+            if not ref_compound:
+                continue
+
+            quotes = ref_compound.get_quotes()
+
+            for quote in quotes:
+                self.db.insert_quote(
+                    compound=compound,
+                    supplier=quote.supplier,
+                    catalogue=quote.catalogue,
+                    entry=quote.entry,
+                    amount=quote.amount,
+                    price=quote.price.amount,
+                    currency=quote.currency,
+                    purity=quote.purity,
+                    lead_time=quote.lead_time,
+                    smiles=quote.smiles,
+                    date=quote.date,
+                    commit=False,
+                )
+
+            if quotes:
+                quoted_compound_ids.add(compound.id)
+
+        self.db.commit()
+
+        quoted_compounds = self.compounds[quoted_compound_ids]
+        unquoted_compounds = compounds - quoted_compounds
+
+        logger.var("#new quotes", self.db.count("quote") - quote_count)
+        logger.var("#quoted_compounds", len(quoted_compounds))
+        logger.var("#unquoted_compounds", len(unquoted_compounds))
+
+        return quoted_compounds, unquoted_compounds
 
     def quote_reactants(
         self,
-        quoter: Quoter,
+        ref_animal: "HIPPO",
         *,
         unquoted_only: bool = False,
     ) -> None:
         """Get batch quotes for all reactants in the database
 
-        :param quoter: The :class:`.Quoter` object to use
+        :param ref_animal: The reference :class:`.HIPPO` animal to fetch quotes from (e.g. the one from https://github.com/mwinokan/EnamineCatalogs)
         :param unquoted_only: Only request quotes for unquoted compouds, defaults to ``False``
         """
 
@@ -2113,11 +2146,11 @@ class HIPPO:
 
     def quote_intermediates(
         self,
-        quoter: Quoter,
+        ref_animal: "HIPPO",
     ) -> None:
         """Get batch quotes for all reactants in the database
 
-        :param quoter: The :class:`.Quoter` object to use
+        :param ref_animal: The reference :class:`.HIPPO` animal to fetch quotes from (e.g. the one from https://github.com/mwinokan/EnamineCatalogs)
         :param unquoted_only: Only request quotes for unquoted compouds, defaults to ``False``
         """
 

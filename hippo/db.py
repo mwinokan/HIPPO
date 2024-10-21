@@ -1061,6 +1061,7 @@ class Database:
         purity: float | None = None,
         lead_time: float,
         smiles: str | None = None,
+        date: str | None = None,
         commit: bool = True,
     ) -> int | None:
         """Insert an entry into the quote table
@@ -1090,56 +1091,77 @@ class Database:
 
         smiles = smiles or ""
 
-        sql = """
-        INSERT or REPLACE INTO quote(
-            quote_smiles,
-            quote_amount,
-            quote_supplier,
-            quote_catalogue,
-            quote_entry,
-            quote_lead_time,
-            quote_price,
-            quote_currency,
-            quote_purity,
-            quote_compound,
-            quote_date
-        )
-        VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, date());
-        """
+        if date:
+
+            sql = """
+            INSERT or REPLACE INTO quote(
+                quote_smiles,
+                quote_amount,
+                quote_supplier,
+                quote_catalogue,
+                quote_entry,
+                quote_lead_time,
+                quote_price,
+                quote_currency,
+                quote_purity,
+                quote_compound,
+                quote_date
+            )
+            VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11);
+            """
+            payload = (
+                smiles,
+                amount,
+                supplier,
+                catalogue,
+                entry,
+                lead_time,
+                price,
+                currency,
+                purity,
+                compound,
+                date,
+            )
+
+        else:
+            sql = """
+            INSERT or REPLACE INTO quote(
+                quote_smiles,
+                quote_amount,
+                quote_supplier,
+                quote_catalogue,
+                quote_entry,
+                quote_lead_time,
+                quote_price,
+                quote_currency,
+                quote_purity,
+                quote_compound,
+                quote_date
+            )
+            VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, date());
+            """
+            payload = (
+                smiles,
+                amount,
+                supplier,
+                catalogue,
+                entry,
+                lead_time,
+                price,
+                currency,
+                purity,
+                compound,
+            )
 
         try:
             self.execute(
                 sql,
-                (
-                    smiles,
-                    amount,
-                    supplier,
-                    catalogue,
-                    entry,
-                    lead_time,
-                    price,
-                    currency,
-                    purity,
-                    compound,
-                ),
+                payload,
             )
 
         except sqlite3.InterfaceError as e:
             logger.error(e)
-            logger.debug(
-                (
-                    smiles,
-                    amount,
-                    supplier,
-                    catalogue,
-                    entry,
-                    lead_time,
-                    price,
-                    currency,
-                    purity,
-                    compound,
-                )
-            )
+            logger.debug(payload)
             raise
 
         except Exception as e:
@@ -2015,6 +2037,8 @@ class Database:
         inchikey: str | None = None,
         alias: str | None = None,
         smiles: str | None = None,
+        none: str = "error",
+        **kwargs,
     ) -> Compound:
         """Get a :class:`.Compound` using one of the following fields: ['id', 'inchikey', 'alias', 'smiles']
 
@@ -2027,14 +2051,19 @@ class Database:
         """
 
         if id is None:
-            id = self.get_compound_id(inchikey=inchikey, smiles=smiles, alias=alias)
+            id = self.get_compound_id(
+                inchikey=inchikey, smiles=smiles, alias=alias, none=none, **kwargs
+            )
 
         if not id:
-            logger.error(f"Invalid {id=}")
+            if none == "error":
+                logger.error(f"Invalid {id=}")
             return None
 
         query = "compound_id, compound_inchikey, compound_alias, compound_smiles"
-        entry = self.select_where(query=query, table="compound", key="id", value=id)
+        entry = self.select_where(
+            query=query, table="compound", key="id", value=id, none=none, **kwargs
+        )
         compound = Compound(self._animal, self, *entry, metadata=None, mol=None)
         return compound
 
@@ -2044,6 +2073,7 @@ class Database:
         inchikey: str | None = None,
         alias: str | None = None,
         smiles: str | None = None,
+        **kwargs,
     ) -> int:
         """Get a compound's ID using one of the following fields: ['inchikey', 'alias', 'smiles']
 
@@ -2056,14 +2086,18 @@ class Database:
 
         if inchikey:
             entry = self.select_id_where(
-                table="compound", key="inchikey", value=inchikey
+                table="compound", key="inchikey", value=inchikey, **kwargs
             )
 
         elif alias:
-            entry = self.select_id_where(table="compound", key="alias", value=alias)
+            entry = self.select_id_where(
+                table="compound", key="alias", value=alias, **kwargs
+            )
 
         elif smiles:
-            entry = self.select_id_where(table="compound", key="smiles", value=smiles)
+            entry = self.select_id_where(
+                table="compound", key="smiles", value=smiles, **kwargs
+            )
 
         else:
             raise NotImplementedError
