@@ -2416,6 +2416,35 @@ class Database:
             d[comp_id].add(pose_id)
         return d
 
+    def get_compound_cluster_dict(
+        self, cset: "CompoundSet | None" = None
+    ) -> dict[tuple, set]:
+
+        if cset is not None:
+            sql = f"""
+            SELECT scaffold_superstructure, scaffold_base FROM scaffold
+            WHERE scaffold_superstructure IN {cset.str_ids}
+            """
+        else:
+            sql = f"""
+            SELECT scaffold_superstructure, scaffold_base FROM scaffold
+            """
+
+        records = self.db.execute(sql).fetchall()
+
+        lookup = {}
+        for superstructure, base in records:
+            group = lookup.setdefault(superstructure, set())
+            group.add(base)
+
+        clustered = {}
+        for superstructure, bases in lookup.items():
+            cluster = tuple(bases)
+            group = clustered.setdefault(cluster, set())
+            group.add(superstructure)
+
+        return clustered
+
     def get_pose_id_interaction_ids_dict(self, pset: "PoseSet") -> dict[int, set]:
         """Get a dictionary mapping :class:`.Pose` ID's to their associated :class:`.Interaction` ID's"""
         records = self.execute(
