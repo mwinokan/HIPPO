@@ -1695,7 +1695,10 @@ class Database:
         """
 
         if isinstance(value, str):
-            value = f"'{value}'"
+            if "'" in value:
+                value = f'"{value}"'
+            else:
+                value = f"'{value}'"
 
         if value is not None:
             where_str = f"{table}_{key}={value}"
