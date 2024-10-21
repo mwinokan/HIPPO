@@ -1622,8 +1622,8 @@ class PoseSet:
                     "summary": c,
                     "grid": d,
                     "draw2d": e,
-                    "draw": e,
-                    "metadata": f,
+                    "draw": f,
+                    "metadata": g,
                 },
             )
 
