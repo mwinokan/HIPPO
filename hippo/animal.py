@@ -399,7 +399,7 @@ class HIPPO:
                     tags.append(tag)
 
             metadata = {"observation_longname": observation_longname}
-            for tag in generated_tag_cols:
+            for tag in GENERATED_TAG_COLS:
                 metadata[tag] = meta_row[tag].values[0]
 
             pose_id = self.db.insert_pose(
