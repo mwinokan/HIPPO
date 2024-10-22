@@ -814,9 +814,11 @@ class ProjectPage:
         for proposal in self.proposals:
 
             d = {}
-            
+
             for attribute in self.scorer.attributes:
-                d[f"{attribute.key} w={attribute.weight}"] = f"{attribute.get_value(proposal)} ({attribute.unweighted(proposal)}%)"
+                d[f"{attribute.key} w={attribute.weight}"] = (
+                    f"{attribute.get_value(proposal)} ({attribute.unweighted(proposal)}%)"
+                )
 
         self.table(table_data)
 

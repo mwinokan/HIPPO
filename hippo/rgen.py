@@ -281,7 +281,7 @@ class RandomRecipeGenerator:
         if shuffle:
             logger.debug("Shuffling Route pool")
             pool.shuffle()
-        
+
         old_recipe = recipe.copy()
 
         logger.var("route pool", len(pool))
@@ -302,7 +302,9 @@ class RandomRecipeGenerator:
 
             # pop a route
             if balance_clusters:
-                candidate_route = pool.balanced_pop(permitted_clusters=permitted_clusters)
+                candidate_route = pool.balanced_pop(
+                    permitted_clusters=permitted_clusters
+                )
             else:
                 candidate_route = pool.pop()
 
