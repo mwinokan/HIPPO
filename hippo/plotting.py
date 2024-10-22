@@ -3,11 +3,8 @@ import plotly.express as px
 import pandas as pd
 import mout
 import plotly.graph_objects as go
-from tqdm import tqdm
 
-import logging
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 """
 
@@ -708,7 +705,7 @@ def plot_compound_property(animal, prop, compounds=None, style="bar", null=None)
         compounds = animal.compounds
 
     if len(compounds) > 1000:
-        compounds = tqdm(compounds)
+        compounds = logger.track(compounds, prefix="Generating plot data")
 
     for comp in compounds:
 
@@ -963,7 +960,7 @@ def plot_pose_property(
 
         plot_data = []
         if len(poses) > 1000:
-            poses = tqdm(poses)
+            poses = logger.track(poses, prefix="Generating plot data")
 
         for pose in poses:
             if len(prop) > 1:

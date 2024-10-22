@@ -5,9 +5,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 import pandas as pd
 
-import logging
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 DATA_COLUMNS = [
     "score",
@@ -488,7 +486,6 @@ class Scorer:
 
         from .cset import CompoundSet
         from .pset import PoseSet
-        from tqdm import tqdm
 
         df = self._data
 
@@ -655,8 +652,17 @@ class Scorer:
 
     ### DUNDERS
 
-    def __repr__(self):
+    def __str__(self) -> str:
+        """Unformatted string representation"""
         return f"Scorer(#recipes={self.num_recipes})"
+
+    def __repr__(self) -> str:
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self}"
 
 
 class Attribute:
@@ -712,9 +718,9 @@ class Attribute:
         null = df.isnull()
 
         if null.sum():
-            from tqdm import tqdm
-
-            for key in tqdm(df[null].index.values):
+            for key in logger.track(
+                df[null].index.values, f"Constructing value dictionary for {self}"
+            ):
                 recipe = self.scorer.recipes[key]
                 self.get_value(recipe, force=True)
             self.scorer._dump_json()
@@ -764,29 +770,6 @@ class Attribute:
             )
 
         return self._percentile_interpolator
-
-    def __call__(
-        self,
-        recipe: "Recipe",
-    ) -> float:
-        """return the score of a given value"""
-
-        if not self.weight:
-            return 0.0
-
-        value = self.unweighted(recipe)
-
-        # if value is None:
-        # return 0.5
-
-        return self.weight * value
-
-    def __repr__(self) -> str:
-
-        if self.weight is None:
-            return f'{self._type}("{self.key}", inverse={self.inverse})'
-        else:
-            return f'{self._type}("{self.key}", weight={self.weight:.2f}, inverse={self.inverse})'
 
     ### METHODS
 
@@ -838,6 +821,39 @@ class Attribute:
             score = 1 - score
 
         return score
+
+    ### DUNDERS
+
+    def __call__(
+        self,
+        recipe: "Recipe",
+    ) -> float:
+        """return the score of a given value"""
+
+        if not self.weight:
+            return 0.0
+
+        value = self.unweighted(recipe)
+
+        # if value is None:
+        # return 0.5
+
+        return self.weight * value
+
+    def __str__(self) -> str:
+        """Unformatted string representation"""
+        if self.weight is None:
+            return f'{self._type}("{self.key}", inverse={self.inverse})'
+        else:
+            return f'{self._type}("{self.key}", weight={self.weight:.2f}, inverse={self.inverse})'
+
+    def __repr__(self) -> str:
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self}"
 
 
 class CustomAttribute(Attribute):

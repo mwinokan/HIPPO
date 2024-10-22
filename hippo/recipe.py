@@ -4,11 +4,7 @@ from .compound import Ingredient
 
 import mcol
 
-from tqdm import tqdm
-
-import logging
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 
 # @dataclass
@@ -357,8 +353,6 @@ class Recipe:
 
         """
 
-        from tqdm import tqdm
-
         from .cset import CompoundSet
 
         assert isinstance(compounds, CompoundSet)
@@ -376,10 +370,11 @@ class Recipe:
         options = []
 
         logger.var("#compounds", n_comps)
-        logger.info("Solving individual compound recipes...")
 
         if n_comps > 1:
-            generator = tqdm(zip(compounds, amount), total=n_comps)
+            generator = logger.track(
+                zip(compounds, amount), prefix="Solving individual compound recipes..."
+            )
         else:
             generator = zip(compounds, amount)
 
@@ -438,7 +433,7 @@ class Recipe:
 
         from itertools import product
 
-        logger.info("Solving recipe combinations...")
+        logger.print("Solving recipe combinations...")
         combinations = list(product(*options))
 
         if not solve_combinations:
@@ -447,12 +442,12 @@ class Recipe:
         if pick_first:
             combinations = [combinations[0]]
 
-        logger.info("Combining recipes...")
+        logger.print()
 
         solutions = []
 
         if n_comps > 1:
-            generator = tqdm(combinations)
+            generator = logger.track(combinations, prefix="Combining recipes...")
         else:
             generator = combinations
 
@@ -477,7 +472,7 @@ class Recipe:
             return solutions[0]
 
         if pick_cheapest:
-            logger.info("Picking cheapest...")
+            logger.print("Picking cheapest...")
             priced = [r for r in solutions if r.price]
             if not priced:
                 logger.error("0 recipes with prices, can't choose cheapest")
@@ -628,7 +623,7 @@ class Recipe:
                 return None
 
         if debug:
-            logger.info(f'Recipe was generated at: {data["timestamp"]}')
+            logger.print(f'Recipe was generated at: {data["timestamp"]}')
         price = data["price"]
 
         # IngredientSets
@@ -1193,7 +1188,12 @@ class Recipe:
 
         return data
 
-    def write_CAR_csv(self, file, return_df=False):
+    def get_routes(self):
+        return self.products.get_routes(permitted_reactions=self.reactions)
+
+    def write_CAR_csv(
+        self, file: "str | Path", return_df: bool = False
+    ) -> "DataFrame | None":
         """List of reactions for CAR
 
         Columns:
@@ -1220,7 +1220,6 @@ class Recipe:
 
         from .cset import CompoundSet
         from pandas import DataFrame
-        from tqdm import tqdm
         from pathlib import Path
 
         # solve each product's reaction
@@ -1229,21 +1228,11 @@ class Recipe:
 
         rows = []
 
-        routes = self.products.get_routes(permitted_reactions=self.reactions)
-
-        # return routes
-
-        # for product in tqdm(self.products):
-
-            # prod_cset = CompoundSet(self.db, [product.id])
-
-            # sub_recipes = prod_cset.get_routes(permitted_reactions=self.reactions)
-
-            # sub_recipes = prod_cset.get_recipes(permitted_reactions=self.reactions)
+        routes = self.get_routes()
 
         for sub_recipe in routes:
 
-            product=sub_recipe.product
+            product = sub_recipe.product
 
             row = {
                 "target-names": str(product.compound),
@@ -1293,6 +1282,353 @@ class Recipe:
         df.to_csv(file, index=False)
 
         return df
+
+    def write_reactant_csv(
+        self, file: "str | Path", return_df: bool = False
+    ) -> "DataFrame | None":
+        """Detailed CSV output including reactant information for purchasing and information on the downstream synthetic use
+
+        Reactant
+        ========
+
+        - ID
+        - SMILES
+        - Inchikey
+
+        Quote
+        =====
+
+        - Supplier
+        - Catalogue
+        - Entry
+        - Lead-time
+        - Quoted amount
+        - Quote currency
+        - Quote price
+        - Quote purity
+
+        Downstream
+        ==========
+
+        - num_reaction_dependencies
+        - num_product_dependencies
+        - reaction_dependencies
+        - product_dependencies
+
+        """
+        # - remove_with
+
+        from pandas import DataFrame
+
+        # from rich import print
+        from .cset import CompoundSet
+        from .rset import ReactionSet
+
+        data = []
+
+        routes = self.get_routes()
+
+        for reactant in logger.track(
+            self.reactants, prefix="Constructing reactant DataFrame"
+        ):
+            quote = reactant.quote
+
+            d = dict(
+                hippo_id=reactant.compound_id,
+                smiles=reactant.smiles,
+                inchikey=reactant.inchikey,
+                required_amount_mg=reactant.amount,
+                quoted_amount=quote.amount,
+                quote_currency=quote.currency,
+                quote_price=quote.price.amount,
+                quote_lead_time_days=quote.lead_time,
+                quote_supplier=quote.supplier,
+                quote_catalogue=quote.catalogue,
+                quote_entry=quote.entry,
+                quoted_smiles=quote.smiles,
+                quoted_purity=quote.purity,
+            )
+
+            downstream_routes = []
+            downstream_reactions = []
+
+            for route in routes:
+                if reactant in route.reactants:
+                    downstream_routes.append(route)
+                for reaction in route.reactions:
+                    if reactant in reaction.reactants:
+                        downstream_reactions.append(reaction)
+
+            downstream_products = CompoundSet(
+                self.db, set(route.product.id for route in downstream_routes)
+            )
+            downstream_reactions = ReactionSet(
+                self.db, set(reaction.id for reaction in downstream_reactions)
+            )
+
+            def get_scaffold_series():
+
+                bases = downstream_products.bases
+
+                if not bases:
+                    bases = downstream_products[0:]
+
+                return bases.ids
+
+            d["num_reaction_dependencies"] = len(downstream_reactions)
+            d["num_product_dependencies"] = len(downstream_products)
+            d["reaction_dependencies"] = downstream_reactions.ids
+            d["product_dependencies"] = downstream_products.ids
+            d["chemistry_types"] = ", ".join(set(downstream_reactions.types))
+            d["scaffold_series"] = get_scaffold_series()
+
+            data.append(d)
+
+        df = DataFrame(data)
+        logger.writing(file)
+        df.to_csv(file, index=False)
+
+        if return_df:
+            return df
+
+        return None
+
+    def write_product_csv(self, file: "str | Path", return_df: bool = False):
+        """Detailed CSV output including product information for selection and synthesis"""
+
+        from pandas import DataFrame
+
+        # from rich import print
+        from .cset import CompoundSet
+        from .rset import ReactionSet
+
+        data = []
+
+        routes = self.get_routes()
+
+        pose_map = self.db.get_compound_id_pose_ids_dict(self.products.compounds)
+
+        for product in logger.track(
+            self.products, prefix="Constructing product DataFrame"
+        ):
+
+            d = dict(
+                hippo_id=product.compound_id,
+                smiles=product.smiles,
+                inchikey=product.inchikey,
+                required_amount_mg=product.amount,
+            )
+
+            upstream_routes = []
+            upstream_reactions = []
+
+            for route in routes:
+                if product in route.products:
+                    upstream_routes.append(route)
+
+                    for reaction in route.reactions:
+                        upstream_reactions.append(reaction)
+
+            upstream_reactions = ReactionSet(
+                self.db, set(reaction.id for reaction in upstream_reactions)
+            )
+
+            def get_scaffold_series():
+
+                if bases := product.bases:
+                    return bases.ids, False
+
+                else:
+                    return [product.id], True
+
+            poses = pose_map.get(product.id, set())
+
+            d["num_poses"] = len(poses)
+            d["poses"] = poses
+            d["tags"] = product.tags
+            d["num_routes"] = len(upstream_routes)
+            d["num_reaction_steps"] = set(
+                len(route.reactions) for route in upstream_routes
+            )
+            d["reaction_dependencies"] = upstream_reactions.ids
+            d["reactant_dependencies"] = set(
+                sum([route.reactants.ids for route in upstream_routes], [])
+            )
+            d["route_ids"] = [route.id for route in upstream_routes]
+            d["chemistry_types"] = ", ".join(set(upstream_reactions.types))
+            series, is_base = get_scaffold_series()
+            d["is_scaffold"] = is_base
+            d["scaffold_series"] = series
+
+            data.append(d)
+
+        df = DataFrame(data)
+        logger.writing(file)
+        df.to_csv(file, index=False)
+
+        if return_df:
+            return df
+
+        return None
+
+    def write_chemistry_csv(self, file: "str | Path", return_df: bool = True):
+        """Detailed CSV output synthetis information for chemistry types in this set"""
+
+        from pandas import DataFrame
+
+        from rich import print
+        from .cset import CompoundSet
+        from .rset import ReactionSet
+
+        data = []
+
+        # get compounds
+
+        scaffolds = CompoundSet(self.db)
+
+        for product in self.products:
+
+            if bases := product.bases:
+                scaffolds += bases
+            else:
+                scaffolds.add(product.compound)
+
+        routes = self.get_routes()
+
+        route_types = {}
+
+        for compound in scaffolds:
+
+            elabs = (
+                self.products.compounds.get_by_base(base=compound, none="quiet") or []
+            )
+
+            d = dict(
+                product_id=compound.id,
+                smiles=compound.smiles,
+                inchikey=compound.inchikey,
+                num_elaborations=len(elabs),
+                is_scaffold=True,
+            )
+
+            upstream_routes = []
+            for route in routes:
+                if compound in route.products:
+                    upstream_routes.append(route)
+
+            if not upstream_routes:
+                logger.warning(f"No routes to scaffold={compound}")
+                continue
+
+            d["num_routes"] = len(upstream_routes)
+
+            for j, route in enumerate(upstream_routes):
+                d[f"route_{j+1}_num_steps"] = len(route.reactions)
+
+                group = route_types.setdefault(compound.id, set())
+                group.add(tuple([r.type for r in route.reactions]))
+
+                for k, reaction in enumerate(route.reactions):
+                    key = f"route_{j+1}_reaction_{k+1}"
+
+                    product = reaction.product
+
+                    d[f"{key}_type"] = reaction.type
+                    d[f"{key}_product_smiles"] = product.smiles
+                    d[f"{key}_product_id"] = product.id
+                    d[f"{key}_product_yield"] = reaction.product_yield
+
+                    for i, reactant in enumerate(reaction.reactants):
+                        d[f"{key}_reactant_{i+1}_smiles"] = reactant.smiles
+                        d[f"{key}_reactant_{i+1}_id"] = reactant.id
+
+            data.append(d)
+
+        missing_bases = {}
+
+        for compound in self.products.compounds:
+
+            if compound in scaffolds:
+                continue
+
+            upstream_routes = []
+            for route in routes:
+                if compound in route.products:
+                    upstream_routes.append(route)
+
+            bases = compound.bases
+
+            for base in bases:
+
+                if base.id not in route_types:
+                    group = missing_bases.setdefault(base.id, [])
+                    group.append(compound.id)
+                    continue
+
+                else:
+                    for route in upstream_routes:
+                        chem_types = tuple([r.type for r in route.reactions])
+
+                        if chem_types not in route_types[base.id]:
+                            logger.success(base)
+                            logger.success(chem_types)
+                            raise ValueError(
+                                "Scaffold has route not present in dataframe"
+                            )
+
+        for base_id, elab_ids in missing_bases.items():
+
+            compound = self.db.get_compound(id=sorted(elab_ids)[0])
+
+            d = dict(
+                product_id=compound.id,
+                smiles=compound.smiles,
+                inchikey=compound.inchikey,
+                num_elaborations=len(elab_ids),
+                is_scaffold=False,
+            )
+
+            upstream_routes = []
+            for route in routes:
+                if compound in route.products:
+                    upstream_routes.append(route)
+
+            if not upstream_routes:
+                logger.error(f"No routes to elab {compound}")
+                raise ValueError(f"No routes to elab {compound}")
+
+            d["num_routes"] = len(upstream_routes)
+
+            for j, route in enumerate(upstream_routes):
+                d[f"route_{j+1}_num_steps"] = len(route.reactions)
+
+                group = route_types.setdefault(compound.id, set())
+                group.add(tuple([r.type for r in route.reactions]))
+
+                for k, reaction in enumerate(route.reactions):
+                    key = f"route_{j+1}_reaction_{k+1}"
+
+                    product = reaction.product
+
+                    d[f"{key}_type"] = reaction.type
+                    d[f"{key}_product_smiles"] = product.smiles
+                    d[f"{key}_product_id"] = product.id
+                    d[f"{key}_product_yield"] = reaction.product_yield
+
+                    for i, reactant in enumerate(reaction.reactants):
+                        d[f"{key}_reactant_{i+1}_smiles"] = reactant.smiles
+                        d[f"{key}_reactant_{i+1}_id"] = reactant.id
+
+            data.append(d)
+
+        df = DataFrame(data)
+        logger.writing(file)
+        df.to_csv(file, index=False)
+
+        if return_df:
+            return df
+
+        return None
 
     def copy(self):
         """ """
@@ -1390,7 +1726,10 @@ class Recipe:
         if self.hash:
             return f"Recipe_{self.hash}({s})"
 
-    def __repr__(self):
+        return f"Recipe({s})"
+
+    def __longstr(self) -> str:
+        """Unformatted string representation"""
         if self.intermediates:
             s = f"{self.reactants} --> {self.intermediates} --> {self.products} via {self.reactions}"
         else:
@@ -1403,6 +1742,14 @@ class Recipe:
             return f"Recipe_{self.hash}({s})"
 
         return f"Recipe({s})"
+
+    def __repr__(self) -> str:
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self.__longstr()}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self.__longstr()}"
 
     def __add__(self, other):
         result = self.copy()
@@ -1519,8 +1866,17 @@ class Route(Recipe):
 
     ### DUNDERS
 
-    def __repr__(self):
-        return f"{mcol.bold}{mcol.underline}Route #{self.id}: {repr(self.product_compound)}"  #' {self.reactants} --> {self.intermediates} --> {self.product_compound} via {self.reactions})'
+    def __str__(self) -> str:
+        """Unformatted string representation"""
+        return f"Route #{self.id}: {self.product_compound}"
+
+    def __repr__(self) -> str:
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self}"
 
 
 class RouteSet:
@@ -1556,7 +1912,7 @@ class RouteSet:
             data = json.load(open(path, "rt"))
 
         new_data = {}
-        for d in tqdm(data["routes"].values()):
+        for d in logger.track(data["routes"].values(), prefix="Loading Routes..."):
             route_id = d["id"]
             new_data[route_id] = Route.from_json(db=db, path=None, data=d)
 
@@ -1670,16 +2026,17 @@ class RouteSet:
     def __len__(self):
         return len(self.data)
 
+    def __str__(self) -> str:
+        """Unformatted string representation"""
+        return "{" f"Route × {len(self)}" "}"
+
     def __repr__(self) -> str:
-        """Formatted string representation"""
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
 
-        s = f"{mcol.bold}{mcol.underline}"
-
-        s += "{" f"Route x {len(self)}" "}"
-
-        s += f"{mcol.unbold}{mcol.ununderline}"
-
-        return s
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self}"
 
     def __iter__(self):
         return iter(self.data.values())
@@ -1713,7 +2070,9 @@ class RecipeSet:
         logger.reading(f"{directory}/{pattern}")
 
         self._recipes = {}
-        for key, path in tqdm(self._json_paths.items(), desc="Loading recipes"):
+        for key, path in logger.track(
+            self._json_paths.items(), prefix="Loading recipes"
+        ):
             try:
                 recipe = Recipe.from_json(
                     db=self.db,
@@ -1751,7 +2110,7 @@ class RecipeSet:
         recipes = self._recipes.values()
 
         if progress:
-            recipes = tqdm(recipes)
+            recipes = logger.track(recipes, prefix=f"Calculating {self} values...")
 
         for recipe in recipes:
             value = getattr(recipe, key)
@@ -1820,13 +2179,14 @@ class RecipeSet:
         assert isinstance(key, str)
         return key in self._recipes
 
+    def __str__(self) -> str:
+        """Unformatted string representation"""
+        return "{" f"Recipe × {len(self)}" "}"
+
     def __repr__(self) -> str:
-        """Formatted string representation"""
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
 
-        s = f"{mcol.bold}{mcol.underline}"
-
-        s += "{" f"Recipes x {len(self)}" "}"
-
-        s += f"{mcol.unbold}{mcol.ununderline}"
-
-        return s
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self}"

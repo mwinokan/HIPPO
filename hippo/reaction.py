@@ -3,9 +3,7 @@ import mcol
 from .compound import Compound
 from .recipe import Recipe
 
-from mlog import setup_logger
-
-logger = setup_logger("HIPPO")
+import mrich as logger
 
 
 class Reaction:
@@ -118,6 +116,11 @@ class Reaction:
     def price_estimate(self) -> float:
         """Estimate the price of this :class:`.Reaction`"""
         return self.db.get_reaction_price_estimate(reaction=self)
+
+    @property
+    def plain_repr(self) -> str:
+        """Unformatted long string representation"""
+        return f"{self}: {self.reaction_str} via {self.type}"
 
     ### METHODS
 
@@ -355,8 +358,12 @@ class Reaction:
         return f"R{self.id}"
 
     def __repr__(self) -> str:
-        """Formatted string representation"""
-        return f"{mcol.bold}{mcol.underline}{self}: {self.reaction_str} via {self.type}{mcol.unbold}{mcol.ununderline}"
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self.plain_repr}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self.plain_repr}"
 
     def __eq__(
         self,

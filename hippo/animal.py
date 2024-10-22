@@ -15,13 +15,10 @@ from .pycule import Quoter
 from .db import Database
 from pathlib import Path
 
-from tqdm import tqdm
-
 from .tools import inchikey_from_smiles, sanitise_smiles, SanitisationError
 
-from mlog import setup_logger
-
-logger = setup_logger("HIPPO")
+import mcol
+import mrich as logger
 
 from rdkit.Chem import Mol
 
@@ -53,18 +50,16 @@ class HIPPO:
         update_legacy: bool = False,
     ):
 
-        logger.header("Creating HIPPO animal")
+        logger.bold("Creating HIPPO animal")
 
         self._name = name
-        # self._target_name = target
 
-        logger.var("name", name, dict(color="arg"))
-        # logger.var('target', target, dict(color='arg'))
+        logger.var("name", name, color="arg")
 
         if not isinstance(db_path, Path):
             db_path = Path(db_path)
 
-        logger.var("db_path", db_path, dict(color="file"))
+        logger.var("db_path", db_path, color="file")
 
         self._db_path = db_path
 
@@ -92,7 +87,7 @@ class HIPPO:
         self._bases = None
         self._elabs = None
 
-        logger.success(f"Initialised animal {self}")
+        logger.success("Initialised animal", f"[var_name]{self}")
 
     ### FACTORIES
 
@@ -299,7 +294,9 @@ class HIPPO:
 
         logger.var("curated_tag_cols", curated_tag_cols)
 
-        for path in tqdm(list(aligned_directory.iterdir())):
+        for path in logger.track(
+            list(aligned_directory.iterdir()), prefix="Adding hits..."
+        ):
 
             if not path.is_dir():
                 continue
@@ -402,7 +399,7 @@ class HIPPO:
                     tags.append(tag)
 
             metadata = {"observation_longname": observation_longname}
-            for tag in generated_tag_cols:
+            for tag in GENERATED_TAG_COLS:
                 metadata[tag] = meta_row[tag].values[0]
 
             pose_id = self.db.insert_pose(
@@ -508,7 +505,7 @@ class HIPPO:
         n_poses = self.num_poses
         n_comps = self.num_compounds
 
-        for i, row in tqdm(df.iterrows()):
+        for i, row in logger.track(df.iterrows(), prefix="Reading SDF rows..."):
 
             name = row[name_col].strip()
 
@@ -704,7 +701,9 @@ class HIPPO:
 
         # loop over rows
 
-        for i, row in tqdm(df.iterrows()):
+        for i, row in logger.track(
+            df.iterrows(), prefix="Processing DataFrame rows..."
+        ):
 
             # determine number of steps
 
@@ -938,7 +937,9 @@ class HIPPO:
         if base_only:
             generator = df.iterrows()
         else:
-            generator = tqdm(df.iterrows())
+            generator = logger.track(
+                df.iterrows(), prefix="Processing DataFrame rows..."
+            )
 
         n_comps = len(self.compounds)
         n_poses = len(self.poses)
@@ -1359,7 +1360,7 @@ class HIPPO:
         ingredients = IngredientSet(self.db)
 
         if len(df) > 100:
-            generator = tqdm(df.iterrows(), total=len(df))
+            generator = logger.track(df.iterrows(), prefix="Loading quotes...")
         else:
             generator = df.iterrows()
 
@@ -1491,7 +1492,7 @@ class HIPPO:
 
         ingredients = IngredientSet(self.db)
 
-        for i, row in tqdm(df.iterrows()):
+        for i, row in logger.track(df.iterrows(), prefix="Loading quotes..."):
             smiles = row[smiles_col]
 
             if not isinstance(smiles, str):
@@ -2073,33 +2074,66 @@ class HIPPO:
 
     def quote_compounds(
         self,
-        quoter: Quoter,
+        ref_animal: "HIPPO",
         compounds: CompoundSet,
     ) -> None:
         """Get batch quotes using the hippo.Quoter object supplied and add the quotes to the database
 
-        :param quoter: The :class:`.Quoter` object to use
+        :param ref_animal: The reference :class:`.HIPPO` animal to fetch quotes from (e.g. the one from https://github.com/mwinokan/EnamineCatalogs)
         :param compounds: A :class:`.CompoundSet` containing the compounds to be quoted
         """
 
-        logger.header(
-            f"Getting {quoter.supplier} quotes for {len(compounds)} compounds"
-        )
-        batch_size = quoter.batch_size
-        for i in range(0, len(compounds), batch_size):
-            logger.debug(f"batch {i%batch_size}")
-            batch = compounds[i : i + batch_size]
-            quoter.get_batch_quote(batch)
+        quoted_compound_ids = set()
+        quote_count = self.db.count("quote")
+
+        for compound in logger.track(compounds):
+
+            ref_compound = ref_animal.compounds(smiles=compound.smiles, none="quiet")
+
+            if not ref_compound:
+                continue
+
+            quotes = ref_compound.get_quotes()
+
+            for quote in quotes:
+                self.db.insert_quote(
+                    compound=compound,
+                    supplier=quote.supplier,
+                    catalogue=quote.catalogue,
+                    entry=quote.entry,
+                    amount=quote.amount,
+                    price=quote.price.amount,
+                    currency=quote.currency,
+                    purity=quote.purity,
+                    lead_time=quote.lead_time,
+                    smiles=quote.smiles,
+                    date=quote.date,
+                    commit=False,
+                )
+
+            if quotes:
+                quoted_compound_ids.add(compound.id)
+
+        self.db.commit()
+
+        quoted_compounds = self.compounds[quoted_compound_ids]
+        unquoted_compounds = compounds - quoted_compounds
+
+        logger.var("#new quotes", self.db.count("quote") - quote_count)
+        logger.var("#quoted_compounds", len(quoted_compounds))
+        logger.var("#unquoted_compounds", len(unquoted_compounds))
+
+        return quoted_compounds, unquoted_compounds
 
     def quote_reactants(
         self,
-        quoter: Quoter,
+        ref_animal: "HIPPO",
         *,
         unquoted_only: bool = False,
     ) -> None:
         """Get batch quotes for all reactants in the database
 
-        :param quoter: The :class:`.Quoter` object to use
+        :param ref_animal: The reference :class:`.HIPPO` animal to fetch quotes from (e.g. the one from https://github.com/mwinokan/EnamineCatalogs)
         :param unquoted_only: Only request quotes for unquoted compouds, defaults to ``False``
         """
 
@@ -2112,11 +2146,11 @@ class HIPPO:
 
     def quote_intermediates(
         self,
-        quoter: Quoter,
+        ref_animal: "HIPPO",
     ) -> None:
         """Get batch quotes for all reactants in the database
 
-        :param quoter: The :class:`.Quoter` object to use
+        :param ref_animal: The reference :class:`.HIPPO` animal to fetch quotes from (e.g. the one from https://github.com/mwinokan/EnamineCatalogs)
         :param unquoted_only: Only request quotes for unquoted compouds, defaults to ``False``
         """
 
@@ -2249,9 +2283,17 @@ class HIPPO:
 
     ### DUNDERS
 
+    def __str__(self) -> str:
+        """Unformatted string representation of this HIPPO"""
+        return f'HIPPO("{self.name}")'
+
     def __repr__(self) -> str:
         """Returns a command line representation of this HIPPO"""
-        return f'HIPPO("{self.name}")'
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.clear}"
+
+    def __rich__(self) -> str:
+        """Representation for mrich"""
+        return f"[bold underline]{self}"
 
     def __getitem__(self, key: str):
         """Get a :class:`.Compound`, :class:`.Pose`, or :class:`.Reaction` by its ID. See :meth:`.HIPPO.get_by_shorthand`"""

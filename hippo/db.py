@@ -17,9 +17,7 @@ from .tools import inchikey_from_smiles
 
 from pathlib import Path
 
-import logging
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 CHEMICALITE_COMPOUND_PROPERTY_MAP = {
     "num_heavy_atoms": "mol_num_hvyatms",
@@ -197,7 +195,7 @@ class Database:
         logger.debug("hippo3.Database.close()")
         if self.connection:
             self.connection.close()
-        mout.success(f"Closed connection to {mcol.file}{self.path}")
+        mout.success(f"Closed connection to {self.path}")
 
     def backup(
         self, destination: Path | str | None = None, pages: int = 10_000
@@ -213,19 +211,19 @@ class Database:
 
         destination = Path(destination)
 
-        logger.debug(f"Backing up {self}...")
+        with logger.spinner(f"Backing up {self.__rich__()}[reset]..."):
 
-        logger.writing(destination)
+            logger.writing(destination)
 
-        def progress(status, remaining, total):
-            logger.debug(f"Copied {total-remaining} of {total} pages...")
+            def progress(status, remaining, total):
+                logger.debug(f"Copied {total-remaining} of {total} pages...")
 
-        src = self.connection
-        dst = sqlite3.connect(destination)
-        with dst:
-            src.backup(dst, pages=pages, progress=progress)
+            src = self.connection
+            dst = sqlite3.connect(destination)
+            with dst:
+                src.backup(dst, pages=pages, progress=progress)
 
-        dst.close()
+            dst.close()
 
     ### GENERAL SQL
 
@@ -244,18 +242,18 @@ class Database:
             conn.load_extension("chemicalite")
             conn.enable_load_extension(False)
 
-            logger.success(f"Database connected @ {mcol.file}{self.path}")
+            logger.success("Database connected @", f"[file]{self.path}")
 
         except sqlite3.OperationalError as e:
 
             if "cannot open shared object file" in str(e):
                 logger.error("chemicalite package not installed correctly")
             else:
-                logger.exception(e)
+                logger.error(e)
             raise
 
         except Error as e:
-            logger.exception(e)
+            logger.error(e)
             raise
 
         self._connection = conn
@@ -285,24 +283,24 @@ class Database:
     def create_blank_db(self) -> None:
         """Create a blank database"""
 
-        logger.out("Creating blank database...")
-        self.create_table_compound()
-        self.create_table_inspiration()
-        self.create_table_reaction()
-        self.create_table_reactant()
-        self.create_table_pose()
-        self.create_table_tag()
-        self.create_table_quote()
-        self.create_table_target()
-        self.create_table_pattern_bfp()
-        self.create_table_feature()
-        self.create_table_route()
-        self.create_table_component()
-        self.create_table_interaction()
-        self.create_table_subsite()
-        self.create_table_subsite_tag()
-        self.create_table_scaffold()
-        self.commit()
+        with logger.loading("Creating blank database..."):
+            self.create_table_compound()
+            self.create_table_inspiration()
+            self.create_table_reaction()
+            self.create_table_reactant()
+            self.create_table_pose()
+            self.create_table_tag()
+            self.create_table_quote()
+            self.create_table_target()
+            self.create_table_pattern_bfp()
+            self.create_table_feature()
+            self.create_table_route()
+            self.create_table_component()
+            self.create_table_interaction()
+            self.create_table_subsite()
+            self.create_table_subsite_tag()
+            self.create_table_scaffold()
+            self.commit()
 
     def create_table_compound(self) -> None:
         """Create the compound table"""
@@ -634,12 +632,12 @@ class Database:
                         f'Skipping compound with existing morgan binary fingerprint "{smiles}"'
                     )
             else:
-                logger.exception(e)
+                logger.error(e)
 
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         compound_id = self.cursor.lastrowid
         if commit:
@@ -687,7 +685,7 @@ class Database:
             self.execute(sql, (compound_id, bfp))
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         bfp_id = self.cursor.lastrowid
         if commit:
@@ -786,11 +784,11 @@ class Database:
                         f'Could not insert pose with duplicate alias "{alias}"'
                     )
             else:
-                logger.exception(e)
+                logger.error(e)
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
             raise
 
         pose_id = self.cursor.lastrowid
@@ -845,7 +843,7 @@ class Database:
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         tag_id = self.cursor.lastrowid
         if commit:
@@ -898,7 +896,7 @@ class Database:
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         inspiration_id = self.cursor.lastrowid
 
@@ -954,7 +952,7 @@ class Database:
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         scaffold_id = self.cursor.lastrowid
 
@@ -995,7 +993,7 @@ class Database:
             self.execute(sql, (type, product, product_yield))
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         reaction_id = self.cursor.lastrowid
         if commit:
@@ -1041,7 +1039,7 @@ class Database:
             logger.warning(f"Skipping existing reactant: {reaction=} {compound=}")
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         reactant_id = self.cursor.lastrowid
 
@@ -1063,6 +1061,7 @@ class Database:
         purity: float | None = None,
         lead_time: float,
         smiles: str | None = None,
+        date: str | None = None,
         commit: bool = True,
     ) -> int | None:
         """Insert an entry into the quote table
@@ -1092,7 +1091,26 @@ class Database:
 
         smiles = smiles or ""
 
-        sql = """
+        payload = [
+            smiles,
+            amount,
+            supplier,
+            catalogue,
+            entry,
+            lead_time,
+            price,
+            currency,
+            purity,
+            compound,
+        ]
+
+        if date:
+            date_str = "?11"
+            payload.append(date)
+        else:
+            date_str = "date()"
+
+        sql = f"""
         INSERT or REPLACE INTO quote(
             quote_smiles,
             quote_amount,
@@ -1106,46 +1124,22 @@ class Database:
             quote_compound,
             quote_date
         )
-        VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, date());
+        VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, {date_str});
         """
 
         try:
             self.execute(
                 sql,
-                (
-                    smiles,
-                    amount,
-                    supplier,
-                    catalogue,
-                    entry,
-                    lead_time,
-                    price,
-                    currency,
-                    purity,
-                    compound,
-                ),
+                tuple(payload),
             )
 
         except sqlite3.InterfaceError as e:
             logger.error(e)
-            logger.debug(
-                (
-                    smiles,
-                    amount,
-                    supplier,
-                    catalogue,
-                    entry,
-                    lead_time,
-                    price,
-                    currency,
-                    purity,
-                    compound,
-                )
-            )
+            logger.debug(payload)
             raise
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
             return None
 
         quote_id = self.cursor.lastrowid
@@ -1178,7 +1172,7 @@ class Database:
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         target_id = self.cursor.lastrowid
         self.commit()
@@ -1238,7 +1232,7 @@ class Database:
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         feature_id = self.cursor.lastrowid
         if commit:
@@ -1293,7 +1287,7 @@ class Database:
             self.execute(sql, (product_id,))
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         route_id = self.cursor.lastrowid
 
@@ -1500,7 +1494,7 @@ class Database:
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         interaction_id = self.cursor.lastrowid
 
@@ -1534,7 +1528,7 @@ class Database:
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         subsite_id = self.cursor.lastrowid
         if commit:
@@ -1594,7 +1588,7 @@ class Database:
             return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
 
         subsite_tag_id = self.cursor.lastrowid
         if commit:
@@ -1697,7 +1691,10 @@ class Database:
         """
 
         if isinstance(value, str):
-            value = f"'{value}'"
+            if "'" in value:
+                value = f'"{value}"'
+            else:
+                value = f"'{value}'"
 
         if value is not None:
             where_str = f"{table}_{key}={value}"
@@ -2014,6 +2011,8 @@ class Database:
         inchikey: str | None = None,
         alias: str | None = None,
         smiles: str | None = None,
+        none: str = "error",
+        **kwargs,
     ) -> Compound:
         """Get a :class:`.Compound` using one of the following fields: ['id', 'inchikey', 'alias', 'smiles']
 
@@ -2026,14 +2025,19 @@ class Database:
         """
 
         if id is None:
-            id = self.get_compound_id(inchikey=inchikey, smiles=smiles, alias=alias)
+            id = self.get_compound_id(
+                inchikey=inchikey, smiles=smiles, alias=alias, none=none, **kwargs
+            )
 
         if not id:
-            logger.error(f"Invalid {id=}")
+            if none == "error":
+                logger.error(f"Invalid {id=}")
             return None
 
         query = "compound_id, compound_inchikey, compound_alias, compound_smiles"
-        entry = self.select_where(query=query, table="compound", key="id", value=id)
+        entry = self.select_where(
+            query=query, table="compound", key="id", value=id, none=none, **kwargs
+        )
         compound = Compound(self._animal, self, *entry, metadata=None, mol=None)
         return compound
 
@@ -2043,6 +2047,7 @@ class Database:
         inchikey: str | None = None,
         alias: str | None = None,
         smiles: str | None = None,
+        **kwargs,
     ) -> int:
         """Get a compound's ID using one of the following fields: ['inchikey', 'alias', 'smiles']
 
@@ -2055,14 +2060,18 @@ class Database:
 
         if inchikey:
             entry = self.select_id_where(
-                table="compound", key="inchikey", value=inchikey
+                table="compound", key="inchikey", value=inchikey, **kwargs
             )
 
         elif alias:
-            entry = self.select_id_where(table="compound", key="alias", value=alias)
+            entry = self.select_id_where(
+                table="compound", key="alias", value=alias, **kwargs
+            )
 
         elif smiles:
-            entry = self.select_id_where(table="compound", key="smiles", value=smiles)
+            entry = self.select_id_where(
+                table="compound", key="smiles", value=smiles, **kwargs
+            )
 
         else:
             raise NotImplementedError
@@ -2417,6 +2426,35 @@ class Database:
             d[comp_id] = d.get(comp_id, set())
             d[comp_id].add(pose_id)
         return d
+
+    def get_compound_cluster_dict(
+        self, cset: "CompoundSet | None" = None
+    ) -> dict[tuple, set]:
+
+        if cset is not None:
+            sql = f"""
+            SELECT scaffold_superstructure, scaffold_base FROM scaffold
+            WHERE scaffold_superstructure IN {cset.str_ids}
+            """
+        else:
+            sql = f"""
+            SELECT scaffold_superstructure, scaffold_base FROM scaffold
+            """
+
+        records = self.db.execute(sql).fetchall()
+
+        lookup = {}
+        for superstructure, base in records:
+            group = lookup.setdefault(superstructure, set())
+            group.add(base)
+
+        clustered = {}
+        for superstructure, bases in lookup.items():
+            cluster = tuple(bases)
+            group = clustered.setdefault(cluster, set())
+            group.add(superstructure)
+
+        return clustered
 
     def get_pose_id_interaction_ids_dict(self, pset: "PoseSet") -> dict[int, set]:
         """Get a dictionary mapping :class:`.Pose` ID's to their associated :class:`.Interaction` ID's"""
@@ -3110,11 +3148,15 @@ class Database:
 
     def __str__(self):
         """Unformatted string representation"""
-        return str(self.path.resolve())
+        return f"Database @ {self.path.resolve()}"
 
     def __repr__(self):
-        """Formatted string representation"""
-        return f"{mcol.bold}{mcol.underline}Database(path={self}){mcol.clear}"
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.clear}"
+
+    def __rich__(self) -> str:
+        """Representation for mrich"""
+        return f"[bold underline]{self}"
 
 
 class LegacyDatabaseError(Exception): ...

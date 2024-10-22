@@ -11,9 +11,7 @@ import mcol
 
 import os
 
-import logging
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 
 class CompoundTable:
@@ -222,6 +220,7 @@ class CompoundTable:
     def get_by_tag(
         self,
         tag: str,
+        **kwargs,
     ) -> "CompoundSet":
         """Get all child compounds with a certain tag
 
@@ -229,7 +228,12 @@ class CompoundTable:
 
         """
         values = self.db.select_where(
-            query="tag_compound", table="tag", key="name", value=tag, multiple=True
+            query="tag_compound",
+            table="tag",
+            key="name",
+            value=tag,
+            multiple=True,
+            **kwargs,
         )
 
         if not values:
@@ -293,7 +297,7 @@ class CompoundTable:
         cset._name = f"elaborations of C{base}"
         return cset
 
-    def get_by_smiles(self, smiles: str) -> "Compound | None":
+    def get_by_smiles(self, smiles: str, **kwargs) -> "Compound | None":
         """Get a member compound by its smiles"""
 
         from .tools import inchikey_from_smiles, sanitise_smiles, SanitisationError
@@ -310,7 +314,7 @@ class CompoundTable:
             return None
             return c
         inchikey = inchikey_from_smiles(smiles)
-        return self[inchikey]
+        return self.db.get_compound(inchikey=inchikey, **kwargs)
 
     def summary(self) -> None:
         """Print a summary of this compound set"""
@@ -352,6 +356,7 @@ class CompoundTable:
         tag: str = None,
         base: int | Compound = None,
         smiles: str | None = None,
+        **kwargs,
     ) -> "CompoundSet | Compound | None":
         """Filter compounds by a given tag, base, or it's SMILES string. See :meth:`.CompoundTable.get_by_tag` and :meth:`.CompoundTable.get_by_base`
 
@@ -363,11 +368,11 @@ class CompoundTable:
         """
 
         if tag:
-            return self.get_by_tag(tag)
+            return self.get_by_tag(tag, **kwargs)
         elif base:
-            return self.get_by_base(base)
+            return self.get_by_base(base, **kwargs)
         elif smiles:
-            return self.get_by_smiles(smiles)
+            return self.get_by_smiles(smiles, **kwargs)
         else:
             logger.error("Must provide one of tag, base, or smiles arguments")
             return None
@@ -434,19 +439,25 @@ class CompoundTable:
 
         return None
 
-    def __repr__(self) -> str:
-        """Formatted string representation"""
-
-        s = f"{mcol.bold}{mcol.underline}"
+    def __str__(self) -> str:
+        """Unformatted string representation"""
 
         if self.name:
-            s += f"{self.name}: "
+            s = f"{self.name}: "
+        else:
+            s = ""
 
-        s += "{" f"C x {len(self)}" "}"
-
-        s += f"{mcol.unbold}{mcol.ununderline}"
+        s += "{" f"C × {len(self)}" "}"
 
         return s
+
+    def __repr__(self) -> str:
+        """ANSI ormatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Representation for mrich"""
+        return f"[bold underline]{self}"
 
     def __len__(self) -> int:
         """Total number of compounds"""
@@ -885,6 +896,7 @@ class CompoundSet:
     def get_by_base(
         self,
         base: Compound | int,
+        none: str = "error",
     ) -> "CompoundSet":
         """Get all compounds that elaborate the given base compound
 
@@ -901,8 +913,12 @@ class CompoundSet:
             table="scaffold",
             key=f"scaffold_base = {base} AND scaffold_superstructure IN {self.str_ids}",
             multiple=True,
+            none=none,
         )
         ids = [v for v, in values if v]
+
+        if not ids:
+            return None
         return CompoundSet(self.db, ids)
 
     def get_all_possible_reactants(
@@ -1169,12 +1185,11 @@ class CompoundSet:
             **kwargs,
         )
 
-    def get_routes(self,
+    def get_routes(
+        self,
         permitted_reactions: "ReactionSet",
         debug: bool = True,
     ):
-
-        from tqdm import tqdm
 
         if "route" not in self.db.table_names:
             logger.error("route table not in Database")
@@ -1213,9 +1228,10 @@ class CompoundSet:
             if all(r in permitted_reactions for r in reactions):
                 available_routes.add(route_id)
 
-        if debug:
-            logger.debug("Getting route objects")
-        routes = [self.db.get_route(id=route_id) for route_id in tqdm(available_routes)]
+        routes = [
+            self.db.get_route(id=route_id)
+            for route_id in logger.track(available_routes, prefix="Getting routes")
+        ]
 
         from .recipe import RouteSet
 
@@ -1276,12 +1292,11 @@ class CompoundSet:
 
         """
 
-        from tqdm import tqdm
         from pandas import DataFrame
 
         data = []
 
-        for comp in tqdm(self):
+        for comp in logger.track(self, prefix="Creating compound dataframe"):
             d = comp.get_dict(
                 mol=mol,
                 metadata=metadata,
@@ -1363,9 +1378,17 @@ class CompoundSet:
         """
         from pandas import DataFrame
 
-        smiles = self.smiles
-        df = DataFrame(dict(smiles=smiles))
-        df.to_csv(file)
+        records = self.db.select_where(
+            table=self.table,
+            query="compound_id, compound_smiles",
+            key=f"compound_id IN {self.str_ids}",
+            multiple=True,
+        )
+
+        data = [dict(id=id, smiles=smiles) for id, smiles in records]
+        df = DataFrame(data)
+        logger.writing(file)
+        df.to_csv(file, index=False)
 
     def write_postera_csv(
         self,
@@ -1384,14 +1407,13 @@ class CompoundSet:
 
         from datetime import date as dt
         from pandas import DataFrame
-        from tqdm import tqdm
 
         if prefix:
             prefix = f"{prefix}_"
 
         data = []
 
-        for c in tqdm(self, total=len(self)):
+        for c in logger.track(self, prefix="Creating DataFrame"):
 
             # get props
             smiles = c.smiles
@@ -1474,7 +1496,7 @@ class CompoundSet:
         for i in self.indices:
             self.db.insert_tag(name=tag, compound=i, commit=False)
 
-        logger.info(f'Tagged {self} w/ "{tag}"')
+        logger.print(f'Tagged {self} w/ "{tag}"')
 
         self.db.commit()
 
@@ -1571,28 +1593,22 @@ class CompoundSet:
     def __str__(self) -> str:
         """Unformatted string representation"""
 
-        s = ""
-
         if self.name:
-            s += f"{self.name}: "
+            s = f"{self.name}: "
+        else:
+            s = ""
 
-        s += "{" f"C x {len(self)}" "}"
+        s += "{" f"C × {len(self)}" "}"
 
         return s
 
     def __repr__(self) -> str:
-        """Formatted string representation"""
+        """ANSI ormatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
 
-        s = f"{mcol.bold}{mcol.underline}"
-
-        if self.name:
-            s += f"{self.name}: "
-
-        s += "{" f"C x {len(self)}" "}"
-
-        s += f"{mcol.unbold}{mcol.ununderline}"
-
-        return s
+    def __rich__(self) -> str:
+        """Representation for mrich"""
+        return f"[bold underline]{self}"
 
     def __contains__(self, other: Compound | Ingredient | int):
         """Check if compound or ingredient is a member of this set"""
@@ -2154,14 +2170,17 @@ class IngredientSet:
         """The number of ingredients in this set"""
         return len(self._data)
 
-    def __repr__(self):
-        return (
-            f"{mcol.bold}{mcol.underline}"
-            "{"
-            f"I x {len(self)}"
-            "}"
-            f"{mcol.unbold}{mcol.ununderline}"
-        )
+    def __str__(self) -> str:
+        """Unformatted string representation"""
+        return "{" f"Ingredient × {len(self)}" "}"
+
+    def __repr__(self) -> str:
+        """ANSI ormatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Representation for mrich"""
+        return f"[bold underline]{self}"
 
     def __add__(self, other):
         """Add another  :class:`.IngredientSet` this set"""

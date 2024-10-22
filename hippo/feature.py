@@ -32,8 +32,12 @@ class Feature:
         return f"F{self.id}"
 
     def __repr__(self) -> str:
-        """Formatted string representation"""
+        """ANSI Formatted string representation"""
         return f"{mcol.bold}{mcol.underline}{self.family} {self.chain_name} {self.residue_name} {self.residue_number} [{self.atom_names}]{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Representation for mrich"""
+        return f"[bold underline]{self.family} {self.chain_name} {self.residue_name} {self.residue_number} [{self.atom_names}]"
 
     @property
     def chain_res_name_number_str(self) -> str:

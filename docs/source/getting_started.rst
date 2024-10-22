@@ -126,12 +126,12 @@ Interactions fingerprinted as follows:
 
 ::
 
-	from tqdm import tqdm
+	import mrich
 
-	for pose in tqdm(animal.poses):
+	for pose in mrich.track(animal.poses):
 		pose.calculate_interactions()
 
-*N.B. tqdm just gives you a nice progress bar*
+*N.B. mrich.track just gives you a nice progress bar*
 
 Interaction fingerprints can be visualised with a 'punchcard', per-residue histogram, or viewed individually for a :class:`.Pose`.
 

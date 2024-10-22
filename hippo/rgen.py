@@ -8,9 +8,7 @@ import json
 
 from .tools import dt_hash
 
-import logging
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 
 class RandomRecipeGenerator:
@@ -208,7 +206,10 @@ class RandomRecipeGenerator:
         if mini_test:
             route_ids = route_ids[:100]
 
-        routes = [self.db.get_route(id=route_id) for route_id, in tqdm(route_ids)]
+        routes = [
+            self.db.get_route(id=route_id)
+            for route_id, in logger.track(route_ids, prefix="Getting routes")
+        ]
 
         from .recipe import RouteSet
 
@@ -394,3 +395,15 @@ class RandomRecipeGenerator:
 
     def __call__(self, *args, **kwargs):
         return self.generate(*args, **kwargs)
+
+    def __str__(self) -> str:
+        """Unformatted string representation"""
+        return f"RandomRecipeGenerator({recipe_dir=})"
+
+    def __repr__(self) -> str:
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self}"

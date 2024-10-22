@@ -6,9 +6,7 @@ import mcol
 
 import os
 
-import logging
-
-logger = logging.getLogger("HIPPO")
+import mrich as logger
 
 
 class PoseTable:
@@ -454,19 +452,24 @@ class PoseTable:
 
         return None
 
-    def __repr__(self) -> str:
-        """Formatted string representation"""
-
-        s = f"{mcol.bold}{mcol.underline}"
-
+    def __str__(self):
+        """Unformatted string representation"""
         if self.name:
-            s += f"{self.name}: "
+            s = f"{self.name}: "
+        else:
+            s = ""
 
-        s += "{" f"P x {len(self)}" "}"
-
-        s += f"{mcol.unbold}{mcol.ununderline}"
+        s += "{" f"P × {len(self)}" "}"
 
         return s
+
+    def __repr__(self) -> str:
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self}"
 
     def __len__(self) -> int:
         """Total number of compounds"""
@@ -958,9 +961,7 @@ class PoseSet:
         data = []
 
         if len(self) > 100:
-            from tqdm import tqdm
-
-            gen = tqdm(self)
+            gen = logger.track(self, prefix="PoseSet --> DataFrame")
         else:
             gen = self
 
@@ -1132,7 +1133,7 @@ class PoseSet:
         for i in self.indices:
             self.db.insert_tag(name=tag, pose=i, commit=False)
 
-        logger.info(f'Tagged {self} w/ "{tag}"')
+        logger.print(f'Tagged {self} w/ "{tag}"')
 
         self.db.commit()
 
@@ -1621,8 +1622,8 @@ class PoseSet:
                     "summary": c,
                     "grid": d,
                     "draw2d": e,
-                    "draw": e,
-                    "metadata": f,
+                    "draw": f,
+                    "metadata": g,
                 },
             )
 
@@ -1693,19 +1694,24 @@ class PoseSet:
 
     ### DUNDERS
 
-    def __repr__(self) -> str:
-        """Formatted string representation"""
-
-        s = f"{mcol.bold}{mcol.underline}"
-
+    def __str__(self):
+        """Unformatted string representation"""
         if self.name:
-            s += f"{self.name}: "
+            s = f"{self.name}: "
+        else:
+            s = ""
 
-        s += "{" f"P x {len(self)}" "}"
-
-        s += f"{mcol.unbold}{mcol.ununderline}"
+        s += "{" f"P × {len(self)}" "}"
 
         return s
+
+    def __repr__(self) -> str:
+        """ANSI Formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Rich Formatted string representation"""
+        return f"[bold underline]{self}"
 
     def __len__(self) -> int:
         """The number of poses in this set"""
@@ -1730,7 +1736,7 @@ class PoseSet:
                 try:
                     index = self.indices[key]
                 except IndexError:
-                    logger.exception(f"list index out of range: {key=} for {self}")
+                    logger.error(f"list index out of range: {key=} for {self}")
                     raise
                 return self.db.get_pose(id=index)
 

@@ -274,6 +274,9 @@ class ProjectPage:
 
         with self.tag("head"):
 
+            with self.tag("title"):
+                self.text(self.title)
+
             self.doc.stag("meta", charset="UTF-8")
             self.doc.stag(
                 "meta", name="viewport", content="width=device-width, initial-scale=1"
@@ -869,7 +872,6 @@ class ProjectPage:
                     original = Path(self.extra_recipe_dir) / filename
                 shutil.copyfile(original, self.resource_dir / filename)
 
-
                 path = self.resource_dir / filename
                 rel_path = Path(self.resource_dir.name) / filename
 
@@ -901,6 +903,54 @@ class ProjectPage:
                         Download=f'<a href="{rel_path}" download>CSV</a>',
                     )
                 )
+
+            # Reactant CSV
+
+            filename = f"Recipe_{proposal.hash}_reactants"
+            path = self.resource_dir / f"{filename}.csv"
+            proposal.write_reactant_csv(path)
+
+            rel_path = Path(self.resource_dir.name) / path.name
+
+            table_data.append(
+                dict(
+                    Name=str(proposal),
+                    Description=f"Reactant data file",
+                    Download=f'<a href="{rel_path}" download>CSV</a>',
+                )
+            )
+
+            # Product CSV
+
+            filename = f"Recipe_{proposal.hash}_products"
+            path = self.resource_dir / f"{filename}.csv"
+            proposal.write_product_csv(path)
+
+            rel_path = Path(self.resource_dir.name) / path.name
+
+            table_data.append(
+                dict(
+                    Name=str(proposal),
+                    Description=f"Product data file",
+                    Download=f'<a href="{rel_path}" download>CSV</a>',
+                )
+            )
+
+            # Scaffold/chemistry CSV
+
+            filename = f"Recipe_{proposal.hash}_chemistry"
+            path = self.resource_dir / f"{filename}.csv"
+            proposal.write_chemistry_csv(path)
+
+            rel_path = Path(self.resource_dir.name) / path.name
+
+            table_data.append(
+                dict(
+                    Name=str(proposal),
+                    Description=f"Chemistry review file",
+                    Download=f'<a href="{rel_path}" download>CSV</a>',
+                )
+            )
 
         self.table(table_data)
 
