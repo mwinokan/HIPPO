@@ -893,7 +893,7 @@ DEFAULT_ATTRIBUTES = {
     ),
     "elaboration_balance": dict(
         type="custom",
-        weight=1.0,
+        weight=0.0,
         function=lambda r: r.product_compounds.elaboration_balance,
         description="A measure for how evenly base compounds have been elaborated",
     ),  ### REALLY UNPERFORMANT?
@@ -911,7 +911,7 @@ DEFAULT_ATTRIBUTES = {
     ),
     "risk_diversity": dict(
         type="custom",
-        weight=1.0,
+        weight=0.0,
         function=lambda r: r.product_compounds.risk_diversity,
         description="A measure of how evenly spread the risk of elaborations are for each base compound. Risk in this case refers to the number of atoms added",
     ),
@@ -923,7 +923,7 @@ DEFAULT_ATTRIBUTES = {
     ),
     "interaction_balance": dict(
         type="custom",
-        weight=1.0,
+        weight=0.0,
         function=lambda r: r.product_interactions.per_feature_count_std,
         description="A measure for how evenly protein features are being interacted with in this selection",
     ),
@@ -935,19 +935,19 @@ DEFAULT_ATTRIBUTES = {
     ),
     "subsite_balance": dict(
         type="custom",
-        weight=1.0,
+        weight=0.0,
         function=lambda r: r.product_poses.subsite_balance,
         description="Count the number of subsites that poses in this set come into contact with",
     ),
     "avg_distance_score": dict(
         type="custom",
-        weight=-1.0,
+        weight=-0.0,
         function=lambda r: r.product_poses.avg_distance_score,
         description="Average distance score (e.g. RMSD to fragment inspirations) for poses in this set",
     ),
     "avg_energy_score": dict(
         type="custom",
-        weight=-1.0,
+        weight=-0.0,
         function=lambda r: r.product_poses.avg_energy_score,
         description="Average energy score (e.g. binding ddG) for poses in this set",
     ),

@@ -585,12 +585,12 @@ class ProjectPage:
         self.section_header(f'{attribute._type}: "{key}"')
 
         with self.tag("ul"):
-            self.var("weight", attribute.weight, tag="li")
-            self.var("inverse", attribute.inverse, tag="li")
-            self.var("min", attribute.min, tag="li")
-            self.var("max", attribute.max, tag="li")
-            self.var("mean", attribute.mean, tag="li")
-            self.var("std", attribute.std, tag="li")
+            self.var("weight", f"{attribute.weight:.2f}", tag="li")
+            self.var("inverse", f"{attribute.inverse:.2f}", tag="li")
+            self.var("min", f"{attribute.min:.2f}", tag="li")
+            self.var("max", f"{attribute.max:.2f}", tag="li")
+            self.var("mean", f"{attribute.mean:.2f}", tag="li")
+            self.var("std", f"{attribute.std:.2f}", tag="li")
 
             if key in DEFAULT_ATTRIBUTES:
                 self.var(
@@ -805,6 +805,17 @@ class ProjectPage:
 
         title = "Proposal Recipes"
         self.section_header(title)
+
+        table_data = []
+
+        for proposal in self.proposals:
+
+            d = {}
+            
+            for attribute in self.scorer.attributes:
+                d[f"{attribute.key} w={attribute.weight}"] = f"{attribute.get_value(proposal)} ({attribute.unweighted(proposal)}%)"
+
+        self.table(table_data)
 
         for proposal in self.proposals:
 

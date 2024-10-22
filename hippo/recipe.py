@@ -1221,8 +1221,11 @@ class Recipe:
         from .cset import CompoundSet
         from pandas import DataFrame
         from tqdm import tqdm
+        from pathlib import Path
 
         # solve each product's reaction
+
+        file = str(Path(file).resolve())
 
         rows = []
 
@@ -1527,7 +1530,7 @@ class RouteSet:
 
         data = {}
         for route in routes:
-            assert isinstance(route, Route)
+            # assert isinstance(route, Route)
             data[route.id] = route
 
         self._data = data
