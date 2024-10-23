@@ -1669,6 +1669,9 @@ class HIPPO:
 
         else:
             if not compound_id:
+
+                assert inchikey
+
                 compound_id = self.db.get_compound_id(inchikey=inchikey)
 
                 check_smiles(compound_id, smiles)
