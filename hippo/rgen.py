@@ -241,6 +241,8 @@ class RandomRecipeGenerator:
         debug=True,
         max_iter=None,
         shuffle=True,
+        balance_clusters: bool = False,
+        permitted_clusters: None | set = None,
     ):
         """
 
@@ -299,7 +301,12 @@ class RandomRecipeGenerator:
                 logger.var("price", price)
 
             # pop a route
-            candidate_route = pool.pop()
+            if balance_clusters:
+                candidate_route = pool.balanced_pop(
+                    permitted_clusters=permitted_clusters
+                )
+            else:
+                candidate_route = pool.pop()
 
             if debug:
                 logger.var("candidate_route", candidate_route)

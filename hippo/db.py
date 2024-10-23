@@ -137,7 +137,7 @@ class Database:
                 logger.error(f"Set overwrite_existing=True to override")
                 raise Exception("Set overwrite_existing=True to override")
 
-        logger.info(f"Copying {source} --> {destination}")
+        logger.print(f"Copying {source} --> {destination}")
 
         def progress(status, remaining, total):
             logger.debug(f"Copied {total-remaining} of {total} pages...")

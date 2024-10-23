@@ -1220,8 +1220,11 @@ class Recipe:
 
         from .cset import CompoundSet
         from pandas import DataFrame
+        from pathlib import Path
 
         # solve each product's reaction
+
+        file = str(Path(file).resolve())
 
         rows = []
 
@@ -2009,6 +2012,20 @@ class RouteSet:
         route_id, route = self.data.popitem()
 
         return route
+
+    def balanced_pop(self, permitted_clusters: set | None = None):
+
+        # get a route/product dictionary indexed by the scaffold cluster
+
+        # store the permitted clusters (or all clusters) list as property
+
+        # get the current cluster (first one or iterate from last one)
+
+        # pop the last route id from the given cluster
+
+        # return the route object
+
+        raise NotImplementedError
 
     def shuffle(self):
         """Randomly shuffle the routes in this set"""
