@@ -409,6 +409,8 @@ class RandomRecipeGenerator:
 
     def __repr__(self) -> str:
         """ANSI Formatted string representation"""
+        import mcol
+
         return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
 
     def __rich__(self) -> str:
