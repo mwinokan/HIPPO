@@ -2431,6 +2431,11 @@ class Database:
     def get_compound_cluster_dict(
         self, cset: "CompoundSet | None" = None
     ) -> dict[tuple, set]:
+        """Create a dictionary grouping compounds by their scaffold/base cluster.
+
+        :param cset: :class:`.CompoundSet` subset to query, defaults to all compounds
+        :returns: A dictionary mapping a tuple of scaffold :class:`.Compound` IDs to a set of superstructure :class:`.Compound` ID's.
+        """
 
         if cset is not None:
             sql = f"""
@@ -2442,7 +2447,7 @@ class Database:
             SELECT scaffold_superstructure, scaffold_base FROM scaffold
             """
 
-        records = self.db.execute(sql).fetchall()
+        records = self.execute(sql).fetchall()
 
         lookup = {}
         for superstructure, base in records:

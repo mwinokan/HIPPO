@@ -1891,6 +1891,9 @@ class RouteSet:
 
         self._data = data
         self._db = db
+        self._cluster_map = None
+        self._permitted_clusters = None
+        self._current_cluster = None
 
     ### FACTORIES
 
@@ -1918,6 +1921,9 @@ class RouteSet:
 
         self._data = new_data
         self._db = db
+        self._cluster_map = None
+        self._permitted_clusters = None
+        self._current_cluster = None
 
         return self
 
@@ -1966,6 +1972,43 @@ class RouteSet:
         """Return the :class:`.Route` IDs"""
         return self.data.keys()
 
+    @property
+    def cluster_map(self) -> dict[tuple, set]:
+        """Create a dictionary grouping routes by their scaffold/base cluster.
+
+        :returns: A dictionary mapping a tuple of scaffold :class:`.Compound` IDs to a set of :class:`.Route` ID's to their superstructures.
+        """
+
+        if self._cluster_map is None:
+
+            # get route mapping
+            pairs = self.db.select_where(
+                query="route_product, route_id",
+                key=f"route_id IN {self.str_ids}",
+                table="route",
+                multiple=True,
+            )
+
+            route_map = {route_product: route_id for route_product, route_id in pairs}
+
+            # group compounds by cluster
+            compound_clusters = self.db.get_compound_cluster_dict(cset=self.products)
+
+            # create the map
+            self._cluster_map = {}
+            for cluster, compounds in compound_clusters.items():
+                self._cluster_map[cluster] = []
+                for compound in compounds:
+                    route_id = route_map.get(compound, None)
+                    if not route_id:
+                        continue
+                    self._cluster_map[cluster].append(route_id)
+
+                if not self._cluster_map[cluster]:
+                    del self._cluster_map[cluster]
+
+        return self._cluster_map
+
     ### METHODS
 
     def copy(self):
@@ -2013,19 +2056,91 @@ class RouteSet:
 
         return route
 
-    def balanced_pop(self, permitted_clusters: set | None = None):
+    def balanced_pop(
+        self, permitted_clusters: set[tuple] | None = None, debug: bool = False
+    ) -> "Route":
 
-        # get a route/product dictionary indexed by the scaffold cluster
+        if not self._data:
+            logger.print("RouteSet depleted")
+            return None
+        if not self.cluster_map:
+            logger.warning("RouteSet.cluster_map depleted but _data isn't...")
+            return self.pop()
 
         # store the permitted clusters (or all clusters) list as property
 
-        # get the current cluster (first one or iterate from last one)
+        if self._permitted_clusters is None:
+            if permitted_clusters:
+                permitted_clusters = list(
+                    set(
+                        (cluster,) if isinstance(cluster, int) else cluster
+                        for cluster in permitted_clusters
+                    )
+                )
+                self._permitted_clusters = permitted_clusters
+            else:
+                self._permitted_clusters = list(self.cluster_map.keys())
+
+        if self._current_cluster is None:
+            self._current_cluster = self._permitted_clusters[0]
+
+        ### pop a Route
+
+        if debug:
+            logger.debug(f"Would pop Route from {self._current_cluster=}")
+
+        cluster = self._current_cluster
 
         # pop the last route id from the given cluster
 
-        # return the route object
+        try:
+            route_id = self._cluster_map[cluster].pop()
+        except IndexError:
+            logger.print(self._permitted_clusters)
+            logger.print(self._cluster_map)
+            raise
 
-        raise NotImplementedError
+        # clean up empty clusters
+
+        if debug:
+            logger.debug("Popped route", route_id)
+
+        # get the Route object
+
+        if route_id in self._data:
+            route = self._data[route_id]
+            del self._data[route_id]
+        else:
+            # if debug:
+            logger.debug("Route not present")
+            return self.balanced_pop()
+
+        ### increment cluster
+
+        n = len(self._permitted_clusters)
+        if n > 1:
+            for i, cluster in enumerate(self._permitted_clusters):
+                if cluster == self._current_cluster:
+                    if i == n - 1:
+                        self._current_cluster = self._permitted_clusters[0]
+                    else:
+                        self._current_cluster = self._permitted_clusters[i + 1]
+                    break
+            else:
+                raise IndexError("This should never be reached...")
+
+        if not self._cluster_map[cluster]:
+            del self._cluster_map[cluster]
+            self._permitted_clusters = [
+                c for c in self._permitted_clusters if c != cluster
+            ]
+            # if debug:
+            logger.debug("Depleted cluster", cluster)
+
+        if debug:
+            logger.debug("#Routes in set", len(self._data))
+
+        return route
 
     def shuffle(self):
         """Randomly shuffle the routes in this set"""
@@ -2034,6 +2149,11 @@ class RouteSet:
         items = list(self.data.items())
         random.shuffle(items)
         self._data = dict(items)
+
+        ### shuffle the cluster map as well
+
+        for cluster, routes in self._cluster_map.items():
+            self._cluster_map[cluster] = random.shuffle(routes)
 
     ### DUNDERS
 
