@@ -2071,13 +2071,20 @@ class RouteSet:
 
         if self._permitted_clusters is None:
             if permitted_clusters:
-                permitted_clusters = list(
-                    set(
-                        (cluster,) if isinstance(cluster, int) else cluster
-                        for cluster in permitted_clusters
-                    )
+                permitted_clusters = set(
+                    (cluster,) if isinstance(cluster, int) else cluster
+                    for cluster in permitted_clusters
                 )
-                self._permitted_clusters = permitted_clusters
+
+                self._permitted_clusters = []
+                for cluster in permitted_clusters:
+                    if cluster not in self.cluster_map:
+                        logger.warning(
+                            cluster, "in permitted_clusters but not cluster_map"
+                        )
+                    else:
+                        self._permitted_clusters.append(cluster)
+
             else:
                 self._permitted_clusters = list(self.cluster_map.keys())
 
@@ -2094,10 +2101,10 @@ class RouteSet:
         # pop the last route id from the given cluster
 
         try:
-            route_id = self._cluster_map[cluster].pop()
+            route_id = self.cluster_map[cluster].pop()
         except IndexError:
             logger.print(self._permitted_clusters)
-            logger.print(self._cluster_map)
+            logger.print(self.cluster_map)
             raise
 
         # clean up empty clusters
@@ -2129,8 +2136,8 @@ class RouteSet:
             else:
                 raise IndexError("This should never be reached...")
 
-        if not self._cluster_map[cluster]:
-            del self._cluster_map[cluster]
+        if not self.cluster_map[cluster]:
+            del self.cluster_map[cluster]
             self._permitted_clusters = [
                 c for c in self._permitted_clusters if c != cluster
             ]
