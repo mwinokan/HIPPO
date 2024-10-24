@@ -4,7 +4,7 @@ from .compound import Ingredient
 
 import mcol
 
-import mrich as logger
+import mrich
 
 
 # @dataclass
@@ -82,11 +82,11 @@ class Recipe:
         from .rset import ReactionSet
 
         if debug:
-            logger.debug(
+            mrich.debug(
                 f"Recipe.from_reaction(R{reaction.id}, {amount=}, {pick_cheapest=})"
             )
-            logger.debug(f"{reaction.product.id=}")
-            logger.debug(f"{reaction.reactants.ids=}")
+            mrich.debug(f"{reaction.product.id=}")
+            mrich.debug(f"{reaction.reactants.ids=}")
 
         if permitted_reactions:
             assert reaction in permitted_reactions
@@ -114,7 +114,7 @@ class Recipe:
 
         if quoted_only or supplier:
             if debug:
-                logger.debug(f"Checking reactant_availability: {reaction=}")
+                mrich.debug(f"Checking reactant_availability: {reaction=}")
             if reaction_checking_cache and reaction.id in reaction_checking_cache:
                 ok = reaction_checking_cache[reaction.id]
                 print("reaction_checking_cache used")
@@ -125,7 +125,7 @@ class Recipe:
                     reaction_checking_cache[reaction.id] = ok
             if not ok:
                 if unavailable_reaction == "error":
-                    logger.error(f"Reactants not available for {reaction=}")
+                    mrich.error(f"Reactants not available for {reaction=}")
                 if pick_cheapest:
                     return None
                 else:
@@ -142,7 +142,7 @@ class Recipe:
                 return pairs
 
         if debug:
-            logger.debug(f"get_reactant_amount_pairs({reaction.id})")
+            mrich.debug(f"get_reactant_amount_pairs({reaction.id})")
         pairs = get_reactant_amount_pairs(reaction)
 
         for reactant, reactant_amount in pairs:
@@ -150,7 +150,7 @@ class Recipe:
             reactant = db.get_compound(id=reactant)
 
             if debug:
-                logger.debug(f"{reactant.id=}, {reactant_amount=}")
+                mrich.debug(f"{reactant.id=}, {reactant_amount=}")
 
             # scale amount
             reactant_amount *= amount
@@ -164,9 +164,9 @@ class Recipe:
 
                 if debug:
                     if len(inner_reactions) == 1:
-                        logger.debug(f"Reactant has ONE inner reaction")
+                        mrich.debug(f"Reactant has ONE inner reaction")
                     else:
-                        logger.warning(f"{reactant=} has MULTIPLE inner reactions")
+                        mrich.warning(f"{reactant=} has MULTIPLE inner reactions")
 
                 new_recipes = []
 
@@ -216,11 +216,11 @@ class Recipe:
 
         if pick_cheapest:
             if debug:
-                logger.debug("Picking cheapest")
+                mrich.debug("Picking cheapest")
             priced = [r for r in recipes if r.get_price(supplier=supplier)]
             # priced = [r for r in recipes if r.price]
             if not priced:
-                logger.error("0 recipes with prices, can't choose cheapest")
+                mrich.error("0 recipes with prices, can't choose cheapest")
                 return recipes
             sorted_recipes = sorted(
                 priced, key=lambda r: r.get_price(supplier=supplier)
@@ -228,7 +228,7 @@ class Recipe:
 
             if debug:
                 for recipe in recipes:
-                    logger.debug(f"{recipe}, {recipe.price}")
+                    mrich.debug(f"{recipe}, {recipe.price}")
 
             return sorted_recipes[0]
             # return sorted(priced, key=lambda r: r.price)[0]
@@ -266,24 +266,24 @@ class Recipe:
         db = reactions.db
 
         if debug:
-            logger.debug("Recipe.from_reactions()")
-            logger.var("reactions", reactions)
-            logger.var("amount", amount)
-            logger.var("final_products_only", final_products_only)
-            logger.var("permitted_reactions", permitted_reactions)
+            mrich.debug("Recipe.from_reactions()")
+            mrich.var("reactions", reactions)
+            mrich.var("amount", amount)
+            mrich.var("final_products_only", final_products_only)
+            mrich.var("permitted_reactions", permitted_reactions)
 
         # get all the products
         products = reactions.products
 
         if debug:
-            logger.var("products", products)
+            mrich.var("products", products)
 
         # return products
 
         if final_products_only:
 
             if debug:
-                logger.var("products.str_ids", products.str_ids)
+                mrich.var("products.str_ids", products.str_ids)
 
             # raise NotImplementedError
             ids = reactions.db.execute(
@@ -299,7 +299,7 @@ class Recipe:
 
             products = CompoundSet(db, ids)
             if debug:
-                logger.var("final products", products)
+                mrich.var("final products", products)
 
             # return ids
 
@@ -369,10 +369,10 @@ class Recipe:
 
         options = []
 
-        logger.var("#compounds", n_comps)
+        mrich.var("#compounds", n_comps)
 
         if n_comps > 1:
-            generator = logger.track(
+            generator = mrich.track(
                 zip(compounds, amount), prefix="Solving individual compound recipes..."
             )
         else:
@@ -409,23 +409,23 @@ class Recipe:
                     comp_options += sol
 
             if not comp_options:
-                logger.error(f"No solutions for compound={comp}")
+                mrich.error(f"No solutions for compound={comp}")
                 continue
 
             if pick_cheapest and len(comp_options) > 1:
                 if warn_multiple_solutions:
-                    logger.warning(f"Multiple solutions for compound={comp}")
+                    mrich.warning(f"Multiple solutions for compound={comp}")
                 if debug:
-                    logger.debug("Picking cheapest...")
+                    mrich.debug("Picking cheapest...")
                 priced = [r for r in comp_options if r.price]
                 comp_options = sorted(priced, key=lambda r: r.price)[:1]
 
             if warn_multiple_solutions and len(comp_options) > 1:
-                logger.warning(f"Multiple solutions for compound={comp}")
+                mrich.warning(f"Multiple solutions for compound={comp}")
                 if debug:
-                    logger.debug(f"{comp_options=}")
+                    mrich.debug(f"{comp_options=}")
             else:
-                logger.success(f"Found solution for compound={comp}")
+                mrich.success(f"Found solution for compound={comp}")
 
             options.append(comp_options)
 
@@ -433,7 +433,7 @@ class Recipe:
 
         from itertools import product
 
-        logger.print("Solving recipe combinations...")
+        mrich.print("Solving recipe combinations...")
         combinations = list(product(*options))
 
         if not solve_combinations:
@@ -442,40 +442,40 @@ class Recipe:
         if pick_first:
             combinations = [combinations[0]]
 
-        logger.print()
+        mrich.print()
 
         solutions = []
 
         if n_comps > 1:
-            generator = logger.track(combinations, prefix="Combining recipes...")
+            generator = mrich.track(combinations, prefix="Combining recipes...")
         else:
             generator = combinations
 
         for combo in generator:
 
             if debug:
-                logger.debug(f"Combination of {len(combo)} recipes")
+                mrich.debug(f"Combination of {len(combo)} recipes")
 
             solution = combo[0]
 
             for i, recipe in enumerate(combo[1:]):
                 if debug:
-                    logger.debug(i + 1)
+                    mrich.debug(i + 1)
                 solution += recipe
 
             solutions.append(solution)
 
         if not solutions:
-            logger.error("No solutions!")
+            mrich.error("No solutions!")
 
         if pick_first:
             return solutions[0]
 
         if pick_cheapest:
-            logger.print("Picking cheapest...")
+            mrich.print("Picking cheapest...")
             priced = [r for r in solutions if r.price]
             if not priced:
-                logger.error("0 recipes with prices, can't choose cheapest")
+                mrich.error("0 recipes with prices, can't choose cheapest")
                 return solutions
             return sorted(priced, key=lambda r: r.price)[0]
 
@@ -509,7 +509,7 @@ class Recipe:
         for i in range(300):
 
             if debug:
-                logger.debug(i)
+                mrich.debug(i)
 
             # reaction_ids = db.get_possible_reaction_ids(compound_ids=compound_ids)
             reaction_ids = db.get_possible_reaction_ids(compound_ids=all_reactants)
@@ -518,19 +518,19 @@ class Recipe:
                 break
 
             if debug:
-                logger.debug(f"Adding {len(reaction_ids)} reactions")
+                mrich.debug(f"Adding {len(reaction_ids)} reactions")
 
             possible_reactions += reaction_ids
 
             if debug:
-                logger.var("reaction_ids", reaction_ids)
+                mrich.var("reaction_ids", reaction_ids)
 
             product_ids = db.get_possible_reaction_product_ids(
                 reaction_ids=reaction_ids
             )
 
             if debug:
-                logger.var("product_ids", product_ids)
+                mrich.var("product_ids", product_ids)
 
             n_prev = len(all_reactants)
 
@@ -545,7 +545,7 @@ class Recipe:
         possible_reactions = list(set(possible_reactions))
 
         if debug:
-            logger.var("all possible reactions", possible_reactions)
+            mrich.var("all possible reactions", possible_reactions)
 
         from .rset import ReactionSet
 
@@ -605,25 +605,25 @@ class Recipe:
         # load JSON
         if not data:
             if debug:
-                logger.reading(path)
+                mrich.reading(path)
             data = json.load(open(path, "rt"))
 
         # check metadata
         if str(db.path.resolve()) != data["database"]:
             if db_mismatch_warning:
-                logger.var("session", str(db.path.resolve()))
-                logger.var("in file", data["database"])
+                mrich.var("session", str(db.path.resolve()))
+                mrich.var("in file", data["database"])
             if allow_db_mismatch:
                 if db_mismatch_warning:
-                    logger.warning("Database path mismatch")
+                    mrich.warning("Database path mismatch")
             else:
-                logger.error(
+                mrich.error(
                     "Database path mismatch, set allow_db_mismatch=True to ignore"
                 )
                 return None
 
         if debug:
-            logger.print(f'Recipe was generated at: {data["timestamp"]}')
+            mrich.print(f'Recipe was generated at: {data["timestamp"]}')
         price = data["price"]
 
         # IngredientSets
@@ -641,10 +641,10 @@ class Recipe:
         reactions = ReactionSet(db, data["reaction_ids"], sort=False)
 
         if debug:
-            logger.var("reactants", reactants)
-            logger.var("intermediates", intermediates)
-            logger.var("products", products)
-            logger.var("reactions", reactions)
+            mrich.var("reactants", reactants)
+            mrich.var("intermediates", intermediates)
+            mrich.var("products", products)
+            mrich.var("reactions", reactions)
 
         # Create the object
         self = cls.__new__(cls)
@@ -928,7 +928,7 @@ class Recipe:
                 hoverkeys = list(n.keys())
 
             if not n:
-                logger.error(f"problem w/ node {key=}")
+                mrich.error(f"problem w/ node {key=}")
                 compound_id = int(key[1:])
                 customdata.append((compound_id, None))
 
@@ -951,7 +951,7 @@ class Recipe:
                 hoverkeys_edges = list(edge.keys())
 
             if not n:
-                logger.error(f"problem w/ edge {s=} {t=}")
+                mrich.error(f"problem w/ edge {s=} {t=}")
                 customdata_edges.append((None, None, None))
 
             else:
@@ -1035,21 +1035,21 @@ class Recipe:
 
         import mcol
 
-        logger.header("Recipe")
+        mrich.header("Recipe")
 
         if price:
             price = self.price
             if price:
                 print("\nprice", price.amount, dict(unit=price.currency))
-                # logger.var('lead-time', self.lead_time, dict(unit='working days'))
+                # mrich.var('lead-time', self.lead_time, dict(unit='working days'))
 
-        logger.var("\n#products", len(self.products))
+        mrich.var("\n#products", len(self.products))
 
         if len(self.products) < 100:
             for product in self.products:
                 print(str(product.compound), f"{product.amount:.2f}", dict(unit="mg"))
 
-        logger.var("\n#intermediates", len(self.intermediates))
+        mrich.var("\n#intermediates", len(self.intermediates))
         if len(self.intermediates) < 100:
             for intermediate in self.intermediates:
                 print(
@@ -1058,12 +1058,12 @@ class Recipe:
                     dict(unit="mg"),
                 )
 
-        logger.var("\n#reactants", len(self.reactants))
+        mrich.var("\n#reactants", len(self.reactants))
         if len(self.reactants) < 100:
             for reactant in self.reactants:
                 print(str(reactant.compound), f"{reactant.amount:.2f}", dict(unit="mg"))
 
-        logger.var("\n#reactions", len(self.reactions))
+        mrich.var("\n#reactions", len(self.reactions))
         if len(self.reactions) < 100:
             for reaction in self.reactions:
                 print(str(reaction), reaction.reaction_str, dict(unit=reaction.type))
@@ -1106,7 +1106,7 @@ class Recipe:
         if extra:
             data.update(extra)
 
-        logger.writing(file)
+        mrich.writing(file)
         json.dump(data, open(file, "wt"), indent=indent)
 
     def get_dict(
@@ -1163,7 +1163,7 @@ class Recipe:
             elif price:
                 data["price"] = self.price
         except AssertionError as e:
-            logger.warning(f"Could not get price: {e}")
+            mrich.warning(f"Could not get price: {e}")
             data["price"] = None
 
         if reactant_supplier:
@@ -1275,10 +1275,10 @@ class Recipe:
         for n_steps in set(df["no-steps"]):
             subset = df[df["no-steps"] == n_steps]
             this_file = file.replace(".csv", f"_{n_steps}steps.csv")
-            logger.writing(this_file)
+            mrich.writing(this_file)
             subset.to_csv(this_file, index=False)
 
-        logger.writing(file)
+        mrich.writing(file)
         df.to_csv(file, index=False)
 
         return df
@@ -1328,7 +1328,7 @@ class Recipe:
 
         routes = self.get_routes()
 
-        for reactant in logger.track(
+        for reactant in mrich.track(
             self.reactants, prefix="Constructing reactant DataFrame"
         ):
             quote = reactant.quote
@@ -1385,7 +1385,7 @@ class Recipe:
             data.append(d)
 
         df = DataFrame(data)
-        logger.writing(file)
+        mrich.writing(file)
         df.to_csv(file, index=False)
 
         if return_df:
@@ -1408,7 +1408,7 @@ class Recipe:
 
         pose_map = self.db.get_compound_id_pose_ids_dict(self.products.compounds)
 
-        for product in logger.track(
+        for product in mrich.track(
             self.products, prefix="Constructing product DataFrame"
         ):
 
@@ -1463,7 +1463,7 @@ class Recipe:
             data.append(d)
 
         df = DataFrame(data)
-        logger.writing(file)
+        mrich.writing(file)
         df.to_csv(file, index=False)
 
         if return_df:
@@ -1517,7 +1517,7 @@ class Recipe:
                     upstream_routes.append(route)
 
             if not upstream_routes:
-                logger.warning(f"No routes to scaffold={compound}")
+                mrich.warning(f"No routes to scaffold={compound}")
                 continue
 
             d["num_routes"] = len(upstream_routes)
@@ -1570,8 +1570,8 @@ class Recipe:
                         chem_types = tuple([r.type for r in route.reactions])
 
                         if chem_types not in route_types[base.id]:
-                            logger.success(base)
-                            logger.success(chem_types)
+                            mrich.success(base)
+                            mrich.success(chem_types)
                             raise ValueError(
                                 "Scaffold has route not present in dataframe"
                             )
@@ -1594,7 +1594,7 @@ class Recipe:
                     upstream_routes.append(route)
 
             if not upstream_routes:
-                logger.error(f"No routes to elab {compound}")
+                mrich.error(f"No routes to elab {compound}")
                 raise ValueError(f"No routes to elab {compound}")
 
             d["num_routes"] = len(upstream_routes)
@@ -1622,7 +1622,7 @@ class Recipe:
             data.append(d)
 
         df = DataFrame(data)
-        logger.writing(file)
+        mrich.writing(file)
         df.to_csv(file, index=False)
 
         if return_df:
@@ -1651,7 +1651,7 @@ class Recipe:
         )
 
         if null_count:
-            logger.warning(f"{null_count} poses have no fingerprint")
+            mrich.warning(f"{null_count} poses have no fingerprint")
 
         return poses.fingerprint
 
@@ -1669,18 +1669,18 @@ class Recipe:
         # all products should have a reaction
         for product in self.products:
             if product not in reaction_products:
-                logger.error(f"Product: {product} does not have associated reaction")
+                mrich.error(f"Product: {product} does not have associated reaction")
                 return False
 
         # all intermediates should be the product of a reaction and the reactant of a reaction
         for intermediate in self.intermediates:
             if intermediate not in reaction_products:
-                logger.error(
+                mrich.error(
                     f"Intermediate: {intermediate} is not the product of any included reactions"
                 )
                 return False
             if intermediate not in reaction_reactants:
-                logger.error(
+                mrich.error(
                     f"Intermediate: {intermediate} is not a reactant of any included reactions"
                 )
                 return False
@@ -1695,7 +1695,7 @@ class Recipe:
                 product_ingredient = self.intermediates(compound_id=reaction.product_id)
 
             if debug and reaction.product_yield < 1.0:
-                logger.debug(f"{reaction}.product_yield={reaction.product_yield}")
+                mrich.debug(f"{reaction}.product_yield={reaction.product_yield}")
 
             for reactant in reaction.reactants:
 
@@ -1707,7 +1707,7 @@ class Recipe:
                 required_amount = product_ingredient.amount / reaction.product_yield
 
                 if reactant_ingredient.amount < required_amount:
-                    logger.error(
+                    mrich.error(
                         f"Not enough of {reactant_ingredient.compound}: {reactant_ingredient.amount} < {required_amount}"
                     )
                     return False
@@ -1915,7 +1915,7 @@ class RouteSet:
             data = json.load(open(path, "rt"))
 
         new_data = {}
-        for d in logger.track(data["routes"].values(), prefix="Loading Routes..."):
+        for d in mrich.track(data["routes"].values(), prefix="Loading Routes..."):
             route_id = d["id"]
             new_data[route_id] = Route.from_json(db=db, path=None, data=d)
 
@@ -2061,10 +2061,10 @@ class RouteSet:
     ) -> "Route":
 
         if not self._data:
-            logger.print("RouteSet depleted")
+            mrich.print("RouteSet depleted")
             return None
         if not self.cluster_map:
-            logger.warning("RouteSet.cluster_map depleted but _data isn't...")
+            mrich.warning("RouteSet.cluster_map depleted but _data isn't...")
             return self.pop()
 
         # store the permitted clusters (or all clusters) list as property
@@ -2079,7 +2079,7 @@ class RouteSet:
                 self._permitted_clusters = []
                 for cluster in permitted_clusters:
                     if cluster not in self.cluster_map:
-                        logger.warning(
+                        mrich.warning(
                             cluster, "in permitted_clusters but not cluster_map"
                         )
                     else:
@@ -2094,7 +2094,7 @@ class RouteSet:
         ### pop a Route
 
         if debug:
-            logger.debug(f"Would pop Route from {self._current_cluster=}")
+            mrich.debug(f"Would pop Route from {self._current_cluster=}")
 
         cluster = self._current_cluster
 
@@ -2103,14 +2103,18 @@ class RouteSet:
         try:
             route_id = self.cluster_map[cluster].pop()
         except IndexError:
-            logger.print(self._permitted_clusters)
-            logger.print(self.cluster_map)
+            mrich.print(self._permitted_clusters)
+            mrich.print(self.cluster_map)
+            raise
+        except AttributeError:
+            mrich.print(cluster)
+            mrich.print(self.cluster_map)
             raise
 
         # clean up empty clusters
 
         if debug:
-            logger.debug("Popped route", route_id)
+            mrich.debug("Popped route", route_id)
 
         # get the Route object
 
@@ -2119,7 +2123,7 @@ class RouteSet:
             del self._data[route_id]
         else:
             # if debug:
-            logger.debug("Route not present")
+            mrich.debug("Route not present")
             return self.balanced_pop()
 
         ### increment cluster
@@ -2142,10 +2146,10 @@ class RouteSet:
                 c for c in self._permitted_clusters if c != cluster
             ]
             # if debug:
-            logger.debug("Depleted cluster", cluster)
+            mrich.debug("Depleted cluster", cluster)
 
         if debug:
-            logger.debug("#Routes in set", len(self._data))
+            mrich.debug("#Routes in set", len(self._data))
 
         return route
 
@@ -2208,10 +2212,10 @@ class RecipeSet:
                 path.name.removeprefix("Recipe_").removesuffix(".json")
             ] = path.resolve()
 
-        logger.reading(f"{directory}/{pattern}")
+        mrich.reading(f"{directory}/{pattern}")
 
         self._recipes = {}
-        for key, path in logger.track(
+        for key, path in mrich.track(
             self._json_paths.items(), prefix="Loading recipes"
         ):
             try:
@@ -2223,7 +2227,7 @@ class RecipeSet:
                     db_mismatch_warning=False,
                 )
             except JSONDecodeError:
-                logger.error(f"Bad JSON in {path}")
+                mrich.error(f"Bad JSON in {path}")
                 continue
             recipe._hash = key
             self._recipes[key] = recipe
@@ -2251,7 +2255,7 @@ class RecipeSet:
         recipes = self._recipes.values()
 
         if progress:
-            recipes = logger.track(recipes, prefix=f"Calculating {self} values...")
+            recipes = mrich.track(recipes, prefix=f"Calculating {self} values...")
 
         for recipe in recipes:
             value = getattr(recipe, key)
@@ -2307,7 +2311,7 @@ class RecipeSet:
                 return self._recipes[key]
 
             case _:
-                logger.error(
+                mrich.error(
                     f"Unsupported type for RecipeSet.__getitem__(): {key=} {type(key)}"
                 )
 
