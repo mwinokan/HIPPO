@@ -8,7 +8,7 @@ import mout
 from datetime import datetime
 from string import ascii_uppercase
 
-import mrich as logger
+import mrich
 
 
 def df_row_to_dict(df_row):
@@ -152,7 +152,7 @@ def sanitise_smiles(s, verbosity=False, sanitisation_failed="error", radical="er
     elif sanitisation_failed == "error":
         raise SanitisationError
     elif sanitisation_failed == "warning":
-        logger.warning(f"sanitisation failed for {smiles=}")
+        mrich.warning(f"sanitisation failed for {smiles=}")
 
     # check radicals
     reconstruct = False
@@ -161,11 +161,11 @@ def sanitise_smiles(s, verbosity=False, sanitisation_failed="error", radical="er
             continue
 
         if radical == "warning":
-            logger.warning(f"Radical atom in {smiles=}")
+            mrich.warning(f"Radical atom in {smiles=}")
         elif radical == "error":
             raise SanitisationError(f"Radical atom in {smiles=}")
         elif radical == "remove":
-            logger.warning(f"Removed radical atom")
+            mrich.warning(f"Removed radical atom")
             atom.SetNumRadicalElectrons(0)
             smiles = MolToSmiles(mol, True)
             reconstruct = True
@@ -177,7 +177,7 @@ def sanitise_smiles(s, verbosity=False, sanitisation_failed="error", radical="er
         mol = AddHs(mol)
         mol = RemoveHs(mol, implicitOnly=True)
         smiles = MolToSmiles(mol, True)
-        logger.warning(f"New {smiles=}")
+        mrich.warning(f"New {smiles=}")
 
     if verbosity:
 

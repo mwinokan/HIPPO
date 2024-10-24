@@ -45,7 +45,7 @@ ENAMINE_V2_LEAD_TIME = {
     },
 }
 
-import mrich as logger
+import mrich
 
 
 class Quoter:
@@ -87,7 +87,7 @@ class Quoter:
             self.wrapper = pycule.core.MCuleWrapper(authorisation_token=token)
 
         else:
-            logger.error(f'Unsupported supplier: "{supplier}"')
+            mrich.error(f'Unsupported supplier: "{supplier}"')
             raise NotImplementedError
 
     def get_quote(self, compound, **kwargs):
@@ -138,7 +138,7 @@ class Quoter:
         from .cset import CompoundSet
 
         n_comps = len(compounds)
-        logger.var("batch size", n_comps)
+        mrich.var("batch size", n_comps)
         assert n_comps <= 2000
 
         unmatched = compounds.copy()
@@ -168,11 +168,11 @@ class Quoter:
         for catalogue in catalogues:
 
             if exact:
-                logger.debug(
+                mrich.debug(
                     f"Exact search in Enamine:{ENAMINE_V2_CATALOGUES[catalogue]}..."
                 )
             else:
-                logger.debug(
+                mrich.debug(
                     f"Similarity==1.0 search in Enamine:{ENAMINE_V2_CATALOGUES[catalogue]}..."
                 )
 
@@ -189,13 +189,13 @@ class Quoter:
                     + f"/catalog/search/in/{catalogue}/by/SMILEs/SIMILARITY/1.00"
                 )
             response = requests.post(url=url, json=payload)
-            logger.var(
+            mrich.var(
                 f"{catalogue} request time = ", time.perf_counter() - t_catalogue_start
             )
 
             # process the request
             if (status := response.status_code) != 200:
-                logger.error(f"Request error: status={status}")
+                mrich.error(f"Request error: status={status}")
                 errors.append(
                     dict(catalogue=catalogue, status=status, response=response)
                 )
@@ -210,7 +210,7 @@ class Quoter:
             this_matched = self.parse_enamine_bulk_products(compounds.db, products)
 
             if this_matched:
-                logger.success(f"Added quotes for {len(this_matched)} compounds")
+                mrich.success(f"Added quotes for {len(this_matched)} compounds")
 
             matched += this_matched
             unmatched -= this_matched
@@ -219,13 +219,13 @@ class Quoter:
 
             # break
 
-        logger.var("Total time = ", time.perf_counter() - t_start)
+        mrich.var("Total time = ", time.perf_counter() - t_start)
 
         if unmatched:
-            logger.error(f"Did not find quotes for {len(unmatched)} compounds")
+            mrich.error(f"Did not find quotes for {len(unmatched)} compounds")
 
         if errors:
-            logger.error(f"{len(errors)} failed requests")
+            mrich.error(f"{len(errors)} failed requests")
 
         return dict(matched=matched, unmatched=unmatched, errors=errors)
 
@@ -255,7 +255,7 @@ class Quoter:
 
             # check if the product has a name
             if not entry:
-                logger.warning(f"Product in {catalogue} but no entry-name. {smiles=}")
+                mrich.warning(f"Product in {catalogue} but no entry-name. {smiles=}")
 
             if p := product["purity"]:
                 purity = product["purity"] / 100
@@ -281,7 +281,7 @@ class Quoter:
                 try:
                     lead_time = ENAMINE_V2_LEAD_TIME[catalogue][availability_str]
                 except KeyError:
-                    logger.error(
+                    mrich.error(
                         f"Unsupported {availability_str=} [{compound_id=}, {entry=}]"
                     )
                     print(pack)
@@ -304,7 +304,7 @@ class Quoter:
 
             # break
 
-        logger.debug("Committing changes to the database...")
+        mrich.debug("Committing changes to the database...")
         db.commit()
 
         return matched
@@ -323,18 +323,18 @@ class Quoter:
 
             smiles = compound.smiles
 
-            logger.header(f"Exact search: {smiles=}")
+            mrich.header(f"Exact search: {smiles=}")
 
             for catalogue in self.catalogues:
 
-                logger.header(f"Searching in {self.supplier} {catalogue}...")
+                mrich.header(f"Searching in {self.supplier} {catalogue}...")
 
                 try:
                     result = self.wrapper.exactsearch(
                         smiles=compound.smiles, currency=currency, catalogue=catalogue
                     )
                 except requests.ConnectionError as e:
-                    logger.error(f"ConnectionError: {e}")
+                    mrich.error(f"ConnectionError: {e}")
                     return None
 
                 # try again but with a similarity search
@@ -344,7 +344,7 @@ class Quoter:
                             smiles, similarity_value=1.0, catalogue=catalogue
                         )
                     except requests.ConnectionError as e:
-                        logger.error(f"ConnectionError: {e}")
+                        mrich.error(f"ConnectionError: {e}")
                         return None
 
                 if result["response"]["result"]["code"] != 0:
@@ -360,18 +360,18 @@ class Quoter:
 
                 name = data["Id"]
 
-                logger.success(f"Found in {catalogue} w/ id={name}")
+                mrich.success(f"Found in {catalogue} w/ id={name}")
 
                 break
 
             else:
 
-                logger.error("No match found")
+                mrich.error("No match found")
                 return None
 
             ### get the information
 
-            logger.header(f"Searching by ID in {self.supplier} {catalogue}...")
+            mrich.header(f"Searching by ID in {self.supplier} {catalogue}...")
 
             for catalogue in self.catalogues:
 
@@ -379,7 +379,7 @@ class Quoter:
 
                 if result["response"]["result"]["code"] == 0:
                     try:
-                        logger.success(f"Found in {catalogue}")
+                        mrich.success(f"Found in {catalogue}")
                         return (
                             self.parse_enamine_response(result, compound, catalogue),
                             result,
@@ -389,11 +389,11 @@ class Quoter:
 
             else:
 
-                logger.error("No catalog entry")
+                mrich.error("No catalog entry")
                 return None
 
         except KeyboardInterrupt:
-            logger.warning("Interrupted quoting")
+            mrich.warning("Interrupted quoting")
 
     def pick_enamine_exact_data(self, smiles, data):
         """
@@ -468,7 +468,7 @@ class Quoter:
 
             if not (packs := data["packs"]) and "synthesis" in delivery:
 
-                logger.warning("Hardcoded REAL quote")
+                mrich.warning("Hardcoded REAL quote")
 
                 compound.db.insert_quote(
                     compound=compound,
@@ -508,7 +508,7 @@ class Quoter:
         data = [d for d in data if not any([p["price"] == 0.0 for p in d["packs"]])]
 
         if len(data) > 1:
-            logger.warning(
+            mrich.warning(
                 f"Taking first data entry after stripping non-priced ({comp_id})"
             )
         return data[0]
@@ -563,10 +563,10 @@ class Quoter:
 
         if pack["status"] not in ["Normal", "Ice pack", ""]:
             print(pack)
-            logger.warning(f"{pack['status']=}")
+            mrich.warning(f"{pack['status']=}")
 
         if not price:
-            logger.warning(f"Skipping price-less Enamine pack ({entry})")
+            mrich.warning(f"Skipping price-less Enamine pack ({entry})")
             return None
 
         compound.db.insert_quote(
@@ -599,27 +599,27 @@ class Quoter:
             smiles = compound.smiles
 
             if exact:
-                logger.header(f"Exact search: {smiles=}")
+                mrich.header(f"Exact search: {smiles=}")
                 result = self.wrapper.singlequerysearch(smiles)
             else:
-                logger.header(f"Similarity==1.0 search: {smiles=}")
+                mrich.header(f"Similarity==1.0 search: {smiles=}")
                 result = self.wrapper.similaritysearch(smiles, threshold=1.0)
 
             if result["response"]["results"]:
 
                 results = result["response"]["results"]
 
-                logger.header(results)
+                mrich.header(results)
 
                 mcule_ids = [data["mcule_id"] for data in results]
                 smiles = [data["smiles"] for data in results]
 
-                logger.success(f"Found w/ ids={mcule_ids}")
+                mrich.success(f"Found w/ ids={mcule_ids}")
 
                 for mcule_id, smile in zip(mcule_ids, smiles):
 
-                    # logger.header(f'{self.wrapper.compoundavailability(mcule_id)=}')
-                    # logger.header(f'{self.wrapper.compounddetails(mcule_id)=}')
+                    # mrich.header(f'{self.wrapper.compoundavailability(mcule_id)=}')
+                    # mrich.header(f'{self.wrapper.compounddetails(mcule_id)=}')
                     result = self.wrapper.compoundprices(mcule_id)
 
                     for pack in result["response"]["best_prices"]:
@@ -627,12 +627,12 @@ class Quoter:
                             compound.db, compound, mcule_id, pack, smile
                         )
 
-                    # logger.header(f'{self.wrapper.compoundpricesamount(mcule_id)=}')
+                    # mrich.header(f'{self.wrapper.compoundpricesamount(mcule_id)=}')
 
             return result
 
         except KeyboardInterrupt:
-            logger.warning("Interrupted quoting")
+            mrich.warning("Interrupted quoting")
 
     def get_mcule_batch_quote(self, compounds):
         """
@@ -651,23 +651,23 @@ class Quoter:
 
         matched = CompoundSet(db)
 
-        logger.var("batch size", n_comps)
+        mrich.var("batch size", n_comps)
         assert n_comps <= 1000
 
         # bulk query compound availability
 
         t_start = time.perf_counter()
-        logger.title("MCule bulk availability query...")
+        mrich.title("MCule bulk availability query...")
         data = self.wrapper.multiplequerieswithavailability(compounds.smiles)
 
-        logger.var("availability query time", time.perf_counter() - t_start)
+        mrich.var("availability query time", time.perf_counter() - t_start)
 
         results = data["response"]["results"]
 
-        logger.var("#results", len(results))
+        mrich.var("#results", len(results))
 
-        logger.title("MCule single price queries...")
-        for result in logger.track(results, prefix="Querying MCule"):
+        mrich.title("MCule single price queries...")
+        for result in mrich.track(results, prefix="Querying MCule"):
 
             entry = result["mcule_id"]
             smiles = result["smiles"]
@@ -676,7 +676,7 @@ class Quoter:
             compound_id = db.get_compound_id(inchikey=flat_inchikey(smiles))
 
             if not compound_id:
-                logger.error(f"Could not find compound matching {smiles=}")
+                mrich.error(f"Could not find compound matching {smiles=}")
                 continue
 
             matched.add(compound_id)
@@ -687,7 +687,7 @@ class Quoter:
                 best_prices = prices["response"]["best_prices"]
             except KeyError as e:
                 print(prices)
-                logger.error(f"Unsupported prices {e}")
+                mrich.error(f"Unsupported prices {e}")
                 continue
 
             for pack in prices["response"]["best_prices"]:
@@ -697,17 +697,17 @@ class Quoter:
                     )
                 except KeyError as e:
                     print(pack)
-                    logger.error(f"Unsupported pack {e}")
+                    mrich.error(f"Unsupported pack {e}")
                     continue
 
-        logger.var("Total time = ", time.perf_counter() - t_start)
+        mrich.var("Total time = ", time.perf_counter() - t_start)
 
         unmatched = compounds - matched
 
         if unmatched:
-            logger.error(f"Did not find quotes for {len(unmatched)} compounds")
+            mrich.error(f"Did not find quotes for {len(unmatched)} compounds")
 
-        logger.success("Committing changes to the database...")
+        mrich.success("Committing changes to the database...")
         db.commit()
 
         return dict(matched=matched, unmatched=unmatched)

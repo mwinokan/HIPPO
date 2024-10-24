@@ -18,7 +18,7 @@ from pathlib import Path
 from .tools import inchikey_from_smiles, sanitise_smiles, SanitisationError
 
 import mcol
-import mrich as logger
+import mrich
 
 from rdkit.Chem import Mol
 
@@ -50,16 +50,16 @@ class HIPPO:
         update_legacy: bool = False,
     ):
 
-        logger.bold("Creating HIPPO animal")
+        mrich.bold("Creating HIPPO animal")
 
         self._name = name
 
-        logger.var("name", name, color="arg")
+        mrich.var("name", name, color="arg")
 
         if not isinstance(db_path, Path):
             db_path = Path(db_path)
 
-        logger.var("db_path", db_path, color="file")
+        mrich.var("db_path", db_path, color="file")
 
         self._db_path = db_path
 
@@ -87,7 +87,7 @@ class HIPPO:
         self._bases = None
         self._elabs = None
 
-        logger.success("Initialised animal", f"[var_name]{self}")
+        mrich.success("Initialised animal", f"[var_name]{self}")
 
     ### FACTORIES
 
@@ -277,7 +277,7 @@ class HIPPO:
 
         skip = skip or []
 
-        logger.var("aligned_directory", aligned_directory)
+        mrich.var("aligned_directory", aligned_directory)
 
         count_directories_tried = 0
         count_compound_registered = 0
@@ -292,9 +292,9 @@ class HIPPO:
             + GENERATED_TAG_COLS
         ]
 
-        logger.var("curated_tag_cols", curated_tag_cols)
+        mrich.var("curated_tag_cols", curated_tag_cols)
 
-        for path in logger.track(
+        for path in mrich.track(
             list(aligned_directory.iterdir()), prefix="Adding hits..."
         ):
 
@@ -372,12 +372,12 @@ class HIPPO:
                 compound = self.compounds[inchikey]
 
                 if not compound:
-                    logger.error(
+                    mrich.error(
                         "Compound exists in database but could not be found by inchikey"
                     )
-                    logger.var("smiles", smiles)
-                    logger.var("inchikey", inchikey)
-                    logger.var("observation_shortname", observation_shortname)
+                    mrich.var("smiles", smiles)
+                    mrich.var("inchikey", inchikey)
+                    mrich.var("observation_shortname", observation_shortname)
                     raise Exception
 
             else:
@@ -417,9 +417,9 @@ class HIPPO:
 
         self.db.commit()
 
-        logger.var("#directories parsed", count_directories_tried)
-        logger.var("#compounds registered", count_compound_registered)
-        logger.var("#poses registered", count_poses_registered)
+        mrich.var("#directories parsed", count_directories_tried)
+        mrich.var("#compounds registered", count_compound_registered)
+        mrich.var("#poses registered", count_poses_registered)
 
     def add_compounds(
         self,
@@ -466,7 +466,7 @@ class HIPPO:
         if not isinstance(sdf_path, Path):
             sdf_path = Path(sdf_path)
 
-        logger.debug(f"{sdf_path=}")
+        mrich.debug(f"{sdf_path=}")
 
         tags = tags or []
 
@@ -499,18 +499,18 @@ class HIPPO:
 
         output_directory = Path(output_directory)
         if not output_directory.exists:
-            logger.writing(f"Creating output directory {output_directory}")
+            mrich.writing(f"Creating output directory {output_directory}")
             os.system(f"mkdir -p {output_directory}")
 
         n_poses = self.num_poses
         n_comps = self.num_compounds
 
-        for i, row in logger.track(df.iterrows(), prefix="Reading SDF rows..."):
+        for i, row in mrich.track(df.iterrows(), prefix="Reading SDF rows..."):
 
             name = row[name_col].strip()
 
             if name == "ver_1.2":
-                logger.warning("Skipping Fragalysis header molecule")
+                mrich.warning("Skipping Fragalysis header molecule")
                 continue
 
             if skip_equal_dict and any(row[k] == v for k, v in skip_equal_dict.items()):
@@ -535,7 +535,7 @@ class HIPPO:
             comp = self.register_compound(smiles=smiles, tags=tags)
 
             if not comp:
-                logger.error(f"Could not register compound {i=}")
+                mrich.error(f"Could not register compound {i=}")
                 continue
 
             # inspirations
@@ -570,7 +570,7 @@ class HIPPO:
                         if pose:
                             inspirations.append(pose)
                         else:
-                            logger.error(f"Could not find inspiration pose {insp}")
+                            mrich.error(f"Could not find inspiration pose {insp}")
                             continue
 
                 else:
@@ -578,7 +578,7 @@ class HIPPO:
                     if pose:
                         inspirations.append(pose)
                     else:
-                        logger.error(f"Could not find inspiration pose {insp}")
+                        mrich.error(f"Could not find inspiration pose {insp}")
                         continue
 
             # metadata
@@ -589,7 +589,7 @@ class HIPPO:
 
                 if not isinstance(col, str):
                     if i == 0:
-                        logger.warning(f"Skipping metadata from column={col}.")
+                        mrich.warning(f"Skipping metadata from column={col}.")
                     continue
 
                 if isinstance(value, float) and isnan(value):
@@ -605,7 +605,7 @@ class HIPPO:
 
                 if not (isinstance(value, str) or isinstance(value, float)):
                     if i == 0:
-                        logger.warning(f"Skipping metadata from column={col}.")
+                        mrich.warning(f"Skipping metadata from column={col}.")
                     continue
 
                 metadata[col] = value
@@ -629,16 +629,16 @@ class HIPPO:
                 break
 
         if n := self.num_compounds - n_comps:
-            f = logger.success
+            f = mrich.success
         else:
-            f = logger.error
+            f = mrich.error
 
         f(f"Loaded {n} compounds from {sdf_path}")
 
         if n := self.num_poses - n_poses:
-            f = logger.success
+            f = mrich.success
         else:
-            f = logger.error
+            f = mrich.error
 
         f(f"Loaded {n} poses from {sdf_path}")
 
@@ -685,13 +685,13 @@ class HIPPO:
             try:
                 df = pd.read_pickle(df_path)
             except UnpicklingError:
-                logger.error(
+                mrich.error(
                     "Could not read DataFrame. Is it a valid sdf or pickled dataframe?"
                 )
                 return None
 
         if debug:
-            logger.var("len(df)", len(df))
+            mrich.var("len(df)", len(df))
 
         reaction_cols = [c for c in df.columns if "_reaction" in c]
 
@@ -701,9 +701,7 @@ class HIPPO:
 
         # loop over rows
 
-        for i, row in logger.track(
-            df.iterrows(), prefix="Processing DataFrame rows..."
-        ):
+        for i, row in mrich.track(df.iterrows(), prefix="Processing DataFrame rows..."):
 
             # determine number of steps
 
@@ -715,7 +713,7 @@ class HIPPO:
             n_steps = len(reaction_types)
 
             if debug:
-                logger.header(f"row={i}, {n_steps=}")
+                mrich.header(f"row={i}, {n_steps=}")
 
             try:
 
@@ -814,7 +812,7 @@ class HIPPO:
                         reactions.append(reaction.id)
 
                         if debug:
-                            logger.var(str(reaction), reaction.reaction_str)
+                            mrich.var(str(reaction), reaction.reaction_str)
 
                     except InvalidChemistryError as e:
                         skipped_reactions += 1
@@ -911,24 +909,24 @@ class HIPPO:
                     [],
                 )
             )
-            logger.var("Present reactions", str(chemistries))
+            mrich.var("Present reactions", str(chemistries))
             check_reaction_types(chemistries)
 
         if f"{n_steps}_num_atom_diff" not in df.columns:
-            logger.error(df_path)
-            logger.error(f"{n_steps}_num_atom_diff not in columns:")
+            mrich.error(df_path)
+            mrich.error(f"{n_steps}_num_atom_diff not in columns:")
             print(df.columns)
             raise NotImplementedError
 
         base_df = df[df[f"{n_steps}_product_name"].str.contains(base_designator)]
 
         if not len(base_df):
-            logger.error(f"No base/scaffold rows found in {df_path.name}")
+            mrich.error(f"No base/scaffold rows found in {df_path.name}")
             return df
 
         for key in warn_nonzero_truthy_bases:
             if not any(base_df[key].values):
-                logger.warning(f"No bases have truthy {key}. Inserting them anyway")
+                mrich.warning(f"No bases have truthy {key}. Inserting them anyway")
                 require_truthy_bases.pop(require_truthy_bases.index(key))
 
         base_id = None
@@ -937,7 +935,7 @@ class HIPPO:
         if base_only:
             generator = df.iterrows()
         else:
-            generator = logger.track(
+            generator = mrich.track(
                 df.iterrows(), prefix="Processing DataFrame rows..."
             )
 
@@ -963,9 +961,7 @@ class HIPPO:
                 if this_row_is_a_base:
 
                     if any(not row[key] for key in require_truthy_bases):
-                        logger.warning(
-                            f"Skipping (row {i=}) which has {key}={row[key]}"
-                        )
+                        mrich.warning(f"Skipping (row {i=}) which has {key}={row[key]}")
                         continue
 
                 elif any(not row[key] for key in require_truthy_elabs):
@@ -981,10 +977,10 @@ class HIPPO:
                 if base_only and base_id and not this_row_is_a_base:
                     break
 
-                # logger.debug(f'{i=} {this_row_is_a_base=}')
+                # mrich.debug(f'{i=} {this_row_is_a_base=}')
 
                 if this_row_is_a_base and skipped_smaller and not base_id:
-                    logger.warning(
+                    mrich.warning(
                         f"Skipped {skipped_smaller} elaborations that are smaller than the base compound"
                     )
 
@@ -1018,7 +1014,7 @@ class HIPPO:
                                 )
                             except KeyError:
                                 print(row)
-                                logger.error(
+                                mrich.error(
                                     f"Expected base_reactants to contain data when {this_row_is_a_base=}"
                                 )
                                 raise
@@ -1123,7 +1119,7 @@ class HIPPO:
                             skipped_reactions += 1
 
                 except InvalidRowError as e:
-                    logger.error(f"Skipping invalid row {i=}: {e}")
+                    mrich.error(f"Skipping invalid row {i=}: {e}")
                     skipped_invalid_smiles += 1
                     continue
 
@@ -1150,7 +1146,7 @@ class HIPPO:
                                         inspiration = pose_id
 
                                     elif len(matches) > 1:
-                                        logger.error(
+                                        mrich.error(
                                             "Multiple matchs for {inspiration=}"
                                         )
                                         from json import dumps
@@ -1172,7 +1168,7 @@ class HIPPO:
 
                                         if len(close_matches) > 0:
                                             if len(close_matches) > 1:
-                                                logger.warning(
+                                                mrich.warning(
                                                     f"Taking closest match: {inspiration=} --> {close_matches[0]}"
                                                 )
 
@@ -1183,29 +1179,29 @@ class HIPPO:
 
                                         if isinstance(inspiration, str):
                                             if allow_missing_inspirations:
-                                                logger.warning(
+                                                mrich.warning(
                                                     f"{inspiration=} not found in inspiration_map"
                                                 )
 
                                                 inspiration = None
 
                                             else:
-                                                # logger.error(
+                                                # mrich.error(
                                                 # f"{inspiration=} not found in inspiration_map, try a smaller inspiration_close_match_cutoff?"
                                                 # )
                                                 from json import dumps
 
-                                                logger.var(
+                                                mrich.var(
                                                     "matches",
                                                     dumps(matches, indent=2),
                                                 )
 
-                                                logger.var(
+                                                mrich.var(
                                                     "close_matches",
                                                     dumps(matches, indent=2),
                                                 )
 
-                                                logger.var(
+                                                mrich.var(
                                                     "inspiration_map",
                                                     dumps(inspiration_map, indent=2),
                                                 )
@@ -1247,7 +1243,7 @@ class HIPPO:
                     break
 
         except KeyboardInterrupt:
-            logger.error("KeyboardInterrupt")
+            mrich.error("KeyboardInterrupt")
 
         self.db.commit()
 
@@ -1256,30 +1252,28 @@ class HIPPO:
         n_reactions = len(self.reactions) - n_reactions
 
         if skipped_reactions:
-            logger.warning(f"Skipped {skipped_reactions} invalid reactions")
+            mrich.warning(f"Skipped {skipped_reactions} invalid reactions")
 
         if skipped_invalid_smiles:
-            logger.warning(f"Skipped {skipped_invalid_smiles} rows with NaN smiles")
+            mrich.warning(f"Skipped {skipped_invalid_smiles} rows with NaN smiles")
 
         if n_comps:
             if not base_only:
-                logger.success(f"Loaded {n_comps} new compounds from {df_path.name}")
+                mrich.success(f"Loaded {n_comps} new compounds from {df_path.name}")
         else:
-            logger.warning(f"Loaded {n_comps} new compounds from {df_path.name}")
+            mrich.warning(f"Loaded {n_comps} new compounds from {df_path.name}")
 
         if n_poses:
             if not base_only:
-                logger.success(f"Loaded {n_poses} new poses from {df_path.name}")
+                mrich.success(f"Loaded {n_poses} new poses from {df_path.name}")
         else:
-            logger.warning(f"Loaded {n_poses} new poses from {df_path.name}")
+            mrich.warning(f"Loaded {n_poses} new poses from {df_path.name}")
 
         if n_reactions:
             if not base_only:
-                logger.success(
-                    f"Loaded {n_reactions} new reactions from {df_path.name}"
-                )
+                mrich.success(f"Loaded {n_reactions} new reactions from {df_path.name}")
         else:
-            logger.warning(f"Loaded {n_reactions} new reactions from {df_path.name}")
+            mrich.warning(f"Loaded {n_reactions} new reactions from {df_path.name}")
 
         return df
 
@@ -1360,7 +1354,7 @@ class HIPPO:
         ingredients = IngredientSet(self.db)
 
         if len(df) > 100:
-            generator = logger.track(df.iterrows(), prefix="Loading quotes...")
+            generator = mrich.track(df.iterrows(), prefix="Loading quotes...")
         else:
             generator = df.iterrows()
 
@@ -1377,13 +1371,11 @@ class HIPPO:
                     expected_id = int(row[orig_name_col])
 
                     if expected_id != compound.id:
-                        logger.error("Compound registration mismatch:")
-                        logger.var("expected_id", expected_id)
-                        logger.var("new_id", compound.id)
-                        logger.var(
-                            "original_smiles", self.compounds[expected_id].smiles
-                        )
-                        logger.var("new_smiles", smiles)
+                        mrich.error("Compound registration mismatch:")
+                        mrich.var("expected_id", expected_id)
+                        mrich.var("new_id", compound.id)
+                        mrich.var("original_smiles", self.compounds[expected_id].smiles)
+                        mrich.var("new_smiles", smiles)
 
                 except ValueError:
                     pass
@@ -1492,7 +1484,7 @@ class HIPPO:
 
         ingredients = IngredientSet(self.db)
 
-        for i, row in logger.track(df.iterrows(), prefix="Loading quotes..."):
+        for i, row in mrich.track(df.iterrows(), prefix="Loading quotes..."):
             smiles = row[smiles_col]
 
             if not isinstance(smiles, str):
@@ -1585,11 +1577,11 @@ class HIPPO:
                 smiles, sanitisation_failed="error", radical=radical, verbosity=debug
             )
         except SanitisationError as e:
-            logger.error(f"Could not sanitise {smiles=}")
-            logger.error(str(e))
+            mrich.error(f"Could not sanitise {smiles=}")
+            mrich.error(str(e))
             return None
         except AssertionError:
-            logger.error(f"Could not sanitise {smiles=}")
+            mrich.error(f"Could not sanitise {smiles=}")
             return None
 
         if bases:
@@ -1598,7 +1590,7 @@ class HIPPO:
         inchikey = inchikey_from_smiles(smiles)
 
         if debug:
-            logger.var("inchikey", inchikey)
+            mrich.var("inchikey", inchikey)
 
         compound_id = self.db.insert_compound(
             smiles=smiles,
@@ -1629,7 +1621,7 @@ class HIPPO:
             )
             (db_smiles,) = db_smiles
             if db_smiles != smiles:
-                logger.warning(
+                mrich.warning(
                     f"SMILES changed during compound registration: {smiles} --> {db_smiles}"
                 )
 
@@ -1845,7 +1837,7 @@ class HIPPO:
                 assert not energy_score
                 assert not distance_score
 
-                logger.warning(f"Splitting ligands in PDB: {path}")
+                mrich.warning(f"Splitting ligands in PDB: {path}")
 
                 results = []
                 for i, res in enumerate(lig_residues):
@@ -1856,7 +1848,7 @@ class HIPPO:
                     for atom in res.atoms:
                         split_sys.add_atom(atom)
 
-                    logger.writing(file)
+                    mrich.writing(file)
                     split_sys.write(file, verbosity=False)
 
                     result = self.register_pose(
@@ -1931,7 +1923,7 @@ class HIPPO:
                             break
                     else:
                         # all atoms within tolerance --> too similar
-                        logger.warning(f"Found similar {pose=}")
+                        mrich.warning(f"Found similar {pose=}")
                         if return_pose:
                             return pose
                         else:
@@ -1979,7 +1971,7 @@ class HIPPO:
 
                     new_alias = alias + "_copy"
 
-                    logger.warning(f"Modifying alias={alias} --> {new_alias}")
+                    mrich.warning(f"Modifying alias={alias} --> {new_alias}")
 
                     pose_data["alias"] = new_alias
                     pose_id = self.db.insert_pose(**pose_data)
@@ -1992,15 +1984,15 @@ class HIPPO:
             assert pose_id
 
         if not pose_id:
-            logger.var("compound", compound)
-            logger.var("inchikey", inchikey)
-            logger.var("alias", alias)
-            logger.var("target", target)
-            logger.var("path", path)
-            logger.var("reference", reference)
-            logger.var("tags", tags)
-            logger.debug(f"{metadata=}")
-            logger.debug(f"{inspirations=}")
+            mrich.var("compound", compound)
+            mrich.var("inchikey", inchikey)
+            mrich.var("alias", alias)
+            mrich.var("target", target)
+            mrich.var("path", path)
+            mrich.var("reference", reference)
+            mrich.var("tags", tags)
+            mrich.debug(f"{metadata=}")
+            mrich.debug(f"{inspirations=}")
 
             raise Exception
 
@@ -2089,7 +2081,7 @@ class HIPPO:
         quoted_compound_ids = set()
         quote_count = self.db.count("quote")
 
-        for compound in logger.track(compounds):
+        for compound in mrich.track(compounds):
 
             ref_compound = ref_animal.compounds(smiles=compound.smiles, none="quiet")
 
@@ -2122,9 +2114,9 @@ class HIPPO:
         quoted_compounds = self.compounds[quoted_compound_ids]
         unquoted_compounds = compounds - quoted_compounds
 
-        logger.var("#new quotes", self.db.count("quote") - quote_count)
-        logger.var("#quoted_compounds", len(quoted_compounds))
-        logger.var("#unquoted_compounds", len(unquoted_compounds))
+        mrich.var("#new quotes", self.db.count("quote") - quote_count)
+        mrich.var("#quoted_compounds", len(quoted_compounds))
+        mrich.var("#unquoted_compounds", len(unquoted_compounds))
 
         return quoted_compounds, unquoted_compounds
 
@@ -2165,7 +2157,7 @@ class HIPPO:
         """Plot an overview of the number of compounds and poses for each tag, see :func:`hippo.plotting.plot_tag_statistics`"""
 
         if not self.num_tags:
-            logger.error("No tagged compounds or poses")
+            mrich.error("No tagged compounds or poses")
             return
         from .plotting import plot_tag_statistics
 
@@ -2242,14 +2234,14 @@ class HIPPO:
 
     def summary(self) -> None:
         """Print a text summary of this HIPPO"""
-        logger.header(self)
-        logger.var("db_path", self.db_path)
-        logger.var("#compounds", self.num_compounds)
-        logger.var("#poses", self.num_poses)
-        logger.var("#reactions", self.num_reactions)
-        logger.var("#tags", self.num_tags)
-        logger.var("tags", self.tags.unique)
-        # logger.var('#products', len(self.products))
+        mrich.header(self)
+        mrich.var("db_path", self.db_path)
+        mrich.var("#compounds", self.num_compounds)
+        mrich.var("#poses", self.num_poses)
+        mrich.var("#reactions", self.num_reactions)
+        mrich.var("#tags", self.num_tags)
+        mrich.var("tags", self.tags.unique)
+        # mrich.var('#products', len(self.products))
 
     def get_by_shorthand(self, key) -> "Compound | Pose | Reaction":
         """Get a :class:`.Compound`, :class:`.Pose`, or :class:`.Reaction` by its ID
@@ -2270,7 +2262,7 @@ class HIPPO:
         try:
             index = int(index)
         except ValueError:
-            logger.error(f"Cannot convert {index} to integer")
+            mrich.error(f"Cannot convert {index} to integer")
             return None
 
         match key[0]:
@@ -2281,7 +2273,7 @@ class HIPPO:
             case "R":
                 return self.reactions[index]
 
-        logger.error(f"Unsupported {prefix=}")
+        mrich.error(f"Unsupported {prefix=}")
         return None
 
     ### DUNDERS

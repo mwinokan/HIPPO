@@ -6,7 +6,7 @@ import mcol
 
 import os
 
-import mrich as logger
+import mrich
 
 
 class PoseTable:
@@ -221,11 +221,11 @@ class PoseTable:
         try:
             flat_smiles = sanitise_smiles(smiles, sanitisation_failed="error")
         except SanitisationError as e:
-            logger.error(f"Could not sanitise {smiles=}")
-            logger.error(str(e))
+            mrich.error(f"Could not sanitise {smiles=}")
+            mrich.error(str(e))
             return None
         except AssertionError:
-            logger.error(f"Could not sanitise {smiles=}")
+            mrich.error(f"Could not sanitise {smiles=}")
             return None
             return c
 
@@ -265,7 +265,7 @@ class PoseTable:
         matches = list(matches)
 
         if not matches:
-            logger.error(f"Did not find pose matching stereochemistry (C{comp_id})")
+            mrich.error(f"Did not find pose matching stereochemistry (C{comp_id})")
             return None
 
         if len(matches) == 1:
@@ -340,15 +340,15 @@ class PoseTable:
         if len(self) <= max_draw:
             self[:].draw()
         else:
-            logger.warning(
+            mrich.warning(
                 f"Too many poses: {len(self)} > {max_draw=}. Increase max_draw or use animal.poses[:].draw()"
             )
 
     def summary(self) -> None:
         """Print a summary of this pose set"""
-        logger.header("PoseTable()")
-        logger.var("#poses", len(self))
-        logger.var("tags", self.tags)
+        mrich.header("PoseTable()")
+        mrich.var("#poses", len(self))
+        mrich.var("tags", self.tags)
 
     def interactive(self) -> None:
         """Interactive widget to navigate poses in the table
@@ -446,7 +446,7 @@ class PoseTable:
                 return pset
 
             case _:
-                logger.error(
+                mrich.error(
                     f"Unsupported type for PoseTable.__getitem__(): {type(key)}"
                 )
 
@@ -961,7 +961,7 @@ class PoseSet:
         data = []
 
         if len(self) > 100:
-            gen = logger.track(self, prefix="PoseSet --> DataFrame")
+            gen = mrich.track(self, prefix="PoseSet --> DataFrame")
         else:
             gen = self
 
@@ -969,7 +969,7 @@ class PoseSet:
             d = pose.get_dict(**kwargs)
 
             if skip_no_mol and not d["mol"]:
-                logger.warning(f'Skipping pose with no mol: {d["id"]} {d["name"]}')
+                mrich.warning(f'Skipping pose with no mol: {d["id"]} {d["name"]}')
                 continue
             data.append(d)
 
@@ -1091,7 +1091,7 @@ class PoseSet:
         ids = set()
         for pose in self:
             value = function(pose)
-            # logger.debug(f'{pose=} {value=}')
+            # mrich.debug(f'{pose=} {value=}')
             if value and not inverse:
                 ids.add(pose.id)
             elif not value and inverse:
@@ -1133,7 +1133,7 @@ class PoseSet:
         for i in self.indices:
             self.db.insert_tag(name=tag, pose=i, commit=False)
 
-        logger.print(f'Tagged {self} w/ "{tag}"')
+        mrich.print(f'Tagged {self} w/ "{tag}"')
 
         self.db.commit()
 
@@ -1188,7 +1188,7 @@ class PoseSet:
                 sets[insp_ids]._indices.append(pose.id)
 
         if single_set:
-            logger.var("#unique inspiration combinations", len(sets))
+            mrich.var("#unique inspiration combinations", len(sets))
             sets = PoseSet(self.db, sum([s.ids for s in sets.values()], []), sort=False)
 
         return sets
@@ -1215,7 +1215,7 @@ class PoseSet:
 
         df.rename(inplace=True, columns={name_col: "_Name", "mol": "ROMol"})
 
-        logger.writing(out_path)
+        mrich.writing(out_path)
 
         from rdkit.Chem import PandasTools
 
@@ -1377,11 +1377,11 @@ class PoseSet:
                     sys = pose.complex_system
 
                     # write the PDB
-                    logger.writing(pdb_path)
+                    mrich.writing(pdb_path)
                     sys.write(pdb_path, verbosity=0)
                     z.write(pdb_path)
 
-            logger.writing(f"{out_key}_pdbs.zip")
+            mrich.writing(f"{out_key}_pdbs.zip")
 
         # create the header molecule
 
@@ -1410,7 +1410,7 @@ class PoseSet:
         if extra_cols:
             for key, value in extra_cols.items():
                 if len(value) != len(pose_df) + 1:
-                    logger.error(
+                    mrich.error(
                         f'extra_col "{key}" does not have the correct number of values'
                     )
                     raise ValueError(
@@ -1423,7 +1423,7 @@ class PoseSet:
 
         fields = []
 
-        logger.writing(out_path)
+        mrich.writing(out_path)
 
         with open(out_path, "w") as sdfh:
             with SDWriter(sdfh) as w:
@@ -1459,7 +1459,7 @@ class PoseSet:
 
             # create the subdirectory
             ref_dir = Path(f"{prefix}ref_{ref_name}")
-            logger.writing(ref_dir)
+            mrich.writing(ref_dir)
             ref_dir.mkdir(parents=True, exist_ok=True)
 
             # write the reference protein
@@ -1611,7 +1611,7 @@ class PoseSet:
                 if draw:
                     pose.draw()
                 if metadata:
-                    logger.title("Metadata:")
+                    mrich.title("Metadata:")
                     pprint(pose.metadata)
 
             out = interactive_output(
@@ -1631,10 +1631,10 @@ class PoseSet:
 
     def summary(self) -> None:
         """Print a summary of this pose set"""
-        logger.header("PoseSet()")
-        logger.var("#poses", len(self))
-        logger.var("#compounds", self.num_compounds)
-        logger.var("tags", self.tags)
+        mrich.header("PoseSet()")
+        mrich.var("#poses", len(self))
+        mrich.var("#compounds", self.num_compounds)
+        mrich.var("tags", self.tags)
 
     def draw(self) -> None:
         """Render this pose set with Py3Dmol"""
@@ -1663,7 +1663,7 @@ class PoseSet:
     def _delete(self, *, force: bool = False) -> None:
 
         if not force:
-            logger.warning("Deleting Poses is risky! Set force=True to continue")
+            mrich.warning("Deleting Poses is risky! Set force=True to continue")
             return
 
         # delete the poses in this set
@@ -1736,7 +1736,7 @@ class PoseSet:
                 try:
                     index = self.indices[key]
                 except IndexError:
-                    logger.error(f"list index out of range: {key=} for {self}")
+                    mrich.error(f"list index out of range: {key=} for {self}")
                     raise
                 return self.db.get_pose(id=index)
 

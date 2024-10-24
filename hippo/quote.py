@@ -1,7 +1,7 @@
 import mcol
 from .price import Price
 
-import mrich as logger
+import mrich
 
 
 class Quote:
@@ -53,8 +53,8 @@ class Quote:
 
         quote_age = (datetime.today() - datetime.strptime(self.date, "%Y-%m-%d")).days
         # if quote_age > 30:
-        # logger.warning(f'Quote is {quote_age} days old')
-        # logger.warning(self)
+        # mrich.warning(f'Quote is {quote_age} days old')
+        # mrich.warning(self)
 
     ### FACTORIES
 

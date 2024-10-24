@@ -3,7 +3,7 @@ import mcol
 from .compound import Compound
 from .recipe import Recipe
 
-import mrich as logger
+import mrich
 
 
 class Reaction:
@@ -266,9 +266,9 @@ class Reaction:
         """
 
         if debug:
-            logger.var("reaction", self.id)
-            logger.var("reactants", self.reactant_ids)
-            logger.var("supplier", supplier)
+            mrich.var("reaction", self.id)
+            mrich.var("reactants", self.reactant_ids)
+            mrich.var("supplier", supplier)
 
         if supplier is None:
 
@@ -302,22 +302,22 @@ class Reaction:
         for reactant_compound, has_quote, has_reaction in triples:
 
             if debug:
-                logger.debug(
+                mrich.debug(
                     f"{reactant_compound=}, {bool(has_quote)=}, {bool(has_reaction)=}"
                 )
 
             if has_quote:
                 if debug:
-                    logger.debug(f"reactant={reactant_compound} has quote")
+                    mrich.debug(f"reactant={reactant_compound} has quote")
                 continue
 
             if has_reaction:
                 if debug:
-                    logger.debug(f"reactant={reactant_compound} has reaction")
+                    mrich.debug(f"reactant={reactant_compound} has reaction")
                 continue
 
             if debug:
-                logger.warning(f"No quote or reaction for reactant={reactant_compound}")
+                mrich.warning(f"No quote or reaction for reactant={reactant_compound}")
 
             return False
 

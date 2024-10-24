@@ -4,7 +4,7 @@ import pandas as pd
 import mout
 import plotly.graph_objects as go
 
-import mrich as logger
+import mrich
 
 """
 
@@ -247,8 +247,8 @@ def plot_interaction_punchcard(
     else:
         iset = poses.interactions
 
-    logger.var("#poses", len(poses))
-    logger.var("#interactions", len(iset))
+    mrich.var("#poses", len(poses))
+    mrich.var("#interactions", len(iset))
 
     plot_data = iset.df
 
@@ -332,7 +332,7 @@ def plot_residue_interactions(
 
     """
 
-    logger.var("#poses", len(poses))
+    mrich.var("#poses", len(poses))
 
     from .iset import InteractionSet
 
@@ -342,7 +342,7 @@ def plot_residue_interactions(
 
     # return iset
 
-    logger.var("#interactions", len(iset))
+    mrich.var("#interactions", len(iset))
 
     plot_data = iset.df
 
@@ -705,7 +705,7 @@ def plot_compound_property(animal, prop, compounds=None, style="bar", null=None)
         compounds = animal.compounds
 
     if len(compounds) > 1000:
-        compounds = logger.track(compounds, prefix="Generating plot data")
+        compounds = mrich.track(compounds, prefix="Generating plot data")
 
     for comp in compounds:
 
@@ -804,7 +804,7 @@ def plot_pose_property(
             # great all poses!
             poses = animal.poses
             n_poses = len(poses)
-            logger.out(f"Querying database for {n_poses} poses...")
+            mrich.out(f"Querying database for {n_poses} poses...")
             field = f"pose_{p}"
             title = title or f"{p} of all poses"
             query = animal.db.select_where(
@@ -816,7 +816,7 @@ def plot_pose_property(
             # subset of poses
             assert poses.table == "pose", f"{poses=} is not a set of Pose objects"
             n_poses = len(poses)
-            logger.out(f"Querying database for {n_poses} poses...")
+            mrich.out(f"Querying database for {n_poses} poses...")
             field = f"pose_{p}"
             title = title or f"{p} of pose subset"
             query = animal.db.select_where(
@@ -861,7 +861,7 @@ def plot_pose_property(
             # great all poses!
             poses = animal.poses
             n_poses = len(poses)
-            logger.out(f"Querying database for {n_poses} poses...")
+            mrich.out(f"Querying database for {n_poses} poses...")
             title = f"distance & energy scores of all poses"
             query = animal.db.select(table="pose", query=query, multiple=True)
 
@@ -869,7 +869,7 @@ def plot_pose_property(
 
             # subset of poses
             n_poses = len(poses)
-            logger.out(f"Querying database for {n_poses} poses...")
+            mrich.out(f"Querying database for {n_poses} poses...")
             title = f"distance & energy scores of pose subset"
             query = animal.db.select_where(
                 table="pose",
@@ -900,7 +900,7 @@ def plot_pose_property(
         subtitle = subtitle or f"#poses={n_poses}"
 
     # elif prop == ['num_atoms_added', 'energy_score'] or prop == ['num_atoms_added', 'energy_score']:
-    # 	logger.error('Use animal.plot_pose_risk_vs_placement')
+    # 	mrich.error('Use animal.plot_pose_risk_vs_placement')
     # 	raise NotImplementedError
 
     # 	query = f'pose_id, , pose_distance_score, pose_energy_score'
@@ -909,7 +909,7 @@ def plot_pose_property(
     # 		# great all poses!
     # 		poses = animal.poses
     # 		n_poses = len(poses)
-    # 		logger.out(f'Querying database for {n_poses} poses...')
+    # 		mrich.out(f'Querying database for {n_poses} poses...')
     # 		title = f'distance & energy scores of all poses'
     # 		query = animal.db.select(table='pose', query=query, multiple=True)
 
@@ -917,7 +917,7 @@ def plot_pose_property(
 
     # 		# subset of poses
     # 		n_poses = len(poses)
-    # 		logger.out(f'Querying database for {n_poses} poses...')
+    # 		mrich.out(f'Querying database for {n_poses} poses...')
     # 		title = f'distance & energy scores of pose subset'
     # 		query = animal.db.select_where(table='pose', query=query, key=f'pose_id in {poses.str_ids}', multiple=True)
 
@@ -960,7 +960,7 @@ def plot_pose_property(
 
         plot_data = []
         if len(poses) > 1000:
-            poses = logger.track(poses, prefix="Generating plot data")
+            poses = mrich.track(poses, prefix="Generating plot data")
 
         for pose in poses:
             if len(prop) > 1:
@@ -1471,7 +1471,7 @@ def plot_compound_tsnee(
 
     df["cluster"] = df["cluster"].astype(str)
 
-    # logger.debug(df.columns)
+    # mrich.debug(df.columns)
 
     fig = px.scatter(
         df,

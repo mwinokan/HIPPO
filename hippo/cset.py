@@ -11,7 +11,7 @@ import mcol
 
 import os
 
-import mrich as logger
+import mrich
 
 
 class CompoundTable:
@@ -306,11 +306,11 @@ class CompoundTable:
         try:
             smiles = sanitise_smiles(smiles, sanitisation_failed="error")
         except SanitisationError as e:
-            logger.error(f"Could not sanitise {smiles=}")
-            logger.error(str(e))
+            mrich.error(f"Could not sanitise {smiles=}")
+            mrich.error(str(e))
             return None
         except AssertionError:
-            logger.error(f"Could not sanitise {smiles=}")
+            mrich.error(f"Could not sanitise {smiles=}")
             return None
             return c
         inchikey = inchikey_from_smiles(smiles)
@@ -318,15 +318,15 @@ class CompoundTable:
 
     def summary(self) -> None:
         """Print a summary of this compound set"""
-        logger.header("CompoundTable()")
-        logger.var("#compounds", len(self))
-        # logger.var('#poses', self.num_poses)
-        logger.var("tags", self.tags)
-        logger.var("#bases", self.num_bases)
-        logger.var("#elabs", self.num_elabs)
-        logger.var("#reactants", self.num_reactants)
-        logger.var("#intermediates", self.num_intermediates)
-        logger.var("#products", self.num_products)
+        mrich.header("CompoundTable()")
+        mrich.var("#compounds", len(self))
+        # mrich.var('#poses', self.num_poses)
+        mrich.var("tags", self.tags)
+        mrich.var("#bases", self.num_bases)
+        mrich.var("#elabs", self.num_elabs)
+        mrich.var("#reactants", self.num_reactants)
+        mrich.var("#intermediates", self.num_intermediates)
+        mrich.var("#products", self.num_products)
 
     def draw(self) -> None:
         """2D grid of drawings of molecules in this set
@@ -374,7 +374,7 @@ class CompoundTable:
         elif smiles:
             return self.get_by_smiles(smiles, **kwargs)
         else:
-            logger.error("Must provide one of tag, base, or smiles arguments")
+            mrich.error("Must provide one of tag, base, or smiles arguments")
             return None
 
     def __getitem__(
@@ -433,7 +433,7 @@ class CompoundTable:
                 return self[ids]
 
             case _:
-                logger.error(
+                mrich.error(
                     f"Unsupported type for CompoundTable.__getitem__(): {key=} {type(key)}"
                 )
 
@@ -985,7 +985,7 @@ class CompoundSet:
         variances = [v for v, in variances]
 
         if debug:
-            logger.debug(f"{variances=}")
+            mrich.debug(f"{variances=}")
 
         return mean(variances)
 
@@ -1039,10 +1039,10 @@ class CompoundSet:
 
     def summary(self) -> None:
         """Print a summary of this compound set"""
-        logger.header("CompoundSet()")
-        logger.var("#compounds", len(self))
-        logger.var("#poses", self.num_poses)
-        logger.var("tags", self.tags)
+        mrich.header("CompoundSet()")
+        mrich.var("#compounds", len(self))
+        mrich.var("#poses", self.num_poses)
+        mrich.var("tags", self.tags)
 
     def interactive(self) -> None:
         """Creates a ipywidget to interactively navigate this PoseSet."""
@@ -1123,7 +1123,7 @@ class CompoundSet:
                     r.draw()
 
             if metadata:
-                logger.title("Metadata:")
+                mrich.title("Metadata:")
                 pprint(comp.metadata)
 
         out = interactive_output(
@@ -1192,7 +1192,7 @@ class CompoundSet:
     ):
 
         if "route" not in self.db.table_names:
-            logger.error("route table not in Database")
+            mrich.error("route table not in Database")
             raise NotImplementedError
 
         sql = f"""
@@ -1205,11 +1205,11 @@ class CompoundSet:
         permitted_reactions = set(permitted_reactions.ids)
 
         if debug:
-            logger.debug("Querying database for routes")
+            mrich.debug("Querying database for routes")
         records = self.db.execute(sql).fetchall()
 
         if debug:
-            logger.debug("Assembling route dictionary")
+            mrich.debug("Assembling route dictionary")
 
         routes = {}
         for route_id, route_product, reaction_id in records:
@@ -1219,7 +1219,7 @@ class CompoundSet:
             routes[route_id]["reactions"].add(reaction_id)
 
         if debug:
-            logger.debug("Checking availability")
+            mrich.debug("Checking availability")
         available_routes = set()
         for route_id, route_dict in routes.items():
             product = route_dict["product"]
@@ -1230,7 +1230,7 @@ class CompoundSet:
 
         routes = [
             self.db.get_route(id=route_id)
-            for route_id in logger.track(available_routes, prefix="Getting routes")
+            for route_id in mrich.track(available_routes, prefix="Getting routes")
         ]
 
         from .recipe import RouteSet
@@ -1296,7 +1296,7 @@ class CompoundSet:
 
         data = []
 
-        for comp in logger.track(self, prefix="Creating compound dataframe"):
+        for comp in mrich.track(self, prefix="Creating compound dataframe"):
             d = comp.get_dict(
                 mol=mol,
                 metadata=metadata,
@@ -1387,7 +1387,7 @@ class CompoundSet:
 
         data = [dict(id=id, smiles=smiles) for id, smiles in records]
         df = DataFrame(data)
-        logger.writing(file)
+        mrich.writing(file)
         df.to_csv(file, index=False)
 
     def write_postera_csv(
@@ -1413,7 +1413,7 @@ class CompoundSet:
 
         data = []
 
-        for c in logger.track(self, prefix="Creating DataFrame"):
+        for c in mrich.track(self, prefix="Creating DataFrame"):
 
             # get props
             smiles = c.smiles
@@ -1437,11 +1437,11 @@ class CompoundSet:
                 case 1:
                     pose = poses[0]
                 case 0:
-                    logger.warning(f"{c} has no poses")
+                    mrich.warning(f"{c} has no poses")
                     assert base
                     pose = base.poses[0]
                 case _:
-                    logger.warning(f"{c} has multiple poses")
+                    mrich.warning(f"{c} has multiple poses")
                     pose = poses[0]
 
             # extract inspirations
@@ -1480,7 +1480,7 @@ class CompoundSet:
 
         df = DataFrame(data)
 
-        logger.writing(file)
+        mrich.writing(file)
         df.to_csv(file, index=False)
 
         return df
@@ -1496,7 +1496,7 @@ class CompoundSet:
         for i in self.indices:
             self.db.insert_tag(name=tag, compound=i, commit=False)
 
-        logger.print(f'Tagged {self} w/ "{tag}"')
+        mrich.print(f'Tagged {self} w/ "{tag}"')
 
         self.db.commit()
 
@@ -1544,7 +1544,7 @@ class CompoundSet:
                 return CompoundSet(self.db, ids)
 
             case IngredientSet():
-                logger.warning(
+                mrich.warning(
                     "Subtracting IngredientSet from CompoundSet. Ignoring quote/amount data"
                 )
                 ids = set(self.ids) - set([int(i) for i in other.compound_ids])
@@ -1673,7 +1673,7 @@ class IngredientSet:
         self._data = DataFrame(columns=self._columns, dtype=object)
 
         if debug:
-            logger.debug(self._data)
+            mrich.debug(self._data)
 
         self._supplier = supplier
 
@@ -1684,7 +1684,7 @@ class IngredientSet:
             assert col in self._data.columns, f"{col} not in df.columns"
 
         if debug:
-            logger.debug(self._data)
+            mrich.debug(self._data)
 
     @classmethod
     def from_ingredient_df(
@@ -2003,7 +2003,7 @@ class IngredientSet:
             amount = ingredient.amount
 
             if (q := ingredient.quote) and not ingredient.quote_id:
-                logger.warning(f"Losing quote! {ingredient.quote=}")
+                mrich.warning(f"Losing quote! {ingredient.quote=}")
 
             supplier = ingredient.supplier
             max_lead_time = ingredient.max_lead_time
@@ -2021,7 +2021,7 @@ class IngredientSet:
 
         if quote_id:
             # if not quoted_amount:
-            #     logger.warning(f'Requoting C{compound_id}...')
+            #     mrich.warning(f'Requoting C{compound_id}...')
 
             assert quoted_amount
 
@@ -2059,9 +2059,9 @@ class IngredientSet:
                     self._data.loc[index, "quoted_amount"] = None
 
                 if debug and supplier:
-                    logger.debug("Adding to existing ingredient")
-                    logger.debug(f'{self._data.loc[index, "supplier"]=}')
-                    logger.debug(f"{supplier=}")
+                    mrich.debug("Adding to existing ingredient")
+                    mrich.debug(f'{self._data.loc[index, "supplier"]=}')
+                    mrich.debug(f"{supplier=}")
 
             else:
                 # from numpy import nan
@@ -2084,7 +2084,7 @@ class IngredientSet:
                 )
 
                 if debug:
-                    logger.out(addition)
+                    mrich.out(addition)
 
     def _get_ingredient(
         self,
@@ -2226,7 +2226,7 @@ class IngredientSet:
 
             elif len(matches) != 1:
 
-                logger.warning(f"Multiple ingredients in set with {compound_id=}")
+                mrich.warning(f"Multiple ingredients in set with {compound_id=}")
                 # print(matches)
 
                 return IngredientSet(

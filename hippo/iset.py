@@ -1,6 +1,6 @@
 import mcol
 
-import mrich as logger
+import mrich
 
 
 class InteractionTable:
@@ -124,7 +124,7 @@ class InteractionSet:
             )
 
             if has_invalid_fps:
-                logger.warning(f"{has_invalid_fps} Poses have not been fingerprinted")
+                mrich.warning(f"{has_invalid_fps} Poses have not been fingerprinted")
 
             sql = f"""
             SELECT interaction_id FROM {table}
@@ -311,18 +311,18 @@ class InteractionSet:
     ) -> None:
         """Print a summary of this :class:`.InteractionSet`"""
 
-        logger.header(self)
+        mrich.header(self)
 
         for interaction in self:
             # print(interaction)
 
-            # logger.var(f'{interaction.family_str}', f'{interaction.distance:.1f}')
+            # mrich.var(f'{interaction.family_str}', f'{interaction.distance:.1f}')
             s = f"{interaction.description}"
 
             if families:
                 s += f" {interaction.feature.family} ~ {interaction.family}"
 
-            logger.var(s, f"{interaction.distance:.1f}", dict(unit="Å"))
+            mrich.var(s, f"{interaction.distance:.1f}", dict(unit="Å"))
 
     def get_classic_fingerprint(self) -> dict:
         """Classic HIPPO fingerprint dictionary, mapping protein :class:`.Feature` ID's to the number of corresponding ligand features (from any :class:`.Pose`)"""

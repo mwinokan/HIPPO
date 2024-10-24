@@ -1,6 +1,6 @@
 import mcol
 
-import mrich as logger
+import mrich
 
 
 class Target:

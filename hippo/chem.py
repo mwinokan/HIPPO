@@ -1,6 +1,6 @@
 from mout import debug_log
 
-import mrich as logger
+import mrich
 
 """
 
@@ -149,15 +149,15 @@ def check_reaction_types(types: list[str]) -> None:
 
     for reaction_type in types:
         if reaction_type not in SUPPORTED_CHEMISTRY:
-            logger.error(f"Can't check chemistry of unsupported {reaction_type=}")
+            mrich.error(f"Can't check chemistry of unsupported {reaction_type=}")
 
 
 def check_chemistry(reaction_type, reactants, product, debug=False):
 
     if reaction_type not in SUPPORTED_CHEMISTRY:
 
-        logger.var("reactants", reactants.ids)
-        logger.var("product", product)
+        mrich.var("reactants", reactants.ids)
+        mrich.var("product", product)
 
         raise UnsupportedChemistryError(f"Unsupported {reaction_type=}")
 
@@ -186,7 +186,7 @@ def check_chemistry(reaction_type, reactants, product, debug=False):
             return False
 
     if debug:
-        logger.success(f"{reaction_type}: All OK")
+        mrich.success(f"{reaction_type}: All OK")
 
     return True
 
@@ -212,9 +212,9 @@ def check_count_diff(check_type, reaction_type, reactants, product, debug=False)
     reac_count = getattr(reactants, attr)
     prod_count = getattr(product, attr)
     if debug:
-        logger.var(f"#{check_type} reactants", reac_count)
+        mrich.var(f"#{check_type} reactants", reac_count)
     if debug:
-        logger.var(f"#{check_type} product", prod_count)
+        mrich.var(f"#{check_type} product", prod_count)
 
     # check against target value
     if isinstance(diff, str):
@@ -225,23 +225,23 @@ def check_count_diff(check_type, reaction_type, reactants, product, debug=False)
 
         if reac_count - prod_count < diff:
             if debug:
-                logger.error(
+                mrich.error(
                     f"{reaction_type}: #{check_type} {(reac_count - prod_count)=} FAIL"
                 )
             return False
 
         elif debug:
-            logger.success(f"{reaction_type}: #{check_type} OK")
+            mrich.success(f"{reaction_type}: #{check_type} OK")
 
     else:
 
         if reac_count - diff != prod_count:
             if debug:
-                logger.error(f"{reaction_type}: #{check_type} FAIL")
+                mrich.error(f"{reaction_type}: #{check_type} FAIL")
             return False
 
         elif debug:
-            logger.success(f"{reaction_type}: #{check_type} OK")
+            mrich.success(f"{reaction_type}: #{check_type} OK")
 
     return True
 
@@ -263,8 +263,8 @@ def check_atomtype_diff(reaction_type, reactants, product, debug=False):
     prod = product.atomtype_dict
 
     if debug:
-        logger.var("reactants.atomtype_dict", str(reac))
-        logger.var("product.atomtype_dict", str(prod))
+        mrich.var("reactants.atomtype_dict", str(reac))
+        mrich.var("product.atomtype_dict", str(prod))
 
     if "removed" in SUPPORTED_CHEMISTRY[reaction_type]["atomtype"]:
         removal = check_specific_atomtype_diff(
@@ -283,7 +283,7 @@ def check_atomtype_diff(reaction_type, reactants, product, debug=False):
             return False
 
     if debug:
-        logger.success(f"{reaction_type}: atomtypes OK")
+        mrich.success(f"{reaction_type}: atomtypes OK")
 
     return True
 
@@ -310,7 +310,7 @@ def check_specific_atomtype_diff(reaction_type, prod, reac, removal=False, debug
         return True
 
     if debug:
-        logger.var(add_str, str(add_dict))
+        mrich.var(add_str, str(add_dict))
 
     for symbol, count in add_dict.items():
 
@@ -321,7 +321,7 @@ def check_specific_atomtype_diff(reaction_type, prod, reac, removal=False, debug
         elif symbol == "*":
             assert count == "*", (symbol, count)
             if debug:
-                logger.debug("Allowing wildcard atomtype differences")
+                mrich.debug("Allowing wildcard atomtype differences")
             continue
 
         else:
@@ -336,20 +336,20 @@ def check_specific_atomtype_diff(reaction_type, prod, reac, removal=False, debug
 
             if removal and r_count - p_count < count:
                 if debug:
-                    logger.error(
+                    mrich.error(
                         f"{symbol}: {r_count=} - {p_count=} >= {r_count - p_count}"
                     )
-                    logger.error(
+                    mrich.error(
                         f"{reaction_type}: atomtype removal {symbol} × {count} FAIL"
                     )
                 return False
 
             elif not removal and p_count - r_count < count:
                 if debug:
-                    logger.error(
+                    mrich.error(
                         f"{symbol}: {p_count=} - {r_count=} >= {p_count - r_count}"
                     )
-                    logger.error(
+                    mrich.error(
                         f"{reaction_type}: atomtype addition {symbol} × {count} FAIL"
                     )
                 return False
@@ -358,20 +358,20 @@ def check_specific_atomtype_diff(reaction_type, prod, reac, removal=False, debug
 
             if removal and r_count - p_count != count:
                 if debug:
-                    logger.error(
+                    mrich.error(
                         f"{symbol}: {r_count=} - {p_count=} = {r_count - p_count}"
                     )
-                    logger.error(
+                    mrich.error(
                         f"{reaction_type}: atomtype removal {symbol} × {count} FAIL"
                     )
                 return False
 
             elif not removal and p_count - r_count != count:
                 if debug:
-                    logger.error(
+                    mrich.error(
                         f"{symbol}: {p_count=} - {r_count=} = {p_count - r_count}"
                     )
-                    logger.error(
+                    mrich.error(
                         f"{reaction_type}: atomtype addition {symbol} × {count} FAIL"
                     )
                 return False

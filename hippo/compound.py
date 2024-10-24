@@ -11,7 +11,7 @@ from .tags import TagSet
 from .target import Target
 from .quote import Quote
 
-import mrich as logger
+import mrich
 
 
 class Compound:
@@ -157,7 +157,7 @@ class Compound:
         """Calculate the number of atoms added relative to the base compound"""
         match self.num_bases:
             case 0:
-                logger.error(f"{self} has no base")
+                mrich.error(f"{self} has no base")
                 return None
             case 1:
                 b_id = self.bases.ids[0]
@@ -165,7 +165,7 @@ class Compound:
                 n_b = self.db.get_compound_computed_property("num_heavy_atoms", b_id)
                 return n_e - n_b
             case _:
-                logger.warning(f"{self} has multiple bases")
+                mrich.warning(f"{self} has multiple bases")
                 n_e = self.num_heavy_atoms
                 return [
                     n_e
@@ -263,10 +263,10 @@ class Compound:
         reactions = self.reactions
         match len(reactions):
             case 0:
-                logger.warning(f"{self} has no reactions")
+                mrich.warning(f"{self} has no reactions")
                 return None
             case 1:
-                logger.warning(f"{self} has multiple reactions, returning first")
+                mrich.warning(f"{self} has multiple reactions, returning first")
             case _:
                 pass
 
@@ -371,10 +371,10 @@ class Compound:
             self.db.delete_where(table="quote", key=f"quote_id IN {delete_str}")
 
             if delete:
-                logger.warning(f"Removed {len(delete)} existing In-Stock Quotes")
+                mrich.warning(f"Removed {len(delete)} existing In-Stock Quotes")
 
             if not_deleted:
-                logger.warning(
+                mrich.warning(
                     f"Did not remove {not_deleted} existing In-Stock Quotes with differing entry/purity/location"
                 )
 
@@ -467,7 +467,7 @@ class Compound:
             suitable_quotes = [q for q in quotes if q.amount >= min_amount]
 
             if not suitable_quotes:
-                logger.debug(f"No quote available with amount >= {min_amount} mg")
+                mrich.debug(f"No quote available with amount >= {min_amount} mg")
                 quotes = [Quote.combination(min_amount, quotes)]
 
             else:
@@ -788,7 +788,7 @@ class Compound:
                 display(drawing)
 
             else:
-                logger.error(
+                mrich.error(
                     f"Problem drawing {base.id=} vs {self.id=}, self referential?"
                 )
                 display(self.mol)
@@ -834,32 +834,32 @@ class Compound:
         :param draw: Include a 2D molecule drawing, defaults to ``True``
         """
 
-        logger.header(repr(self))
+        mrich.header(repr(self))
 
-        logger.var("inchikey", self.inchikey)
-        logger.var("alias", self.alias)
-        logger.var("smiles", self.smiles)
-        logger.var("bases", self.bases)
-        logger.var("elabs", self.elabs)
+        mrich.var("inchikey", self.inchikey)
+        mrich.var("alias", self.alias)
+        mrich.var("smiles", self.smiles)
+        mrich.var("bases", self.bases)
+        mrich.var("elabs", self.elabs)
 
-        logger.var("is_base", self.is_base)
-        logger.var("is_elab", self.is_elab)
-        logger.var("num_heavy_atoms", self.num_heavy_atoms)
-        logger.var("num_rings", self.num_rings)
-        logger.var("formula", self.formula)
+        mrich.var("is_base", self.is_base)
+        mrich.var("is_elab", self.is_elab)
+        mrich.var("num_heavy_atoms", self.num_heavy_atoms)
+        mrich.var("num_rings", self.num_rings)
+        mrich.var("formula", self.formula)
 
-        logger.var("#reactions (product)", self.num_reactions)
-        logger.var("#reactions (reactant)", self.num_reactant)
+        mrich.var("#reactions (product)", self.num_reactions)
+        mrich.var("#reactions (reactant)", self.num_reactant)
 
-        logger.var("tags", self.tags)
+        mrich.var("tags", self.tags)
 
         poses = self.poses
-        logger.var("#poses", len(poses))
+        mrich.var("#poses", len(poses))
         if poses:
-            logger.var("targets", poses.targets)
+            mrich.var("targets", poses.targets)
 
         if metadata:
-            logger.var("metadata", str(self.metadata))
+            mrich.var("metadata", str(self.metadata))
 
         if draw:
             self.draw()
@@ -940,9 +940,9 @@ class Compound:
             ids = [p.id for p in self.poses if p.id != pose.id]
             for i in ids:
                 self.db.delete_where(table="pose", key="id", value=i)
-            logger.success(f"Successfully posed {self} (and deleted old poses)")
+            mrich.success(f"Successfully posed {self} (and deleted old poses)")
         else:
-            logger.success(f"Successfully posed {self}")
+            mrich.success(f"Successfully posed {self}")
 
         return pose
 

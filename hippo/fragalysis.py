@@ -1,4 +1,4 @@
-import mrich as logger
+import mrich
 
 
 def generate_header(
@@ -70,7 +70,7 @@ def download_target(
     destination = Path(destination)
 
     if not destination.exists():
-        logger.writing(destination)
+        mrich.writing(destination)
         destination.mkdir(exist_ok=True, parents=True)
 
     root = STACK_URLS[stack]
@@ -93,19 +93,19 @@ def download_target(
         "trans_matrix_info": False,
     }
 
-    logger.print("Requesting download...")
+    mrich.print("Requesting download...")
 
     url = root + "/api/download_structures/"
 
-    logger.var("url", url)
+    mrich.var("url", url)
 
     response = requests.post(url, json=payload)
 
     if response.status_code == 200:
-        logger.print("Download is ready.")
+        mrich.print("Download is ready.")
     else:
-        logger.error(f"Download request failed: {response.status_code=}")
-        logger.error(response.text)
+        mrich.error(f"Download request failed: {response.status_code=}")
+        mrich.error(response.text)
         return None
 
     file_url = urllib.request.pathname2url(response.json()["file_url"])
@@ -113,46 +113,46 @@ def download_target(
     zip_path = destination / Path(file_url).name
 
     if zip_path.exists() and not overwrite:
-        logger.warning(f"Using existing {zip_path}")
+        mrich.warning(f"Using existing {zip_path}")
 
     else:
 
         if zip_path.exists():
-            logger.warning(f"Overwriting {zip_path}")
+            mrich.warning(f"Overwriting {zip_path}")
 
-        logger.writing(zip_path)
+        mrich.writing(zip_path)
 
         url = f"{root}/api/download_structures/?file_url={file_url}"
 
-        logger.var("url", url)
+        mrich.var("url", url)
 
         filename, headers = urllib.request.urlretrieve(url, filename=zip_path)
 
     if not zip_path.exists():
-        logger.error("Download failed")
+        mrich.error("Download failed")
         return None
 
     if unzip:
         try:
             import zipfile
 
-            logger.print(f"Unzipping {zip_path}")
+            mrich.print(f"Unzipping {zip_path}")
 
             target_dir = destination / Path(file_url).name.removesuffix(".zip")
 
             target_dir.mkdir(exist_ok=overwrite)
 
-            logger.writing(target_dir)
+            mrich.writing(target_dir)
             with zipfile.ZipFile(zip_path, "r") as zip_ref:
                 zip_ref.extractall(target_dir)
 
         except FileExistsError:
-            logger.warning(
+            mrich.warning(
                 f"Did not unzip as directory {target_dir} exists. Set overwrite=True to override in future"
             )
             unzip = False
 
-    logger.success(f"Downloaded {mcol.varName}{target_name}{mcol.success} from {stack}")
+    mrich.success(f"Downloaded {mcol.varName}{target_name}{mcol.success} from {stack}")
 
     if unzip:
         return Path(target_dir)
@@ -211,7 +211,7 @@ def parse_observation_longcode(longcode: str) -> dict[str]:
             target = None
 
         case _:
-            logger.var("dashx_split", dashx_split)
+            mrich.var("dashx_split", dashx_split)
             raise UnsupportedFragalysisLongcodeError(dashx_split)
 
     match len(data):
@@ -248,8 +248,8 @@ def find_observation_longcode_matches(
     keys = dq.keys()
 
     if debug:
-        logger.var("allow_version_none", allow_version_none)
-        logger.var("dq", str(dq))
+        mrich.var("allow_version_none", allow_version_none)
+        mrich.var("dq", str(dq))
 
     matches = []
 
@@ -257,7 +257,7 @@ def find_observation_longcode_matches(
 
         if code == query:
             if debug:
-                logger.debug("exact match")
+                mrich.debug("exact match")
             matches.append(code)
             continue
 
@@ -276,11 +276,11 @@ def find_observation_longcode_matches(
                 break
         else:
             if debug:
-                logger.debug(f"{query} matches {code}")
+                mrich.debug(f"{query} matches {code}")
             matches.append(code)
 
     if debug:
-        logger.var("#matches", len(matches))
+        mrich.var("#matches", len(matches))
 
     if len(matches) < 1 and not allow_version_none:
         return find_observation_longcode_matches(query, codes, allow_version_none=True)

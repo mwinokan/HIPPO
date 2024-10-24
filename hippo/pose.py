@@ -11,7 +11,7 @@ import pickle
 
 from pathlib import Path
 
-import mrich as logger
+import mrich
 
 from molparse.rdkit.features import (
     FEATURE_FAMILIES,
@@ -82,7 +82,7 @@ class Pose:
         if fingerprint is None:
             self._has_fingerprint = False
         elif not isinstance(fingerprint, int):
-            logger.warning("Legacy fingerprint data format")
+            mrich.warning("Legacy fingerprint data format")
             self.has_fingerprint = False
         else:
             self.has_fingerprint = bool(fingerprint)
@@ -165,7 +165,7 @@ class Pose:
                     table="pose", id=self.id, key="pose_smiles", value=self._smiles
                 )
             except InvalidMolError:
-                logger.warning(f"Taking smiles from {self.compound}")
+                mrich.warning(f"Taking smiles from {self.compound}")
                 self._smiles = self.compound.smiles
         return self._smiles
 
@@ -220,9 +220,9 @@ class Pose:
 
             if self.path.endswith(".pdb"):
 
-                logger.reading(self.path)
+                mrich.reading(self.path)
 
-                # logger.reading(self.path)
+                # mrich.reading(self.path)
                 sys = mp.parse(self.path, verbosity=False)
 
                 self.protein_system = sys.protein_system
@@ -246,12 +246,12 @@ class Pose:
                         lig_residues = [r for r in sys.residues if r.type == "LIG"]
 
                     if len(lig_residues) > 1:
-                        logger.warning(f"Multiple ligands in PDB {self}")
+                        mrich.warning(f"Multiple ligands in PDB {self}")
 
                     lig_res = lig_residues[0]
 
                     if not (mol := lig_res.rdkit_mol):
-                        logger.error(
+                        mrich.error(
                             f"[{self}] Error computing RDKit Mol from PDB={self.path}"
                         )
 
@@ -271,17 +271,17 @@ class Pose:
                     try:
                         mol = AssignBondOrdersFromTemplate(template, mol)
                     except Exception as e:
-                        logger.error(
+                        mrich.error(
                             f"Exception occured during AssignBondOrdersFromTemplate for {self}.mol"
                         )
                         print(f"template_smiles={self.compound.smiles}")
                         print(f"pdbblock={print(lig_res.pdb_block)}")
-                        logger.error(e)
+                        mrich.error(e)
                         mol = lig_res.rdkit_mol
 
                 else:
 
-                    logger.warning(
+                    mrich.warning(
                         f"There are multiple *_ligand.mol files in {Path(self.path).parent}"
                     )
 
@@ -289,13 +289,13 @@ class Pose:
 
             elif self.path.endswith(".mol"):
 
-                logger.reading(self.path)
+                mrich.reading(self.path)
 
-                # logger.reading(self.path)
+                # mrich.reading(self.path)
                 mol = mp.parse(self.path, verbosity=False)
 
                 if not mol:
-                    logger.error(
+                    mrich.error(
                         f"[{self}] Error computing RDKit Mol from .mol={self.path}"
                     )
 
@@ -308,7 +308,7 @@ class Pose:
                 raise NotImplementedError
 
             if not mol:
-                logger.error(f"Could not parse {self}.path={self.path}")
+                mrich.error(f"Could not parse {self}.path={self.path}")
 
         return self._mol
 
@@ -325,7 +325,7 @@ class Pose:
     def protein_system(self) -> "molparse.System":
         """Returns the pose's protein molparse.System"""
         if self._protein_system is None and self.path.endswith(".pdb"):
-            # logger.debug(f'getting pose protein system {self}')
+            # mrich.debug(f'getting pose protein system {self}')
             self.protein_system = mp.parse(self.path, verbosity=False).protein_system
         return self._protein_system
 
@@ -552,16 +552,16 @@ class Pose:
         )
 
         if debug:
-            logger.var("energy_score", self.energy_score)
-            logger.var("distance_score", self.distance_score)
+            mrich.var("energy_score", self.energy_score)
+            mrich.var("distance_score", self.distance_score)
 
             for inspiration in self.inspirations:
-                logger.var(
+                mrich.var(
                     f"{inspiration} SuCOS",
                     SuCOS_score(inspiration.mol, self.mol, print_scores=debug),
                 )
 
-            logger.var(f"multi SuCOS", multi_sucos)
+            mrich.var(f"multi SuCOS", multi_sucos)
 
         return multi_sucos
 
@@ -751,7 +751,7 @@ class Pose:
             ### create temporary table
 
             if "temp_interaction" in self.db.table_names:
-                logger.warning("Deleting existing temp_interaction table")
+                mrich.warning("Deleting existing temp_interaction table")
                 self.db.execute("DROP TABLE temp_interaction")
 
             self.db.create_table_interaction(table="temp_interaction", debug=False)
@@ -769,13 +769,13 @@ class Pose:
                 protein_system = self.reference.protein_system
 
             else:
-                logger.debug("Unsupported: Pose.calculate_interactions()")
+                mrich.debug("Unsupported: Pose.calculate_interactions()")
                 raise NotImplementedError(f"{self.reference=}, {self.path=}")
 
             assert protein_system
 
             if not self.mol:
-                logger.error(f"Could not read molecule for {self}")
+                mrich.error(f"Could not read molecule for {self}")
                 return
 
             ### get features
@@ -951,11 +951,11 @@ class Pose:
                         )
 
             if mutation_warnings:
-                logger.warning(
+                mrich.warning(
                     f"Skipped {mutation_count} protein features because the residue was mutated:"
                 )
                 for mutation in mutation_warnings:
-                    logger.warning(mutation)
+                    mrich.warning(mutation)
 
             if resolve:
                 from .iset import InteractionSet
@@ -973,7 +973,7 @@ class Pose:
             self.db.execute("DROP TABLE temp_interaction")
 
         elif debug:
-            logger.warning(f"{self} is already fingerprinted, no new calculation")
+            mrich.warning(f"{self} is already fingerprinted, no new calculation")
 
     def calculate_classic_fingerprint(
         self,
@@ -987,17 +987,17 @@ class Pose:
 
             protein_system = self.protein_system
             if not self.protein_system:
-                # logger.reading(self.path)
+                # mrich.reading(self.path)
                 protein_system = mp.parse(self.path, verbosity=False).protein_system
 
         elif self.path.endswith(".mol") and self.reference:
 
-            # logger.debug('fingerprint from .mol and reference pose')
+            # mrich.debug('fingerprint from .mol and reference pose')
             protein_system = self.reference.protein_system
 
         else:
 
-            logger.debug("Unsupported: Pose.calculate_fingerprint()")
+            mrich.debug("Unsupported: Pose.calculate_fingerprint()")
             raise NotImplementedError(f"{self.reference=}, {self.path=}")
 
         assert protein_system
@@ -1036,10 +1036,10 @@ class Pose:
                 continue
 
             # if prot_feature.residue_number == 77:
-            #   logger.debug(repr(prot_feature))
+            #   mrich.debug(repr(prot_feature))
 
             if prot_residue.name != prot_feature.residue_name:
-                logger.warning(f"Feature {repr(prot_feature)}")
+                mrich.warning(f"Feature {repr(prot_feature)}")
                 continue
 
             prot_atoms = [
@@ -1064,7 +1064,7 @@ class Pose:
 
             if valid_features:
                 if debug:
-                    logger.debug(
+                    mrich.debug(
                         f"PROT: {prot_feature.residue_name} {prot_feature.residue_number} {prot_feature.atom_names}, LIG: #{len(valid_features)} {[f for f in valid_features]}"
                     )
                 fingerprint[prot_feature.id] = len(valid_features)
@@ -1151,25 +1151,25 @@ class Pose:
 
         """
         if self.alias:
-            logger.header(f"{str(self)}: {self.alias}")
+            mrich.header(f"{str(self)}: {self.alias}")
         else:
-            logger.header(f"{str(self)}: {self.inchikey}")
-        logger.var("inchikey", self.inchikey)
-        logger.var("alias", self.alias)
-        logger.var("smiles", self.smiles)
-        logger.var("compound", repr(self.compound))
-        logger.var("path", self.path)
-        logger.var("target", repr(self.target))
-        logger.var("reference", self.reference)
-        logger.var("tags", self.tags)
-        logger.var("num_heavy_atoms", self.num_heavy_atoms)
-        logger.var("distance_score", self.distance_score)
-        logger.var("energy_score", self.energy_score)
+            mrich.header(f"{str(self)}: {self.inchikey}")
+        mrich.var("inchikey", self.inchikey)
+        mrich.var("alias", self.alias)
+        mrich.var("smiles", self.smiles)
+        mrich.var("compound", repr(self.compound))
+        mrich.var("path", self.path)
+        mrich.var("target", repr(self.target))
+        mrich.var("reference", self.reference)
+        mrich.var("tags", self.tags)
+        mrich.var("num_heavy_atoms", self.num_heavy_atoms)
+        mrich.var("distance_score", self.distance_score)
+        mrich.var("energy_score", self.energy_score)
         if inspirations := self.inspirations:
-            logger.var("inspirations", self.inspirations.names)
-            logger.var("num_atoms_added", self.num_atoms_added)
+            mrich.var("inspirations", self.inspirations.names)
+            mrich.var("num_atoms_added", self.num_atoms_added)
         if metadata:
-            logger.var("metadata", str(self.metadata))
+            mrich.var("metadata", str(self.metadata))
 
     def showcase(self) -> None:
         """Print and render this pose as if you were using :meth:`.PoseSet.interactive`"""
@@ -1179,7 +1179,7 @@ class Pose:
         self.draw()
         from pprint import pprint
 
-        logger.title("Metadata:")
+        mrich.title("Metadata:")
         pprint(self.metadata)
 
     def plain_repr(self) -> str:

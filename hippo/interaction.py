@@ -1,6 +1,6 @@
 import mcol
 
-import mrich as logger
+import mrich
 
 
 class Interaction:
@@ -152,17 +152,17 @@ class Interaction:
     def summary(self) -> None:
         """Print a summary of this interaction's properties"""
 
-        logger.header(f"Interaction {self.id}")
+        mrich.header(f"Interaction {self.id}")
 
-        logger.var("feature", self.feature)
-        logger.var("pose", self.pose)
-        logger.var("family", self.family)
-        logger.var("atom_ids", self.atom_ids)
-        logger.var("prot_coord", self.prot_coord)
-        logger.var("lig_coord", self.lig_coord)
-        logger.var("distance", self.distance)
-        logger.var("angle", self.angle)
-        logger.var("energy", self.energy)
+        mrich.var("feature", self.feature)
+        mrich.var("pose", self.pose)
+        mrich.var("family", self.family)
+        mrich.var("atom_ids", self.atom_ids)
+        mrich.var("prot_coord", self.prot_coord)
+        mrich.var("lig_coord", self.lig_coord)
+        mrich.var("distance", self.distance)
+        mrich.var("angle", self.angle)
+        mrich.var("energy", self.energy)
 
     ### DUNDERS
 

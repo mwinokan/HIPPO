@@ -17,7 +17,7 @@ from .tools import inchikey_from_smiles
 
 from pathlib import Path
 
-import mrich as logger
+import mrich
 
 CHEMICALITE_COMPOUND_PROPERTY_MAP = {
     "num_heavy_atoms": "mol_num_hvyatms",
@@ -42,14 +42,14 @@ class Database:
 
         assert isinstance(path, Path)
 
-        logger.debug("hippo.Database.__init__()")
+        mrich.debug("hippo.Database.__init__()")
 
         self._path = path
         self._connection = None
         self._cursor = None
         self._animal = animal
 
-        logger.debug(f"Database.path = {self.path}")
+        mrich.debug(f"Database.path = {self.path}")
 
         try:
             path = path.resolve(strict=True)
@@ -65,34 +65,30 @@ class Database:
 
         if "interaction" not in self.table_names:
             if not update_legacy:
-                logger.error("This is a legacy format database (hippo-db < 0.3.23)")
-                logger.error("Existing fingerprints will not be compatible")
-                logger.error(
-                    "Re-initialise HIPPO object with update_legacy=True to fix"
-                )
+                mrich.error("This is a legacy format database (hippo-db < 0.3.23)")
+                mrich.error("Existing fingerprints will not be compatible")
+                mrich.error("Re-initialise HIPPO object with update_legacy=True to fix")
                 raise LegacyDatabaseError("hippo-db < 0.3.23")
             else:
-                logger.warning("This is a legacy format database (hippo-db < 0.3.23)")
-                logger.warning("Clearing legacy fingerprints...")
+                mrich.warning("This is a legacy format database (hippo-db < 0.3.23)")
+                mrich.warning("Clearing legacy fingerprints...")
                 self.create_table_interaction()
                 self.delete_interactions()
 
         if "subsite" not in self.table_names or "subsite_tag" not in self.table_names:
-            logger.warning("This is a legacy format database (hippo-db < 0.3.24)")
+            mrich.warning("This is a legacy format database (hippo-db < 0.3.24)")
             self.create_table_subsite()
             self.create_table_subsite_tag()
 
         if "scaffold" not in self.table_names:
             if not update_legacy:
-                logger.error("This is a legacy format database (hippo-db < 0.3.25)")
-                logger.error("Existing base-elab relationships will not be compatible")
-                logger.error(
-                    "Re-initialise HIPPO object with update_legacy=True to fix"
-                )
+                mrich.error("This is a legacy format database (hippo-db < 0.3.25)")
+                mrich.error("Existing base-elab relationships will not be compatible")
+                mrich.error("Re-initialise HIPPO object with update_legacy=True to fix")
                 raise LegacyDatabaseError("hippo-db < 0.3.25")
             else:
-                logger.warning("This is a legacy format database (hippo-db < 0.3.25)")
-                logger.warning("Migrating compound_base values to scaffold table...")
+                mrich.warning("This is a legacy format database (hippo-db < 0.3.25)")
+                mrich.warning("Migrating compound_base values to scaffold table...")
                 self.create_table_scaffold()
                 self.migrate_legacy_bases()
 
@@ -102,14 +98,12 @@ class Database:
 
         elif "component_amount" not in self.column_names("component"):
             if not update_legacy:
-                logger.error("This is a legacy format database (hippo-db < 0.3.29)")
-                logger.error(
-                    "Re-initialise HIPPO object with update_legacy=True to fix"
-                )
+                mrich.error("This is a legacy format database (hippo-db < 0.3.29)")
+                mrich.error("Re-initialise HIPPO object with update_legacy=True to fix")
                 raise LegacyDatabaseError("hippo-db < 0.3.29")
             else:
-                logger.warning("This is a legacy format database (hippo-db < 0.3.29)")
-                logger.warning("Updating legacy routes...")
+                mrich.warning("This is a legacy format database (hippo-db < 0.3.29)")
+                mrich.warning("Updating legacy routes...")
 
             self.update_legacy_routes()
 
@@ -131,16 +125,16 @@ class Database:
 
         if destination.exists():
             if overwrite_existing:
-                logger.warning(f"Overwriting {destination}")
+                mrich.warning(f"Overwriting {destination}")
             else:
-                logger.error(f"Will not overwrite {destination}")
-                logger.error(f"Set overwrite_existing=True to override")
+                mrich.error(f"Will not overwrite {destination}")
+                mrich.error(f"Set overwrite_existing=True to override")
                 raise Exception("Set overwrite_existing=True to override")
 
-        logger.print(f"Copying {source} --> {destination}")
+        mrich.print(f"Copying {source} --> {destination}")
 
         def progress(status, remaining, total):
-            logger.debug(f"Copied {total-remaining} of {total} pages...")
+            mrich.debug(f"Copied {total-remaining} of {total} pages...")
 
         src = sqlite3.connect(source)
         dst = sqlite3.connect(destination)
@@ -193,7 +187,7 @@ class Database:
 
     def close(self) -> None:
         """Close the connection"""
-        logger.debug("hippo.Database.close()")
+        mrich.debug("hippo.Database.close()")
         if self.connection:
             self.connection.close()
         mout.success(f"Closed connection to {self.path}")
@@ -212,12 +206,12 @@ class Database:
 
         destination = Path(destination)
 
-        with logger.spinner(f"Backing up {self.__rich__()}[reset]..."):
+        with mrich.spinner(f"Backing up {self.__rich__()}[reset]..."):
 
-            logger.writing(destination)
+            mrich.writing(destination)
 
             def progress(status, remaining, total):
-                logger.debug(f"Copied {total-remaining} of {total} pages...")
+                mrich.debug(f"Copied {total-remaining} of {total} pages...")
 
             src = self.connection
             dst = sqlite3.connect(destination)
@@ -230,31 +224,31 @@ class Database:
 
     def connect(self) -> None:
         """Connect to the database"""
-        logger.debug("hippo.Database.connect()")
+        mrich.debug("hippo.Database.connect()")
 
         conn = None
 
         try:
             conn = sqlite3.connect(self.path)
 
-            logger.debug(f"{sqlite3.version=}")
+            mrich.debug(f"{sqlite3.version=}")
 
             conn.enable_load_extension(True)
             conn.load_extension("chemicalite")
             conn.enable_load_extension(False)
 
-            logger.success("Database connected @", f"[file]{self.path}")
+            mrich.success("Database connected @", f"[file]{self.path}")
 
         except sqlite3.OperationalError as e:
 
             if "cannot open shared object file" in str(e):
-                logger.error("chemicalite package not installed correctly")
+                mrich.error("chemicalite package not installed correctly")
             else:
-                logger.error(e)
+                mrich.error(e)
             raise
 
         except Error as e:
-            logger.error(e)
+            mrich.error(e)
             raise
 
         self._connection = conn
@@ -284,7 +278,7 @@ class Database:
     def create_blank_db(self) -> None:
         """Create a blank database"""
 
-        with logger.loading("Creating blank database..."):
+        with mrich.loading("Creating blank database..."):
             self.create_table_compound()
             self.create_table_inspiration()
             self.create_table_reaction()
@@ -305,7 +299,7 @@ class Database:
 
     def create_table_compound(self) -> None:
         """Create the compound table"""
-        logger.debug("HIPPO.Database.create_table_compound()")
+        mrich.debug("HIPPO.Database.create_table_compound()")
 
         sql = """CREATE TABLE compound(
             compound_id INTEGER PRIMARY KEY,
@@ -327,7 +321,7 @@ class Database:
 
     def create_table_inspiration(self) -> None:
         """Create the inspiration table"""
-        logger.debug("HIPPO.Database.create_table_inspiration()")
+        mrich.debug("HIPPO.Database.create_table_inspiration()")
 
         sql = """CREATE TABLE inspiration(
             inspiration_original INTEGER,
@@ -342,7 +336,7 @@ class Database:
 
     def create_table_scaffold(self) -> None:
         """Create the scaffold table"""
-        logger.debug("HIPPO.Database.create_table_scaffold()")
+        mrich.debug("HIPPO.Database.create_table_scaffold()")
 
         sql = """CREATE TABLE scaffold(
             scaffold_base INTEGER,
@@ -357,7 +351,7 @@ class Database:
 
     def create_table_reaction(self) -> None:
         """Create the reaction table"""
-        logger.debug("HIPPO.Database.create_table_reaction()")
+        mrich.debug("HIPPO.Database.create_table_reaction()")
 
         sql = """CREATE TABLE reaction(
             reaction_id INTEGER PRIMARY KEY,
@@ -372,7 +366,7 @@ class Database:
 
     def create_table_reactant(self) -> None:
         """Create the reactant table"""
-        logger.debug("HIPPO.Database.create_table_reactant()")
+        mrich.debug("HIPPO.Database.create_table_reactant()")
 
         sql = """CREATE TABLE reactant(
             reactant_amount REAL,
@@ -388,7 +382,7 @@ class Database:
 
     def create_table_pose(self) -> None:
         """Create the pose table"""
-        logger.debug("HIPPO.Database.create_table_pose()")
+        mrich.debug("HIPPO.Database.create_table_pose()")
 
         sql = """CREATE TABLE pose(
             pose_id INTEGER PRIMARY KEY,
@@ -418,7 +412,7 @@ class Database:
 
     def create_table_tag(self) -> None:
         """Create the tag table"""
-        logger.debug("HIPPO.Database.create_table_tag()")
+        mrich.debug("HIPPO.Database.create_table_tag()")
 
         sql = """CREATE TABLE tag(
             tag_name TEXT,
@@ -435,7 +429,7 @@ class Database:
 
     def create_table_quote(self) -> None:
         """Create the quote table"""
-        logger.debug("HIPPO.Database.create_table_quote()")
+        mrich.debug("HIPPO.Database.create_table_quote()")
 
         sql = """CREATE TABLE quote(
             quote_id INTEGER PRIMARY KEY,
@@ -459,7 +453,7 @@ class Database:
 
     def create_table_target(self) -> None:
         """Create the target table"""
-        logger.debug("HIPPO.Database.create_table_target()")
+        mrich.debug("HIPPO.Database.create_table_target()")
         sql = """CREATE TABLE target(
             target_id INTEGER PRIMARY KEY,
             target_name TEXT,
@@ -472,7 +466,7 @@ class Database:
 
     def create_table_feature(self) -> None:
         """Create the feature table"""
-        logger.debug("HIPPO.Database.create_table_feature()")
+        mrich.debug("HIPPO.Database.create_table_feature()")
         sql = """CREATE TABLE feature(
             feature_id INTEGER PRIMARY KEY,
             feature_family TEXT,
@@ -489,7 +483,7 @@ class Database:
 
     def create_table_route(self) -> None:
         """Create the route table"""
-        logger.debug("HIPPO.Database.create_table_route()")
+        mrich.debug("HIPPO.Database.create_table_route()")
         sql = """CREATE TABLE route(
             route_id INTEGER PRIMARY KEY,
             route_product INTEGER
@@ -500,7 +494,7 @@ class Database:
 
     def create_table_component(self) -> None:
         """Create the component table"""
-        logger.debug("HIPPO.Database.create_table_component()")
+        mrich.debug("HIPPO.Database.create_table_component()")
         sql = """CREATE TABLE component(
             component_id INTEGER PRIMARY KEY,
             component_route INTEGER,
@@ -515,7 +509,7 @@ class Database:
 
     def create_table_pattern_bfp(self) -> None:
         """Create the pattern_bfp table"""
-        logger.debug("HIPPO.Database.create_table_pattern_bfp()")
+        mrich.debug("HIPPO.Database.create_table_pattern_bfp()")
 
         sql = "CREATE VIRTUAL TABLE compound_pattern_bfp USING rdtree(compound_id, fp bits(2048))"
 
@@ -527,7 +521,7 @@ class Database:
         """Create an interaction table"""
 
         if debug:
-            logger.debug(f"HIPPO.Database.create_table_interaction({table=})")
+            mrich.debug(f"HIPPO.Database.create_table_interaction({table=})")
         sql = f"""CREATE TABLE {table}(
             interaction_id INTEGER PRIMARY KEY,
             interaction_feature INTEGER NOT NULL,
@@ -549,7 +543,7 @@ class Database:
     def create_table_subsite(self) -> None:
         """Create the subsite table"""
 
-        logger.debug("HIPPO.Database.create_table_subsite()")
+        mrich.debug("HIPPO.Database.create_table_subsite()")
         sql = """CREATE TABLE subsite(
             subsite_id INTEGER PRIMARY KEY,
             subsite_target INTEGER NOT NULL,
@@ -564,7 +558,7 @@ class Database:
     def create_table_subsite_tag(self) -> None:
         """Create the subsite_tag table"""
 
-        logger.debug("HIPPO.Database.create_table_subsite_tag()")
+        mrich.debug("HIPPO.Database.create_table_subsite_tag()")
         sql = """CREATE TABLE subsite_tag(
             subsite_tag_id INTEGER PRIMARY KEY,
             subsite_tag_ref INTEGER NOT NULL,
@@ -616,29 +610,29 @@ class Database:
         except sqlite3.IntegrityError as e:
             if "UNIQUE constraint failed: compound.compound_inchikey" in str(e):
                 if warn_duplicate:
-                    logger.warning(
+                    mrich.warning(
                         f'Skipping compound with existing inchikey "{inchikey}"'
                     )
             elif "UNIQUE constraint failed: compound.compound_smiles" in str(e):
                 if warn_duplicate:
-                    logger.warning(f'Skipping compound with existing smiles "{smiles}"')
+                    mrich.warning(f'Skipping compound with existing smiles "{smiles}"')
             elif "UNIQUE constraint failed: compound.compound_pattern_bfp" in str(e):
                 if warn_duplicate:
-                    logger.warning(
+                    mrich.warning(
                         f'Skipping compound with existing pattern binary fingerprint "{smiles}"'
                     )
             elif "UNIQUE constraint failed: compound.compound_morgan_bfp" in str(e):
                 if warn_duplicate:
-                    logger.warning(
+                    mrich.warning(
                         f'Skipping compound with existing morgan binary fingerprint "{smiles}"'
                     )
             else:
-                logger.error(e)
+                mrich.error(e)
 
             return None
 
         except Exception as e:
-            logger.error(e)
+            mrich.error(e)
 
         compound_id = self.cursor.lastrowid
         if commit:
@@ -655,7 +649,7 @@ class Database:
         result = self.insert_compound_pattern_bfp(compound_id, commit=commit)
 
         if not result:
-            logger.error("Could not insert compound pattern bfp")
+            mrich.error("Could not insert compound pattern bfp")
 
         if metadata:
             self.insert_metadata(
@@ -686,7 +680,7 @@ class Database:
             self.execute(sql, (compound_id, bfp))
 
         except Exception as e:
-            logger.error(e)
+            mrich.error(e)
 
         bfp_id = self.cursor.lastrowid
         if commit:
@@ -749,7 +743,7 @@ class Database:
                 path = str(path)
 
             except FileNotFoundError as e:
-                logger.error(f"Path cannot be resolved: {mcol.file}{path}")
+                mrich.error(f"Path cannot be resolved: {mcol.file}{path}")
                 raise
 
         sql = """
@@ -776,20 +770,18 @@ class Database:
         except sqlite3.IntegrityError as e:
             if "UNIQUE constraint failed: pose.pose_path" in str(e):
                 if warn_duplicate:
-                    logger.warning(
-                        f'Could not insert pose with duplicate path "{path}"'
-                    )
+                    mrich.warning(f'Could not insert pose with duplicate path "{path}"')
             elif "UNIQUE constraint failed: pose.pose_alias" in str(e):
                 if warn_duplicate:
-                    logger.warning(
+                    mrich.warning(
                         f'Could not insert pose with duplicate alias "{alias}"'
                     )
             else:
-                logger.error(e)
+                mrich.error(e)
             return None
 
         except Exception as e:
-            logger.error(e)
+            mrich.error(e)
             raise
 
         pose_id = self.cursor.lastrowid
@@ -844,7 +836,7 @@ class Database:
             return None
 
         except Exception as e:
-            logger.error(e)
+            mrich.error(e)
 
         tag_id = self.cursor.lastrowid
         if commit:
@@ -891,13 +883,13 @@ class Database:
 
         except sqlite3.IntegrityError as e:
             if warn_duplicate:
-                logger.warning(
+                mrich.warning(
                     f"Skipping existing inspiration: {original=} {derivative=}"
                 )
             return None
 
         except Exception as e:
-            logger.error(e)
+            mrich.error(e)
 
         inspiration_id = self.cursor.lastrowid
 
@@ -936,7 +928,7 @@ class Database:
         ), f"Must pass an integer ID or Compound object (superstructure) {superstructure=} {type(superstructure)}"
 
         if base == superstructure:
-            logger.warning(f"Skipped self-referential scaffold assignment (C{base})")
+            mrich.warning(f"Skipped self-referential scaffold assignment (C{base})")
             return None
 
         sql = """
@@ -949,11 +941,11 @@ class Database:
 
         except sqlite3.IntegrityError as e:
             if warn_duplicate:
-                logger.warning(f"Skipping existing scaffold: {base=} {superstructure=}")
+                mrich.warning(f"Skipping existing scaffold: {base=} {superstructure=}")
             return None
 
         except Exception as e:
-            logger.error(e)
+            mrich.error(e)
 
         scaffold_id = self.cursor.lastrowid
 
@@ -994,7 +986,7 @@ class Database:
             self.execute(sql, (type, product, product_yield))
 
         except Exception as e:
-            logger.error(e)
+            mrich.error(e)
 
         reaction_id = self.cursor.lastrowid
         if commit:
@@ -1037,10 +1029,10 @@ class Database:
             self.execute(sql, (amount, reaction.id, compound.id))
 
         except sqlite3.IntegrityError as e:
-            logger.warning(f"Skipping existing reactant: {reaction=} {compound=}")
+            mrich.warning(f"Skipping existing reactant: {reaction=} {compound=}")
 
         except Exception as e:
-            logger.error(e)
+            mrich.error(e)
 
         reactant_id = self.cursor.lastrowid
 
@@ -1135,12 +1127,12 @@ class Database:
             )
 
         except sqlite3.InterfaceError as e:
-            logger.error(e)
-            logger.debug(payload)
+            mrich.error(e)
+            mrich.debug(payload)
             raise
 
         except Exception as e:
-            logger.error(e)
+            mrich.error(e)
             return None
 
         quote_id = self.cursor.lastrowid
@@ -1169,11 +1161,11 @@ class Database:
             self.execute(sql, (name,))
 
         except sqlite3.IntegrityError as e:
-            logger.warning(f"Skipping existing target with {name=}")
+            mrich.warning(f"Skipping existing target with {name=}")
             return None
 
         except Exception as e:
-            logger.error(e)
+            mrich.error(e)
 
         target_id = self.cursor.lastrowid
         self.commit()
@@ -1233,7 +1225,7 @@ class Database:
             return None
 
         except Exception as e:
-            logger.error(e)
+            mrich.error(e)
 
         feature_id = self.cursor.lastrowid
         if commit:
@@ -1288,7 +1280,7 @@ class Database:
             self.execute(sql, (product_id,))
 
         except Exception as e:
-            logger.error(e)
+            mrich.error(e)
 
         route_id = self.cursor.lastrowid
 
@@ -1352,7 +1344,7 @@ class Database:
         except sqlite3.IntegrityError as e:
 
             if "UNIQUE constraint failed: component" in str(e):
-                logger.warning(
+                mrich.warning(
                     f"Did not add existing component={ref} (type={component_type}) to {route=}"
                 )
                 return None
@@ -1488,14 +1480,14 @@ class Database:
 
         except sqlite3.IntegrityError as e:
             if warn_duplicate:
-                # logger.warning(f"Skipping existing interaction: {(feature, pose, family, atom_ids, prot_coord, lig_coord, distance, energy)}")
-                logger.warning(
+                # mrich.warning(f"Skipping existing interaction: {(feature, pose, family, atom_ids, prot_coord, lig_coord, distance, energy)}")
+                mrich.warning(
                     f"Skipping existing interaction: {feature=} {pose=} {family=} {atom_ids=}"
                 )
             return None
 
         except Exception as e:
-            logger.error(e)
+            mrich.error(e)
 
         interaction_id = self.cursor.lastrowid
 
@@ -1525,11 +1517,11 @@ class Database:
             self.execute(sql, (target, name))
 
         except sqlite3.IntegrityError as e:
-            logger.warning(f"Skipping existing subsite for {target=} with {name=}")
+            mrich.warning(f"Skipping existing subsite for {target=} with {name=}")
             return None
 
         except Exception as e:
-            logger.error(e)
+            mrich.error(e)
 
         subsite_id = self.cursor.lastrowid
         if commit:
@@ -1583,13 +1575,13 @@ class Database:
             self.execute(sql, (subsite_id, pose_id))
 
         except sqlite3.IntegrityError as e:
-            logger.warning(
+            mrich.warning(
                 f"Skipping existing subsite_tag for {subsite_id=} with {pose_id=}"
             )
             return None
 
         except Exception as e:
-            logger.error(e)
+            mrich.error(e)
 
         subsite_tag_id = self.cursor.lastrowid
         if commit:
@@ -1623,7 +1615,7 @@ class Database:
         try:
             self.execute(sql)
         except sqlite3.OperationalError as e:
-            logger.var("sql", sql)
+            mrich.var("sql", sql)
             raise
 
         if multiple:
@@ -1710,7 +1702,7 @@ class Database:
         try:
             self.execute(sql)
         except sqlite3.OperationalError as e:
-            logger.var("sql", sql)
+            mrich.var("sql", sql)
             raise
 
         if multiple:
@@ -1719,7 +1711,7 @@ class Database:
             result = self.cursor.fetchone()
 
         if not result and none == "error":
-            logger.error(f"No entry in {table} with {where_str}")
+            mrich.error(f"No entry in {table} with {where_str}")
             return None
         elif not result and none == "exception":
             raise ValueError(f"No entry in {table} with {where_str}")
@@ -1811,7 +1803,7 @@ class Database:
             result = self.execute(sql)
 
         except sqlite3.OperationalError as e:
-            logger.var("sql", sql)
+            mrich.var("sql", sql)
             raise
 
         if commit:
@@ -1882,7 +1874,7 @@ class Database:
         try:
             self.execute(sql, (value,))
         except sqlite3.OperationalError as e:
-            logger.var("sql", sql)
+            mrich.var("sql", sql)
             raise
 
         id = self.cursor.lastrowid
@@ -1915,7 +1907,7 @@ class Database:
         try:
             self.execute(sql, (value,))
         except sqlite3.OperationalError as e:
-            logger.var("sql", sql)
+            mrich.var("sql", sql)
             raise
 
         if commit:
@@ -1965,7 +1957,7 @@ class Database:
         :returns: ID of the last inserted scaffold record
         """
 
-        logger.debug("HIPPO.Database.migrate_legacy_bases()")
+        mrich.debug("HIPPO.Database.migrate_legacy_bases()")
 
         cursor = self.execute(
             """
@@ -2032,7 +2024,7 @@ class Database:
 
         if not id:
             if none == "error":
-                logger.error(f"Invalid {id=}")
+                mrich.error(f"Invalid {id=}")
             return None
 
         query = "compound_id, compound_inchikey, compound_alias, compound_smiles"
@@ -2125,7 +2117,7 @@ class Database:
             id = self.get_pose_id(inchikey=inchikey, alias=alias)
 
         if not id:
-            logger.error(f"Invalid {id=}")
+            mrich.error(f"Invalid {id=}")
             return None
 
         query = "pose_id, pose_inchikey, pose_alias, pose_smiles, pose_reference, pose_path, pose_compound, pose_target, pose_mol, pose_fingerprint, pose_energy_score, pose_distance_score"
@@ -2154,7 +2146,7 @@ class Database:
                 table="pose", key="inchikey", value=inchikey, multiple=True
             )
             if len(entries) != 1:
-                logger.warning(f"Multiple poses with {inchikey=}")
+                mrich.warning(f"Multiple poses with {inchikey=}")
                 return entries
             else:
                 entry = entries[0]
@@ -2185,7 +2177,7 @@ class Database:
         """
 
         if not id:
-            logger.error(f"Invalid {id=}")
+            mrich.error(f"Invalid {id=}")
             return None
 
         query = "reaction_id, reaction_type, reaction_product, reaction_product_yield"
@@ -2351,7 +2343,7 @@ class Database:
         )
 
         if debug:
-            logger.var("product_id", product_id)
+            mrich.var("product_id", product_id)
 
         triples = self.select_where(
             table="component",
@@ -2380,7 +2372,7 @@ class Database:
                     raise ValueError(f"Unknown component type {c_type}")
 
         if debug:
-            logger.var("pairs", pairs)
+            mrich.var("pairs", pairs)
 
         products = CompoundSet(self, [product_id])
         reactants = CompoundSet(self, reactant_ids)
@@ -2406,7 +2398,7 @@ class Database:
         )
 
         if debug:
-            logger.var("recipe", recipe)
+            mrich.var("recipe", recipe)
 
         return recipe
 
@@ -2578,10 +2570,10 @@ class Database:
         for i in range(300):
 
             if debug:
-                logger.var("recursive depth", i + 1)
+                mrich.var("recursive depth", i + 1)
 
             if debug:
-                logger.var("#products", len(product_ids))
+                mrich.var("#products", len(product_ids))
 
             product_ids_str = str(tuple(product_ids)).replace(",)", ")")
 
@@ -2602,7 +2594,7 @@ class Database:
                 all_reactions.add(reaction_id)
 
             if debug:
-                logger.var("#reactions", len(reaction_ids))
+                mrich.var("#reactions", len(reaction_ids))
 
             reaction_ids_str = str(tuple(reaction_ids)).replace(",)", ")")
 
@@ -2614,7 +2606,7 @@ class Database:
             )
 
             if debug:
-                logger.var("#reactants", len(reactant_ids))
+                mrich.var("#reactants", len(reactant_ids))
 
             reactant_ids = [q for q, in reactant_ids]
 
@@ -2641,8 +2633,8 @@ class Database:
         all_reactions = ReactionSet(self, all_reactions)
 
         if debug:
-            logger.var("#all_reactants", len(all_reactants))
-            logger.var("#all_reactions", len(all_reactions))
+            mrich.var("#all_reactants", len(all_reactants))
+            mrich.var("#all_reactions", len(all_reactions))
 
         return all_reactants, all_reactions
 
@@ -2660,7 +2652,7 @@ class Database:
 
         # get reactants for a given reaction
 
-        logger.warning("Price estimate does not account for branching!")
+        mrich.warning("Price estimate does not account for branching!")
         reactants, _ = self.get_unsolved_reaction_tree(
             product_ids=reaction.reactant_ids
         )
@@ -2812,13 +2804,13 @@ class Database:
         try:
             self.execute(sql, (query,))
         except sqlite3.OperationalError as e:
-            logger.var("sql", sql)
+            mrich.var("sql", sql)
             raise
 
         result = self.cursor.fetchall()
 
         if not result and none == "error":
-            logger.error(f"No compounds with substructure {query}")
+            mrich.error(f"No compounds with substructure {query}")
             return None
 
         from .cset import CompoundSet
@@ -2858,13 +2850,13 @@ class Database:
         try:
             self.execute(sql, (query, threshold))
         except sqlite3.OperationalError as e:
-            logger.var("sql", sql)
+            mrich.var("sql", sql)
             raise
 
         result = self.cursor.fetchall()
 
         if not result and none == "error":
-            logger.error(f"No compounds with similarity >= {threshold} to {query}")
+            mrich.error(f"No compounds with similarity >= {threshold} to {query}")
             return None
 
         if return_similarity:
@@ -3057,7 +3049,7 @@ class Database:
                 del_list.append(reaction)
 
         for reaction in del_list:
-            logger.warning(f"Deleted duplicate {reaction=}")
+            mrich.warning(f"Deleted duplicate {reaction=}")
             self.delete_where("reaction", "id", reaction.id)
 
         return pruned

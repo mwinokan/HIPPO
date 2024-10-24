@@ -5,7 +5,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 import pandas as pd
 
-import mrich as logger
+import mrich
 
 DATA_COLUMNS = [
     "score",
@@ -183,7 +183,7 @@ class Scorer:
         null = col.isnull()
 
         if null.sum():
-            logger.debug("Calculating scores...")
+            mrich.debug("Calculating scores...")
             for key in col[null].index.values:
                 recipe = self.recipes[key]
                 score = self.score(recipe)
@@ -229,13 +229,13 @@ class Scorer:
             self._attributes[key] = ca
 
             if weight_reset_warning:
-                logger.warning("Attribute weights have been reset")
+                mrich.warning("Attribute weights have been reset")
             self.weights = 1.0
 
             self._data[key] = None
 
         else:
-            logger.warning("Existing attribute with {key=}")
+            mrich.warning("Existing attribute with {key=}")
 
         return self._attributes[key]
 
@@ -251,7 +251,7 @@ class Scorer:
             key = path.name.removeprefix("Recipe_").removesuffix(".json")
 
             if key in self.recipes:
-                logger.warning(f"Skipping duplicate {path}")
+                mrich.warning(f"Skipping duplicate {path}")
                 continue
 
             recipe = Recipe.from_json(self._db, path, allow_db_mismatch=True)
@@ -259,14 +259,14 @@ class Scorer:
             recipe._hash = key
 
             if debug:
-                logger.debug(recipe)
+                mrich.debug(recipe)
 
             if debug:
-                logger.debug("Updating Scorer.recipes._json_paths")
+                mrich.debug("Updating Scorer.recipes._json_paths")
             self.recipes._json_paths[key] = path.resolve()
 
             if debug:
-                logger.debug("Updating Scorer.recipes._recipes")
+                mrich.debug("Updating Scorer.recipes._recipes")
             self.recipes._recipes[key] = recipe
 
             self._data.loc[key] = None
@@ -304,7 +304,7 @@ class Scorer:
                 )
 
             print(pd.DataFrame(print_data))
-            logger.var("score", score)
+            mrich.var("score", score)
 
         recipe._score = score
 
@@ -326,10 +326,10 @@ class Scorer:
         if self._df is None or params != self._df_params:
 
             if debug:
-                logger.debug("Scorer.get_df()")
+                mrich.debug("Scorer.get_df()")
 
             if debug:
-                logger.debug("Scorer.recipes.get_df()")
+                mrich.debug("Scorer.recipes.get_df()")
 
             data = []
 
@@ -355,7 +355,7 @@ class Scorer:
             for attribute in self.attributes:
 
                 if debug:
-                    logger.debug(f"Getting {attribute.key=} values")
+                    mrich.debug(f"Getting {attribute.key=} values")
 
                 if isinstance(attribute, CustomAttribute):
 
@@ -383,7 +383,7 @@ class Scorer:
 
             df = self.get_df(serialise_price=True)
 
-            logger.debug("Sorting DataFrame...")
+            mrich.debug("Sorting DataFrame...")
             self._sorted_df = df.sort_values(by="score", ascending=False)
 
         df = self._sorted_df
@@ -403,7 +403,7 @@ class Scorer:
         import plotly.express as px
 
         if len(keys) != 2:
-            logger.error("Only two keys supported")
+            mrich.error("Only two keys supported")
             return None
 
         # calculate scores
@@ -462,9 +462,9 @@ class Scorer:
 
     def summary(self):
 
-        logger.header(repr(self))
+        mrich.header(repr(self))
         for attribute in self.attributes:
-            logger.out(
+            mrich.out(
                 f"{repr(attribute)} min={attribute.min:.3g}, mean={attribute.mean:.3g}, std={attribute.std:.3g}, max={attribute.max:.3g}"
             )
 
@@ -501,7 +501,7 @@ class Scorer:
 
         # populate missing product compound ids
         if null.sum():
-            logger.debug(f'Populating _data["{col}"]...')
+            mrich.debug(f'Populating _data["{col}"]...')
             assert len(df[null]) == null.sum()
             for key in df[null].index.values:
                 recipe = self.recipes[key]
@@ -522,10 +522,10 @@ class Scorer:
 
             cset = CompoundSet(self.db, compound_ids, sort=False)
 
-            logger.debug(f"Getting poses for {len(cset)} compounds")
+            mrich.debug(f"Getting poses for {len(cset)} compounds")
             pose_map = self.db.get_compound_id_pose_ids_dict(cset)
 
-            logger.debug(f'Populating _data["{col}"]...')
+            mrich.debug(f'Populating _data["{col}"]...')
             for key in df[null].index.values:
                 assert len(df[null]) == null.sum()
                 recipe = self.recipes[key]
@@ -556,10 +556,10 @@ class Scorer:
 
             pset = PoseSet(self.db, pose_ids, sort=False)
 
-            logger.debug(f"Getting interactions for {len(pset)} poses")
+            mrich.debug(f"Getting interactions for {len(pset)} poses")
             interaction_map = self.db.get_pose_id_interaction_ids_dict(pset)
 
-            logger.debug(f'Populating _data["{col}"]...')
+            mrich.debug(f'Populating _data["{col}"]...')
             for key in df[null].index.values:
                 assert len(df[null]) == null.sum()
                 recipe = self.recipes[key]
@@ -583,7 +583,7 @@ class Scorer:
         from .pset import PoseSet
         from .iset import InteractionSet
 
-        logger.debug("Populating recipe caches")
+        mrich.debug("Populating recipe caches")
         for key, recipe in self.recipes.items():
 
             row = self._data.loc[key]
@@ -608,13 +608,13 @@ class Scorer:
 
     def _dump_json(self):
         path = self.json_path
-        logger.writing(path)
+        mrich.writing(path)
         self._data.to_json(path)
 
     def _load_json(self):
         path = self.json_path
 
-        logger.reading(path)
+        mrich.reading(path)
         cached = pd.read_json(path, orient="columns")
 
         if (cached_columns := set(cached.columns)) != (
@@ -622,10 +622,10 @@ class Scorer:
         ):
 
             for col in cached_columns - self_columns:
-                logger.error(f"JSON has unexpected {col}")
+                mrich.error(f"JSON has unexpected {col}")
 
             for col in self_columns - cached_columns:
-                logger.error(f"JSON is missing {col}")
+                mrich.error(f"JSON is missing {col}")
 
             display(cached.head())
             display(self._data.head())
@@ -636,12 +636,12 @@ class Scorer:
         self_keys = set(self._data.index.values)
 
         if difference := cached_keys - self_keys:
-            logger.warning("JSON has extra Recipes:")
-            logger.warning(difference)
+            mrich.warning("JSON has extra Recipes:")
+            mrich.warning(difference)
 
         if difference := self_keys - cached_keys:
-            logger.erro("JSON is missing Recipes:")
-            logger.error(difference)
+            mrich.erro("JSON is missing Recipes:")
+            mrich.error(difference)
             raise ValueError("JSON is missing Recipes")
 
         cached.replace({np.nan: None}, inplace=True),
@@ -718,7 +718,7 @@ class Attribute:
         null = df.isnull()
 
         if null.sum():
-            for key in logger.track(
+            for key in mrich.track(
                 df[null].index.values, f"Constructing value dictionary for {self}"
             ):
                 recipe = self.scorer.recipes[key]

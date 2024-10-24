@@ -45,7 +45,7 @@ class ProjectPage:
 
         self._all_scaffolds = self.animal.compounds(tag=scaffold_tag)
 
-        logger.debug(f"{len(self.all_scaffolds)=}")
+        mrich.debug(f"{len(self.all_scaffolds)=}")
 
         self._all_scaffold_poses = None
         self._all_elabs = None
@@ -176,7 +176,7 @@ class ProjectPage:
     @property
     def proposal(self):
         if len(self.proposals) != 1:
-            logger.warning(f"{len(self.proposals)=}")
+            mrich.warning(f"{len(self.proposals)=}")
         return self._proposals[0]
 
     @property
@@ -193,7 +193,7 @@ class ProjectPage:
         path = self.index_path
 
         with open(path, "wt") as f:
-            logger.writing(path)
+            mrich.writing(path)
             f.writelines(indent(self.doc.getvalue()))
 
     ### INTERNAL HTML STUFF
@@ -201,16 +201,16 @@ class ProjectPage:
     def make_directories(self) -> None:
         """Create output directories"""
 
-        logger.writing(self.output_dir)
+        mrich.writing(self.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        logger.writing(self.resource_dir)
+        mrich.writing(self.resource_dir)
         (self.resource_dir).mkdir(parents=True, exist_ok=True)
 
-        logger.writing(self.mol_image_dir)
+        mrich.writing(self.mol_image_dir)
         (self.mol_image_dir).mkdir(parents=True, exist_ok=True)
 
-        logger.writing(self.pose_sdf_dir)
+        mrich.writing(self.pose_sdf_dir)
         (self.pose_sdf_dir).mkdir(parents=True, exist_ok=True)
 
     def setup_page(self) -> None:
@@ -411,7 +411,7 @@ class ProjectPage:
 
         image = MolToImage(compound.mol)
         path = self.mol_image_dir / f"C{compound.id}.png"
-        logger.writing(path)
+        mrich.writing(path)
         image.save(path)
 
     def save_pose_sdf(self, pose):
@@ -635,7 +635,7 @@ class ProjectPage:
         fig = self.funnel()
         self.plotly_graph(fig, "project_funnel.html")
         # except Exception as e:
-        # logger.error(e)
+        # mrich.error(e)
 
     def sec_hits(self) -> None:
         """Section on experimental hits"""
@@ -739,7 +739,7 @@ class ProjectPage:
         elabs = self.scaffolds.elabs
 
         if not elabs:
-            logger.warning("No elaborations")
+            mrich.warning("No elaborations")
             return None
 
         self._elaborations = elabs
@@ -886,7 +886,7 @@ class ProjectPage:
                 )
             except FileNotFoundError:
                 # hit_poses.write_sdf(path, inspirations=False)
-                logger.error(f"Could not find pose SDF: {original}")
+                mrich.error(f"Could not find pose SDF: {original}")
 
             # CAR CSVs
 

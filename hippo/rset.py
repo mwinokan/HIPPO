@@ -5,7 +5,7 @@ import mcol
 import os
 from numpy import int64
 
-import mrich as logger
+import mrich
 
 from .reaction import Reaction
 
@@ -279,7 +279,7 @@ class ReactionTable:
                 return self[ids]
 
             case _:
-                logger.error(
+                mrich.error(
                     f"Unsupported type for ReactionTable.__getitem__(): {key=} {type(key)}"
                 )
 
@@ -328,7 +328,7 @@ class ReactionTable:
         if type:
             return self.get_by_type(type)
         else:
-            logger.error("Must provide type argument")
+            mrich.error("Must provide type argument")
             return None
 
 
@@ -612,10 +612,10 @@ class ReactionSet:
         from pandas import DataFrame
         from rdkit.Chem import Mol
 
-        logger.debug("Using slower Reaction.dict rather than direct SQL query...")
+        mrich.debug("Using slower Reaction.dict rather than direct SQL query...")
 
         data = []
-        for r in logger.track(self, prefix="ReactionSet --> DataFrame"):
+        for r in mrich.track(self, prefix="ReactionSet --> DataFrame"):
             data.append(r.get_dict(smiles=smiles, mols=mols, **kwargs))
 
         return DataFrame(data)
@@ -648,7 +648,7 @@ class ReactionSet:
     def summary(self) -> None:
         """Print a summary of the Reactions"""
 
-        logger.header(self)
+        mrich.header(self)
         for reaction in self:
             print(repr(reaction))
 
@@ -687,7 +687,7 @@ class ReactionSet:
                 try:
                     index = self.indices[key]
                 except IndexError:
-                    logger.error(f"list index out of range: {key=} for {self}")
+                    mrich.error(f"list index out of range: {key=} for {self}")
                     raise
                 return self.db.get_reaction(id=index)
             case slice():
@@ -699,7 +699,7 @@ class ReactionSet:
                 ids = self.ids[key]
                 return ReactionSet(self.db, ids)
             case _:
-                logger.error(
+                mrich.error(
                     f"Unsupported type for ReactionSet.__getitem__(): {key=} {type(key)}"
                 )
 
