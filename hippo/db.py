@@ -42,7 +42,7 @@ class Database:
 
         assert isinstance(path, Path)
 
-        logger.debug("hippo3.Database.__init__()")
+        logger.debug("hippo.Database.__init__()")
 
         self._path = path
         self._connection = None
@@ -193,7 +193,7 @@ class Database:
 
     def close(self) -> None:
         """Close the connection"""
-        logger.debug("hippo3.Database.close()")
+        logger.debug("hippo.Database.close()")
         if self.connection:
             self.connection.close()
         mout.success(f"Closed connection to {self.path}")
@@ -230,7 +230,7 @@ class Database:
 
     def connect(self) -> None:
         """Connect to the database"""
-        logger.debug("hippo3.Database.connect()")
+        logger.debug("hippo.Database.connect()")
 
         conn = None
 
