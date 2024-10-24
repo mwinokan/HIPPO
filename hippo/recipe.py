@@ -2159,8 +2159,8 @@ class RouteSet:
 
         ### shuffle the cluster map as well
 
-        for cluster, routes in self._cluster_map.items():
-            self._cluster_map[cluster] = random.shuffle(routes)
+        for cluster, routes in self.cluster_map.items():
+            self.cluster_map[cluster] = random.shuffle(routes)
 
     ### DUNDERS
 
