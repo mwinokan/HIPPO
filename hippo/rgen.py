@@ -8,7 +8,7 @@ import json
 
 from .tools import dt_hash
 
-import mrich as logger
+import mrich
 
 
 class RandomRecipeGenerator:
@@ -26,7 +26,7 @@ class RandomRecipeGenerator:
         start_with: Recipe | CompoundSet | IngredientSet = None,
     ):
 
-        logger.debug("RandomRecipeGenerator.__init__()")
+        mrich.debug("RandomRecipeGenerator.__init__()")
 
         # Static parameters
         self._db_path = db.path
@@ -34,9 +34,9 @@ class RandomRecipeGenerator:
         self._suppliers = suppliers
         self._starting_recipe = start_with
 
-        logger.var("database", self.db_path)
-        logger.var("max_lead_time", self.max_lead_time)
-        logger.var("suppliers", self.suppliers)
+        mrich.var("database", self.db_path)
+        mrich.var("max_lead_time", self.max_lead_time)
+        mrich.var("suppliers", self.suppliers)
 
         # Database set up
         self._db = db
@@ -44,16 +44,16 @@ class RandomRecipeGenerator:
         # JSON I/O set up
         self._data_path = Path(str(self.db_path).replace(".sqlite", "_rgen.json"))
         if self.data_path.exists():
-            logger.warning(f"Will overwrite existing rgen data file: {self.data_path}")
+            mrich.warning(f"Will overwrite existing rgen data file: {self.data_path}")
 
         # Recipe I/O set up
         path = Path(str(self.db_path).replace(".sqlite", "_recipes"))
-        logger.writing(f"{path}/")
+        mrich.writing(f"{path}/")
         path.mkdir(exist_ok=True)
         self._recipe_dir = path
 
         # Route pool
-        logger.debug("Solving route pool...")
+        mrich.debug("Solving route pool...")
         self._route_pool = self.get_route_pool()
 
         # dump data
@@ -86,9 +86,9 @@ class RandomRecipeGenerator:
             allow_db_mismatch=True,
         )
 
-        logger.var("database", self.db_path)
-        logger.var("max_lead_time", self.max_lead_time)
-        logger.var("suppliers", self.suppliers)
+        mrich.var("database", self.db_path)
+        mrich.var("max_lead_time", self.max_lead_time)
+        mrich.var("suppliers", self.suppliers)
 
         self._db = db
 
@@ -168,7 +168,7 @@ class RandomRecipeGenerator:
 		"""
 
         if "route" not in self.db.table_names:
-            logger.error("route table not in Database")
+            mrich.error("route table not in Database")
             raise NotImplementedError
 
         assert self.suppliers_str
@@ -208,7 +208,7 @@ class RandomRecipeGenerator:
 
         routes = [
             self.db.get_route(id=route_id)
-            for route_id, in logger.track(route_ids, prefix="Getting routes")
+            for route_id, in mrich.track(route_ids, prefix="Getting routes")
         ]
 
         from .recipe import RouteSet
@@ -229,7 +229,7 @@ class RandomRecipeGenerator:
         data["starting_recipe"] = self.starting_recipe.get_dict(serialise_price=True)
         data["route_pool"] = self.route_pool.get_dict()
 
-        logger.writing(self.data_path)
+        mrich.writing(self.data_path)
         json.dump(data, open(self.data_path, "wt"), indent=4)
 
     def generate(
@@ -279,26 +279,25 @@ class RandomRecipeGenerator:
         assert len(pool), "Route pool is empty!"
 
         if shuffle:
-            logger.debug("Shuffling Route pool")
+            mrich.debug("Shuffling Route pool")
             pool.shuffle()
 
         old_recipe = recipe.copy()
 
-        logger.var("route pool", len(pool))
-        logger.var("max_iter", max_iter)
+        mrich.var("route pool", len(pool))
+        mrich.var("max_iter", max_iter)
 
-        pbar = tqdm(total=max_iter)
-
-        for i in range(max_iter):
+        for i in mrich.track(range(max_iter), prefix="Generating Recipe..."):
 
             if debug:
-                logger.title(f"Iteration {i}")
+                mrich.title(f"Iteration {i}")
 
             price = recipe.price
-            pbar.set_postfix(dict(price=str(price), num_products=len(recipe.products)))
+            mrich.set_progress_field("price", price)
+            mrich.set_progress_field("#products", len(recipe.products))
 
             if debug:
-                logger.var("price", price)
+                mrich.var("price", price)
 
             # pop a route
             if balance_clusters:
@@ -309,72 +308,63 @@ class RandomRecipeGenerator:
                 candidate_route = pool.pop()
 
             if debug:
-                logger.var("candidate_route", candidate_route)
+                mrich.var("candidate_route", candidate_route)
             if debug:
-                logger.var("candidate_route.reactants", candidate_route.reactants.ids)
+                mrich.var("candidate_route.reactants", candidate_route.reactants.ids)
 
             if candidate_route.product in recipe.products:
                 continue
 
             # add the route to the recipe
             if debug:
-                logger.var("#recipe.reactants", len(recipe.reactants))
+                mrich.var("#recipe.reactants", len(recipe.reactants))
             recipe += candidate_route
             if debug:
-                logger.var("#recipe.reactants", len(recipe.reactants))
+                mrich.var("#recipe.reactants", len(recipe.reactants))
 
             # calculate the new price
             try:
                 new_price = recipe.price
             except AssertionError:
-                logger.error(
+                mrich.error(
                     f"Something went wrong while calculating the price after adding {candidate_route=} to recipe"
                 )
                 raise
 
             if debug:
-                logger.var("new price", new_price)
+                mrich.var("new price", new_price)
 
             # Break if product pool depleted
             if not len(pool):
-                pbar.update(1)
                 stop_reason = "Product pool depleted"
-                logger.info(stop_reason)
-                pbar.close()
+                mrich.info(stop_reason)
                 break
 
             # check breaking conditions
             if new_price > budget:
-                pbar.update(1)
                 recipe = old_recipe.copy()
                 continue
 
             if len(recipe.reactions) > max_reactions:
-                pbar.close()
                 stop_reason = "Max #reactions exceeded"
-                logger.info(stop_reason)
+                mrich.info(stop_reason)
                 break
 
             if len(recipe.products) > max_products:
-                pbar.close()
                 stop_reason = "Max #products exceeded"
-                logger.info(stop_reason)
+                mrich.info(stop_reason)
                 break
 
             # accept change
             old_recipe = recipe.copy()
 
-            pbar.update(1)
-            # pbar.set_postfix(dict(price=str(price)))
-
         else:
             stop_reason = "Max #iterations reached"
-            logger.warning(stop_reason)
-            pbar.close()
+            mrich.warning(stop_reason)
 
         ### recalculate the products to see if any extra can be had for free?
 
-        logger.success(f"Completed after {i} iterations")
+        mrich.success(f"Completed after {i} iterations")
 
         metadict = {
             "rgen_data_path": str(self.data_path.resolve()),
