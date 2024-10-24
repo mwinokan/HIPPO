@@ -293,7 +293,7 @@ class RandomRecipeGenerator:
                 mrich.title(f"Iteration {i}")
 
             price = recipe.price
-            mrich.set_progress_field("price", price)
+            mrich.set_progress_field("price", str(price))
             mrich.set_progress_field("#products", len(recipe.products))
 
             if debug:
