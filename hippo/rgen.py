@@ -238,7 +238,7 @@ class RandomRecipeGenerator:
         currency: str = "EUR",
         max_products=1000,
         max_reactions=1000,
-        debug=True,
+        debug=False,
         max_iter=None,
         shuffle=True,
         balance_clusters: bool = False,
