@@ -381,7 +381,7 @@ class ProjectPage:
             ):
                 ...
 
-    def table(self, data, style: str = "w3-table-all", **kwargs):
+    def table(self, data, style: str = "w3-table-all w3-responsive", **kwargs):
         """Embed some data as a table"""
         from pandas import DataFrame
 
