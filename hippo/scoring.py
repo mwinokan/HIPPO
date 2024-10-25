@@ -376,22 +376,8 @@ class Scorer:
         return self._df
 
     def get_sorted_df(self, budget: float | None = None):
-
-        raise NotImplementedError
-
-        if self._sorted_df is None:
-
-            df = self.get_df(serialise_price=True)
-
-            mrich.debug("Sorting DataFrame...")
-            self._sorted_df = df.sort_values(by="score", ascending=False)
-
-        df = self._sorted_df
-
-        if budget:
-            df = df[df["price"] < budget]
-
-        return df
+        self.scores
+        return self._data.sort_values(by="score", ascending=False)
 
     def plot(
         self,
@@ -644,7 +630,7 @@ class Scorer:
             mrich.warning(difference)
 
         if difference := self_keys - cached_keys:
-            mrich.erro("JSON is missing Recipes:")
+            mrich.error("JSON is missing Recipes:")
             mrich.error(difference)
             raise ValueError("JSON is missing Recipes")
 
@@ -919,7 +905,7 @@ DEFAULT_ATTRIBUTES = {
     ),
     "elaboration_balance": dict(
         type="custom",
-        weight=0.0,
+        weight=1.0,
         function=lambda r: r.product_compounds.elaboration_balance,
         description="A measure for how evenly base compounds have been elaborated",
     ),  ### REALLY UNPERFORMANT?
