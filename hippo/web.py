@@ -820,9 +820,11 @@ class ProjectPage:
 
             d = {}
 
+            d["price"] = str(proposal.price)
+
             for attribute in self.scorer.attributes:
                 d[f"{attribute.key} w={attribute.weight}"] = (
-                    f"{attribute.get_value(proposal)} ({attribute.unweighted(proposal)}%)"
+                    f"{attribute.get_value(proposal):.1f} ({attribute.unweighted(proposal):.0%})"
                 )
 
             table_data.append(d)
