@@ -462,10 +462,14 @@ class Scorer:
 
     def summary(self):
 
-        mrich.header(repr(self))
+        mrich.header(self)
         for attribute in self.attributes:
-            mrich.out(
-                f"{repr(attribute)} min={attribute.min:.3g}, mean={attribute.mean:.3g}, std={attribute.std:.3g}, max={attribute.max:.3g}"
+            # mrich.out(
+            # f"{repr(attribute)} min={attribute.min:.3g}, mean={attribute.mean:.3g}, std={attribute.std:.3g}, max={attribute.max:.3g}"
+            # )
+            mrich.print(
+                attribute,
+                f"min={attribute.min:.3g}, mean={attribute.mean:.3g}, std={attribute.std:.3g}, max={attribute.max:.3g}",
             )
 
     def __check_integrity(self):
@@ -658,6 +662,8 @@ class Scorer:
 
     def __repr__(self) -> str:
         """ANSI Formatted string representation"""
+        import mcol
+
         return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
 
     def __rich__(self) -> str:
@@ -718,12 +724,14 @@ class Attribute:
         null = df.isnull()
 
         if null.sum():
-            for key in mrich.track(
-                df[null].index.values, f"Constructing value dictionary for {self}"
-            ):
-                recipe = self.scorer.recipes[key]
-                self.get_value(recipe, force=True)
-            self.scorer._dump_json()
+            # for key in mrich.track(
+            # df[null].index.values, f"Constructing value dictionary for {self}"
+            # , total = len(df[null])):
+            with mrich.loading(f"Constructing value dictionary for {self}"):
+                for key in df[null].index.values:
+                    recipe = self.scorer.recipes[key]
+                    self.get_value(recipe, force=True)
+                self.scorer._dump_json()
 
         return df.to_dict()
 
@@ -849,6 +857,8 @@ class Attribute:
 
     def __repr__(self) -> str:
         """ANSI Formatted string representation"""
+        import mcol
+
         return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
 
     def __rich__(self) -> str:

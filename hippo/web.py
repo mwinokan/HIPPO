@@ -3,8 +3,9 @@ import shutil
 
 import logging
 
-logger = logging.getLogger("HIPPO")
 logging.getLogger("PIL").setLevel(logging.WARNING)
+
+import mrich
 
 
 class ProjectPage:

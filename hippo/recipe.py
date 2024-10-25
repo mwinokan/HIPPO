@@ -1504,6 +1504,7 @@ class Recipe:
             )
 
             d = dict(
+                scaffold_id=compound.id,
                 product_id=compound.id,
                 smiles=compound.smiles,
                 inchikey=compound.inchikey,
@@ -1581,6 +1582,7 @@ class Recipe:
             compound = self.db.get_compound(id=sorted(elab_ids)[0])
 
             d = dict(
+                scaffold_id=base_id,
                 product_id=compound.id,
                 smiles=compound.smiles,
                 inchikey=compound.inchikey,
@@ -2063,8 +2065,9 @@ class RouteSet:
         if not self._data:
             mrich.print("RouteSet depleted")
             return None
+
         if not self.cluster_map:
-            mrich.warning("RouteSet.cluster_map depleted but _data isn't...")
+            # mrich.warning("RouteSet.cluster_map depleted but _data isn't...")
             return self.pop()
 
         # store the permitted clusters (or all clusters) list as property
@@ -2110,6 +2113,11 @@ class RouteSet:
             mrich.print(cluster)
             mrich.print(self.cluster_map)
             raise
+        except KeyError:
+            mrich.print("cluster", cluster)
+            mrich.print("self._permitted_clusters", self._permitted_clusters)
+            mrich.print("self.cluster_map.keys()", self.cluster_map.keys())
+            raise
 
         # clean up empty clusters
 
@@ -2128,6 +2136,7 @@ class RouteSet:
 
         ### increment cluster
 
+        # def increment_cluster(cluster):
         n = len(self._permitted_clusters)
         if n > 1:
             for i, cluster in enumerate(self._permitted_clusters):
@@ -2140,13 +2149,23 @@ class RouteSet:
             else:
                 raise IndexError("This should never be reached...")
 
+        # increment_cluster()
+
         if not self.cluster_map[cluster]:
             del self.cluster_map[cluster]
+            if not self.cluster_map:
+                mrich.debug("RouteSet.cluster_map depleted")
             self._permitted_clusters = [
                 c for c in self._permitted_clusters if c != cluster
             ]
             # if debug:
             mrich.debug("Depleted cluster", cluster)
+
+            if not self._permitted_clusters:
+                mrich.debug("Depleted all permitted clusters", cluster)
+                mrich.debug("Removing cluster restriction", cluster)
+                self._permitted_clusters = list(self.cluster_map.keys())
+                self._current_cluster = None
 
         if debug:
             mrich.debug("#Routes in set", len(self._data))
@@ -2233,7 +2252,7 @@ class RecipeSet:
             recipe._hash = key
             self._recipes[key] = recipe
 
-        # print(self._recipes)
+        mrich.success("Loaded", len(self), "Recipes")
 
     ### FACTORIES
 
