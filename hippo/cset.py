@@ -767,7 +767,10 @@ class CompoundSet:
 
         counts = [c for c, in counts]  # + [0 for _ in range(len(self)-len(counts))]
 
-        return -std(counts)
+        from hirsch import hirsch
+        return hirsch(counts)
+
+        # return -std(counts)
 
     @property
     def num_bases_elaborated(self) -> int:
