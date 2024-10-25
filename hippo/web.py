@@ -453,7 +453,11 @@ class ProjectPage:
         with self.tag("div", klass="w3-row"):
             for compound in compounds:
 
-                with self.tag("div", klass=f"w3-col s12 m6 l4 {style} w3-hover-border-black", style="border:8px solid white"):
+                with self.tag(
+                    "div",
+                    klass=f"w3-col s12 m6 l4 {style} w3-hover-border-black",
+                    style="border:8px solid white",
+                ):
                     with self.tag("p"):
                         with self.tag("b"):
                             self.text(f"{compound}")

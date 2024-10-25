@@ -768,6 +768,7 @@ class CompoundSet:
         counts = [c for c, in counts]  # + [0 for _ in range(len(self)-len(counts))]
 
         from hirsch import hirsch
+
         return hirsch(counts)
 
         # return -std(counts)
