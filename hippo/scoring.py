@@ -376,22 +376,8 @@ class Scorer:
         return self._df
 
     def get_sorted_df(self, budget: float | None = None):
-
-        raise NotImplementedError
-
-        if self._sorted_df is None:
-
-            df = self.get_df(serialise_price=True)
-
-            mrich.debug("Sorting DataFrame...")
-            self._sorted_df = df.sort_values(by="score", ascending=False)
-
-        df = self._sorted_df
-
-        if budget:
-            df = df[df["price"] < budget]
-
-        return df
+        self.scores
+        return self._data.sort_values(by="score", ascending=False)
 
     def plot(
         self,
@@ -462,10 +448,14 @@ class Scorer:
 
     def summary(self):
 
-        mrich.header(repr(self))
+        mrich.header(self)
         for attribute in self.attributes:
-            mrich.out(
-                f"{repr(attribute)} min={attribute.min:.3g}, mean={attribute.mean:.3g}, std={attribute.std:.3g}, max={attribute.max:.3g}"
+            # mrich.out(
+            # f"{repr(attribute)} min={attribute.min:.3g}, mean={attribute.mean:.3g}, std={attribute.std:.3g}, max={attribute.max:.3g}"
+            # )
+            mrich.print(
+                attribute,
+                f"min={attribute.min:.3g}, mean={attribute.mean:.3g}, std={attribute.std:.3g}, max={attribute.max:.3g}",
             )
 
     def __check_integrity(self):
@@ -640,7 +630,7 @@ class Scorer:
             mrich.warning(difference)
 
         if difference := self_keys - cached_keys:
-            mrich.erro("JSON is missing Recipes:")
+            mrich.error("JSON is missing Recipes:")
             mrich.error(difference)
             raise ValueError("JSON is missing Recipes")
 
@@ -658,6 +648,8 @@ class Scorer:
 
     def __repr__(self) -> str:
         """ANSI Formatted string representation"""
+        import mcol
+
         return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
 
     def __rich__(self) -> str:
@@ -718,12 +710,14 @@ class Attribute:
         null = df.isnull()
 
         if null.sum():
-            for key in mrich.track(
-                df[null].index.values, f"Constructing value dictionary for {self}"
-            ):
-                recipe = self.scorer.recipes[key]
-                self.get_value(recipe, force=True)
-            self.scorer._dump_json()
+            # for key in mrich.track(
+            # df[null].index.values, f"Constructing value dictionary for {self}"
+            # , total = len(df[null])):
+            with mrich.loading(f"Constructing value dictionary for {self}"):
+                for key in df[null].index.values:
+                    recipe = self.scorer.recipes[key]
+                    self.get_value(recipe, force=True)
+                self.scorer._dump_json()
 
         return df.to_dict()
 
@@ -849,6 +843,8 @@ class Attribute:
 
     def __repr__(self) -> str:
         """ANSI Formatted string representation"""
+        import mcol
+
         return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
 
     def __rich__(self) -> str:
@@ -909,7 +905,7 @@ DEFAULT_ATTRIBUTES = {
     ),
     "elaboration_balance": dict(
         type="custom",
-        weight=0.0,
+        weight=1.0,
         function=lambda r: r.product_compounds.elaboration_balance,
         description="A measure for how evenly base compounds have been elaborated",
     ),  ### REALLY UNPERFORMANT?

@@ -337,7 +337,7 @@ class RandomRecipeGenerator:
             # Break if product pool depleted
             if not len(pool):
                 stop_reason = "Product pool depleted"
-                mrich.info(stop_reason)
+                mrich.success(stop_reason)
                 break
 
             # check breaking conditions
@@ -347,12 +347,12 @@ class RandomRecipeGenerator:
 
             if len(recipe.reactions) > max_reactions:
                 stop_reason = "Max #reactions exceeded"
-                mrich.info(stop_reason)
+                mrich.success(stop_reason)
                 break
 
             if len(recipe.products) > max_products:
                 stop_reason = "Max #products exceeded"
-                mrich.info(stop_reason)
+                mrich.success(stop_reason)
                 break
 
             # accept change
@@ -395,7 +395,7 @@ class RandomRecipeGenerator:
 
     def __str__(self) -> str:
         """Unformatted string representation"""
-        return f"RandomRecipeGenerator({recipe_dir=})"
+        return f"RandomRecipeGenerator(recipe_dir={self.recipe_dir})"
 
     def __repr__(self) -> str:
         """ANSI Formatted string representation"""

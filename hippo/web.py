@@ -3,8 +3,9 @@ import shutil
 
 import logging
 
-logger = logging.getLogger("HIPPO")
 logging.getLogger("PIL").setLevel(logging.WARNING)
+
+import mrich
 
 
 class ProjectPage:
@@ -452,7 +453,11 @@ class ProjectPage:
         with self.tag("div", klass="w3-row"):
             for compound in compounds:
 
-                with self.tag("div", klass=f"w3-col s12 m6 l4 {style}"):
+                with self.tag(
+                    "div",
+                    klass=f"w3-col s12 m6 l4 {style} w3-hover-border-black",
+                    style="border:8px solid white",
+                ):
                     with self.tag("p"):
                         with self.tag("b"):
                             self.text(f"{compound}")
@@ -815,10 +820,14 @@ class ProjectPage:
 
             d = {}
 
+            d["price"] = str(proposal.price)
+
             for attribute in self.scorer.attributes:
                 d[f"{attribute.key} w={attribute.weight}"] = (
-                    f"{attribute.get_value(proposal)} ({attribute.unweighted(proposal)}%)"
+                    f"{attribute.get_value(proposal):.1f} ({attribute.unweighted(proposal):.0%})"
                 )
+
+            table_data.append(d)
 
         self.table(table_data)
 
