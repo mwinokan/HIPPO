@@ -2421,15 +2421,26 @@ class Database:
         return d
 
     def get_compound_cluster_dict(
-        self, cset: "CompoundSet | None" = None
+        self, 
+        cset: "CompoundSet | None" = None,
+        *,
+        fractions: bool = False,
+        max_bases: int | None = None,
+        fraction_reference: "CompoundSet | None" = None,
     ) -> dict[tuple, set]:
         """Create a dictionary grouping compounds by their scaffold/base cluster.
 
         :param cset: :class:`.CompoundSet` subset to query, defaults to all compounds
+        :param fractions: Calculate fractional populations for each cluster
+        :param max_bases: Define the maximum number of compounds to use as cluster keys
+        :param fraction_reference: Use cset to build the cluster map and use fraction_reference to determine the fractional populations
         :returns: A dictionary mapping a tuple of scaffold :class:`.Compound` IDs to a set of superstructure :class:`.Compound` ID's.
         """
 
-        if cset is not None:
+        if fractions:
+            assert cset is not None
+
+        if (cset is not None and not fractions) or (fraction_reference is not None):
             sql = f"""
             SELECT scaffold_superstructure, scaffold_base FROM scaffold
             WHERE scaffold_superstructure IN {cset.str_ids}
@@ -2448,9 +2459,22 @@ class Database:
 
         clustered = {}
         for superstructure, bases in lookup.items():
+            if max_bases and len(bases) > max_bases:
+                continue
             cluster = tuple(bases)
             group = clustered.setdefault(cluster, set())
             group.add(superstructure)
+
+        if fractions:
+            if fraction_reference is not None:
+                cset = fraction_reference
+                
+            fractions = {}
+            for cluster, members in clustered.items():
+                size = len(members)
+                present = sum(1 for c in members if c in cset)
+                fractions[cluster] = present / size
+            return fractions
 
         return clustered
 
