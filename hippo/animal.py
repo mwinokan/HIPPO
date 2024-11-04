@@ -253,6 +253,7 @@ class HIPPO:
         aligned_directory: str | Path,
         skip: list | None = None,
         debug: bool = False,
+        load_pose_mols: bool = False,
     ) -> pd.DataFrame:
         """Load in crystallographic hits downloaded from Fragalysis.
 
@@ -414,6 +415,9 @@ class HIPPO:
 
             if pose_id:
                 count_poses_registered += 1
+
+            if pose_id and load_pose_mols:
+                self.poses[pose_id].mol
 
         self.db.commit()
 
@@ -777,7 +781,7 @@ class HIPPO:
                             this_tags = tags
 
                         else:
-                            this_tags = ["Syndirella base"] + tags
+                            this_tags = ["Syndirella scaffold"] + tags
 
                         product_id, duplicate = self.register_compound(
                             smiles=smiles,
@@ -1072,7 +1076,7 @@ class HIPPO:
                                 base = None
 
                             elif this_row_is_a_base:
-                                this_tags = ["Syndirella base"] + tags
+                                this_tags = ["Syndirella scaffold"] + tags
                                 base = None
 
                             else:
