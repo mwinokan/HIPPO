@@ -646,189 +646,79 @@ class HIPPO:
 
         f(f"Loaded {n} poses from {sdf_path}")
 
-    def add_syndirella_bases(
+    def add_syndirella_scaffolds(
         self,
-        df_path: str | Path,
+        output_directory: str | Path,
         *,
+        pattern: str = "*-*-?-scaffold-check/scaffold-*",
         tags: None | list[str] = None,
-        reaction_yield_map: dict | None = None,
-        check_chemistry: bool = True,
-        return_reactions: bool = False,
+        target: int | str = 1,
         debug: bool = False,
-    ) -> CompoundSet | tuple[CompoundSet, ReactionSet]:
+    ) -> None:
         """
-        Load Syndirella base compounds and poses from a pickled DataFrame
+        Load Poses from Syndirella "scaffold-check" outputs
 
         :param df_path: Path to the pickled DataFrame or SDF.
         :param tags: list of tags to assign to compounds and poses, defaults to ``None``
-        :param reaction_yield_map: dictionary mapping reaction type strings to their yield ratio, defaults to ``None``
-        :param check_chemistry: check the reaction chemistry, defaults to ``True``
-        :param return_reactions: Return :class:`.ReactionSet` of reactions, defaults to ``False``
+        :param target: :class:`.Target` ID or name
+        :param pattern: UNIX pattern by which to search for subdirectories
         :param debug: Increase verbosity of output, defaults to ``False``
-        :returns: :class:`.CompoundSet` of compounds if ``return_reactions = False``, else returns a tuple: ``(compounds, reactions)``
+        :returns: None
         """
 
-        raise NotImplementedError
+        import json
 
-        from .chem import check_reaction_types, InvalidChemistryError
+        output_directory = Path(output_directory)
 
-        tags = tags or []
+        n_poses = self.num_poses
 
-        if isinstance(df_path, str):
-            df_path = Path(df_path)
+        mrich.warning("Not setting inspirations and references")
 
-        from pickle import UnpicklingError
+        for subdir in mrich.track(list(output_directory.glob(pattern)), prefix="Loading scaffolds..."):
 
-        if df_path.name.endswith(".csv"):
-            raise NotImplementedError
-        elif df_path.name.endswith(".sdf"):
-            from rdkit.Chem import PandasTools
-
-            df = PandasTools.LoadSDF(df_path)
-        else:
-            try:
-                df = pd.read_pickle(df_path)
-            except UnpicklingError:
-                mrich.error(
-                    "Could not read DataFrame. Is it a valid sdf or pickled dataframe?"
-                )
-                return None
-
-        if debug:
-            mrich.var("len(df)", len(df))
-
-        reaction_cols = [c for c in df.columns if "_reaction" in c]
-
-        product_ids = set()
-
-        reactions = []
-
-        # loop over rows
-
-        for i, row in mrich.track(df.iterrows(), prefix="Processing DataFrame rows..."):
-
-            # determine number of steps
-
-            reaction_types = [
-                r for c in reaction_cols if isinstance((r := row[c]), str)
-            ]
-            check_reaction_types(reaction_types)
-
-            n_steps = len(reaction_types)
+            inchikey = subdir.parent.name.replace("-scaffold-check","")
+            
+            compound = self.compounds[inchikey]
 
             if debug:
-                mrich.header(f"row={i}, {n_steps=}")
+                mrich.var("subdir", subdir)
+                mrich.var("inchikey", inchikey)
+                mrich.var("compound", compound)
 
-            try:
+            name = subdir.name
 
-                # loop over each reaction step
-                for j in range(n_steps):
-
-                    j += 1
-
-                    reactants = []
-
-                    reactant_previous_product = row[f"{j}_r_previous_product"]
-
-                    # reactant 1
-                    if reactant_previous_product == 1:
-                        reactant1_id = product_id
-                        reactants.append(reactant1_id)
-                    elif smiles := row[f"{j}_r1_smiles"]:
-
-                        if not isinstance(smiles, str):
-                            raise InvalidRowError(f"non-string {j}_r1_smiles")
-
-                        reactant1_id, duplicate = self.register_compound(
-                            smiles=smiles,
-                            commit=False,
-                            return_compound=False,
-                            tags=tags,
-                            base=None,
-                            register_base_if_duplicate=False,
-                            return_duplicate=True,
-                        )
-
-                        reactants.append(reactant1_id)
-
-                    # reactant 2
-                    if reactant_previous_product == 2:
-                        reactant2_id = product_id
-                        reactants.append(reactant2_id)
-                    elif smiles := row[f"{j}_r2_smiles"]:
-
-                        if not isinstance(smiles, str):
-                            raise InvalidRowError(f"non-string {j}_r2_smiles")
-
-                        reactant2_id, duplicate = self.register_compound(
-                            smiles=smiles,
-                            commit=False,
-                            return_compound=False,
-                            tags=tags,
-                            base=None,
-                            register_base_if_duplicate=False,
-                            return_duplicate=True,
-                        )
-
-                        reactants.append(reactant2_id)
-
-                    # product
-                    if smiles := row[f"{j}_product_smiles"]:
-                        if not isinstance(smiles, str):
-                            raise InvalidRowError(f"non-string {j}_product_smiles")
-
-                        if j != n_steps:
-                            this_tags = tags
-
-                        else:
-                            this_tags = ["Syndirella scaffold"] + tags
-
-                        product_id, duplicate = self.register_compound(
-                            smiles=smiles,
-                            tags=this_tags,
-                            commit=False,
-                            return_compound=False,
-                            base=None,
-                            register_base_if_duplicate=False,
-                            return_duplicate=True,
-                        )
-
-                        if j == n_steps:
-                            product_ids.add(product_id)
-
-                    # register the reaction
-                    if reaction_yield_map:
-                        product_yield = reaction_yield_map[row[f"{j}_reaction"]]
-                    else:
-                        product_yield = 1.0
-
-                    try:
-
-                        reaction = self.register_reaction(
-                            reactants=reactants,
-                            product=product_id,
-                            type=row[f"{j}_reaction"],
-                            commit=False,
-                            product_yield=product_yield,
-                            check_chemistry=check_chemistry,
-                        )
-
-                        reactions.append(reaction.id)
-
-                        if debug:
-                            mrich.var(str(reaction), reaction.reaction_str)
-
-                    except InvalidChemistryError as e:
-                        skipped_reactions += 1
-
-            except InvalidRowError as e:
-                skipped_invalid_smiles += 1
+            mol_file = subdir/f"{name}.minimised.mol"
+            if not mol_file.exists():
                 continue
 
-        if return_reactions:
-            return self.compounds[product_ids], self.reactions[reactions]
+            json_file = subdir/f"{name}.minimised.json"
+            if not json_file.exists():
+                continue
+
+            metadata = json.load(open(json_file, 'rt'))
+
+            if debug:
+                mrich.print(metadata)
+
+            energy_score = metadata["Energy"]["bound"]["total_score"] - metadata["Energy"]["unbound"]["total_score"]
+            distance_score = metadata["mRMSD"]
+
+            tags = tags or ["Syndirella scaffold"]
+            
+            self.register_pose(
+                path=mol_file,
+                compound=compound, 
+                target=target,
+                tags=tags,
+                return_pose=False,
+            )
+
+        n_poses = self.num_poses - n_poses
+
+        if n_poses:
+            mrich.success(f"Added {n_poses} scaffold Poses")
         else:
-            return self.compounds[product_ids]
+            mrich.warning(f"Added {n_poses} scaffold Poses")
 
     def add_syndirella_elabs(
         self,
@@ -940,7 +830,8 @@ class HIPPO:
             generator = df.iterrows()
         else:
             generator = mrich.track(
-                df.iterrows(), prefix="Processing DataFrame rows..."
+                df.iterrows(), prefix="Processing DataFrame rows...",
+                total=len(df),
             )
 
         n_comps = len(self.compounds)
@@ -1132,92 +1023,97 @@ class HIPPO:
 
                 # inspirations
                 inspirations = []
-                for inspiration in row.regarded:
-                    if inspiration_map:
-                        match inspiration_map:
-                            case dict():
-                                try:
-                                    inspiration = inspiration_map[inspiration]
-                                except KeyError:
 
-                                    matches = find_observation_longcode_matches(
-                                        inspiration, inspiration_map.keys()
-                                    )
+                if pd.isna(row.regarded):
+                    mrich.warning(f"Null inspiration {i=}")
 
-                                    if len(matches) == 1:
-                                        pose_id = inspiration_map[matches[0]]
-                                        inspiration_map[inspiration] = pose_id
-                                        inspiration = pose_id
+                else:
+                    for inspiration in row.regarded:
+                        if inspiration_map:
+                            match inspiration_map:
+                                case dict():
+                                    try:
+                                        inspiration = inspiration_map[inspiration]
+                                    except KeyError:
 
-                                    elif len(matches) > 1:
-                                        mrich.error(
-                                            "Multiple matchs for {inspiration=}"
-                                        )
-                                        from json import dumps
-
-                                        dumps(matches, indent=2),
-
-                                    if len(matches) == 0:
-
-                                        import difflib
-
-                                        inspiration_close_match_cutoff = 0.95
-
-                                        close_matches = difflib.get_close_matches(
-                                            inspiration,
-                                            inspiration_map.keys(),
-                                            n=5,
-                                            cutoff=inspiration_close_match_cutoff,
+                                        matches = find_observation_longcode_matches(
+                                            inspiration, inspiration_map.keys()
                                         )
 
-                                        if len(close_matches) > 0:
-                                            if len(close_matches) > 1:
-                                                mrich.warning(
-                                                    f"Taking closest match: {inspiration=} --> {close_matches[0]}"
-                                                )
+                                        if len(matches) == 1:
+                                            pose_id = inspiration_map[matches[0]]
+                                            inspiration_map[inspiration] = pose_id
+                                            inspiration = pose_id
 
-                                            inspiration_map[inspiration] = (
-                                                inspiration_map[close_matches[0]]
+                                        elif len(matches) > 1:
+                                            mrich.error(
+                                                "Multiple matchs for {inspiration=}"
                                             )
-                                            inspiration = inspiration_map[inspiration]
+                                            from json import dumps
 
-                                        if isinstance(inspiration, str):
-                                            if allow_missing_inspirations:
-                                                mrich.warning(
-                                                    f"{inspiration=} not found in inspiration_map"
+                                            dumps(matches, indent=2),
+
+                                        if len(matches) == 0:
+
+                                            import difflib
+
+                                            inspiration_close_match_cutoff = 0.95
+
+                                            close_matches = difflib.get_close_matches(
+                                                inspiration,
+                                                inspiration_map.keys(),
+                                                n=5,
+                                                cutoff=inspiration_close_match_cutoff,
+                                            )
+
+                                            if len(close_matches) > 0:
+                                                if len(close_matches) > 1:
+                                                    mrich.warning(
+                                                        f"Taking closest match: {inspiration=} --> {close_matches[0]}"
+                                                    )
+
+                                                inspiration_map[inspiration] = (
+                                                    inspiration_map[close_matches[0]]
                                                 )
+                                                inspiration = inspiration_map[inspiration]
 
-                                                inspiration = None
+                                            if isinstance(inspiration, str):
+                                                if allow_missing_inspirations:
+                                                    mrich.warning(
+                                                        f"{inspiration=} not found in inspiration_map"
+                                                    )
 
-                                            else:
-                                                # mrich.error(
-                                                # f"{inspiration=} not found in inspiration_map, try a smaller inspiration_close_match_cutoff?"
-                                                # )
-                                                from json import dumps
+                                                    inspiration = None
 
-                                                mrich.var(
-                                                    "matches",
-                                                    dumps(matches, indent=2),
-                                                )
+                                                else:
+                                                    # mrich.error(
+                                                    # f"{inspiration=} not found in inspiration_map, try a smaller inspiration_close_match_cutoff?"
+                                                    # )
+                                                    from json import dumps
 
-                                                mrich.var(
-                                                    "close_matches",
-                                                    dumps(matches, indent=2),
-                                                )
+                                                    mrich.var(
+                                                        "matches",
+                                                        dumps(matches, indent=2),
+                                                    )
 
-                                                mrich.var(
-                                                    "inspiration_map",
-                                                    dumps(inspiration_map, indent=2),
-                                                )
-                                                raise
-                            case _:
-                                inspiration = inspiration_map(inspiration)
+                                                    mrich.var(
+                                                        "close_matches",
+                                                        dumps(matches, indent=2),
+                                                    )
 
-                    else:
-                        # this is really expensive
-                        inspiration = self.poses[inspiration]
-                    if inspiration:
-                        inspirations.append(inspiration)
+                                                    mrich.var(
+                                                        "inspiration_map",
+                                                        dumps(inspiration_map, indent=2),
+                                                    )
+                                                    raise
+                                case _:
+                                    inspiration = inspiration_map(inspiration)
+
+                        else:
+                            # this is really expensive
+                            inspiration = self.poses[inspiration]
+                        if inspiration:
+                            inspirations.append(inspiration)
 
                 if path_to_mol:
 
@@ -2314,6 +2210,11 @@ GENERATED_TAG_COLS = [
     "CrystalformSites upload name",
     "Quatassemblies upload name",
     "Crystalforms upload name",
+    "ConformerSites short tag",
+    "CanonSites short tag",
+    "CrystalformSites short tag",
+    "Quatassemblies short tag",
+    "Crystalforms short tag",
     "Centroid res",
     "Experiment code",
 ]
