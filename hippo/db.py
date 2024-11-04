@@ -928,7 +928,7 @@ class Database:
         ), f"Must pass an integer ID or Compound object (superstructure) {superstructure=} {type(superstructure)}"
 
         if base == superstructure:
-            mrich.warning(f"Skipped self-referential scaffold assignment (C{base})")
+            # mrich.warning(f"Skipped self-referential scaffold assignment (C{base})")
             return None
 
         sql = """
