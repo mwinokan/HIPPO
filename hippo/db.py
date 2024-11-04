@@ -2421,7 +2421,7 @@ class Database:
         return d
 
     def get_compound_cluster_dict(
-        self, 
+        self,
         cset: "CompoundSet | None" = None,
         *,
         fractions: bool = False,
@@ -2468,7 +2468,7 @@ class Database:
         if fractions:
             if fraction_reference is not None:
                 cset = fraction_reference
-                
+
             fractions = {}
             for cluster, members in clustered.items():
                 size = len(members)
