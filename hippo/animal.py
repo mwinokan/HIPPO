@@ -674,10 +674,12 @@ class HIPPO:
 
         mrich.warning("Not setting inspirations and references")
 
-        for subdir in mrich.track(list(output_directory.glob(pattern)), prefix="Loading scaffolds..."):
+        for subdir in mrich.track(
+            list(output_directory.glob(pattern)), prefix="Loading scaffolds..."
+        ):
 
-            inchikey = subdir.parent.name.replace("-scaffold-check","")
-            
+            inchikey = subdir.parent.name.replace("-scaffold-check", "")
+
             compound = self.compounds[inchikey]
 
             if debug:
@@ -687,27 +689,30 @@ class HIPPO:
 
             name = subdir.name
 
-            mol_file = subdir/f"{name}.minimised.mol"
+            mol_file = subdir / f"{name}.minimised.mol"
             if not mol_file.exists():
                 continue
 
-            json_file = subdir/f"{name}.minimised.json"
+            json_file = subdir / f"{name}.minimised.json"
             if not json_file.exists():
                 continue
 
-            metadata = json.load(open(json_file, 'rt'))
+            metadata = json.load(open(json_file, "rt"))
 
             if debug:
                 mrich.print(metadata)
 
-            energy_score = metadata["Energy"]["bound"]["total_score"] - metadata["Energy"]["unbound"]["total_score"]
+            energy_score = (
+                metadata["Energy"]["bound"]["total_score"]
+                - metadata["Energy"]["unbound"]["total_score"]
+            )
             distance_score = metadata["mRMSD"]
 
             tags = tags or ["Syndirella scaffold"]
-            
+
             self.register_pose(
                 path=mol_file,
-                compound=compound, 
+                compound=compound,
                 target=target,
                 tags=tags,
                 return_pose=False,
@@ -830,7 +835,8 @@ class HIPPO:
             generator = df.iterrows()
         else:
             generator = mrich.track(
-                df.iterrows(), prefix="Processing DataFrame rows...",
+                df.iterrows(),
+                prefix="Processing DataFrame rows...",
                 total=len(df),
             )
 
@@ -1075,7 +1081,9 @@ class HIPPO:
                                                 inspiration_map[inspiration] = (
                                                     inspiration_map[close_matches[0]]
                                                 )
-                                                inspiration = inspiration_map[inspiration]
+                                                inspiration = inspiration_map[
+                                                    inspiration
+                                                ]
 
                                             if isinstance(inspiration, str):
                                                 if allow_missing_inspirations:
@@ -1103,7 +1111,9 @@ class HIPPO:
 
                                                     mrich.var(
                                                         "inspiration_map",
-                                                        dumps(inspiration_map, indent=2),
+                                                        dumps(
+                                                            inspiration_map, indent=2
+                                                        ),
                                                     )
                                                     raise
                                 case _:
