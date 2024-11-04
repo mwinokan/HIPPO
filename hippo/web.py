@@ -820,6 +820,7 @@ class ProjectPage:
 
             d = {}
 
+            d["hash"] = str(proposal.hash)
             d["price"] = str(proposal.price)
 
             for attribute in self.scorer.attributes:
