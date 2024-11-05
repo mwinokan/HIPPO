@@ -834,7 +834,7 @@ class Compound:
         :param draw: Include a 2D molecule drawing, defaults to ``True``
         """
 
-        mrich.header(repr(self))
+        mrich.header(self)
 
         mrich.var("inchikey", self.inchikey)
         mrich.var("alias", self.alias)
