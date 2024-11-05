@@ -1030,7 +1030,7 @@ class HIPPO:
                 # inspirations
                 inspirations = []
 
-                if pd.isna(row.regarded):
+                if isinstance(row.regarded, float) and pd.isna(row.regarded):
                     mrich.warning(f"Null inspiration {i=}")
 
                 else:
@@ -1125,7 +1125,7 @@ class HIPPO:
                         if inspiration:
                             inspirations.append(inspiration)
 
-                if path_to_mol:
+                if path_to_mol and not pd.isna(path_to_mol):
 
                     path_to_mol = path_to_mol.replace("//", "/")
 
@@ -1981,43 +1981,53 @@ class HIPPO:
         self,
         ref_animal: "HIPPO",
         compounds: CompoundSet,
-    ) -> None:
+        debug: bool = False,
+    ) -> "CompoundSet,CompoundSet":
         """Get batch quotes using the hippo.Quoter object supplied and add the quotes to the database
 
         :param ref_animal: The reference :class:`.HIPPO` animal to fetch quotes from (e.g. the one from https://github.com/mwinokan/EnamineCatalogs)
         :param compounds: A :class:`.CompoundSet` containing the compounds to be quoted
         """
 
+        inchikeys = compounds.inchikeys
+            
+        sql = f"""
+        SELECT quote_id, quote_smiles, quote_amount, quote_supplier, quote_catalogue, quote_entry, quote_lead_time, quote_price, quote_currency, quote_purity, quote_date, quote_compound FROM quote
+        INNER JOIN compound ON quote_compound = compound_id
+        WHERE compound_inchikey IN {tuple(inchikeys)}
+        """
+
+        with mrich.loading("Querying reference database..."):
+            records = ref_animal.db.execute(sql).fetchall()
+
         quoted_compound_ids = set()
         quote_count = self.db.count("quote")
 
-        for compound in mrich.track(compounds):
+        for record in mrich.track(records, total=len(records), prefix="Inserting quotes"):
 
-            ref_compound = ref_animal.compounds(smiles=compound.smiles, none="quiet")
+            quote_id, quote_smiles, quote_amount, quote_supplier, quote_catalogue, quote_entry, quote_lead_time, quote_price, quote_currency, quote_purity, quote_date, quote_compound = record
 
-            if not ref_compound:
-                continue
+            compound = self.compounds(smiles=quote_smiles)
 
-            quotes = ref_compound.get_quotes()
+            if debug:
+                mrich.debug("Inserting quote for", compound)
 
-            for quote in quotes:
-                self.db.insert_quote(
-                    compound=compound,
-                    supplier=quote.supplier,
-                    catalogue=quote.catalogue,
-                    entry=quote.entry,
-                    amount=quote.amount,
-                    price=quote.price.amount,
-                    currency=quote.currency,
-                    purity=quote.purity,
-                    lead_time=quote.lead_time,
-                    smiles=quote.smiles,
-                    date=quote.date,
-                    commit=False,
-                )
+            self.db.insert_quote(
+                compound=compound,
+                supplier=quote_supplier,
+                catalogue=quote_catalogue,
+                entry=quote_entry,
+                amount=quote_amount,
+                price=quote_price,
+                currency=quote_currency,
+                purity=quote_purity,
+                lead_time=quote_lead_time,
+                smiles=quote_smiles,
+                date=quote_date,
+                commit=False,
+            )
 
-            if quotes:
-                quoted_compound_ids.add(compound.id)
+            quoted_compound_ids.add(compound.id)
 
         self.db.commit()
 
