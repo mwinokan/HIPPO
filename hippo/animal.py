@@ -2072,9 +2072,9 @@ class HIPPO:
         ref_animal: "HIPPO",
         compounds: CompoundSet,
     ) -> None:
-        """Get batch quotes using the hippo.Quoter object supplied and add the quotes to the database
+        """Transfer quotes from another reference :class:`.HIPPO` animal object (e.g. the one from https://github.com/mwinokan/EnamineCatalogs)
 
-        :param ref_animal: The reference :class:`.HIPPO` animal to fetch quotes from (e.g. the one from https://github.com/mwinokan/EnamineCatalogs)
+        :param ref_animal: The reference :class:`.HIPPO` animal to fetch quotes from
         :param compounds: A :class:`.CompoundSet` containing the compounds to be quoted
         """
 
