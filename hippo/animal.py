@@ -1990,7 +1990,7 @@ class HIPPO:
         """
 
         inchikeys = compounds.inchikeys
-            
+
         sql = f"""
         SELECT quote_id, quote_smiles, quote_amount, quote_supplier, quote_catalogue, quote_entry, quote_lead_time, quote_price, quote_currency, quote_purity, quote_date, quote_compound FROM quote
         INNER JOIN compound ON quote_compound = compound_id
@@ -2003,9 +2003,24 @@ class HIPPO:
         quoted_compound_ids = set()
         quote_count = self.db.count("quote")
 
-        for record in mrich.track(records, total=len(records), prefix="Inserting quotes"):
+        for record in mrich.track(
+            records, total=len(records), prefix="Inserting quotes"
+        ):
 
-            quote_id, quote_smiles, quote_amount, quote_supplier, quote_catalogue, quote_entry, quote_lead_time, quote_price, quote_currency, quote_purity, quote_date, quote_compound = record
+            (
+                quote_id,
+                quote_smiles,
+                quote_amount,
+                quote_supplier,
+                quote_catalogue,
+                quote_entry,
+                quote_lead_time,
+                quote_price,
+                quote_currency,
+                quote_purity,
+                quote_date,
+                quote_compound,
+            ) = record
 
             compound = self.compounds(smiles=quote_smiles)
 
