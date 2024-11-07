@@ -1364,7 +1364,7 @@ class PoseSet:
 
             # output subdirectory
             out_key = Path(out_path).name.removesuffix(".sdf")
-            pdb_dir = Path(out_key)
+            pdb_dir = Path(out_path).parent / Path(out_key)
             pdb_dir.mkdir(exist_ok=True)
 
             # create the zip archive
