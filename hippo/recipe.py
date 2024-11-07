@@ -1194,7 +1194,11 @@ class Recipe:
     def write_CAR_csv(
         self, file: "str | Path", return_df: bool = False
     ) -> "DataFrame | None":
-        """List of reactions for CAR
+        """Prepares CSVs for use with CAR.
+
+        .. attention::
+
+            This method requires a populated `route` table. For a workaround use :meth:`.CompoundSet.write_CAR_csv` instead
 
         Columns:
 
