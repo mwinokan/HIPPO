@@ -401,7 +401,8 @@ class HIPPO:
 
             metadata = {"observation_longname": observation_longname}
             for tag in GENERATED_TAG_COLS:
-                metadata[tag] = meta_row[tag].values[0]
+                if tag in meta_row.columns:
+                    metadata[tag] = meta_row[tag].values[0]
 
             pose_id = self.db.insert_pose(
                 compound=compound,
