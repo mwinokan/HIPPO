@@ -949,7 +949,7 @@ class PoseSet:
 
         return PoseSet(self.db, ids)
 
-    def get_df(self, skip_no_mol=True, **kwargs) -> "pandas.DataFrame":
+    def get_df(self, skip_no_mol=True, reference: str = "name", **kwargs) -> "pandas.DataFrame":
         """Get a DataFrame of the poses in this set. Keyword arguments passed to :meth:`.Pose.get_dict`.
 
         :param skip_no_mol: skip poses that have no mol (Default value = True)
@@ -966,7 +966,7 @@ class PoseSet:
             gen = self
 
         for pose in gen:
-            d = pose.get_dict(reference="name", **kwargs)
+            d = pose.get_dict(reference=reference, **kwargs)
 
             if skip_no_mol and not d["mol"]:
                 mrich.warning(f'Skipping pose with no mol: {d["id"]} {d["name"]}')
@@ -1242,6 +1242,7 @@ class PoseSet:
         ingredients: IngredientSet = None,
         tags: bool = True,
         extra_cols: dict[str, list] = None,
+        name_col: str = "name",
     ):
         """Prepare an SDF for upload to the RHS of Fragalysis.
 
@@ -1258,6 +1259,7 @@ class PoseSet:
         :param ingredients: get procurement and amount information from this :class:`.IngredientSet` (Default value = None)
         :param tags: include a column for tags in the output (Default value = True)
         :param extra_cols: extra_cols should be a dictionary with a key for each column name, and list values where the first element is the field description, and all subsequent elements are values for each pose.
+        :param name: How to determine the molecule name, see :meth:`.PoseSet.get_df`
 
         """
 
@@ -1267,7 +1269,7 @@ class PoseSet:
 
         assert out_path.endswith(".sdf")
 
-        name_col = "_Name"
+        _name_col = "_Name"
         mol_col = "ROMol"
 
         # get the dataframe of poses
@@ -1287,11 +1289,12 @@ class PoseSet:
             drops.pop(drops.index("compound"))
 
         pose_df = pose_df.drop(columns=drops, errors="ignore")
+        
+        pose_df[_name_col] = pose_df[name_col]
 
         pose_df.rename(
             inplace=True,
             columns={
-                "name": name_col,
                 "id": "HIPPO ID",
                 "mol": mol_col,
                 "inspirations": "ref_mols",
@@ -1428,7 +1431,7 @@ class PoseSet:
         with open(out_path, "w") as sdfh:
             with SDWriter(sdfh) as w:
                 w.write(header)
-            PandasTools.WriteSDF(pose_df, sdfh, mol_col, name_col, set(pose_df.columns))
+            PandasTools.WriteSDF(pose_df, sdfh, mol_col, _name_col, set(pose_df.columns))
 
         # keep record of export
         value = str(Path(out_path).resolve())
