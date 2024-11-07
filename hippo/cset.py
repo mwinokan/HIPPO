@@ -861,7 +861,12 @@ class CompoundSet:
     @property
     def reaction_ids(self) -> list[int]:
         """Returns a list of :class:`.Reaction` IDs that result in members of this set"""
-        records = self.db.select_where(table='reaction', query='reaction_id', key=f'reaction_product IN {self.str_ids}', multiple=True)
+        records = self.db.select_where(
+            table="reaction",
+            query="reaction_id",
+            key=f"reaction_product IN {self.str_ids}",
+            multiple=True,
+        )
         if not records:
             return None
         return [r for r, in records]
@@ -1498,9 +1503,9 @@ class CompoundSet:
         return df
 
     def write_CAR_csv(
-        self, 
-        file: "str | Path", 
-        amount: float = 1, # in mg
+        self,
+        file: "str | Path",
+        amount: float = 1,  # in mg
         return_df: bool = False,
         # pick_cheapest: bool = False,
         quoted_only: bool = False,
