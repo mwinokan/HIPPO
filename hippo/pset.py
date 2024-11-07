@@ -1366,9 +1366,10 @@ class PoseSet:
             out_key = Path(out_path).name.removesuffix(".sdf")
             pdb_dir = Path(out_path).parent / Path(out_key)
             pdb_dir.mkdir(exist_ok=True)
+            zip_path = Path(out_path).parent / f"{out_key}_pdbs.zip"
 
             # create the zip archive
-            with ZipFile(f"{out_key}_pdbs.zip", "w") as z:
+            with ZipFile(str(zip_path.resolve()), "w") as z:
 
                 # loop over poses
                 for (i, row), pose in zip(pose_df.iterrows(), self):
