@@ -949,7 +949,9 @@ class PoseSet:
 
         return PoseSet(self.db, ids)
 
-    def get_df(self, skip_no_mol=True, reference: str = "name", **kwargs) -> "pandas.DataFrame":
+    def get_df(
+        self, skip_no_mol=True, reference: str = "name", **kwargs
+    ) -> "pandas.DataFrame":
         """Get a DataFrame of the poses in this set. Keyword arguments passed to :meth:`.Pose.get_dict`.
 
         :param skip_no_mol: skip poses that have no mol (Default value = True)
@@ -1289,7 +1291,7 @@ class PoseSet:
             drops.pop(drops.index("compound"))
 
         pose_df = pose_df.drop(columns=drops, errors="ignore")
-        
+
         pose_df[_name_col] = pose_df[name_col]
 
         pose_df.rename(
@@ -1431,7 +1433,9 @@ class PoseSet:
         with open(out_path, "w") as sdfh:
             with SDWriter(sdfh) as w:
                 w.write(header)
-            PandasTools.WriteSDF(pose_df, sdfh, mol_col, _name_col, set(pose_df.columns))
+            PandasTools.WriteSDF(
+                pose_df, sdfh, mol_col, _name_col, set(pose_df.columns)
+            )
 
         # keep record of export
         value = str(Path(out_path).resolve())
