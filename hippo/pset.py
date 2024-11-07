@@ -966,7 +966,7 @@ class PoseSet:
             gen = self
 
         for pose in gen:
-            d = pose.get_dict(**kwargs)
+            d = pose.get_dict(reference="name", **kwargs)
 
             if skip_no_mol and not d["mol"]:
                 mrich.warning(f'Skipping pose with no mol: {d["id"]} {d["name"]}')
