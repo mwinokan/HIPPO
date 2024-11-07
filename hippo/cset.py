@@ -858,6 +858,14 @@ class CompoundSet:
             return True
         return False
 
+    @property
+    def reaction_ids(self) -> list[int]:
+        """Returns a list of :class:`.Reaction` IDs that result in members of this set"""
+        records = self.db.select_where(table='reaction', query='reaction_id', key=f'reaction_product IN {self.str_ids}', multiple=True)
+        if not records:
+            return None
+        return [r for r, in records]
+
     ### FILTERING
 
     def get_by_tag(
@@ -1488,6 +1496,119 @@ class CompoundSet:
         df.to_csv(file, index=False)
 
         return df
+
+    def write_CAR_csv(
+        self, 
+        file: "str | Path", 
+        amount: float = 1, # in mg
+        return_df: bool = False,
+        # pick_cheapest: bool = False,
+        quoted_only: bool = False,
+        get_ingredient_quotes: bool = True,
+        **kwargs,
+    ) -> "DataFrame | None":
+        """List of reactions for CAR
+
+        Columns:
+
+        * target-name
+        * no-steps
+        * concentration = None
+        * amount-required
+        * batch-tag
+
+        per reaction
+
+        * reactant-1-1
+        * reactant-2-1
+        * reaction-product-smiles-1
+        * reaction-name-1
+        * reaction-recipe-1
+        * reaction-groupby-column-1
+
+        :param file: output file
+        :param amount: amount of each product in `mg`
+        :param quoted_only: only choose reactants that have quotes
+        :param supplier: only choose reactants that have quotes from this supplier
+        :param kwargs: passed to :meth:`.Recipe.from_reaction`
+        :param return_df: return a `DataFrame` (Default value = False)
+
+        """
+
+        from pathlib import Path
+        from pandas import DataFrame
+        from .recipe import Recipe
+
+        file = str(Path(file).resolve())
+
+        rows = []
+
+        for r_id in mrich.track(self.reaction_ids, prefix="Solving compound recipes"):
+
+            reaction = self.db.get_reaction(id=r_id)
+
+            recipes = Recipe.from_reaction(
+                reaction,
+                amount=amount,
+                pick_cheapest=False,
+                quoted_only=quoted_only,
+                get_ingredient_quotes=get_ingredient_quotes,
+                **kwargs,
+            )
+
+            for sub_recipe in recipes:
+
+                product = sub_recipe.product
+
+                row = {
+                    "target-names": str(product.compound),
+                    "no-steps": 0,
+                    "concentration-required-mM": None,
+                    "amount-required-uL": None,
+                    "batch-tag": None,
+                }
+
+                for i, reaction in enumerate(sub_recipe.reactions):
+
+                    i = i + 1
+
+                    row["no-steps"] += 1
+
+                    match len(reaction.reactants):
+                        case 1:
+                            row[f"reactant-1-{i}"] = reaction.reactants[0].smiles
+                            row[f"reactant-2-{i}"] = None
+                        case 2:
+                            row[f"reactant-1-{i}"] = reaction.reactants[0].smiles
+                            row[f"reactant-2-{i}"] = reaction.reactants[1].smiles
+                        case _:
+                            raise NotImplementedError(
+                                f"Unsupported number of reactants for {reaction=}: {len(reaction.reactants)}"
+                            )
+
+                    row[f"reaction-product-smiles-{i}"] = reaction.product.smiles
+                    row[f"reaction-name-{i}"] = reaction.type
+                    row[f"reaction-recipe-{i}"] = None
+                    row[f"reaction-groupby-column-{i}"] = None
+                    # row[f'reaction-id-{i}'] = int(reaction.id)
+
+                rows.append(row)
+
+        df = DataFrame(rows)
+
+        df = df.convert_dtypes()
+
+        for n_steps in set(df["no-steps"]):
+            subset = df[df["no-steps"] == n_steps]
+            this_file = file.replace(".csv", f"_{n_steps}steps.csv")
+            mrich.writing(this_file)
+            subset.to_csv(this_file, index=False)
+
+        mrich.writing(file)
+        df.to_csv(file, index=False)
+
+        if return_df:
+            return df
 
     def add_tag(
         self,
