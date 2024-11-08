@@ -269,7 +269,7 @@ class Database:
             else:
                 return self.cursor.execute(sql)
         except sqlite3.OperationalError as e:
-            if "database is locked" in e and retry:
+            if "database is locked" in str(e) and retry:
                 with mrich.clock(
                     f"SQLite Database is locked, waiting {retry} second(s)..."
                 ):
