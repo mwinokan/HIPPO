@@ -409,7 +409,7 @@ class Recipe:
                     comp_options += sol
 
             if not comp_options:
-                mrich.error(f"No solutions for compound={comp}")
+                mrich.error(f"No solutions for compound={comp} ({comp.reactions.ids=})")
                 continue
 
             if pick_cheapest and len(comp_options) > 1:
@@ -1194,7 +1194,11 @@ class Recipe:
     def write_CAR_csv(
         self, file: "str | Path", return_df: bool = False
     ) -> "DataFrame | None":
-        """List of reactions for CAR
+        """Prepares CSVs for use with CAR.
+
+        .. attention::
+
+            This method requires a populated `route` table. For a workaround use :meth:`.CompoundSet.write_CAR_csv` instead
 
         Columns:
 
