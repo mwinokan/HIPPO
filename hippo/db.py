@@ -4,6 +4,7 @@ import sqlite3
 from sqlite3 import Error
 from pprint import pprint
 import json
+import time
 
 from .compound import Compound
 from .pose import Pose
@@ -254,10 +255,11 @@ class Database:
         self._connection = conn
         self._cursor = conn.cursor()
 
-    def execute(self, sql, payload=None) -> None:
+    def execute(self, sql, payload=None, *, retry: float | None = 1) -> None:
         """Execute arbitrary SQL
 
         :param sql: SQL query
+        :param retry: If truthy, keep trying to execute every `retry` seconds if the Database is locked
         :param payload: Payload for insertion, etc. (Default value = None)
 
         """
@@ -266,6 +268,14 @@ class Database:
                 return self.cursor.execute(sql, payload)
             else:
                 return self.cursor.execute(sql)
+        except sqlite3.OperationalError as e:
+            if "database is locked" in e and retry:
+                with mrich.clock(f"SQLite Database is locked, waiting {retry} second(s)..."):
+                    time.sleep(retry)
+                mrich.print("[debug]SQLite Database was locked, retrying...")
+                return self.execute(sql=sql, payload=payload, retry=retry)
+            else:
+                raise
         except Error as e:
             raise
 
