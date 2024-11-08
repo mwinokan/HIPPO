@@ -1726,7 +1726,7 @@ class HIPPO:
         :param split_PDB: Register a :class:`.Pose` for every ligand residue in the PDB, defaults to ``False``
         :param duplicate_alias: In the case of a duplicate, define the behaviour for the ``alias`` property, defaults to ``'modify'`` which appends ``_copy`` to the alias. Set to ``error`` to raise an Exception.
         :param resolve_path: Resolve to an absoltue path, default = True.
-        :returns: The registered/existing :class:`.Pose` object or its ID (depending on ``return_compound``)
+        :returns: The registered/existing :class:`.Pose` object or its ID (depending on ``return_pose``)
         """
 
         assert duplicate_alias in ["error", "modify"]
