@@ -281,9 +281,23 @@ class Database:
         except Error as e:
             raise
 
-    def commit(self) -> None:
-        """Commit changes to the database"""
-        self.connection.commit()
+    def commit(self, *, retry: float | None = 1) -> None:
+        """Commit changes to the database
+        
+        :param retry: If truthy, keep trying to execute every `retry` seconds if the Database is locked
+        """
+        try:
+            self.connection.commit()
+        except sqlite3.OperationalError as e:
+            if "database is locked" in str(e) and retry:
+                with mrich.clock(
+                    f"SQLite Database is locked, waiting {retry} second(s)..."
+                ):
+                    time.sleep(retry)
+                mrich.print("[debug]SQLite Database was locked, retrying...")
+                return self.commit()
+            else:
+                raise
 
     ### CREATE TABLES
 
