@@ -779,7 +779,7 @@ class Pose:
 
             else:
                 mrich.debug("Unsupported: Pose.calculate_interactions()")
-                raise NotImplementedError(f"{self.reference=}, {self.path=}")
+                raise NotImplementedError(f"{self}, {self.reference=}, {self.path=}")
 
             assert protein_system
 
