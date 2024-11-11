@@ -283,7 +283,7 @@ class Database:
 
     def commit(self, *, retry: float | None = 1) -> None:
         """Commit changes to the database
-        
+
         :param retry: If truthy, keep trying to execute every `retry` seconds if the Database is locked
         """
         try:
