@@ -611,6 +611,7 @@ class Pose:
         reference: bool | str = True,
         metadata: bool = True,
         duplicate_name: str | bool = False,
+        sanitise_null_metadata_values: bool = False,
         tags: bool = True,
     ) -> dict:
         """Returns a dictionary representing this Pose. Arguments:
@@ -673,7 +674,17 @@ class Pose:
 
         if metadata and (metadict := self.metadata):
             for key in metadict:
-                data[key] = metadict[key]
+
+                value = metadict[key]
+
+                if (
+                    sanitise_null_metadata_values
+                    and isinstance(value, str)
+                    and not value
+                ):
+                    value = None
+
+                data[key] = value
 
         return data
 

@@ -1283,6 +1283,7 @@ class PoseSet:
             reference="name",
             metadata=metadata,
             tags=tags,
+            sanitise_null_metadata_values=True,
         )
 
         drops = ["path", "compound", "target", "ref_pdb", "original SMILES"]
@@ -1406,12 +1407,12 @@ class PoseSet:
 
         header_cols = set(header.GetPropNames())
 
-        # empty properties
-        pose_df["generation_date"] = [None] * len(pose_df)
-        pose_df["submitter_name"] = [None] * len(pose_df)
-        pose_df["method"] = [None] * len(pose_df)
-        pose_df["submitter_email"] = [None] * len(pose_df)
-        pose_df["ref_url"] = [None] * len(pose_df)
+        # # empty properties
+        # pose_df["generation_date"] = [None] * len(pose_df)
+        # pose_df["submitter_name"] = [None] * len(pose_df)
+        # pose_df["method"] = [None] * len(pose_df)
+        # pose_df["submitter_email"] = [None] * len(pose_df)
+        # pose_df["ref_url"] = [None] * len(pose_df)
 
         if extra_cols:
             for key, value in extra_cols.items():
