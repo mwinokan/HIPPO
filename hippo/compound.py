@@ -946,6 +946,39 @@ class Compound:
 
         return pose
 
+    def get_inspirations(self, debug: bool = True) -> "PoseSet":
+        """Since inspirations map :class:`.Pose` objects to each other rather than :class:`.Compound` objects, this only works if there are poses registerd for this compound or it's elaborations/superstructures.
+
+        :returns: a :class:`.PoseSet` object
+        """
+
+        from .pset import PoseSet
+
+        sql = """
+        SELECT pose_id, inspiration_original FROM compound
+        INNER JOIN scaffold ON compound_id = scaffold_base
+        INNER JOIN pose ON compound_id = pose_compound
+        INNER JOIN inspiration ON pose_id = inspiration_derivative
+        WHERE compound_id = :compound_id
+        """
+
+        with mrich.spinner(f"Querying inspirations for {self}"):
+            records = self.db.execute(sql, dict(compound_id=self.id)).fetchall()
+
+        if not records:
+            mrich.warning("Could not determine inspirations for", self)
+            return None
+
+        derivatives = PoseSet(self.db, set(a for a, b in records))
+        inspirations = PoseSet(self.db, set(b for a, b in records))
+
+        if debug:
+            mrich.debug(f"Inspirations derived from {derivatives.ids}")
+
+        inspirations._name = f"Inspirations for {self}"
+
+        return inspirations
+
     ### DUNDERS
 
     def __str__(self) -> str:
