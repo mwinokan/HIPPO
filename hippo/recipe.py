@@ -1470,7 +1470,14 @@ class Recipe:
             inspirations = inspiration_map.get(product.id, None)
 
             if not inspirations and not is_base:
-                inspirations = inspiration_map.get(product.bases[0].id, None)
+                base = product.bases[0]
+                inspirations = inspiration_map.get(base.id, None)
+
+                if not inspirations and "inspiration_pose_ids" in base.metadata:
+                    inspirations = base.metadata["inspiration_pose_ids"]
+
+            if not inspirations and is_base and "inspiration_pose_ids" in product.metadata:
+                inspirations = product.metadata["inspiration_pose_ids"]
 
             if inspirations:
                 inspirations = PoseSet(self.db, inspirations)

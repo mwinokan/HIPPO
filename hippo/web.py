@@ -473,6 +473,10 @@ class ProjectPage:
                         self.doc.asis("<br>")
 
                         inspirations = inspiration_map.get(compound.id, None)
+
+                        if not inspirations and "inspiration_pose_ids" in compound.metadata:
+                            inspirations = compound.metadata["inspiration_pose_ids"]
+
                         if inspirations:
                             inspirations = self.animal.poses[inspirations]
                             self.text(f"inspirations: {inspirations.names}")
