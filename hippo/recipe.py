@@ -1403,6 +1403,7 @@ class Recipe:
         from pandas import DataFrame
 
         # from rich import print
+        from .pset import PoseSet
         from .cset import CompoundSet
         from .rset import ReactionSet
 
@@ -1411,6 +1412,8 @@ class Recipe:
         routes = self.get_routes()
 
         pose_map = self.db.get_compound_id_pose_ids_dict(self.products.compounds)
+
+        inspiration_map = self.db.get_compound_id_inspiration_ids_dict()
 
         for product in mrich.track(
             self.products, prefix="Constructing product DataFrame"
@@ -1463,6 +1466,17 @@ class Recipe:
             series, is_base = get_scaffold_series()
             d["is_scaffold"] = is_base
             d["scaffold_series"] = series
+
+            inspirations = inspiration_map.get(product.id, None)
+
+            if not inspirations and not is_base:
+                inspirations = inspiration_map.get(product.bases[0].id, None)
+
+            if inspirations: 
+                inspirations = PoseSet(self.db, inspirations)
+                d["inspirations"] = ", ".join(n for n in inspirations.names)
+            else:
+                d["inspirations"] = ""
 
             data.append(d)
 
