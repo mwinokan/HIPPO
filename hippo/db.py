@@ -2517,6 +2517,26 @@ class Database:
             d[pose_id].add(interaction_id)
         return d
 
+    def get_compound_id_inspiration_ids_dict(self) -> dict[int, set]:
+
+        sql = """
+        SELECT compound_id, pose_id, inspiration_original FROM compound
+        INNER JOIN scaffold ON compound_id = scaffold_base
+        INNER JOIN pose ON compound_id = pose_compound
+        INNER JOIN inspiration ON pose_id = inspiration_derivative
+        """
+
+        with mrich.spinner("Database.get_pose_id_interaction_ids_dict()"):
+            records = self.execute(sql).fetchall()
+
+        d = {}
+
+        for compound_id, pose_id, inspiration_id in records:
+            d[compound_id] = d.get(compound_id, set())
+            d[compound_id].add(inspiration_id)
+
+        return d
+
     def get_interaction(self, *, id: int, table: str = "interaction") -> "Interaction":
         """Fetch the :class:`.Interaction` object with given ID
 
