@@ -946,7 +946,7 @@ class Compound:
 
         return pose
 
-    def get_inspirations(self, debug: bool = True) -> "PoseSet":
+    def get_inspirations(self, debug: bool = True, none: str="warning") -> "PoseSet":
         """Since inspirations map :class:`.Pose` objects to each other rather than :class:`.Compound` objects, this only works if there are poses registerd for this compound or it's elaborations/superstructures.
 
         :returns: a :class:`.PoseSet` object
@@ -965,7 +965,7 @@ class Compound:
         with mrich.spinner(f"Querying inspirations for {self}"):
             records = self.db.execute(sql, dict(compound_id=self.id)).fetchall()
 
-        if not records:
+        if not records and none in ("warning", "warn"):
             mrich.warning("Could not determine inspirations for", self)
             return None
 
