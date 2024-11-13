@@ -1472,7 +1472,7 @@ class Recipe:
             if not inspirations and not is_base:
                 inspirations = inspiration_map.get(product.bases[0].id, None)
 
-            if inspirations: 
+            if inspirations:
                 inspirations = PoseSet(self.db, inspirations)
                 d["inspirations"] = ", ".join(n for n in inspirations.names)
             else:
