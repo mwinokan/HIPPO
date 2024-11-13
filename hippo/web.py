@@ -474,7 +474,10 @@ class ProjectPage:
 
                         inspirations = inspiration_map.get(compound.id, None)
 
-                        if not inspirations and "inspiration_pose_ids" in compound.metadata:
+                        if (
+                            not inspirations
+                            and "inspiration_pose_ids" in compound.metadata
+                        ):
                             inspirations = compound.metadata["inspiration_pose_ids"]
 
                         if inspirations:

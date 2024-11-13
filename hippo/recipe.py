@@ -1476,7 +1476,11 @@ class Recipe:
                 if not inspirations and "inspiration_pose_ids" in base.metadata:
                     inspirations = base.metadata["inspiration_pose_ids"]
 
-            if not inspirations and is_base and "inspiration_pose_ids" in product.metadata:
+            if (
+                not inspirations
+                and is_base
+                and "inspiration_pose_ids" in product.metadata
+            ):
                 inspirations = product.metadata["inspiration_pose_ids"]
 
             if inspirations:
