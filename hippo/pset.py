@@ -550,7 +550,13 @@ class PoseSet:
         if sort:
             self._indices = sorted(list(set(indices)))
         else:
-            self._indices = list(set(indices))
+
+            # remove duplicates but keep order
+            self._indices = dict()
+            for i in indices:
+                if i not in self._indices:
+                    self._indices[i] = i
+            self._indices = list(self._indices.keys())
 
         self._interactions = None
 
