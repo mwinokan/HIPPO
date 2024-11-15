@@ -4,6 +4,8 @@ from .cset import IngredientSet
 
 import mcol
 
+from typing import Callable
+
 import os
 
 import mrich
@@ -1532,12 +1534,14 @@ class PoseSet:
         self,
         print_name: str = True,
         method: str | None = None,
+        function: Callable | None = None,
         **kwargs,
     ):
         """Interactive widget to navigate compounds in the table
 
         :param print_name: print the :class:`.Pose` name  (Default value = True)
         :param method: pass the name of a :class:`.Pose` method to interactively display. Keyword arguments to interactive() will be passed through (Default value = None)
+        :param function: pass a callable which will be called as `function(pose)`
 
         """
 
@@ -1563,6 +1567,26 @@ class PoseSet:
                 value = getattr(pose, method)(**kwargs)
                 if value:
                     display(value)
+
+            return interactive(
+                widget,
+                i=BoundedIntText(
+                    value=0,
+                    min=0,
+                    max=len(self) - 1,
+                    step=1,
+                    description="Pose:",
+                    disabled=False,
+                ),
+            )
+
+        elif function:
+
+            def widget(i):
+                pose = self[i]
+                if print_name:
+                    print(repr(pose))
+                display(function(pose))
 
             return interactive(
                 widget,
