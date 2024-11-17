@@ -24,7 +24,7 @@ except Exception as e:
     mrich.error(e)
     pass
 
-aspirin = Compound.objects.first()
+aspirin = Compound._objects.first()
 assert aspirin
 mrich.var("aspirin", aspirin)
 
@@ -43,19 +43,24 @@ A71EV2A = Target.objects.first()
 assert A71EV2A
 mrich.var("A71EV2A", A71EV2A)
 
-# try:
-pose = Pose(
-    # name="A71EV2A",
-    compound=aspirin,
-    target=A71EV2A,
-    path="/path/to/pose.mol",
-)
+try:
+    pose = Pose(
+        # name="A71EV2A",
+        compound=aspirin,
+        target=A71EV2A,
+        path="/path/to/pose.mol",
+    )
 
-pose.full_clean()
-pose.save()
-# except:
-# raise
-# pass
+    pose.full_clean()
+    pose.save()
+except Exception as e:
+    mrich.error(e)
+    pass
 
 pose = Pose.objects.first()
 mrich.var("pose", pose)
+
+all_compounds = Compound._objects.all()
+mrich.var("all_compounds", all_compounds)
+
+mrich.print(dir(Compound))
