@@ -202,6 +202,17 @@ class InteractionSet:
         return self._indices
 
     @property
+    def types(self) -> list[str]:
+        """Returns the ids of interactions in this set"""
+        records = self.db.select_where(
+            query="interaction_type",
+            table="interaction",
+            key=f"interaction_id IN {self.str_ids}",
+            multiple=True,
+        )
+        return [r for r, in records]
+
+    @property
     def db(self) -> "Database":
         """The associated HIPPO :class:`.Database`"""
         return self._db
@@ -241,11 +252,24 @@ class InteractionSet:
         return self._df
 
     @property
-    def residue_number_chain_pairs(self) -> list[tuple[int]]:
+    def residue_number_chain_pairs(self) -> list[tuple]:
         """Get a list of ``(residue_number, chain_name)`` tuples"""
 
         sql = f"""
         SELECT DISTINCT feature_residue_number, feature_chain_name FROM {self.table}
+        INNER JOIN feature
+        ON feature_id = interaction_feature
+        WHERE interaction_id IN {self.str_ids}
+        """
+
+        return self.db.execute(sql).fetchall()
+
+    @property
+    def type_residue_number_chain_triples(self) -> list[tuple]:
+        """Get a list of ``(interaction_type, residue_number, chain_name)`` tuples"""
+
+        sql = f"""
+        SELECT DISTINCT interaction_type, feature_residue_number, feature_chain_name FROM {self.table}
         INNER JOIN feature
         ON feature_id = interaction_feature
         WHERE interaction_id IN {self.str_ids}
@@ -322,7 +346,7 @@ class InteractionSet:
             if families:
                 s += f" {interaction.feature.family} ~ {interaction.family}"
 
-            mrich.var(s, f"{interaction.distance:.1f}", dict(unit="Å"))
+            mrich.var(s, f"{interaction.distance:.1f}", "Å")
 
     def get_classic_fingerprint(self) -> dict:
         """Classic HIPPO fingerprint dictionary, mapping protein :class:`.Feature` ID's to the number of corresponding ligand features (from any :class:`.Pose`)"""
