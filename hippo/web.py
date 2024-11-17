@@ -450,6 +450,8 @@ class ProjectPage:
 
         id_num_poses_dict = compounds.id_num_poses_dict
 
+        inspiration_map = self.db.get_compound_id_inspiration_ids_dict()
+
         with self.tag("div", klass="w3-row"):
             for compound in compounds:
 
@@ -468,6 +470,21 @@ class ProjectPage:
                         self.text(f"{compound.inchikey}")
                         self.doc.asis("<br>")
                         self.text(f"{compound.smiles}")
+                        self.doc.asis("<br>")
+
+                        inspirations = inspiration_map.get(compound.id, None)
+
+                        if (
+                            not inspirations
+                            and "inspiration_pose_ids" in compound.metadata
+                        ):
+                            inspirations = compound.metadata["inspiration_pose_ids"]
+
+                        if inspirations:
+                            inspirations = self.animal.poses[inspirations]
+                            self.text(f"inspirations: {inspirations.names}")
+                        else:
+                            self.text(f"inspirations: ?")
 
                     num_poses = id_num_poses_dict[compound.id]
                     self.button(f"{num_poses} poses", disable=num_poses == 0)
