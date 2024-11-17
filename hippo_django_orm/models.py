@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from django.db import models
+from .expressions import MolFromSmiles, MolPatternBfpFromSmiles
 
 
 class TargetModel(models.Model):
@@ -23,13 +24,19 @@ class CompoundModel(models.Model):
     inchikey = models.CharField(max_length=27, unique=True)
     alias = models.CharField(max_length=60, blank=True, unique=True)
     smiles = models.CharField(max_length=90)
-    mol = models.BinaryField(blank=True)
-    metadata = models.JSONField(default=dict(), blank=True)
+    mol = models.GeneratedField(
+        expression=MolFromSmiles("smiles", "mol"),
+        output_field=models.BinaryField(blank=True),
+        db_persist=True,
+    )
 
-    ### legacy (pre-django implementation)
-    # base = models.ForeignKey(Compound, on_delete=models.CASCADE)
-    # pattern_bfp = models.BinaryField()
-    # morgan_bfp = models.BinaryField()
+    pattern_bfp = models.GeneratedField(
+        expression=MolPatternBfpFromSmiles("smiles", "pattern_bfp"),
+        output_field=models.BinaryField(blank=True),
+        db_persist=True,
+    )
+
+    metadata = models.JSONField(default=dict(), blank=True)
 
 
 class PoseModel(models.Model):
