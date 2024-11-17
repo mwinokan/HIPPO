@@ -11,6 +11,9 @@ from django.db import models, connections
 import mrich
 from pathlib import Path
 
+# enable custom signal handlers
+from . import signals
+
 
 class Database:
     """Standalone wrapper for Django's ORM"""
