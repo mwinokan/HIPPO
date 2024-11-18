@@ -4,6 +4,7 @@ from pathlib import Path
 from django.db import models
 from .expressions import MolFromSmiles, MolPatternBfpFromSmiles
 from .fields import MolField
+from datetime import date
 
 
 class TargetModel(models.Model):
@@ -62,10 +63,29 @@ class PoseModel(models.Model):
     compound = models.ForeignKey("Compound", on_delete=models.CASCADE)
     target = models.ForeignKey("Target", on_delete=models.CASCADE)
     mol = MolField(blank=True)
-    # mol = models.BinaryField(blank=True)
     energy_score = models.FloatField(blank=True, null=True)
     distance_score = models.FloatField(blank=True, null=True)
     metadata = models.JSONField(default=dict(), blank=True)
+    fingerprinted = models.BooleanField(default=False)
 
-    ### legacy (pre-django implementation)
-    # fingerprint
+
+class QuoteModel(models.Model):
+    class Meta:
+        app_label = "hippo"
+        abstract = True
+
+    from .price import CURRENCIES
+
+    id = models.BigAutoField(primary_key=True)
+    amount = models.FloatField()  # TODO: ADD Positive validation
+    supplier = models.CharField(max_length=60, blank=False)
+    catalogue = models.CharField(max_length=60, blank=True)
+    entry = models.CharField(max_length=60, blank=True)
+    lead_time = models.FloatField()  # TODO: ADD positive validation
+    price = models.DecimalField(
+        max_digits=8, decimal_places=2
+    )  # TODO: ADD positive validation
+    currency = models.CharField(max_length=3, blank=True, choices=CURRENCIES)
+    date = models.DateField(default=date.today)
+    compound = models.ForeignKey("Compound", on_delete=models.CASCADE)
+    purity = models.FloatField()  # TODO: ADD 0-1 range validation
