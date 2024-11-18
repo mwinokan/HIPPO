@@ -1040,33 +1040,33 @@ class Recipe:
         if price:
             price = self.price
             if price:
-                print("\nprice", price.amount, dict(unit=price.currency))
-                # mrich.var('lead-time', self.lead_time, dict(unit='working days'))
+                mrich.var("\nprice", price.amount, price.currency)
+                # mrich.var('lead-time', self.lead_time, 'working days))
 
         mrich.var("\n#products", len(self.products))
 
         if len(self.products) < 100:
             for product in self.products:
-                print(str(product.compound), f"{product.amount:.2f}", dict(unit="mg"))
+                mrich.var(str(product.compound), f"{product.amount:.2f}", "mg")
 
         mrich.var("\n#intermediates", len(self.intermediates))
         if len(self.intermediates) < 100:
             for intermediate in self.intermediates:
-                print(
+                mrich.var(
                     str(intermediate.compound),
                     f"{intermediate.amount:.2f}",
-                    dict(unit="mg"),
+                    "mg",
                 )
 
         mrich.var("\n#reactants", len(self.reactants))
         if len(self.reactants) < 100:
             for reactant in self.reactants:
-                print(str(reactant.compound), f"{reactant.amount:.2f}", dict(unit="mg"))
+                mrich.var(str(reactant.compound), f"{reactant.amount:.2f}", "mg")
 
         mrich.var("\n#reactions", len(self.reactions))
         if len(self.reactions) < 100:
             for reaction in self.reactions:
-                print(str(reaction), reaction.reaction_str, dict(unit=reaction.type))
+                mrich.var(str(reaction), reaction.reaction_str, reaction.type)
 
     def get_ingredient(self, id):
         """Get an ingredient by its compound ID
