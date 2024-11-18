@@ -1724,6 +1724,7 @@ class Recipe:
             mrich.error("Not all intermediate Compounds in Database")
             return False
 
+        reaction_intermediates = self.reactions.intermediates
         reaction_products = self.reactions.products
         reaction_reactants = self.reactions.reactants
 
@@ -1733,18 +1734,18 @@ class Recipe:
                 mrich.error(f"Product: {product} does not have associated reaction")
                 return False
 
-        # all intermediates should be the product of a reaction and the reactant of a reaction
+        # intermediates
         for intermediate in self.intermediates:
-            if intermediate not in reaction_products:
+            if intermediate not in reaction_intermediates:
                 mrich.error(
-                    f"Intermediate: {intermediate} is not the product of any included reactions"
+                    f"Intermediate: {intermediate} is not in self.reactions.intermediates"
                 )
                 return False
 
-            if intermediate not in reaction_reactants:
-                mrich.error(
-                    f"Intermediate: {intermediate} is not a reactant of any included reactions"
-                )
+        # reactants
+        for reactant in self.reactants:
+            if reactant not in reaction_reactants:
+                mrich.error(f"Reactant: {reactant} is not in self.reactions.reactants")
                 return False
 
         # all reactions should have enough reactant
