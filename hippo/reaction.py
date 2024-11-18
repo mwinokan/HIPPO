@@ -351,6 +351,31 @@ class Reaction:
 
         return data
 
+    def _delete(self) -> None:
+        """Delete this reaction and any related reactants, routes, and components"""
+
+        self = animal.R53848
+
+        route_ids = self.db.select_where(
+            query="component_route",
+            table="component",
+            key=f"component_ref = {self.id} AND component_type = 1",
+            multiple=True,
+        )
+
+        route_ids = [r for r, in route_ids]
+        route_str_ids = str(tuple(route_ids)).replace(",)", ")")
+
+        self.db.delete_where(
+            table="component", key=f"component_route IN {route_str_ids}"
+        )
+
+        self.db.delete_where(table="route", key=f"route_id IN {route_str_ids}")
+
+        self.db.delete_where(table="reactant", key="reaction", value=self.id)
+
+        self.db.delete_where(table="reaction", key="id", value=self.id)
+
     ### DUNDERS
 
     def __str__(self) -> str:
