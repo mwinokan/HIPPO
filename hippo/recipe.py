@@ -1709,14 +1709,14 @@ class Recipe:
             return False
 
         if self.db.count_where(
-            table="compound", key=f"compound_id IN {self.reactant_compounds.str_ids}"
+            table="compound", key=f"compound_id IN {self.reactants.compounds.str_ids}"
         ) < len(self.reactants):
             mrich.error("Not all reactant Compounds in Database")
             return False
 
         if self.db.count_where(
             table="compound",
-            key=f"compound_id IN {self.intermediate_compounds.str_ids}",
+            key=f"compound_id IN {self.intermediates.compounds.str_ids}",
         ) < len(self.intermediates):
             mrich.error("Not all intermediate Compounds in Database")
             return False
