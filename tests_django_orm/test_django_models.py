@@ -1,6 +1,7 @@
 import mrich
 
 from hippo_django_orm.database import Database
+from rdkit.Chem import Mol
 
 db = Database(
     name="/Users/tfb64483/Software/HIPPO/tests_django_orm/test_django_models.sqlite"
@@ -63,4 +64,18 @@ mrich.var("pose", pose)
 all_compounds = Compound._objects.all()
 mrich.var("all_compounds", all_compounds)
 
-mrich.print(dir(Compound))
+# mrich.print(dir(Compound))
+
+# mols = [m for m in Compound._objects.raw("SELECT id, mol_from_smiles(smiles) FROM compound")]
+
+# print(mols)
+
+# from django.db import connection
+
+# with connection.cursor() as cursor:
+#     cursor.execute("SELECT mol_to_binary_mol(mol_from_smiles(smiles)) FROM compound")
+#     mol, = cursor.fetchone()
+#     mrich.print(mol)
+#     mrich.print(Mol(mol))
+
+mrich.print(all_compounds[0].mol)
