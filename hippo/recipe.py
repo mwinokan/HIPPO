@@ -1035,7 +1035,7 @@ class Recipe:
 
         import mcol
 
-        mrich.header("Recipe")
+        mrich.h1(str(self))
 
         if price:
             price = self.price
@@ -1043,13 +1043,14 @@ class Recipe:
                 mrich.var("\nprice", price.amount, price.currency)
                 # mrich.var('lead-time', self.lead_time, 'working days))
 
-        mrich.var("\n#products", len(self.products))
+        mrich.h3(f"{len(self.products)} products")
 
         if len(self.products) < 100:
             for product in self.products:
                 mrich.var(str(product.compound), f"{product.amount:.2f}", "mg")
 
-        mrich.var("\n#intermediates", len(self.intermediates))
+        mrich.h3(f"{len(self.intermediates)} intermediates")
+
         if len(self.intermediates) < 100:
             for intermediate in self.intermediates:
                 mrich.var(
@@ -1058,12 +1059,14 @@ class Recipe:
                     "mg",
                 )
 
-        mrich.var("\n#reactants", len(self.reactants))
+        mrich.h3(f"{len(self.reactants)} reactants")
+
         if len(self.reactants) < 100:
             for reactant in self.reactants:
                 mrich.var(str(reactant.compound), f"{reactant.amount:.2f}", "mg")
 
-        mrich.var("\n#reactions", len(self.reactions))
+        mrich.h3(f"{len(self.reactions)} reactions")
+
         if len(self.reactions) < 100:
             for reaction in self.reactions:
                 mrich.var(str(reaction), reaction.reaction_str, reaction.type)
@@ -1737,6 +1740,7 @@ class Recipe:
                     f"Intermediate: {intermediate} is not the product of any included reactions"
                 )
                 return False
+
             if intermediate not in reaction_reactants:
                 mrich.error(
                     f"Intermediate: {intermediate} is not a reactant of any included reactions"
