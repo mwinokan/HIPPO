@@ -354,8 +354,6 @@ class Reaction:
     def _delete(self) -> None:
         """Delete this reaction and any related reactants, routes, and components"""
 
-        self = animal.R53848
-
         route_ids = self.db.select_where(
             query="component_route",
             table="component",
