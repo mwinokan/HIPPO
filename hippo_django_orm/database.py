@@ -43,7 +43,9 @@ class Database:
         # create the tables
         self.create_tables()
 
-    def create_tables(self, debug: bool = True) -> None:
+        mrich.success("Connected Database @", f"[file]{name}")
+
+    def create_tables(self, debug: bool = False) -> None:
         """For each table in the schema, rename the Model, create the table if it doesn't exist, and add any missing columns"""
 
         from .target import Target

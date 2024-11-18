@@ -4,6 +4,8 @@ from hippo_django_orm.database import Database
 from rdkit.Chem import Mol
 import molparse as mp
 
+mrich.h3("TEST Database.__init__")
+
 db = Database(
     name="/Users/tfb64483/Software/HIPPO/tests_django_orm/test_django_models.sqlite"
 )
@@ -12,6 +14,8 @@ db = Database(
 from hippo_django_orm.compound import Compound
 from hippo_django_orm.target import Target
 from hippo_django_orm.pose import Pose
+
+mrich.h3("TEST INSERT compound")
 
 try:
     aspirin = Compound(
@@ -30,6 +34,8 @@ aspirin = Compound._objects.first()
 assert aspirin
 mrich.var("aspirin", aspirin)
 
+mrich.h3("TEST INSERT target")
+
 try:
     A71EV2A = Target(
         name="A71EV2A",
@@ -44,6 +50,8 @@ except Exception as e:
 A71EV2A = Target.objects.first()
 assert A71EV2A
 mrich.var("A71EV2A", A71EV2A)
+
+mrich.h3("TEST INSERT pose")
 
 try:
     pose = Pose(
@@ -63,18 +71,49 @@ except Exception as e:
 pose = Pose.objects.first()
 mrich.var("pose", pose)
 
+### TEST GETTING compound.mol
+
+mrich.h3("TEST GETTING compound.mol")
+
+compound = Compound._objects.first()
+mrich.var("compound.mol", compound.mol)
+
+### TEST GETTING pose.mol
+
+mrich.h3("TEST GETTING pose.mol")
+
+pose = Pose.objects.first()
+mrich.var("pose.mol", pose.mol)
+mrich.var("bool(pose.mol)", bool(pose.mol))
+
+### TEST SETTING pose.mol
+
+mrich.h3("TEST SETTING pose.mol")
+
 mol = mp.rdkit.mol_from_smiles("CCC")
-
+mrich.var("mol", mol)
 pose.mol = mol
-
 pose.full_clean()
 pose.save()
 
+### TEST GETTING pose.mol
+
+mrich.h3("TEST GETTING pose.mol")
+
 pose = Pose.objects.first()
-
 mrich.var("pose.mol", pose.mol)
+mrich.var("bool(pose.mol)", bool(pose.mol))
 
-mrich.var("pdbblock", mp.rdkit.mol_to_pdb_block(pose.mol))
+# pose.mol = mol
+
+# pose.full_clean()
+# pose.save()
+
+# pose = Pose.objects.first()
+
+# mrich.var("pose.mol", pose.mol)
+
+# mrich.var("pdbblock", mp.rdkit.mol_to_pdb_block(pose.mol))
 
 # all_compounds = Compound._objects.all()
 # mrich.var("all_compounds", all_compounds)
