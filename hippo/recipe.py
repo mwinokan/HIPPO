@@ -1696,17 +1696,30 @@ class Recipe:
 
         # all references should exist
 
-        for reaction in self.reactions:
-            assert reaction
+        if animal.db.count_where(
+            table="reaction", key=f"reaction_id IN {self.reactions.str_ids}"
+        ) < len(self.reactions):
+            mrich.error("Not all Reactions in Database")
+            return False
 
-        for product in self.products:
-            assert product
+        if animal.db.count_where(
+            table="compound", key=f"compound_id IN {self.product_compounds.str_ids}"
+        ) < len(self.products):
+            mrich.error("Not all product Compounds in Database")
+            return False
 
-        for reactant in self.reactants:
-            assert reactant
+        if animal.db.count_where(
+            table="compound", key=f"compound_id IN {self.reactant_compounds.str_ids}"
+        ) < len(self.reactants):
+            mrich.error("Not all reactant Compounds in Database")
+            return False
 
-        for intermediate in self.intermediates:
-            assert intermediate
+        if animal.db.count_where(
+            table="compound",
+            key=f"compound_id IN {self.intermediate_compounds.str_ids}",
+        ) < len(self.intermediates):
+            mrich.error("Not all intermediate Compounds in Database")
+            return False
 
         reaction_products = self.reactions.products
         reaction_reactants = self.reactions.reactants
