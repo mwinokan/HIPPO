@@ -26,7 +26,7 @@ class CompoundModel(models.Model):
 
     id = models.BigAutoField(primary_key=True)
     inchikey = models.CharField(max_length=27, unique=True)
-    alias = models.CharField(max_length=60, blank=True, unique=True)
+    alias = models.CharField(max_length=60, blank=True, unique=True, null=True)
     smiles = models.CharField(max_length=90)
     metadata = models.JSONField(default=dict(), blank=True)
 
@@ -52,14 +52,14 @@ class PoseModel(models.Model):
         abstract = True
 
     id = models.BigAutoField(primary_key=True)
-    inchikey = models.CharField(max_length=27, unique=True, blank=True)
-    alias = models.CharField(max_length=60, blank=True, unique=True)
-    smiles = models.CharField(max_length=90, blank=True, unique=True)
+    inchikey = models.CharField(max_length=27, unique=False, blank=True)
+    alias = models.CharField(max_length=60, blank=True, unique=True, null=True)
+    smiles = models.CharField(max_length=90, blank=True, unique=True, null=True)
 
     reference = models.ForeignKey(
         "Pose", on_delete=models.SET_NULL, blank=True, null=True
     )
-    path = models.FilePathField(Path("/"), max_length=200)
+    path = models.FilePathField(Path("/"), max_length=200, unique=True)
     compound = models.ForeignKey("Compound", on_delete=models.CASCADE)
     target = models.ForeignKey("Target", on_delete=models.CASCADE)
     mol = MolField(blank=True)
