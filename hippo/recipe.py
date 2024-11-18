@@ -1694,6 +1694,20 @@ class Recipe:
 
     def check_integrity(self, debug: bool = False) -> bool:
 
+        # all references should exist
+
+        for reaction in self.reactions:
+            assert reaction
+
+        for product in self.products:
+            assert product
+
+        for reactant in self.reactants:
+            assert reactant
+
+        for intermediate in self.intermediates:
+            assert intermediate
+
         reaction_products = self.reactions.products
         reaction_reactants = self.reactions.reactants
 
