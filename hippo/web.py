@@ -623,10 +623,8 @@ class ProjectPage:
                     description += "(Lower is better)"
                 else:
                     description += "(Lower is better)"
-                    
-                self.var(
-                    "Description", description, tag="li"
-                )
+
+                self.var("Description", description, tag="li")
 
         if histogram:
             fig = attribute.histogram(progress=True)
