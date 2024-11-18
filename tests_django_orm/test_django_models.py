@@ -2,6 +2,7 @@ import mrich
 
 from hippo_django_orm.database import Database
 from rdkit.Chem import Mol
+import molparse as mp
 
 db = Database(
     name="/Users/tfb64483/Software/HIPPO/tests_django_orm/test_django_models.sqlite"
@@ -56,26 +57,40 @@ try:
     pose.save()
 except Exception as e:
     mrich.error(e)
+    raise
     pass
 
 pose = Pose.objects.first()
 mrich.var("pose", pose)
 
-all_compounds = Compound._objects.all()
-mrich.var("all_compounds", all_compounds)
+mol = mp.rdkit.mol_from_smiles("CCC")
 
-# mrich.print(dir(Compound))
+pose.mol = mol
 
-# mols = [m for m in Compound._objects.raw("SELECT id, mol_from_smiles(smiles) FROM compound")]
+pose.full_clean()
+pose.save()
 
-# print(mols)
+pose = Pose.objects.first()
 
-# from django.db import connection
+mrich.var("pose.mol", pose.mol)
 
-# with connection.cursor() as cursor:
-#     cursor.execute("SELECT mol_to_binary_mol(mol_from_smiles(smiles)) FROM compound")
-#     mol, = cursor.fetchone()
-#     mrich.print(mol)
-#     mrich.print(Mol(mol))
+mrich.var("pdbblock", mp.rdkit.mol_to_pdb_block(pose.mol))
 
-mrich.print(all_compounds[0].mol)
+# all_compounds = Compound._objects.all()
+# mrich.var("all_compounds", all_compounds)
+
+# # mrich.print(dir(Compound))
+
+# # mols = [m for m in Compound._objects.raw("SELECT id, mol_from_smiles(smiles) FROM compound")]
+
+# # print(mols)
+
+# # from django.db import connection
+
+# # with connection.cursor() as cursor:
+# #     cursor.execute("SELECT mol_to_binary_mol(mol_from_smiles(smiles)) FROM compound")
+# #     mol, = cursor.fetchone()
+# #     mrich.print(mol)
+# #     mrich.print(Mol(mol))
+
+# mrich.print(all_compounds[0].mol)
