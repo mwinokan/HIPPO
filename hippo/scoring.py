@@ -71,7 +71,7 @@ class Scorer:
         self._data.replace({np.nan: None}, inplace=True),
 
         if populate:
-            if load_cache and self.json_path.exists:
+            if load_cache and self.json_path.exists():
                 self._load_json()
             else:
                 self._populate_query_cache()
@@ -90,6 +90,7 @@ class Scorer:
         pattern: str = "*.json",
         skip: list[str] | None = None,
         load_cache: bool = True,
+        subsites: bool = True,
         # **kwargs,
     ):
 
@@ -113,13 +114,14 @@ class Scorer:
             if skip and key in skip:
                 continue
 
-            # print(key, attribute)
+            if not subsites and "subsite" in key:
+                continue
 
             self.add_custom_attribute(
                 key, attribute["function"], weight_reset_warning=False
             )
 
-        if load_cache and self.json_path.exists:
+        if load_cache and self.json_path.exists():
             self._load_json()
         else:
             self._populate_query_cache()
@@ -885,65 +887,149 @@ class CustomAttribute(Attribute):
         return value
 
 
+# DEFAULT_ATTRIBUTES = {
+#     "num_bases": dict(
+#         type="custom",
+#         weight=1.0,
+#         function=lambda r: r.product_compounds.count_by_tag(tag="Syndirella base"),
+#         description="The number of Syndirella base compounds in this selection",
+#     ),
+#     "num_products": dict(
+#         type="standard",
+#         weight=1.0,
+#         description="The number of product compounds in this selection",
+#     ),
+#     "num_bases_elaborated": dict(
+#         type="custom",
+#         weight=1.0,
+#         function=lambda r: r.product_compounds.num_bases_elaborated,
+#         description="The number of Syndirella base compounds that have at least one elaboration in this selection",
+#     ),
+#     "elaboration_balance": dict(
+#         type="custom",
+#         weight=1.0,
+#         function=lambda r: r.product_compounds.elaboration_balance,
+#         description="A measure for how evenly base compounds have been elaborated",
+#     ),  ### REALLY UNPERFORMANT?
+#     "num_inspirations": dict(
+#         type="custom",
+#         weight=1.0,
+#         function=lambda r: r.product_poses.num_inspirations,
+#         description="The number of unique fragment compounds that inspired poses for product compounds in this selection",
+#     ),
+#     "num_inspiration_sets": dict(
+#         type="custom",
+#         weight=1.0,
+#         function=lambda r: r.product_poses.num_inspiration_sets,
+#         description="The number of unique fragment combinations that inspired poses for product compounds in this selection",
+#     ),
+#     "risk_diversity": dict(
+#         type="custom",
+#         weight=0.0,
+#         function=lambda r: r.product_compounds.risk_diversity,
+#         description="A measure of how evenly spread the risk of elaborations are for each base compound. Risk in this case refers to the number of atoms added",
+#     ),
+#     "interaction_count": dict(
+#         type="custom",
+#         weight=1.0,
+#         function=lambda r: r.product_interactions.num_features,
+#         description="The number of protein features that are being interecated with in this selection",
+#     ),
+#     "interaction_balance": dict(
+#         type="custom",
+#         weight=0.0,
+#         function=lambda r: r.product_interactions.per_feature_count_std,
+#         description="A measure for how evenly protein features are being interacted with in this selection",
+#     ),
+#     "num_subsites": dict(
+#         type="custom",
+#         weight=1.0,
+#         function=lambda r: r.product_poses.num_subsites,
+#         description="Count the number of subsites that poses in this set come into contact with",
+#     ),
+#     "subsite_balance": dict(
+#         type="custom",
+#         weight=0.0,
+#         function=lambda r: r.product_poses.subsite_balance,
+#         description="Count the number of subsites that poses in this set come into contact with",
+#     ),
+#     "avg_distance_score": dict(
+#         type="custom",
+#         weight=-0.0,
+#         function=lambda r: r.product_poses.avg_distance_score,
+#         description="Average distance score (e.g. RMSD to fragment inspirations) for poses in this set",
+#     ),
+#     "avg_energy_score": dict(
+#         type="custom",
+#         weight=-0.0,
+#         function=lambda r: r.product_poses.avg_energy_score,
+#         description="Average energy score (e.g. binding ddG) for poses in this set",
+#     ),
+#     # "reaction_risk": dict(type='custom', weight=1.0, function=None),
+#     # "pockets?": dict(type='custom', weight=1.0, function=None),
+#     # "chemical_diversity": dict(type='custom', weight=1.0, function=None),
+#     # "DMS/sequence_variability": dict(type='custom', weight=1.0, function=None),
+# }
+
 DEFAULT_ATTRIBUTES = {
     "num_bases": dict(
         type="custom",
         weight=1.0,
         function=lambda r: r.product_compounds.count_by_tag(tag="Syndirella base"),
-        description="The number of Syndirella base compounds in this selection",
+        description="The number of Syndirella base compounds in this selection. Higher is better.",
     ),
     "num_products": dict(
         type="standard",
         weight=1.0,
-        description="The number of product compounds in this selection",
+        description="The number of product compounds in this selection. Higher is better.",
     ),
     "num_bases_elaborated": dict(
         type="custom",
         weight=1.0,
         function=lambda r: r.product_compounds.num_bases_elaborated,
-        description="The number of Syndirella base compounds that have at least one elaboration in this selection",
+        description="The number of Syndirella base compounds that have at least one elaboration in this selection. Higher is better.",
     ),
     "elaboration_balance": dict(
         type="custom",
         weight=1.0,
         function=lambda r: r.product_compounds.elaboration_balance,
-        description="A measure for how evenly base compounds have been elaborated",
+        description="A measure for how evenly base compounds have been elaborated using an h-index. Higher is better.",
     ),  ### REALLY UNPERFORMANT?
     "num_inspirations": dict(
         type="custom",
         weight=1.0,
         function=lambda r: r.product_poses.num_inspirations,
-        description="The number of unique fragment compounds that inspired poses for product compounds in this selection",
+        description="The number of unique fragment compounds that inspired poses for product compounds in this selection. Higher is better.",
     ),
     "num_inspiration_sets": dict(
         type="custom",
         weight=1.0,
         function=lambda r: r.product_poses.num_inspiration_sets,
-        description="The number of unique fragment combinations that inspired poses for product compounds in this selection",
+        description="The number of unique fragment combinations that inspired poses for product compounds in this selection. Higher is better.",
     ),
-    "risk_diversity": dict(
-        type="custom",
-        weight=0.0,
-        function=lambda r: r.product_compounds.risk_diversity,
-        description="A measure of how evenly spread the risk of elaborations are for each base compound. Risk in this case refers to the number of atoms added",
-    ),
+    # "risk_diversity": dict(
+    #     type="custom",
+    #     weight=0.0,
+    #     function=lambda r: r.product_compounds.risk_diversity,
+    #     description="A measure of how evenly spread the risk of elaborations are for each base compound. Risk in this case refers to the number of atoms added. Higher is better",
+    # ), # REMOVED BECAUSE IT DOES NOT NECESSARILY IMPROVE AS PRODUCTS ARE ADDED
     "interaction_count": dict(
         type="custom",
         weight=1.0,
         function=lambda r: r.product_interactions.num_features,
-        description="The number of protein features that are being interecated with in this selection",
+        description="The number of protein features that are being interecated with in this selection. Higher is better.",
     ),
     "interaction_balance": dict(
         type="custom",
         weight=0.0,
-        function=lambda r: r.product_interactions.per_feature_count_std,
-        description="A measure for how evenly protein features are being interacted with in this selection",
+        function=lambda r: r.product_interactions.per_feature_count_hirsch,
+        description="A measure for how evenly protein features are being interacted with in this selection using an h-index. Higher is better",
     ),
     "num_subsites": dict(
         type="custom",
         weight=1.0,
         function=lambda r: r.product_poses.num_subsites,
-        description="Count the number of subsites that poses in this set come into contact with",
+        description="Count the number of subsites that poses in this set come into contact with. Higher is better.",
     ),
     "subsite_balance": dict(
         type="custom",
@@ -955,13 +1041,13 @@ DEFAULT_ATTRIBUTES = {
         type="custom",
         weight=-0.0,
         function=lambda r: r.product_poses.avg_distance_score,
-        description="Average distance score (e.g. RMSD to fragment inspirations) for poses in this set",
+        description="Average distance score (e.g. RMSD to fragment inspirations) for poses in this set. Lower is better.",
     ),
     "avg_energy_score": dict(
         type="custom",
         weight=-0.0,
         function=lambda r: r.product_poses.avg_energy_score,
-        description="Average energy score (e.g. binding ddG) for poses in this set",
+        description="Average energy score (e.g. binding ddG) for poses in this set. Lower is better.",
     ),
     # "reaction_risk": dict(type='custom', weight=1.0, function=None),
     # "pockets?": dict(type='custom', weight=1.0, function=None),
