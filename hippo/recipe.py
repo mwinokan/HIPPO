@@ -1781,14 +1781,14 @@ class Recipe:
     def __str__(self):
 
         if self.score:
-            s = f"score={self.score:.3f}"
+            s = f"(score={self.score:.3f})"
         else:
             s = ""
 
         if self.hash:
-            return f"Recipe_{self.hash}({s})"
+            return f"Recipe_{self.hash}{s}"
 
-        return f"Recipe({s})"
+        return f"Recipe{s}"
 
     def __longstr(self) -> str:
         """Unformatted string representation"""
