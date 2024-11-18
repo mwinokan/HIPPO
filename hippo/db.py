@@ -2210,6 +2210,10 @@ class Database:
         entry = self.select_where(
             query=query, table="reaction", key="id", value=id, none=none
         )
+
+        if not entry:
+            return None
+
         reaction = Reaction(self, *entry)
         return reaction
 
