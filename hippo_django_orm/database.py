@@ -13,6 +13,7 @@ from pathlib import Path
 
 # enable custom signal handlers
 from . import signals
+from .setup import setup_django
 
 
 class Database:
@@ -22,28 +23,23 @@ class Database:
         self,
         # path: str | Path,
         name: str,
+        db_alias: str = "default",
         debug: bool = True,
     ) -> None:
 
-        # define DATABASES dictionary
-        DATABASES = {
-            "default": {
-                "ENGINE": "django.db.backends.sqlite3",
-                "NAME": name,
-                "APP_LABEL": "hippo",
-            }
-        }
+        self._db_alias = db_alias
 
-        # Update the settings with the custom DATABASES dictionary
-        settings.configure(DATABASES=DATABASES)
-
-        # Initialize Django
-        django.setup()
+        # modify this for multiple databases?
+        setup_django({db_alias: name})
 
         # create the tables
         self.create_tables()
 
         mrich.success("Connected Database @", f"[file]{name}")
+
+    @property
+    def connection(self):
+        return connections[self._db_alias]
 
     def create_tables(self, debug: bool = False) -> None:
         """For each table in the schema, rename the Model, create the table if it doesn't exist, and add any missing columns"""
@@ -82,31 +78,23 @@ class Database:
 
     def create_table(self, model) -> None:
         """Create a table if it doesnt exist"""
-        with connections["default"].schema_editor() as schema_editor:
-            if (
-                model._meta.db_table
-                not in connections["default"].introspection.table_names()
-            ):
+        with self.connection.schema_editor() as schema_editor:
+            if model._meta.db_table not in self.connection.introspection.table_names():
                 schema_editor.create_model(model)
 
     def get_missing_columns(self, model) -> set[str]:
 
         missing_columns = set()
 
-        with connections["default"].schema_editor() as schema_editor:
+        with self.connection.schema_editor() as schema_editor:
             # Check if the table exists
-            if (
-                model._meta.db_table
-                in connections["default"].introspection.table_names()
-            ):
+            if model._meta.db_table in self.connection.introspection.table_names():
                 # Get the current columns in the table
                 current_columns = [field.column for field in model._meta.fields]
 
                 # Get the database columns
-                database_columns = connections[
-                    "default"
-                ].introspection.get_table_description(
-                    connections["default"].cursor(), model._meta.db_table
+                database_columns = self.connection.introspection.get_table_description(
+                    self.connection.cursor(), model._meta.db_table
                 )
                 database_column_names = [column.name for column in database_columns]
 
@@ -119,20 +107,15 @@ class Database:
 
     def update_table(self, model, debug: bool = True) -> None:
         """Update table if you added fields (doesn't drop fields)"""
-        with connections["default"].schema_editor() as schema_editor:
+        with self.connection.schema_editor() as schema_editor:
             # Check if the table exists
-            if (
-                model._meta.db_table
-                in connections["default"].introspection.table_names()
-            ):
+            if model._meta.db_table in self.connection.introspection.table_names():
                 # Get the current columns in the table
                 current_columns = [field.column for field in model._meta.fields]
 
                 # Get the database columns
-                database_columns = connections[
-                    "default"
-                ].introspection.get_table_description(
-                    connections["default"].cursor(), model._meta.db_table
+                database_columns = self.connection.introspection.get_table_description(
+                    self.connection.cursor(), model._meta.db_table
                 )
                 database_column_names = [column.name for column in database_columns]
 
