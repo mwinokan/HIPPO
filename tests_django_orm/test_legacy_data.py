@@ -19,9 +19,13 @@ animal = HIPPO(
     "/Users/tfb64483/Software/HIPPO/tests_django_orm/test_A71EV2A_django.sqlite",
 )
 
-from hippo_django_orm.compound.compound import Compound
-from hippo_django_orm.target.target import Target
-from hippo_django_orm.pose.pose import Pose
+from hippo_django_orm.compound import Compound
+from hippo_django_orm.target import Target
+from hippo_django_orm.pose import Pose
+from hippo_django_orm.quote import Quote
+from hippo_django_orm.interaction import Interaction
+from hippo_django_orm.feature import Feature
+
 from django.core.exceptions import ValidationError
 
 ### TARGETS
@@ -114,6 +118,69 @@ with mrich.loading("Pose"):
 
         # break
 
+### Quote
+
+quote = Quote(
+    amount=0.1,
+    supplier="Enamine",
+    catalogue="EU BB",
+    compound=animal.compounds[1],
+)
+quote.full_clean()
+quote.save()
+
+### Feature
+
+t2 = Target(name="D68EV3C")
+t2.full_clean()
+t2.save()
+
+feature = Feature(
+    family="LumpedHydrophobe",
+    target=animal.targets[1],
+    chain_name="A",
+    residue_name="CYS",
+    residue_number="123",
+    atom_names=["C", "N", "SG"],
+)
+feature.full_clean()
+feature.save()
+
+feature = Feature(
+    family="LumpedHydrophobe",
+    target=animal.targets[2],
+    chain_name="A",
+    residue_name="CYS",
+    residue_number="123",
+    atom_names=["C", "N", "SG"],
+)
+feature.full_clean()
+feature.save()
+
+### Interaction
+
+features = animal.targets[1].features
+
+mrich.print(type(features))
+# mrich.print(dir(features))
+mrich.print(list(f for f in features))
+
+mrich.print(features.__class__)
+mrich.print(animal.targets[1].features[0])
+
+interaction = Interaction(
+    family="LumpedHydrophobe",
+    type="Hydrophobic",
+    pose=animal.poses[1],
+    feature=animal.targets[1].features[0],
+    atom_ids=[1, 2, 3, 4],
+    prot_coord=[1.0, 2.0, 3.0],
+    lig_coord=[1.0, 2.0, 3.0],
+    distance=0.2,
+)
+interaction.full_clean()
+interaction.save()
+
 ### Test repr's
 
 animal.summary()
@@ -124,6 +191,10 @@ mrich.var("targets", animal.targets)
 mrich.var("targets", Target._objects.all())
 mrich.var("compounds[:4]", Compound._objects.filter(id__lt=5))
 mrich.var("len(compounds[:4])", len(Compound._objects.filter(id__lt=5)))
+mrich.var("targets[1].features", animal.targets[1].features)
+mrich.var("animal.C1", animal.C1)
+mrich.var("animal.T1", animal.T1)
+mrich.var("animal.R1", animal.R1)
 
 ### Tags
 
