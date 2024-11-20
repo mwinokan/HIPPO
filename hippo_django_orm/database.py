@@ -84,6 +84,8 @@ class Database:
         from .feature import Feature
         from .solvent import Solvent
         from .models import SubsiteMember
+        from .reaction import Reaction
+        from .reactant import Reactant
 
         # define the table names
         MODELS = [
@@ -97,6 +99,8 @@ class Database:
             Feature,
             SubsiteMember,
             Solvent,
+            Reaction,
+            Reactant,
         ]
 
         for model in MODELS:
