@@ -1,7 +1,7 @@
 from .abstract_set import AbstractQuerySet
 
 
-class CompoundSet(AbstractQuerySet):
+class TargetSet(AbstractQuerySet):
 
     _shorthand = "C"
     _max_str_ids = 5

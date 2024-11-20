@@ -122,6 +122,9 @@ class Database:
         with self.connection.schema_editor() as schema_editor:
             if model._meta.db_table not in self.connection.introspection.table_names():
                 schema_editor.create_model(model)
+                mrich.debug(
+                    f"Created table: {model._meta.db_table} for model: {model.__name__}"
+                )
 
     def get_missing_columns(self, model) -> set[str]:
 
