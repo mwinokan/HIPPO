@@ -9,6 +9,7 @@ from .orm.validators import validate_list_of_integers, validate_coord
 from molparse.rdkit.features import FEATURE_FAMILIES, INTERACTION_TYPES
 from django.core.validators import MinValueValidator, MaxValueValidator
 
+
 class TargetModel(models.Model):
     class Meta:
         app_label = "hippo"
@@ -190,8 +191,10 @@ class InteractionModel(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    family = models.CharField(max_length=30, choices={f:f for f in FEATURE_FAMILIES})
-    type = models.CharField(max_length=30, choices={f:f for f in INTERACTION_TYPES.values()})
+    family = models.CharField(max_length=30, choices={f: f for f in FEATURE_FAMILIES})
+    type = models.CharField(
+        max_length=30, choices={f: f for f in INTERACTION_TYPES.values()}
+    )
 
     pose = models.ForeignKey(
         "Pose", on_delete=models.CASCADE, related_name="interactions"
@@ -204,8 +207,10 @@ class InteractionModel(models.Model):
     prot_coord = models.JSONField(validators=[validate_coord])
     lig_coord = models.JSONField(validators=[validate_coord])
     distance = models.FloatField(validators=[MinValueValidator(0.0)])
-    angle = models.FloatField(blank=True,null=True,
-        validators=[MinValueValidator(0.0), MaxValueValidator(360)]
+    angle = models.FloatField(
+        blank=True,
+        null=True,
+        validators=[MinValueValidator(0.0), MaxValueValidator(360)],
     )
     energy = models.FloatField(blank=True, null=True)
 
