@@ -138,6 +138,7 @@ class ReactantModel(models.Model):
         "Reaction", on_delete=models.CASCADE, related_name="reactants"
     )
     compound = models.ForeignKey("Compund", on_delete=models.RESTRICT, related_name="+")
+    solvent = models.ForeignKey("Solvent", on_delete=models.SET_NULL, related_name="+")
 
 
 class FeatureModel(models.Model):
@@ -227,3 +228,12 @@ class SubsiteMember(models.Model):
     )
     atom_ids = models.JSONField()  # TODO: validation
     metadata = models.JSONField(default=dict(), blank=True)
+
+
+class SolventModel(models.Model):
+    class Meta:
+        app_label = "hippo"
+        abstract = True
+
+    id = models.BigAutoField(primary_key=True)
+    name = models.CharField(max_length=30, unique=True)

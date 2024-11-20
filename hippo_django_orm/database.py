@@ -82,6 +82,7 @@ class Database:
         from .subsite import Subsite
         from .interaction import Interaction
         from .feature import Feature
+        from .solvent import Solvent
 
         # define the table names
         MODELS = [
@@ -94,6 +95,7 @@ class Database:
             Interaction,
             Feature,
             SubsiteMember,
+            Solvent,
         ]
 
         for model in MODELS:
