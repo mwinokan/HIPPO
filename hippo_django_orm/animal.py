@@ -19,10 +19,12 @@ class HIPPO:
         from .compound import CompoundTable
         from .pose import PoseTable
         from .target import TargetTable
+        from .reaction import ReactionTable
 
         self.compounds = CompoundTable()
         self.poses = PoseTable()
         self.targets = TargetTable()
+        self.reactions = ReactionTable()
 
     ### FACTORIES
 
