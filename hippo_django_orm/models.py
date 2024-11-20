@@ -1,13 +1,13 @@
 """This file defines the base models for the HIPPO Database schema using django, these classes are then subclassed in other files to create Python wrappers"""
 
 from pathlib import Path
+from datetime import date
 from django.db import models
 from .orm.expressions import MolFromSmiles, MolPatternBfpFromSmiles
 from .orm.fields import MolField
-from datetime import date
-
+from .orm.validators import validate_list_of_integers, validate_coord
 from molparse.rdkit.features import FEATURE_FAMILIES, INTERACTION_TYPES
-
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 class TargetModel(models.Model):
     class Meta:
@@ -88,20 +88,30 @@ class QuoteModel(models.Model):
     from .price.price import CURRENCIES
 
     id = models.BigAutoField(primary_key=True)
-    amount = models.FloatField()  # TODO: ADD Positive validation
+    amount = models.FloatField(validators=[MinValueValidator(0.0)])
     supplier = models.CharField(max_length=60, blank=False)
     catalogue = models.CharField(max_length=60, blank=True)
     entry = models.CharField(max_length=60, blank=True)
-    lead_time = models.FloatField()  # TODO: ADD positive validation
+    lead_time = models.FloatField(
+        validators=[MinValueValidator(0.0)], blank=True, null=True
+    )
     price = models.DecimalField(
-        max_digits=8, decimal_places=2
-    )  # TODO: ADD positive validation
+        validators=[MinValueValidator(0.0)],
+        blank=True,
+        null=True,
+        max_digits=8,
+        decimal_places=2,
+    )
     currency = models.CharField(max_length=3, blank=True, choices=CURRENCIES)
     date = models.DateField(default=date.today)
     compound = models.ForeignKey(
         "Compound", on_delete=models.CASCADE, related_name="quotes"
     )
-    purity = models.FloatField()  # TODO: ADD 0-1 range validation
+    purity = models.FloatField(
+        blank=True,
+        null=True,
+        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
+    )
 
 
 class TagModel(models.Model):
@@ -123,7 +133,9 @@ class ReactionModel(models.Model):
     product = models.ForeignKey(
         "Compound", on_delete=models.CASCADE, related_name="reactions"
     )
-    yield_fraction = models.FloatField()  # TODO: ADD validation
+    yield_fraction = models.FloatField(
+        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
+    )
 
 
 class ReactantModel(models.Model):
@@ -133,7 +145,7 @@ class ReactantModel(models.Model):
         unique_together = ("reaction", "compound")
 
     id = models.BigAutoField(primary_key=True)
-    amount = models.FloatField()  # TODO: validate positive
+    amount = models.FloatField(validators=[MinValueValidator(0.0)])
     reaction = models.ForeignKey(
         "Reaction", on_delete=models.CASCADE, related_name="reactants"
     )
@@ -142,6 +154,7 @@ class ReactantModel(models.Model):
 
 
 class FeatureModel(models.Model):
+
     class Meta:
         app_label = "hippo"
         abstract = True
@@ -155,10 +168,10 @@ class FeatureModel(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    family = models.CharField(max_length=30, choices=FEATURE_FAMILIES)
+    family = models.CharField(max_length=30, choices={f:f for f in FEATURE_FAMILIES})
 
     target = models.ForeignKey(
-        "Target", on_delete=models.CASCADE, related_name="features"
+        "Target", on_delete=models.CASCADE, related_name="_features",
     )
 
     chain_name = models.CharField(max_length=5)
@@ -175,8 +188,8 @@ class InteractionModel(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    family = models.CharField(max_length=30, choices=FEATURE_FAMILIES)
-    type = models.CharField(max_length=30, choices=INTERACTION_TYPES.values())
+    family = models.CharField(max_length=30, choices={f:f for f in FEATURE_FAMILIES})
+    type = models.CharField(max_length=30, choices={f:f for f in INTERACTION_TYPES.values()})
 
     pose = models.ForeignKey(
         "Pose", on_delete=models.CASCADE, related_name="interactions"
@@ -185,12 +198,14 @@ class InteractionModel(models.Model):
     feature = models.ForeignKey(
         "Feature", on_delete=models.RESTRICT, related_name="interactions"
     )
-    atom_ids = models.JSONField()  # TODO: Validation
-    prot_coord = models.JSONField()  # TODO: Validation
-    lig_coord = models.JSONField()  # TODO: Validation
-    distance = models.FloatField()  # TODO: Validate positive
-    angle = models.FloatField()  # TODO: Validate positive
-    energy = models.FloatField()
+    atom_ids = models.JSONField(validators=[validate_list_of_integers])
+    prot_coord = models.JSONField(validators=[validate_coord])
+    lig_coord = models.JSONField(validators=[validate_coord])
+    distance = models.FloatField(validators=[MinValueValidator(0.0)])
+    angle = models.FloatField(blank=True,null=True,
+        validators=[MinValueValidator(0.0), MaxValueValidator(360)]
+    )
+    energy = models.FloatField(blank=True, null=True)
 
 
 class SubsiteModel(models.Model):

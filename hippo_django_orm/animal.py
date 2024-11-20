@@ -1,5 +1,6 @@
 import mrich
 from .database import Database
+from django.core.exceptions import ObjectDoesNotExist
 
 
 class HIPPO:
@@ -106,15 +107,22 @@ class HIPPO:
 
         match key[0]:
             case "C":
-                return self.compounds[index]
+                table = self.compounds
             case "P":
-                return self.poses[index]
+                table = self.poses
             case "T":
-                return self.targets[index]
+                table = self.targets
             case "R":
-                return self.reactions[index]
+                table = self.reactions
+            case _:
+                mrich.error(f"Unsupported {prefix=}")
+                return None
 
-        mrich.error(f"Unsupported {prefix=}")
+        try:
+            return table[index]
+        except ObjectDoesNotExist:
+            mrich.error(f"No object with shorthand: {key=}")
+
         return None
 
     ### DUNDERS
