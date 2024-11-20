@@ -168,10 +168,12 @@ class FeatureModel(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    family = models.CharField(max_length=30, choices={f:f for f in FEATURE_FAMILIES})
+    family = models.CharField(max_length=30, choices={f: f for f in FEATURE_FAMILIES})
 
     target = models.ForeignKey(
-        "Target", on_delete=models.CASCADE, related_name="_features",
+        "Target",
+        on_delete=models.CASCADE,
+        related_name="_features",
     )
 
     chain_name = models.CharField(max_length=5)
