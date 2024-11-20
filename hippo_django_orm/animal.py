@@ -15,9 +15,9 @@ class HIPPO:
         # DB must be initialised before importing any models
         self._db = Database(path=db_path)
 
-        from .compound.compound_table import CompoundTable
-        from .pose.pose_table import PoseTable
-        from .target.target_table import TargetTable
+        from .compound import CompoundTable
+        from .pose import PoseTable
+        from .target import TargetTable
 
         self.compounds = CompoundTable()
         self.poses = PoseTable()

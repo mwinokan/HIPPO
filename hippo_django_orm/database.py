@@ -74,16 +74,16 @@ class Database:
     def create_tables(self, debug: bool = False) -> None:
         """For each table in the schema, rename the Model, create the table if it doesn't exist, and add any missing columns"""
 
-        from .target.target import Target
-        from .compound.compound import Compound
-        from .pose.pose import Pose
-        from .quote.quote import Quote
-        from .tag.tag import Tag
+        from .target import Target
+        from .compound import Compound
+        from .pose import Pose
+        from .quote import Quote
+        from .tag import Tag
+        from .subsite import Subsite
+        from .interaction import Interaction
+        from .feature import Feature
+        from .solvent import Solvent
         from .models import SubsiteMember
-        from .subsite.subsite import Subsite
-        from .interaction.interaction import Interaction
-        from .feature.feature import Feature
-        from .solvent.solvent import Solvent
 
         # define the table names
         MODELS = [
