@@ -5,7 +5,12 @@ from django.conf import settings
 DJANGO_SETUP = False
 
 
-def setup_django(databases, force: bool = False):
+def setup_django(
+    databases,
+    force: bool = False,
+    include_contenttypes: bool = False,
+    include_templates: bool = False,
+):
 
     global DJANGO_SETUP
     if DJANGO_SETUP and not force:
@@ -20,8 +25,46 @@ def setup_django(databases, force: bool = False):
             "APP_LABEL": "hippo",
         }
 
+    INSTALLED_APPS = ["hippo"]
+    TEMPLATES = []
+
+    if include_templates:
+
+        from pathlib import Path
+
+        BASE_DIR = Path(__file__).resolve().parent.parent
+
+        include_contenttypes = True
+        INSTALLED_APPS.append("django.contrib.admin")
+        INSTALLED_APPS.append("django.contrib.auth")
+        INSTALLED_APPS.append("django.contrib.sessions")
+        INSTALLED_APPS.append("django.contrib.messages")
+
+        TEMPLATES = [
+            {
+                "BACKEND": "django.template.backends.django.DjangoTemplates",
+                "DIRS": [
+                    BASE_DIR / "templates"
+                ],  # Specify the path to your template files
+                "APP_DIRS": True,  # Enables template loading from `templates` directory within apps
+                "OPTIONS": {
+                    "context_processors": [
+                        "django.template.context_processors.debug",
+                        "django.template.context_processors.request",
+                        "django.contrib.auth.context_processors.auth",
+                        "django.contrib.messages.context_processors.messages",
+                    ],
+                },
+            },
+        ]
+
+    if include_contenttypes:
+        INSTALLED_APPS.append("django.contrib.contenttypes")
+
     # Update the settings with the custom DATABASES dictionary
-    settings.configure(DATABASES=DATABASES)
+    settings.configure(
+        DATABASES=DATABASES, INSTALLED_APPS=INSTALLED_APPS, TEMPLATES=TEMPLATES
+    )
 
     # Initialize Django
     django.setup()

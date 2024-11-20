@@ -26,6 +26,7 @@ class Database:
         # reference: str | Path | None = None,
         setup_django: bool = True,
         debug: bool = True,
+        **kwargs,
     ) -> None:
 
         self._db_alias = db_alias
@@ -36,7 +37,7 @@ class Database:
             databases = {
                 db_alias: path,
             }
-            setup_django(databases)
+            setup_django(databases, **kwargs)
 
         # create the tables
         self.create_tables()
