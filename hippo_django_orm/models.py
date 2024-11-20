@@ -150,7 +150,9 @@ class ReactantModel(models.Model):
     reaction = models.ForeignKey(
         "Reaction", on_delete=models.CASCADE, related_name="reactants"
     )
-    compound = models.ForeignKey("Compund", on_delete=models.RESTRICT, related_name="+")
+    compound = models.ForeignKey(
+        "Compound", on_delete=models.RESTRICT, related_name="+"
+    )
     solvent = models.ForeignKey("Solvent", on_delete=models.SET_NULL, related_name="+")
 
 
