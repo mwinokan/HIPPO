@@ -77,6 +77,46 @@ class HIPPO:
         # mrich.var("#tags", self.num_tags)
         # mrich.var("tags", self.tags.unique)
 
+    def get_by_shorthand(self, key) -> "Compound | Pose | Reaction":
+        """Get a :class:`.Compound`, :class:`.Pose`, or :class:`.Reaction` by its ID
+
+        :param key: shortname of the object, e.g. C100 for :class:`.Compound` with id=100
+        :returns: :class:`.Compound`, :class:`.Pose`, or :class:`.Reaction` object
+        """
+
+        if not isinstance(key, str):
+            ValueError(f"{key=} must be a str")
+
+        if len(key) > 1:
+            ValueError(f"{key=} must be longer than 1")
+
+        prefix = key[0]
+        index = key[1:]
+
+        prefix = prefix.upper()
+
+        if prefix not in "CPRT":
+            raise ValueError(f"Unknown {prefix=}")
+
+        try:
+            index = int(index)
+        except ValueError:
+            mrich.error(f"Cannot convert {index} to integer")
+            return None
+
+        match key[0]:
+            case "C":
+                return self.compounds[index]
+            case "P":
+                return self.poses[index]
+            case "T":
+                return self.targets[index]
+            case "R":
+                return self.reactions[index]
+
+        mrich.error(f"Unsupported {prefix=}")
+        return None
+
     ### DUNDERS
 
     def __str__(self) -> str:
@@ -90,3 +130,11 @@ class HIPPO:
     def __rich__(self) -> str:
         """Representation for mrich"""
         return f"[bold underline]{self}"
+
+    def __getitem__(self, key: str):
+        """Get a :class:`.Compound`, :class:`.Pose`, or :class:`.Reaction` by its ID. See :meth:`.HIPPO.get_by_shorthand`"""
+        return self.get_by_shorthand(key)
+
+    def __getattr__(self, key: str):
+        """Get a :class:`.Compound`, :class:`.Pose`, or :class:`.Reaction` by its ID. See :meth:`.HIPPO.get_by_shorthand`"""
+        return self.get_by_shorthand(key)
