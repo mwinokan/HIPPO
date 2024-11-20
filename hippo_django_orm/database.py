@@ -13,7 +13,6 @@ from pathlib import Path
 
 # enable custom signal handlers
 from . import signals
-from .setup import setup_django
 
 
 class Database:
@@ -22,20 +21,50 @@ class Database:
     def __init__(
         self,
         # path: str | Path,
-        name: str,
+        path: str | Path,
         db_alias: str = "default",
+        # reference: str | Path | None = None,
+        setup_django: bool = True,
         debug: bool = True,
     ) -> None:
 
         self._db_alias = db_alias
 
-        # modify this for multiple databases?
-        setup_django({db_alias: name})
+        if setup_django:
+            from .setup import setup_django
+
+            databases = {
+                db_alias: path,
+            }
+            setup_django(databases)
 
         # create the tables
         self.create_tables()
 
-        mrich.success("Connected Database @", f"[file]{name}")
+        mrich.success(f'Connected Database "{db_alias}" @', f"[file]{path}")
+
+    @classmethod
+    def multi(cls, paths):
+
+        databases = {
+            "default": paths[0],
+            # "reference":path2,
+        }
+
+        for i, path in enumerate(paths[1:]):
+            databases[f"reference{i+1}"] = path
+
+        from .setup import setup_django
+
+        setup_django(databases)
+
+        dbs = []
+        for alias, path in databases.items():
+            db = cls.__new__(cls)
+            db.__init__(path=path, db_alias=alias, setup_django=False)
+            dbs.append(db)
+
+        return dbs
 
     @property
     def connection(self):
@@ -47,22 +76,30 @@ class Database:
         from .target import Target
         from .compound import Compound
         from .pose import Pose
+        from .quote import Quote
+        from .tag import Tag
+        from .models import SubsiteMember
+        from .subsite import Subsite
+        from .interaction import Interaction
+        from .feature import Feature
 
         # define the table names
-        MODELS = {
-            "target": Target,
-            "compound": Compound,
-            "pose": Pose,
-        }
+        MODELS = [
+            Target,
+            Compound,
+            Pose,
+            Quote,
+            Tag,
+            Subsite,
+            Interaction,
+            Feature,
+            SubsiteMember,
+        ]
 
-        for table_name, model in MODELS.items():
+        for model in MODELS:
 
             if debug:
-                mrich.var("table_name", table_name)
                 mrich.var("model", model)
-
-            # rename the Model class
-            model._meta.db_table = table_name
 
             # create the table
             self.create_table(model)
@@ -70,11 +107,12 @@ class Database:
             # add missing columns
             missing_columns = self.get_missing_columns(model)
             if missing_columns:
-                mrich.warning(
-                    f"Database using legacy schema, updating table '{table_name}'"
-                )
-                mrich.var("missing_columns", missing_columns)
-                self.update_table(model, debug=debug)
+                raise ValueError("Database using legacy schema")
+                # mrich.warning(
+                #     f"Database using legacy schema, updating table '{table_name}'"
+                # )
+                # mrich.var("missing_columns", missing_columns)
+                # self.update_table(model, debug=debug)
 
     def create_table(self, model) -> None:
         """Create a table if it doesnt exist"""

@@ -12,7 +12,7 @@ def setup_django(databases, force: bool = False):
         mrich.debug("django already setup")
 
     # define DATABASES dictionary
-    DATABASES = {}
+    DATABASES = {"default": {}}
     for alias, path in databases.items():
         DATABASES[alias] = {
             "ENGINE": "django.db.backends.sqlite3",

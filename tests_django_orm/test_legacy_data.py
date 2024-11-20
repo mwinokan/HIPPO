@@ -14,7 +14,7 @@ legacy_animal = hippo.HIPPO("TestLegacyA71EV2A", "test_A71EV2A_legacy.sqlite")
 from hippo_django_orm.database import Database
 
 db = Database(
-    name="/Users/tfb64483/Software/HIPPO/tests_django_orm/test_A71EV2A_django.sqlite"
+    path="/Users/tfb64483/Software/HIPPO/tests_django_orm/test_A71EV2A_django.sqlite"
 )
 
 from hippo_django_orm.compound import Compound
@@ -79,6 +79,18 @@ for legacy_pose in legacy_animal.poses:
     else:
         reference = None
 
+    inspirations = []
+
+    if legacy_pose.inspirations:
+
+        for legacy_inspiration in legacy_pose.inspirations:
+
+            inspiration = Pose.objects.get(alias=legacy_inspiration.alias)
+            mrich.print(inspiration)
+
+            if inspiration:
+                inspirations.append(inspiration)
+
     target = Target.objects.get(name=legacy_pose.target.name)
 
     pose = Pose(
@@ -93,6 +105,9 @@ for legacy_pose in legacy_animal.poses:
         metadata=legacy_pose.metadata.data,
     )  # , smiles=legacy_pose.smiles, mol=legacy_pose.mol)
 
+    if inspirations:
+        pose.inspirations.set(inspirations)
+
     try:
         pose.full_clean()
         pose.save()
@@ -105,3 +120,9 @@ for legacy_pose in legacy_animal.poses:
 print(Pose.objects.all())
 
 ### Tags
+
+## Fake Data
+
+# Inspirations
+# Scaffolds
+# Reactions
