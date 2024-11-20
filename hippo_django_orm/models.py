@@ -2,8 +2,8 @@
 
 from pathlib import Path
 from django.db import models
-from .expressions import MolFromSmiles, MolPatternBfpFromSmiles
-from .fields import MolField
+from .orm.expressions import MolFromSmiles, MolPatternBfpFromSmiles
+from .orm.fields import MolField
 from datetime import date
 
 from molparse.rdkit.features import FEATURE_FAMILIES, INTERACTION_TYPES
@@ -85,7 +85,7 @@ class QuoteModel(models.Model):
         abstract = True
         unique_together = ("amount", "supplier", "catalogue", "entry")
 
-    from .price import CURRENCIES
+    from .price.price import CURRENCIES
 
     id = models.BigAutoField(primary_key=True)
     amount = models.FloatField()  # TODO: ADD Positive validation

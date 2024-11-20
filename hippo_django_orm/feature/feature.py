@@ -1,4 +1,4 @@
-from .models import FeatureModel
+from ..models import FeatureModel
 
 
 class Feature(FeatureModel):

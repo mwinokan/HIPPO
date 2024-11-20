@@ -1,4 +1,4 @@
-from .models import SubsiteModel
+from ..models import SubsiteModel
 
 
 class Subsite(SubsiteModel):

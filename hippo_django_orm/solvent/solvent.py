@@ -1,4 +1,4 @@
-from .models import SolventModel
+from ..models import SolventModel
 
 
 class Solvent(SolventModel):

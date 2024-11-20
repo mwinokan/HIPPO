@@ -1,5 +1,5 @@
 from .target import Target
-from .abstract_table import AbstractTable
+from ..abstract import AbstractTable
 
 
 class TargetTable(AbstractTable):

@@ -1,4 +1,4 @@
-from .models import PoseModel
+from ..models import PoseModel
 from .pose_set import PoseSet
 
 

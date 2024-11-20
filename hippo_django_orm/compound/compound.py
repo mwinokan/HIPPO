@@ -1,4 +1,4 @@
-from .models import CompoundModel
+from ..models import CompoundModel
 from .compound_set import CompoundSet
 
 

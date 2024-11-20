@@ -19,9 +19,9 @@ animal = HIPPO(
     "/Users/tfb64483/Software/HIPPO/tests_django_orm/test_A71EV2A_django.sqlite",
 )
 
-from hippo_django_orm.compound import Compound
-from hippo_django_orm.target import Target
-from hippo_django_orm.pose import Pose
+from hippo_django_orm.compound.compound import Compound
+from hippo_django_orm.target.target import Target
+from hippo_django_orm.pose.pose import Pose
 from django.core.exceptions import ValidationError
 
 ### TARGETS

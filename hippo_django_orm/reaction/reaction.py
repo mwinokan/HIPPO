@@ -1,4 +1,4 @@
-from .models import ReactionModel
+from ..models import ReactionModel
 
 
 class Reaction(ReactionModel):

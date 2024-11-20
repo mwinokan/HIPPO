@@ -1,4 +1,4 @@
-from .abstract_set import AbstractQuerySet
+from ..abstract import AbstractQuerySet
 
 
 class TargetSet(AbstractQuerySet):

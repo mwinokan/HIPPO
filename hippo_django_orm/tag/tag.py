@@ -1,4 +1,4 @@
-from .models import TagModel
+from ..models import TagModel
 
 
 class Tag(TagModel):

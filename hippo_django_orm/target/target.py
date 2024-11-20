@@ -1,4 +1,4 @@
-from .models import TargetModel
+from ..models import TargetModel
 from .target_set import TargetSet
 
 

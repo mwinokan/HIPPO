@@ -1,4 +1,4 @@
-from .models import ReactantModel
+from ..models import ReactantModel
 
 
 class Reactant(ReactantModel):

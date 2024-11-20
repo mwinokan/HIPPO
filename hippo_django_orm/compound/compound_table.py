@@ -1,5 +1,5 @@
 from .compound import Compound
-from .abstract_table import AbstractTable
+from ..abstract import AbstractTable
 
 
 class CompoundTable(AbstractTable):

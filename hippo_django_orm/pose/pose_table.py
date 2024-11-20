@@ -1,5 +1,5 @@
 from .pose import Pose
-from .abstract_table import AbstractTable
+from ..abstract import AbstractTable
 
 
 class PoseTable(AbstractTable):

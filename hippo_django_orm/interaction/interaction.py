@@ -1,4 +1,4 @@
-from .models import InteractionModel
+from ..models import InteractionModel
 
 
 class Interaction(InteractionModel):
