@@ -855,7 +855,7 @@ class PoseSet:
         """
 
         scores = self.db.execute(sql).fetchall()
-        return mean([s for s, in scores])
+        return mean([s for s, in scores if s is not None])
 
     @property
     def avg_distance_score(self) -> float:
@@ -869,7 +869,8 @@ class PoseSet:
         """
 
         scores = self.db.execute(sql).fetchall()
-        return mean([s for s, in scores])
+
+        return mean([s for s, in scores if s is not None])
 
     @property
     def derivatives(self) -> "PoseSet":
