@@ -94,8 +94,6 @@ class HIPPO:
         prefix = key[0]
         index = key[1:]
 
-        prefix = prefix.upper()
-
         if prefix not in "CPRT":
             raise ValueError(f"Unknown {prefix=}")
 
