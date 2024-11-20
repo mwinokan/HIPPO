@@ -23,7 +23,7 @@ SUPPORTED_CHEMISTRY = {
     },
     "Ester_amidation": {
         "heavy_atoms_diff": ">=3",
-        # "rings_diff": 0,
+        "rings_diff": 0,
         "atomtype": {
             "removed": {"O": ">=1", "*": "*"},
         },
