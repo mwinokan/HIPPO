@@ -25,6 +25,9 @@ class AbstractTable:
 
     ### METHODS
 
+    def get(self, *args, **kwargs):
+        return self._all_objects.get(*args, **kwargs)
+
     ### DUNDERS
 
     def __str__(self) -> str:
@@ -62,3 +65,15 @@ class AbstractTable:
     def __iter__(self):
         """Iterate through members"""
         return iter(self._all_objects)
+
+    def __getitem__(self, key):
+        """Get member based on type of key:
+
+        int: self.get(id=key)
+        """
+
+        match key:
+            case int():
+                return self.get(id=key)
+            case _:
+                raise NotImplementedError
