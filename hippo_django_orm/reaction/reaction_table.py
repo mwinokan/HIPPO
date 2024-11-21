@@ -4,8 +4,6 @@ from ..abstract import AbstractTable
 
 class ReactionTable(AbstractTable):
 
-    _shorthand = "T"
-    _max_str_ids = 5
     _name = "all reactions"
     _model = Reaction
 

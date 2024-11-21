@@ -88,7 +88,7 @@ class Database:
         from .reactant import Reactant
 
         # define the table names
-        MODELS = [
+        self.MODELS = [
             Target,
             Compound,
             Pose,
@@ -103,7 +103,9 @@ class Database:
             Reactant,
         ]
 
-        for model in MODELS:
+        self.MODEL_SHORTHANDS = [m._shorthand for m in self.MODELS if m._shorthand]
+
+        for model in self.MODELS:
 
             if debug:
                 mrich.var("model", model)

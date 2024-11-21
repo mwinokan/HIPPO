@@ -4,6 +4,8 @@ import mcol
 class AbstractTable:
     """Defines methods common to all hippo QuerySet wrappers, e.g. CompoundSet"""
 
+    _max_str_ids = 5
+
     ### FACTORIES
 
     ### PROPERTIES
@@ -16,7 +18,7 @@ class AbstractTable:
     @property
     def shorthand(self) -> str:
         """Returns the shorthand for elements in this set"""
-        return self._shorthand
+        return self._model._shorthand
 
     @property
     def _all_objects(self):

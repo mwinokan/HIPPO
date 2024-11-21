@@ -8,37 +8,33 @@ from .orm.fields import MolField
 from .orm.validators import validate_list_of_integers, validate_coord
 from molparse.rdkit.features import FEATURE_FAMILIES, INTERACTION_TYPES
 from django.core.validators import MinValueValidator, MaxValueValidator
+from .abstract import AbstractModel
 
 
-class TargetModel(models.Model):
+class TargetModel(AbstractModel):
     class Meta:
         app_label = "hippo"
         abstract = True
 
-    id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=60, blank=True, unique=True)
     metadata = models.JSONField(default=dict(), blank=True)
 
+    _shorthand = "T"
 
-class CompoundModel(models.Model):
+
+class CompoundModel(AbstractModel):
     class Meta:
         app_label = "hippo"
         abstract = True
 
-    # regular fields
-
-    id = models.BigAutoField(primary_key=True)
     inchikey = models.CharField(max_length=27, unique=True)
     alias = models.CharField(max_length=60, blank=True, unique=True, null=True)
     smiles = models.CharField(max_length=90)
     metadata = models.JSONField(default=dict(), blank=True)
 
-    # chemicalite functions as custom Expressions in generated fields
-
     mol = models.GeneratedField(
         expression=MolFromSmiles("smiles", "mol"),
         output_field=MolField(blank=True),
-        # output_field=models.BinaryField(blank=True),
         db_persist=True,
     )
 
@@ -51,13 +47,14 @@ class CompoundModel(models.Model):
     scaffolds = models.ManyToManyField("Compound", related_name="elaborations")
     tags = models.ManyToManyField("Tag", related_name="compounds")
 
+    _shorthand = "C"
 
-class PoseModel(models.Model):
+
+class PoseModel(AbstractModel):
     class Meta:
         app_label = "hippo"
         abstract = True
 
-    id = models.BigAutoField(primary_key=True)
     inchikey = models.CharField(max_length=27, blank=True)
     alias = models.CharField(max_length=60, blank=True, unique=True, null=True)
     smiles = models.CharField(max_length=90, blank=True, null=True)
@@ -79,8 +76,10 @@ class PoseModel(models.Model):
     inspirations = models.ManyToManyField("Pose", related_name="derivatives")
     tags = models.ManyToManyField("Tag", related_name="poses")
 
+    _shorthand = "P"
 
-class QuoteModel(models.Model):
+
+class QuoteModel(AbstractModel):
     class Meta:
         app_label = "hippo"
         abstract = True
@@ -88,7 +87,6 @@ class QuoteModel(models.Model):
 
     from .price.price import CURRENCIES
 
-    id = models.BigAutoField(primary_key=True)
     amount = models.FloatField(validators=[MinValueValidator(0.0)])
     supplier = models.CharField(max_length=60, blank=False)
     catalogue = models.CharField(max_length=60, blank=True)
@@ -114,22 +112,24 @@ class QuoteModel(models.Model):
         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
     )
 
+    _shorthand = "Q"
 
-class TagModel(models.Model):
+
+class TagModel(AbstractModel):
     class Meta:
         app_label = "hippo"
         abstract = True
 
-    id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=60, blank=False, unique=True)
 
+    _shorthand = None
 
-class ReactionModel(models.Model):
+
+class ReactionModel(AbstractModel):
     class Meta:
         app_label = "hippo"
         abstract = True
 
-    id = models.BigAutoField(primary_key=True)
     type = models.CharField(max_length=60, blank=False)
     product = models.ForeignKey(
         "Compound", on_delete=models.CASCADE, related_name="reactions"
@@ -138,14 +138,15 @@ class ReactionModel(models.Model):
         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
     )
 
+    _shorthand = "R"
 
-class ReactantModel(models.Model):
+
+class ReactantModel(AbstractModel):
     class Meta:
         app_label = "hippo"
         abstract = True
         unique_together = ("reaction", "compound")
 
-    id = models.BigAutoField(primary_key=True)
     amount = models.FloatField(validators=[MinValueValidator(0.0)])
     reaction = models.ForeignKey(
         "Reaction", on_delete=models.CASCADE, related_name="reactants"
@@ -155,8 +156,10 @@ class ReactantModel(models.Model):
     )
     solvent = models.ForeignKey("Solvent", on_delete=models.SET_NULL, related_name="+")
 
+    _shorthand = None
 
-class FeatureModel(models.Model):
+
+class FeatureModel(AbstractModel):
 
     class Meta:
         app_label = "hippo"
@@ -168,8 +171,6 @@ class FeatureModel(models.Model):
             "residue_number",
             "atom_names",
         )
-
-    id = models.BigAutoField(primary_key=True)
 
     family = models.CharField(max_length=30, choices={f: f for f in FEATURE_FAMILIES})
 
@@ -184,14 +185,14 @@ class FeatureModel(models.Model):
     residue_number = models.PositiveSmallIntegerField()
     atom_names = models.JSONField()  # TODO: Validate as list
 
+    _shorthand = "F"
 
-class InteractionModel(models.Model):
+
+class InteractionModel(AbstractModel):
     class Meta:
         app_label = "hippo"
         abstract = True
         unique_together = ("feature", "pose", "type", "family")
-
-    id = models.BigAutoField(primary_key=True)
 
     family = models.CharField(max_length=30, choices={f: f for f in FEATURE_FAMILIES})
     type = models.CharField(
@@ -216,14 +217,15 @@ class InteractionModel(models.Model):
     )
     energy = models.FloatField(blank=True, null=True)
 
+    _shorthand = "I"
 
-class SubsiteModel(models.Model):
+
+class SubsiteModel(AbstractModel):
     class Meta:
         app_label = "hippo"
         abstract = True
         unique_together = ("target", "name")
 
-    id = models.BigAutoField(primary_key=True)
     target = models.ForeignKey(
         "Target", on_delete=models.CASCADE, related_name="subsites"
     )
@@ -236,14 +238,15 @@ class SubsiteModel(models.Model):
         related_name="subsites",
     )
 
+    _shorthand = "S"
 
-class SubsiteMember(models.Model):
+
+class SubsiteMember(AbstractModel):
     class Meta:
         app_label = "hippo"
         abstract = False
         unique_together = ("subsite", "pose")
 
-    id = models.BigAutoField(primary_key=True)
     subsite = models.ForeignKey(
         "Subsite", on_delete=models.RESTRICT, related_name="_subsite_members"
     )
@@ -253,11 +256,14 @@ class SubsiteMember(models.Model):
     atom_ids = models.JSONField()  # TODO: validation
     metadata = models.JSONField(default=dict(), blank=True)
 
+    _shorthand = None
 
-class SolventModel(models.Model):
+
+class SolventModel(AbstractModel):
     class Meta:
         app_label = "hippo"
         abstract = True
 
-    id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=30, unique=True)
+
+    _shorthand = None
