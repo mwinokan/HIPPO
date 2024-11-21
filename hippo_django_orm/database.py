@@ -39,6 +39,40 @@ class Database:
             }
             setup_django(databases, **kwargs)
 
+        # import the models
+        from .target import Target
+        from .compound import Compound
+        from .pose import Pose
+        from .quote import Quote
+        from .tag import Tag
+        from .subsite import Subsite
+        from .interaction import Interaction
+        from .feature import Feature
+        from .solvent import Solvent
+        from .models import SubsiteMember
+        from .reaction import Reaction
+        from .reactant import Reactant
+
+        # define the table names
+        self.MODELS = [
+            Target,
+            Compound,
+            Pose,
+            Quote,
+            Tag,
+            Subsite,
+            Interaction,
+            Feature,
+            SubsiteMember,
+            Solvent,
+            Reaction,
+            Reactant,
+        ]
+
+        # check the models
+        for model in self.MODELS:
+            model._check_model()
+
         # create the tables
         self.create_tables()
 
@@ -73,35 +107,6 @@ class Database:
 
     def create_tables(self, debug: bool = False) -> None:
         """For each table in the schema, rename the Model, create the table if it doesn't exist, and add any missing columns"""
-
-        from .target import Target
-        from .compound import Compound
-        from .pose import Pose
-        from .quote import Quote
-        from .tag import Tag
-        from .subsite import Subsite
-        from .interaction import Interaction
-        from .feature import Feature
-        from .solvent import Solvent
-        from .models import SubsiteMember
-        from .reaction import Reaction
-        from .reactant import Reactant
-
-        # define the table names
-        self.MODELS = [
-            Target,
-            Compound,
-            Pose,
-            Quote,
-            Tag,
-            Subsite,
-            Interaction,
-            Feature,
-            SubsiteMember,
-            Solvent,
-            Reaction,
-            Reactant,
-        ]
 
         self.MODEL_SHORTHANDS = [m._shorthand for m in self.MODELS if m._shorthand]
 

@@ -8,7 +8,7 @@ from .orm.fields import MolField
 from .orm.validators import validate_list_of_integers, validate_coord
 from molparse.rdkit.features import FEATURE_FAMILIES, INTERACTION_TYPES
 from django.core.validators import MinValueValidator, MaxValueValidator
-from .abstract import AbstractModel
+from .abstract import AbstractModel, AbstractQuerySet
 
 
 class TargetModel(AbstractModel):
@@ -44,8 +44,8 @@ class CompoundModel(AbstractModel):
         db_persist=True,
     )
 
-    scaffolds = models.ManyToManyField("Compound", related_name="elaborations")
-    tags = models.ManyToManyField("Tag", related_name="compounds")
+    _scaffolds = models.ManyToManyField("Compound", related_name="_elaborations")
+    _tags = models.ManyToManyField("Tag", related_name="_compounds")
 
     _shorthand = "C"
 
@@ -64,7 +64,7 @@ class PoseModel(AbstractModel):
     )
     path = models.FilePathField(Path("/"), max_length=200, unique=True)
     compound = models.ForeignKey(
-        "Compound", on_delete=models.CASCADE, related_name="poses"
+        "Compound", on_delete=models.CASCADE, related_name="_poses"
     )
     target = models.ForeignKey(
         "Target", on_delete=models.CASCADE, related_name="_poses"
@@ -75,8 +75,8 @@ class PoseModel(AbstractModel):
     metadata = models.JSONField(default=dict(), blank=True)
     fingerprinted = models.BooleanField(default=False)
 
-    inspirations = models.ManyToManyField("Pose", related_name="derivatives")
-    tags = models.ManyToManyField("Tag", related_name="_poses")
+    _inspirations = models.ManyToManyField("Pose", related_name="_derivatives")
+    _tags = models.ManyToManyField("Tag", related_name="_poses")
 
     _shorthand = "P"
 
@@ -106,7 +106,7 @@ class QuoteModel(AbstractModel):
     currency = models.CharField(max_length=3, blank=True, choices=CURRENCIES)
     date = models.DateField(default=date.today)
     compound = models.ForeignKey(
-        "Compound", on_delete=models.CASCADE, related_name="quotes"
+        "Compound", on_delete=models.CASCADE, related_name="_quotes"
     )
     purity = models.FloatField(
         blank=True,
@@ -134,7 +134,7 @@ class ReactionModel(AbstractModel):
 
     type = models.CharField(max_length=60, blank=False)
     product = models.ForeignKey(
-        "Compound", on_delete=models.CASCADE, related_name="reactions"
+        "Compound", on_delete=models.CASCADE, related_name="_reactions"
     )
     yield_fraction = models.FloatField(
         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
@@ -151,7 +151,7 @@ class ReactantModel(AbstractModel):
 
     amount = models.FloatField(validators=[MinValueValidator(0.0)])
     reaction = models.ForeignKey(
-        "Reaction", on_delete=models.CASCADE, related_name="reactants"
+        "Reaction", on_delete=models.CASCADE, related_name="_reactants"
     )
     compound = models.ForeignKey(
         "Compound", on_delete=models.RESTRICT, related_name="+"
@@ -202,11 +202,11 @@ class InteractionModel(AbstractModel):
     )
 
     pose = models.ForeignKey(
-        "Pose", on_delete=models.CASCADE, related_name="interactions"
+        "Pose", on_delete=models.CASCADE, related_name="_interactions"
     )
 
     feature = models.ForeignKey(
-        "Feature", on_delete=models.RESTRICT, related_name="interactions"
+        "Feature", on_delete=models.RESTRICT, related_name="_interactions"
     )
     atom_ids = models.JSONField(validators=[validate_list_of_integers])
     prot_coord = models.JSONField(validators=[validate_coord])
@@ -243,11 +243,16 @@ class SubsiteModel(AbstractModel):
     _shorthand = "S"
 
 
+class SubsiteMemberSet(AbstractQuerySet): ...
+
+
 class SubsiteMember(AbstractModel):
     class Meta:
         app_label = "hippo"
         abstract = False
         unique_together = ("subsite", "pose")
+
+    _objects = SubsiteMemberSet.as_manager()
 
     subsite = models.ForeignKey(
         "Subsite", on_delete=models.RESTRICT, related_name="_subsite_members"

@@ -14,7 +14,7 @@ class AbstractQuerySet(models.QuerySet, AbstractTable):
 
     @property
     def shorthand(self):
-        return self.model.shorthand
+        return self.model._shorthand
 
     ### METHODS
 

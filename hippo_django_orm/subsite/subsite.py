@@ -6,6 +6,6 @@ class Subsite(SubsiteModel):
 
     _objects = SubsiteSet.as_manager()
 
-    @property
-    def poses(self):
-        return self._poses(manager="_objects").all()
+    # @property
+    # def poses(self):
+    #     return self._poses(manager="_objects").all()

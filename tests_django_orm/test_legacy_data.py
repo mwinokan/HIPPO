@@ -215,10 +215,7 @@ mrich.var("animal.T1", animal.T1)
 mrich.var("animal.R1", animal.R1)
 mrich.var("animal.T1.subsites", animal.T1.subsites)
 mrich.var("T1.subsites[0].poses", animal.T1.subsites[0].poses)
-mrich.var("T1.poses", animal.T1.poses)
-
-for model in animal.db.MODELS:
-    model._check_relations()
+mrich.var("T1.poses", animal.T1.poses, str(type(animal.T1.poses)))
 
 ### Tags
 
