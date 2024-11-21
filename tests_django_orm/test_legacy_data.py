@@ -25,6 +25,8 @@ from hippo_django_orm.pose import Pose
 from hippo_django_orm.quote import Quote
 from hippo_django_orm.interaction import Interaction
 from hippo_django_orm.feature import Feature
+from hippo_django_orm.subsite import Subsite
+from hippo_django_orm.models import SubsiteMember
 
 from django.core.exceptions import ValidationError
 
@@ -181,6 +183,22 @@ interaction = Interaction(
 interaction.full_clean()
 interaction.save()
 
+### Subsite
+
+subsite = Subsite(
+    target=animal.T1,
+    name="Oxyanion hole",
+)
+
+
+subsite.full_clean()
+subsite.save()
+
+member = SubsiteMember(subsite=subsite, pose=animal.P1, atom_ids=[1, 2, 3])
+
+member.full_clean()
+member.save()
+
 ### Test repr's
 
 animal.summary()
@@ -195,6 +213,12 @@ mrich.var("targets[1].features", animal.targets[1].features)
 mrich.var("animal.C1", animal.C1)
 mrich.var("animal.T1", animal.T1)
 mrich.var("animal.R1", animal.R1)
+mrich.var("animal.T1.subsites", animal.T1.subsites)
+mrich.var("T1.subsites[0].poses", animal.T1.subsites[0].poses)
+mrich.var("T1.poses", animal.T1.poses)
+
+for model in animal.db.MODELS:
+    model._check_relations()
 
 ### Tags
 

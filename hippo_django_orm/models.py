@@ -66,7 +66,9 @@ class PoseModel(AbstractModel):
     compound = models.ForeignKey(
         "Compound", on_delete=models.CASCADE, related_name="poses"
     )
-    target = models.ForeignKey("Target", on_delete=models.CASCADE, related_name="poses")
+    target = models.ForeignKey(
+        "Target", on_delete=models.CASCADE, related_name="_poses"
+    )
     mol = MolField(blank=True)
     energy_score = models.FloatField(blank=True, null=True)
     distance_score = models.FloatField(blank=True, null=True)
@@ -74,7 +76,7 @@ class PoseModel(AbstractModel):
     fingerprinted = models.BooleanField(default=False)
 
     inspirations = models.ManyToManyField("Pose", related_name="derivatives")
-    tags = models.ManyToManyField("Tag", related_name="poses")
+    tags = models.ManyToManyField("Tag", related_name="_poses")
 
     _shorthand = "P"
 
@@ -227,15 +229,15 @@ class SubsiteModel(AbstractModel):
         unique_together = ("target", "name")
 
     target = models.ForeignKey(
-        "Target", on_delete=models.CASCADE, related_name="subsites"
+        "Target", on_delete=models.CASCADE, related_name="_subsites"
     )
     name = models.CharField(max_length=30)
     metadata = models.JSONField(default=dict(), blank=True)
-    poses = models.ManyToManyField(
+    _poses = models.ManyToManyField(
         "Pose",
         through="SubsiteMember",
         through_fields=("subsite", "pose"),
-        related_name="subsites",
+        related_name="_subsites",
     )
 
     _shorthand = "S"
