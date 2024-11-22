@@ -2,6 +2,7 @@ import mcol
 import mrich
 from django.db import models
 import importlib
+from ..orm.managers import ManagerRouter
 
 
 class AbstractModel(models.Model):
@@ -47,14 +48,13 @@ class AbstractModel(models.Model):
 
     @classmethod
     def _create_reverse_wrapper(cls, field) -> None:
-        """Assign the custom <model>Set manager to a ManyToOne ReverseField <field>"""
+        """Assign a custom ManagerRouter to the <field> to choose between the custom <model>Set managor of the default ManyToOne ReverseField / RelatedManager"""
 
-        def wrap_reverse_manager(self) -> "AbstractQuerySet":
-            """access the _<field>.objects.all() using the _objects manager"""
-            return getattr(self, f"_{field}")(manager="_objects").all()
+        def get_manager_router(self) -> "ManagerRouter":
+            return ManagerRouter(model=self, field=field)
 
         # Set the _<field> attribute
-        setattr(cls, field, property(wrap_reverse_manager))
+        setattr(cls, field, property(get_manager_router))
 
     @classmethod
     def _create_table_wrapper(cls) -> None:
