@@ -839,6 +839,7 @@ class ProjectPage:
 
             d["hash"] = str(proposal.hash)
             d["price"] = str(proposal.price)
+            d["price/compound"] = str(proposal.price / proposal.num_products)
 
             for attribute in self.scorer.attributes:
                 d[f"{attribute.key} w={attribute.weight}"] = (
