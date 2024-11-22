@@ -47,7 +47,10 @@ class AbstractTable:
 
         elif n <= self._max_str_ids:
             s += "{ "
-            s += ", ".join(str(member) for member in self)
+            s += ", ".join(
+                member.__longstr__() if hasattr(member, "__longstr__") else str(member)
+                for member in self
+            )
             s += " }"
 
         else:
