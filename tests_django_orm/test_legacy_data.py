@@ -30,6 +30,8 @@ from hippo_django_orm.observation import Observation
 from hippo_django_orm.reaction import Reaction
 from hippo_django_orm.product import Product
 from hippo_django_orm.reactant import Reactant
+from hippo_django_orm.tag import Tag
+
 
 from django.core.exceptions import ValidationError
 
@@ -164,15 +166,6 @@ feature.save()
 
 ### Interaction
 
-features = animal.targets[1].features
-
-mrich.print(type(features))
-# mrich.print(dir(features))
-mrich.print(list(f for f in features))
-
-mrich.print(features.__class__)
-mrich.print(animal.targets[1].features[0])
-
 interaction = Interaction(
     family="LumpedHydrophobe",
     type="Hydrophobic",
@@ -222,6 +215,32 @@ reactant.save()
 reactant = Reactant(reaction=reaction, compound=animal.C3)
 reactant.full_clean()
 reactant.save()
+
+### Tags
+
+# mrich.debug("Trying to add C6 to CompoundSet")
+# Compound._objects.filter(id__lt=5).add(animal.C6)
+
+tag = Tag(name="Fragment Screen")
+tag.full_clean()
+tag.save()
+
+mrich.debug("Trying to add Tag to C1")
+animal.C1.tags.add(tag)
+mrich.print(animal.C1.tags)
+exit()
+
+tag = Tag(name="Fragmenstein")
+tag.full_clean()
+tag.save()
+
+animal.P1._tags.add(tag)
+
+tag = Tag(name="Experiment")
+tag.full_clean()
+tag.save()
+
+animal.P2._tags.add(tag)
 
 ### Test repr's
 
