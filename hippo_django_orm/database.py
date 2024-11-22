@@ -49,9 +49,10 @@ class Database:
         from .interaction import Interaction
         from .feature import Feature
         from .solvent import Solvent
-        from .models import SubsiteMember
+        from .observation import Observation
         from .reaction import Reaction
         from .reactant import Reactant
+        from .product import Product
 
         # define the table names
         self.MODELS = [
@@ -63,10 +64,11 @@ class Database:
             Subsite,
             Interaction,
             Feature,
-            SubsiteMember,
+            Observation,
             Solvent,
             Reaction,
             Reactant,
+            Product,
         ]
 
         # check the models
@@ -74,9 +76,11 @@ class Database:
             model._check_model()
 
         # create the tables
-        self.create_tables()
+        self._create_tables()
 
         mrich.success(f'Connected Database "{db_alias}" @', f"[file]{path}")
+
+    ### FACTORIES
 
     @classmethod
     def multi(cls, paths):
@@ -101,11 +105,15 @@ class Database:
 
         return dbs
 
+    ### PROPERTIES
+
     @property
     def connection(self):
         return connections[self._db_alias]
 
-    def create_tables(self, debug: bool = False) -> None:
+    ### DATABASE ADMIN
+
+    def _create_tables(self, debug: bool = False) -> None:
         """For each table in the schema, rename the Model, create the table if it doesn't exist, and add any missing columns"""
 
         self.MODEL_SHORTHANDS = [m._shorthand for m in self.MODELS if m._shorthand]
@@ -116,10 +124,10 @@ class Database:
                 mrich.var("model", model)
 
             # create the table
-            self.create_table(model)
+            self._create_table(model)
 
             # add missing columns
-            missing_columns = self.get_missing_columns(model)
+            missing_columns = self._get_missing_columns(model)
             if missing_columns:
                 raise ValueError("Database using legacy schema")
                 # mrich.warning(
@@ -128,7 +136,7 @@ class Database:
                 # mrich.var("missing_columns", missing_columns)
                 # self.update_table(model, debug=debug)
 
-    def create_table(self, model) -> None:
+    def _create_table(self, model) -> None:
         """Create a table if it doesnt exist"""
         with self.connection.schema_editor() as schema_editor:
             if model._meta.db_table not in self.connection.introspection.table_names():
@@ -137,7 +145,7 @@ class Database:
                     f"Created table: {model._meta.db_table} for model: {model.__name__}"
                 )
 
-    def get_missing_columns(self, model) -> set[str]:
+    def _get_missing_columns(self, model) -> set[str]:
 
         missing_columns = set()
 
@@ -160,7 +168,7 @@ class Database:
 
         return missing_columns
 
-    def update_table(self, model, debug: bool = True) -> None:
+    def _update_table(self, model, debug: bool = True) -> None:
         """Update table if you added fields (doesn't drop fields)"""
         with self.connection.schema_editor() as schema_editor:
             # Check if the table exists
@@ -181,3 +189,14 @@ class Database:
                         schema_editor.add_field(model, field)
                         if debug:
                             mrich.debug(f"Adding {field} to {model}")
+
+    ### METHODS
+
+    def summary(self):
+
+        mrich.header(self)
+
+        for model in self.MODELS:
+
+            mrich.var(model.__name__, model.all(), separator=":")
+            # print(model.__name__, model.all(), separator=":")

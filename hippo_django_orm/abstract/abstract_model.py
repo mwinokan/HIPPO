@@ -1,5 +1,7 @@
+import mcol
 import mrich
 from django.db import models
+import importlib
 
 
 class AbstractModel(models.Model):
@@ -9,9 +11,7 @@ class AbstractModel(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    @property
-    def shorthand(self) -> str | None:
-        return self._shorthand
+    ### MODEL SETUP
 
     @classmethod
     def _check_model(cls):
@@ -35,23 +35,83 @@ class AbstractModel(models.Model):
 
                 if prop not in dir(cls):
                     cls._create_reverse_wrapper(prop)
-
-                    # mrich.warning(f"No property wrapper for {name}.{prop} defined")
-                    # mrich.debug(f"Created property wrapper for {name}.{prop}")
-
                 else:
                     mrich.warning(f"Existing property wrapper for {name}.{prop}")
 
-    @classmethod
-    def _create_reverse_wrapper(cls, field):
+        prop = "_table"
 
-        def wrap_reverse_manager(self):
+        if prop not in dir(cls):
+            cls._create_table_wrapper()
+        else:
+            mrich.warning(f"Existing table wrapper: {name}.{prop}")
+
+    @classmethod
+    def _create_reverse_wrapper(cls, field) -> None:
+        """Assign the custom <model>Set manager to a ManyToOne ReverseField <field>"""
+
+        def wrap_reverse_manager(self) -> "AbstractQuerySet":
+            """access the _<field>.objects.all() using the _objects manager"""
             return getattr(self, f"_{field}")(manager="_objects").all()
 
+        # Set the _<field> attribute
         setattr(cls, field, property(wrap_reverse_manager))
+
+    @classmethod
+    def _create_table_wrapper(cls) -> None:
+        """Set the _table property on the child <model> Model to point to the <model>Table class if defined"""
+
+        # define names
+        module_name = cls.__name__.lower()
+        model_name = cls.__name__
+        table_class = f"{model_name}Table"
+
+        # import submodule
+        module = importlib.import_module(f"..{module_name}", package=__package__)
+
+        def get_table_wrapper():
+            """Get an instance of the <model>Table"""
+            return getattr(module, table_class)()
+
+        # check if the <model>Table class exists
+        if hasattr(module, table_class):
+
+            # set the _table attribute on the class
+            setattr(cls, "_table", get_table_wrapper)
+
+        else:
+            mrich.warning(f"{module_name} has no {table_class}")
+
+    ### CLASSMETHODS
+
+    @classmethod
+    def all(cls):
+        if hasattr(cls, "_table"):
+            # defined programmatically by _create_table_wrapper
+            return cls._table()
+        return cls._objects.all()
+
+    @classmethod
+    def filter(cls):
+        return cls._objects.filter()
+
+    ### PROPERTIES
+
+    @property
+    def shorthand(self) -> str | None:
+        return self._shorthand
+
+    ### DUNDERS
 
     def __str__(self) -> str:
         if s := self.shorthand:
             return f"{self.shorthand}{self.id}"
         else:
             return f"{self.__name__}_{self.id}"
+
+    def __repr__(self) -> str:
+        """ANSI formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Representation for mrich"""
+        return f"[bold underline]{self}"

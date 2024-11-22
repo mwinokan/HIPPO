@@ -26,7 +26,10 @@ from hippo_django_orm.quote import Quote
 from hippo_django_orm.interaction import Interaction
 from hippo_django_orm.feature import Feature
 from hippo_django_orm.subsite import Subsite
-from hippo_django_orm.models import SubsiteMember
+from hippo_django_orm.observation import Observation
+from hippo_django_orm.reaction import Reaction
+from hippo_django_orm.product import Product
+from hippo_django_orm.reactant import Reactant
 
 from django.core.exceptions import ValidationError
 
@@ -194,10 +197,31 @@ subsite = Subsite(
 subsite.full_clean()
 subsite.save()
 
-member = SubsiteMember(subsite=subsite, pose=animal.P1, atom_ids=[1, 2, 3])
+observation = Observation(subsite=subsite, pose=animal.P1, atom_ids=[1, 2, 3])
 
-member.full_clean()
-member.save()
+observation.full_clean()
+observation.save()
+
+### Reaction
+
+reaction = Reaction(
+    type="Amidation",
+)
+
+reaction.full_clean()
+reaction.save()
+
+product = Product(reaction=reaction, compound=animal.C1)
+product.full_clean()
+product.save()
+
+reactant = Reactant(reaction=reaction, compound=animal.C2)
+reactant.full_clean()
+reactant.save()
+
+reactant = Reactant(reaction=reaction, compound=animal.C3)
+reactant.full_clean()
+reactant.save()
 
 ### Test repr's
 

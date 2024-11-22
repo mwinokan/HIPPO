@@ -72,10 +72,13 @@ class HIPPO:
     def summary(self) -> None:
         """Print a text summary of this HIPPO"""
         mrich.header(self)
-        mrich.var("db_path", self.db_path)
-        mrich.var("#compounds", self.num_compounds)
-        mrich.var("#poses", self.num_poses)
-        mrich.var("#targets", self.num_targets)
+        mrich.var("name", self.name)
+
+        self.db.summary()
+
+        # mrich.var("#compounds", self.num_compounds)
+        # mrich.var("#poses", self.num_poses)
+        # mrich.var("#targets", self.num_targets)
         # mrich.var("#reactions", self.num_reactions)
         # mrich.var("#tags", self.num_tags)
         # mrich.var("tags", self.tags.unique)

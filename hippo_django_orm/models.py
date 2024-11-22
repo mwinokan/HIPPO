@@ -133,14 +133,57 @@ class ReactionModel(AbstractModel):
         abstract = True
 
     type = models.CharField(max_length=60, blank=False)
-    product = models.ForeignKey(
-        "Compound", on_delete=models.CASCADE, related_name="_reactions"
+
+    _products = models.ManyToManyField(
+        "Compound",
+        through="Product",
+        through_fields=("reaction", "compound"),
+        related_name="_reactions",
     )
+
+    # product = models.ForeignKey(
+    #     "Compound", on_delete=models.CASCADE, related_name="_reactions"
+    # )
+
     yield_fraction = models.FloatField(
-        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
+        default=1.0, validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
+    )
+
+    _reactants = models.ManyToManyField(
+        "Compound",
+        through="Reactant",
+        through_fields=("reaction", "compound"),
+        related_name="_reactions",
     )
 
     _shorthand = "R"
+
+
+class ProductModel(AbstractModel):
+    class Meta:
+        app_label = "hippo"
+        abstract = True
+        unique_together = ("reaction", "compound")
+
+    amount = models.FloatField(default=1.0, validators=[MinValueValidator(0.0)])
+
+    reaction = models.ForeignKey(
+        "Reaction", on_delete=models.CASCADE, related_name="_reactants"
+    )
+
+    compound = models.ForeignKey(
+        "Compound", on_delete=models.RESTRICT, related_name="_reactants"
+    )
+
+    solvent = models.ForeignKey(
+        "Solvent",
+        null=True,
+        blank=True,
+        on_delete=models.RESTRICT,
+        related_name="_reactants",
+    )
+
+    _shorthand = None
 
 
 class ReactantModel(AbstractModel):
@@ -149,14 +192,21 @@ class ReactantModel(AbstractModel):
         abstract = True
         unique_together = ("reaction", "compound")
 
-    amount = models.FloatField(validators=[MinValueValidator(0.0)])
+    amount = models.FloatField(default=1.0, validators=[MinValueValidator(0.0)])
     reaction = models.ForeignKey(
         "Reaction", on_delete=models.CASCADE, related_name="_reactants"
     )
     compound = models.ForeignKey(
-        "Compound", on_delete=models.RESTRICT, related_name="+"
+        "Compound", on_delete=models.RESTRICT, related_name="_reactants"
     )
-    solvent = models.ForeignKey("Solvent", on_delete=models.SET_NULL, related_name="+")
+
+    solvent = models.ForeignKey(
+        "Solvent",
+        null=True,
+        blank=True,
+        on_delete=models.RESTRICT,
+        related_name="_reactants",
+    )
 
     _shorthand = None
 
@@ -233,9 +283,12 @@ class SubsiteModel(AbstractModel):
     )
     name = models.CharField(max_length=30)
     metadata = models.JSONField(default=dict(), blank=True)
+
+    # _poses M2M field defined on
+
     _poses = models.ManyToManyField(
         "Pose",
-        through="SubsiteMember",
+        through="Observation",
         through_fields=("subsite", "pose"),
         related_name="_subsites",
     )
@@ -243,27 +296,22 @@ class SubsiteModel(AbstractModel):
     _shorthand = "S"
 
 
-class SubsiteMemberSet(AbstractQuerySet): ...
-
-
-class SubsiteMember(AbstractModel):
+class ObservationModel(AbstractModel):
     class Meta:
         app_label = "hippo"
-        abstract = False
+        abstract = True
         unique_together = ("subsite", "pose")
 
-    _objects = SubsiteMemberSet.as_manager()
-
     subsite = models.ForeignKey(
-        "Subsite", on_delete=models.RESTRICT, related_name="_subsite_members"
+        "Subsite", on_delete=models.RESTRICT, related_name="_observations"
     )
     pose = models.ForeignKey(
-        "Pose", on_delete=models.CASCADE, related_name="_subsite_members"
+        "Pose", on_delete=models.CASCADE, related_name="_observations"
     )
     atom_ids = models.JSONField()  # TODO: validation
     metadata = models.JSONField(default=dict(), blank=True)
 
-    _shorthand = None
+    _shorthand = "O"
 
 
 class SolventModel(AbstractModel):

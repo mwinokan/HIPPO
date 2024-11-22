@@ -42,7 +42,10 @@ class AbstractTable:
 
         n = len(self)
 
-        if n <= self._max_str_ids:
+        if n == 0:
+            s += "{ empty " f"{self.__class__.__name__}" " }"
+
+        elif n <= self._max_str_ids:
             s += "{ "
             s += ", ".join(str(member) for member in self)
             s += " }"
