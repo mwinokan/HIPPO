@@ -22,3 +22,12 @@ class ManagerRouter:
 
     def __getitem__(self, key):
         return self.custom_manager[key]
+
+    def __str__(self):
+        return self.custom_manager.__str__()
+
+    def __repr__(self):
+        return self.custom_manager.__repr__()
+
+    def __rich__(self):
+        return self.custom_manager.__rich__()
