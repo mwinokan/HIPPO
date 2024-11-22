@@ -31,6 +31,7 @@ from hippo_django_orm.reaction import Reaction
 from hippo_django_orm.product import Product
 from hippo_django_orm.reactant import Reactant
 from hippo_django_orm.tag import Tag
+from hippo_django_orm.solvent import Solvent
 
 
 from django.core.exceptions import ValidationError
@@ -216,6 +217,16 @@ reactant = Reactant(reaction=reaction, compound=animal.C3)
 reactant.full_clean()
 reactant.save()
 
+### Solvent
+
+solvent = Solvent(name="Irn Bru")
+solvent.full_clean()
+solvent.save()
+
+reactant.solvent = solvent
+reactant.full_clean()
+reactant.save()
+
 ### Tags
 
 # mrich.debug("Trying to add C6 to CompoundSet")
@@ -228,19 +239,18 @@ tag.save()
 mrich.debug("Trying to add Tag to C1")
 animal.C1.tags.add(tag)
 mrich.print(animal.C1.tags)
-exit()
 
 tag = Tag(name="Fragmenstein")
 tag.full_clean()
 tag.save()
 
-animal.P1._tags.add(tag)
+animal.P1.tags.add(tag)
 
 tag = Tag(name="Experiment")
 tag.full_clean()
 tag.save()
 
-animal.P2._tags.add(tag)
+animal.P2.tags.add(tag)
 
 ### Test repr's
 
@@ -259,6 +269,13 @@ mrich.var("animal.R1", animal.R1)
 mrich.var("animal.T1.subsites", animal.T1.subsites)
 mrich.var("T1.subsites[0].poses", animal.T1.subsites[0].poses)
 mrich.var("T1.poses", animal.T1.poses, str(type(animal.T1.poses)))
+
+animal.R1.summary()
+
+for reactant in animal.R1.reactants:
+    reactant.summary()
+
+mrich.var("animal.R1.products", animal.R1.products, str(type(animal.R1.products)))
 
 ### Tags
 
