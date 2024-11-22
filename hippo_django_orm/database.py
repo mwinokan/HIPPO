@@ -8,6 +8,7 @@ import django
 from django.conf import settings
 from django.db import models, connections
 
+import mcol
 import mrich
 from pathlib import Path
 
@@ -30,6 +31,7 @@ class Database:
     ) -> None:
 
         self._db_alias = db_alias
+        self._path = Path(path).resolve()
 
         if setup_django:
             from .orm.setup import setup_django
@@ -110,6 +112,14 @@ class Database:
     @property
     def connection(self):
         return connections[self._db_alias]
+
+    @property
+    def path(self) -> str:
+        return self._path
+
+    @property
+    def db_alias(self) -> str:
+        return self._db_alias
 
     ### DATABASE ADMIN
 
@@ -200,3 +210,16 @@ class Database:
 
             mrich.var(model.__name__, model.all(), separator=":")
             # print(model.__name__, model.all(), separator=":")
+
+    ### DUNDERS
+
+    def __str__(self) -> str:
+        return f'Database("{self.path.name}")'
+
+    def __repr__(self) -> str:
+        """ANSI formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Representation for mrich"""
+        return f"[bold underline]{self}"
