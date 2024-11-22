@@ -2086,7 +2086,9 @@ class IngredientSet:
 
             quote = ingredient.quote
 
-            assert quote, f"NULL Quote: {ingredient=}"
+            if not quote:
+                mrich.warning(f"NULL Quote: {ingredient=}")
+                continue
 
             self.df.loc[i, "quote_id"] = quote.id
 

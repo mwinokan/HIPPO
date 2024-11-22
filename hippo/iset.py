@@ -310,7 +310,7 @@ class InteractionSet:
         return count
 
     @property
-    def per_feature_count_std(self) -> float:
+    def per_feature_count_hirsch(self) -> float:
         """A measure for how evenly protein :class:`.Feature`s are being interacted with"""
 
         counts = self.db.execute(
@@ -325,7 +325,11 @@ class InteractionSet:
 
         from numpy import std
 
-        return -std(counts)
+        # return -std(counts)
+
+        from hirsch import hirsch
+
+        return hirsch(counts)
 
     ### METHODS
 

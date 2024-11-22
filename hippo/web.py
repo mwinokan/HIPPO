@@ -611,16 +611,20 @@ class ProjectPage:
 
         with self.tag("ul"):
             self.var("weight", f"{attribute.weight:.2f}", tag="li")
-            self.var("inverse", f"{attribute.inverse:.2f}", tag="li")
+            self.var("inverse", f"{attribute.inverse}", tag="li")
             self.var("min", f"{attribute.min:.2f}", tag="li")
             self.var("max", f"{attribute.max:.2f}", tag="li")
             self.var("mean", f"{attribute.mean:.2f}", tag="li")
             self.var("std", f"{attribute.std:.2f}", tag="li")
 
             if key in DEFAULT_ATTRIBUTES:
-                self.var(
-                    "Description", DEFAULT_ATTRIBUTES[key]["description"], tag="li"
-                )
+                description = DEFAULT_ATTRIBUTES[key]["description"]
+                if attribute.inverse:
+                    description += "(Lower is better)"
+                else:
+                    description += "(Lower is better)"
+
+                self.var("Description", description, tag="li")
 
         if histogram:
             fig = attribute.histogram(progress=True)
