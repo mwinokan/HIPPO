@@ -168,11 +168,11 @@ class ProductModel(AbstractModel):
     amount = models.FloatField(default=1.0, validators=[MinValueValidator(0.0)])
 
     reaction = models.ForeignKey(
-        "Reaction", on_delete=models.CASCADE, related_name="_reactants"
+        "Reaction", on_delete=models.CASCADE, related_name="_products"
     )
 
     compound = models.ForeignKey(
-        "Compound", on_delete=models.RESTRICT, related_name="_reactants"
+        "Compound", on_delete=models.RESTRICT, related_name="_products"
     )
 
     solvent = models.ForeignKey(
