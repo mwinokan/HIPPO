@@ -20,6 +20,7 @@ class TargetModel(AbstractModel):
     metadata = models.JSONField(default=dict(), blank=True)
 
     _shorthand = "T"
+    _name_field = "name"
 
 
 class CompoundModel(AbstractModel):
@@ -48,6 +49,7 @@ class CompoundModel(AbstractModel):
     _tags = models.ManyToManyField("Tag", related_name="_compounds")
 
     _shorthand = "C"
+    _name_field = "alias"
 
 
 class PoseModel(AbstractModel):
@@ -79,6 +81,7 @@ class PoseModel(AbstractModel):
     _tags = models.ManyToManyField("Tag", related_name="_poses")
 
     _shorthand = "P"
+    _name_field = "alias"
 
 
 class QuoteModel(AbstractModel):
@@ -115,6 +118,7 @@ class QuoteModel(AbstractModel):
     )
 
     _shorthand = "Q"
+    _name_field = None
 
 
 class TagModel(AbstractModel):
@@ -125,6 +129,7 @@ class TagModel(AbstractModel):
     name = models.CharField(max_length=60, blank=False, unique=True)
 
     _shorthand = None
+    _name_field = "name"
 
 
 class ReactionModel(AbstractModel):
@@ -157,6 +162,7 @@ class ReactionModel(AbstractModel):
     )
 
     _shorthand = "R"
+    _name_field = "type"
 
 
 class ProductModel(AbstractModel):
@@ -184,6 +190,7 @@ class ProductModel(AbstractModel):
     )
 
     _shorthand = None
+    _name_field = None
 
 
 class ReactantModel(AbstractModel):
@@ -238,6 +245,7 @@ class FeatureModel(AbstractModel):
     atom_names = models.JSONField()  # TODO: Validate as list
 
     _shorthand = "F"
+    _name_field = "family"
 
 
 class InteractionModel(AbstractModel):
@@ -270,6 +278,7 @@ class InteractionModel(AbstractModel):
     energy = models.FloatField(blank=True, null=True)
 
     _shorthand = "I"
+    _name_field = "type"
 
 
 class SubsiteModel(AbstractModel):
@@ -294,6 +303,7 @@ class SubsiteModel(AbstractModel):
     )
 
     _shorthand = "S"
+    _name_field = "name"
 
 
 class ObservationModel(AbstractModel):
@@ -312,6 +322,7 @@ class ObservationModel(AbstractModel):
     metadata = models.JSONField(default=dict(), blank=True)
 
     _shorthand = "O"
+    _name_field = None
 
 
 class SolventModel(AbstractModel):
@@ -322,3 +333,4 @@ class SolventModel(AbstractModel):
     name = models.CharField(max_length=30, unique=True)
 
     _shorthand = None
+    _name_field = "name"

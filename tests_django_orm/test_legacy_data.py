@@ -270,13 +270,26 @@ mrich.var("animal.T1.subsites", animal.T1.subsites)
 mrich.var("T1.subsites[0].poses", animal.T1.subsites[0].poses)
 mrich.var("T1.poses", animal.T1.poses, str(type(animal.T1.poses)))
 
-animal.R1.summary()
+# animal.R1.summary()
 
-for reactant in animal.R1.reactants:
-    reactant.summary()
+# for reactant in animal.R1.reactants:
+#     reactant.summary()
 
 mrich.var("animal.R1.products", animal.R1.products, str(type(animal.R1.products)))
 
+Compound._objects.first().summary()
+Target._objects.first().summary()
+Pose._objects.first().summary()
+Quote._objects.first().summary()
+Interaction._objects.first().summary()
+Feature._objects.first().summary()
+Subsite._objects.first().summary()
+Observation._objects.first().summary()
+Reaction._objects.first().summary()
+Product._objects.first().summary()
+Reactant._objects.first().summary()
+Tag._objects.first().summary()
+Solvent._objects.first().summary()
 ### Tags
 
 ## Fake Data

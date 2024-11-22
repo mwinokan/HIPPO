@@ -204,12 +204,19 @@ class Database:
 
     def summary(self):
 
-        mrich.header(self)
+        from rich.panel import Panel
+        from rich.box import SIMPLE_HEAVY
+        from rich.table import Table
+
+        table = Table(title=self.__rich__(), box=SIMPLE_HEAVY)
+        table.add_column("Model", style="var_name")
+        table.add_column("Entries", style="result")
 
         for model in self.MODELS:
+            table.add_row(f"[bold]{model.__name__}", model.all().__rich__(name=False))
 
-            mrich.var(model.__name__, model.all(), separator=":")
-            # print(model.__name__, model.all(), separator=":")
+        panel = Panel(table, expand=False)
+        mrich.print(panel)
 
     ### DUNDERS
 

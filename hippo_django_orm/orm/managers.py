@@ -31,3 +31,6 @@ class ManagerRouter:
 
     def __rich__(self):
         return self.custom_manager.__rich__()
+
+    def __bool__(self):
+        return len(self.custom_manager) > 0

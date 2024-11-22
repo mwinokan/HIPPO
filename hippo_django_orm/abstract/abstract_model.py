@@ -118,24 +118,32 @@ class AbstractModel(models.Model):
 
     def summary(self):
 
+        from rich.panel import Panel
+        from rich.box import SIMPLE_HEAVY
         from rich.table import Table
 
         fields = self.get_wrapped_field_names()
 
-        table = Table(title=self.__rich__())
-        table.add_column("field")
-        table.add_column("value")
+        table = Table(title=self.__rich__(), box=SIMPLE_HEAVY)
+        table.add_column("Field", style="var_name")
+        table.add_column("Value", style="result")
+
+        table.add_row(f"[bold]Model", f"[bold var_type]{self.__name__}")
 
         for field in fields:
             value = getattr(self, field)
+
+            if not value:
+                continue
 
             if hasattr(value, "__rich__"):
                 s = value.__rich__()
             else:
                 s = str(value)
-            table.add_row(field, s)
+            table.add_row(f"[bold]{field}", s)
 
-        mrich.print(table)
+        panel = Panel(table, expand=False)
+        mrich.print(panel)
 
     ### DUNDERS
 
@@ -146,11 +154,11 @@ class AbstractModel(models.Model):
         else:
             s = f"{self.__name__}_{self.id}"
 
-        if hasattr(self, "alias") and (alias := self.alias):
-            return f'{s} "{alias}"'
+        if field := self._name_field:
+            return f'{s} "{getattr(self, field)}"'
 
-        if hasattr(self, "name") and (name := self.name):
-            return f'{s} "{name}"'
+        # if hasattr(self, "name") and (name := self.name):
+        # return f'{s} "{name}"'
 
         return s
 
@@ -160,7 +168,8 @@ class AbstractModel(models.Model):
 
     def __rich__(self) -> str:
         """Representation for mrich"""
-        return f"[bold underline]{self}"
+        return f"[bold]{self}"
 
+    @property
     def __name__(self):
         return self.__class__.__name__

@@ -1,4 +1,5 @@
 import mcol
+import mrich
 
 
 class AbstractTable:
@@ -30,12 +31,8 @@ class AbstractTable:
     def get(self, *args, **kwargs):
         return self._all_objects.get(*args, **kwargs)
 
-    ### DUNDERS
-
-    def __str__(self) -> str:
-        """Unformatted string representation"""
-
-        if self.name:
+    def get_str(self, name: bool = True) -> str:
+        if name and self.name:
             s = f"{self.name}: "
         else:
             s = ""
@@ -43,28 +40,34 @@ class AbstractTable:
         n = len(self)
 
         if n == 0:
-            s += "{ empty " f"{self.__class__.__name__}" " }"
+            s += "{empty " f"{self.__class__.__name__}" "}"
 
         elif n <= self._max_str_ids:
-            s += "{ "
+            s += "{"
             s += ", ".join(
                 member.__longstr__() if hasattr(member, "__longstr__") else str(member)
                 for member in self
             )
-            s += " }"
+            s += "}"
 
         else:
             s += "{" f"{self.shorthand} × {len(self)}" "}"
 
         return s
 
+    ### DUNDERS
+
+    def __str__(self) -> str:
+        """Unformatted string representation"""
+        return self.get_str()
+
     def __repr__(self) -> str:
         """ANSI formatted string representation"""
         return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
 
-    def __rich__(self) -> str:
+    def __rich__(self, name: bool = True) -> str:
         """Representation for mrich"""
-        return f"[bold underline]{self}"
+        return f"[bold]{self.get_str(name=name)}"
 
     def __len__(self) -> int:
         """Total number of compounds"""
@@ -85,3 +88,6 @@ class AbstractTable:
                 return self.get(id=key)
             case _:
                 raise NotImplementedError
+
+    def __bool__(self):
+        return len(self) > 0
