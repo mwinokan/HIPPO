@@ -8,13 +8,13 @@ class HIPPO:
     HIPPO class
     """
 
-    def __init__(self, name: str, db_path: str) -> None:
+    def __init__(self, name: str, db_path: str, **kwargs) -> None:
 
         self._name = name
         self._db_path = db_path
 
         # DB must be initialised before importing any models
-        self._db = Database(path=db_path)
+        self._db = Database(path=db_path, **kwargs)
 
         from .compound import CompoundTable
         from .pose import PoseTable

@@ -10,7 +10,7 @@ class AbstractModel(models.Model):
         app_label = "hippo"
         abstract = True
 
-    id = models.BigAutoField(primary_key=True)
+    _id = models.BigAutoField(primary_key=True)
 
     ### MODEL SETUP
 
@@ -95,6 +95,10 @@ class AbstractModel(models.Model):
         return cls._objects.filter()
 
     ### PROPERTIES
+
+    @property
+    def id(self):
+        return self._id
 
     @property
     def shorthand(self) -> str | None:

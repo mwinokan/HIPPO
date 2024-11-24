@@ -18,6 +18,10 @@ class AbstractQuerySet(models.QuerySet, AbstractTable):
 
     ### METHODS
 
+
+    def filter(self, *args, **kwargs):
+        kwargs = self._add_prefix_in_kwargs(kwargs)
+        return super().filter(*args, **kwargs)
     ### DUNDERS
 
     # __getitem__ handled by models.QuerySet
