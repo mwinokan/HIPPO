@@ -15,7 +15,7 @@ class AbstractModel(models.Model):
     ### MODEL SETUP
 
     @classmethod
-    def _check_model(cls):
+    def _setup_wrappers(cls):
 
         name = cls.__name__
 

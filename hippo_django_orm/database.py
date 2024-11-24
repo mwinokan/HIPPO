@@ -73,9 +73,9 @@ class Database:
             Product,
         ]
 
-        # check the models
+        # setup custom attribute wrappers
         for model in self.MODELS:
-            model._check_model()
+            model._setup_wrappers()
 
         # create the tables
         self._create_tables()
