@@ -27,6 +27,7 @@ class Database:
         # reference: str | Path | None = None,
         setup_django: bool = True,
         debug: bool = True,
+        django_debug: bool = False,
         **kwargs,
     ) -> None:
 
@@ -39,7 +40,7 @@ class Database:
             databases = {
                 db_alias: path,
             }
-            setup_django(databases, **kwargs)
+            setup_django(databases, debug=django_debug, **kwargs)
 
         # import the models
         from .target import Target

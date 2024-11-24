@@ -10,6 +10,7 @@ def setup_django(
     force: bool = False,
     include_contenttypes: bool = False,
     include_templates: bool = False,
+    debug: bool = False,
 ):
 
     global DJANGO_SETUP
@@ -61,10 +62,38 @@ def setup_django(
     if include_contenttypes:
         INSTALLED_APPS.append("django.contrib.contenttypes")
 
-    # Update the settings with the custom DATABASES dictionary
-    settings.configure(
-        DATABASES=DATABASES, INSTALLED_APPS=INSTALLED_APPS, TEMPLATES=TEMPLATES
+    SETTINGS = dict(
+        DATABASES=DATABASES,
+        INSTALLED_APPS=INSTALLED_APPS,
+        TEMPLATES=TEMPLATES,
     )
+
+    if debug:
+        SETTINGS["DEBUG"] = True
+        SETTINGS["LOGGING"] = {
+            "version": 1,
+            "filters": {
+                "require_debug_true": {
+                    "()": "django.utils.log.RequireDebugTrue",
+                }
+            },
+            "handlers": {
+                "console": {
+                    "level": "DEBUG",
+                    "filters": ["require_debug_true"],
+                    "class": "logging.StreamHandler",
+                }
+            },
+            "loggers": {
+                "django.db.backends": {
+                    "level": "DEBUG",
+                    "handlers": ["console"],
+                }
+            },
+        }
+
+    # Update the settings with the custom DATABASES dictionary
+    settings.configure(**SETTINGS)
 
     # Initialize Django
     django.setup()
