@@ -17,6 +17,7 @@ from hippo_django_orm import HIPPO
 animal = HIPPO(
     "test_A71EV2A_django",
     "/Users/tfb64483/Software/HIPPO/tests_django_orm/test_A71EV2A_django.sqlite",
+    django_debug=False,
 )
 
 from hippo_django_orm.compound import Compound
