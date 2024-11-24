@@ -18,10 +18,16 @@ class AbstractQuerySet(models.QuerySet, AbstractTable):
 
     ### METHODS
 
+    # def filter(self, *args, **kwargs):
+    #     # raise ValueError(f"{args=} {kwargs=}")
+    #     # mrich.debug(self.__class__.__name__, "filter", args, kwargs)
+    #     kwargs = {(f"_{k}" if not k.startswith("_") else k):v for k,v in kwargs.items()}
+    #     return super().filter(*args, **kwargs)
 
     def filter(self, *args, **kwargs):
         kwargs = self._add_prefix_in_kwargs(kwargs)
         return super().filter(*args, **kwargs)
+
     ### DUNDERS
 
     # __getitem__ handled by models.QuerySet

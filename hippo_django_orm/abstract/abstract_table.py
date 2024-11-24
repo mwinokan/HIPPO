@@ -29,7 +29,7 @@ class AbstractTable:
     ### METHODS
 
     def _add_prefix_in_kwargs(self, kwargs):
-        return {("_"+k if k.startswith("id") else k):v for k,v in kwargs.items()}
+        return {("_" + k if k.startswith("id") else k): v for k, v in kwargs.items()}
 
     def get(self, *args, **kwargs):
         kwargs = self._add_prefix_in_kwargs(kwargs)
@@ -38,6 +38,12 @@ class AbstractTable:
     def filter(self, *args, **kwargs):
         kwargs = self._add_prefix_in_kwargs(kwargs)
         return self._all_objects.filter(*args, **kwargs)
+
+    # def all(self):
+    #     # kwargs = {(f"_{k}" if not k.startswith("_") else k):v for k,v in kwargs.items()}
+    #     # mrich.debug(self.__class__.__name__, "all", args, kwargs)
+    #     return self._all_objects
+
     def get_str(self, name: bool = True) -> str:
         if name and self.name:
             s = f"{self.name}: "

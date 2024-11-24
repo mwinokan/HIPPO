@@ -12,6 +12,15 @@ class AbstractModel(models.Model):
 
     _id = models.BigAutoField(primary_key=True)
 
+    def __init__(self, auto_save: bool = False, *args, **kwargs):
+
+        #     # set up parent instance
+        #     super().__setattr__("_auto_save", False)
+        super().__init__(*args, **kwargs)
+        self._wrapped_field_names = None
+
+    #     super().__setattr__("_auto_save", auto_save)
+
     ### MODEL SETUP
 
     @classmethod
@@ -20,6 +29,8 @@ class AbstractModel(models.Model):
         name = cls.__name__
 
         for field in dir(cls):
+
+            mrich.debug(name, field, str(type(getattr(cls, field))))
 
             if field == "objects":
                 mrich.warning(f"No custom Manager defined for {name}")
@@ -104,9 +115,15 @@ class AbstractModel(models.Model):
     def shorthand(self) -> str | None:
         return self._shorthand
 
+    @property
+    def wrapped_field_names(self):
+        if not self._wrapped_field_names:
+            self._wrapped_field_names = self.get_wrapped_field_names()
+        return self._wrapped_field_names
+
     ### METHODS
 
-    def get_wrapped_field_names(self) -> list[str]:
+    def get_wrapped_field_names(self) -> set[str]:
 
         fields = self._meta.get_fields()
 
@@ -118,7 +135,7 @@ class AbstractModel(models.Model):
                 names = [n for n in names if n != name]
             names.append(name)
 
-        return names
+        return set(names)
 
     def summary(self):
 
@@ -126,7 +143,7 @@ class AbstractModel(models.Model):
         from rich.box import SIMPLE_HEAVY
         from rich.table import Table
 
-        fields = self.get_wrapped_field_names()
+        fields = self.wrapped_field_names
 
         table = Table(title=self.__rich__(), box=SIMPLE_HEAVY)
         table.add_column("Field", style="var_name")
@@ -148,6 +165,19 @@ class AbstractModel(models.Model):
 
         panel = Panel(table, expand=False)
         mrich.print(panel)
+
+    # def save(self, full_clean: bool = True, *args, **kwargs):
+    #     if full_clean:
+    #         self.full_clean()
+    #     super().save(*args, **kwargs)
+
+    # def save(self, full_clean: bool = True, *args, **kwargs):
+    #     auto = self._auto_save
+    #     super().__setattr__("_auto_save", False)
+    #     # self.full_clean()
+    #     super().save(*args, **kwargs)
+    #     if auto:
+    #         super().__setattr__("_auto_save", True)
 
     ### DUNDERS
 
@@ -177,3 +207,15 @@ class AbstractModel(models.Model):
     @property
     def __name__(self):
         return self.__class__.__name__
+
+    # def __setattr__(self, key, value):
+    #     if self._auto_save and key in self.wrapped_field_names:
+    #         result = super().__setattr__(key, value)
+    #         mrich.debug(f"auto-saving on __setattr__({key=})")
+    #         self.save()
+    #         return result
+
+    #     return super().__setattr__(key, value)
+
+    # def __super_setattr__(self, key, value):
+    #     return super().__setattr__(key, value)
