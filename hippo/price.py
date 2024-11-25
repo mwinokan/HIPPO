@@ -145,7 +145,7 @@ class Price:
         if isinstance(other, int) or isinstance(other, float):
             if self.is_null:
                 return self
-            return Price(amount=self.amount/other, currency=self.currency)
+            return Price(amount=self.amount / other, currency=self.currency)
 
         elif isinstance(other, Price):
             assert self.currency == other.currency
