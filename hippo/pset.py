@@ -1288,7 +1288,7 @@ class PoseSet:
             query="DISTINCT pose_id",
             key=f"pose_reference IS NULL and pose_id in {self.str_ids}",
             multiple=True,
-            none="quiet"
+            none="quiet",
         )
 
         if values:
@@ -1296,7 +1296,7 @@ class PoseSet:
             added_refs = PoseSet(self.db)
 
             for pose in PoseSet(self.db, poses_missing_refs):
-                if 'hits' in pose.tags:
+                if "hits" in pose.tags:
                     pose.reference = pose.id
                     added_refs._indices.append(pose.id)
 
@@ -1330,7 +1330,7 @@ class PoseSet:
             drops.pop(drops.index("compound"))
 
         prev = len(pose_df)
-        pose_df = pose_df[pose_df['reference'].notna()]
+        pose_df = pose_df[pose_df["reference"].notna()]
         if len(pose_df) < prev:
             mrich.warning(f"Skipping {prev - len(pose_df)} Poses with no reference")
 
