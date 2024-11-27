@@ -1529,6 +1529,46 @@ class PoseSet:
 
         return "; ".join(commands)
 
+    def to_knitwork(self, out_path: str, path_root: str = ".") -> None:
+        """Knitwork takes a CSV input with:
+
+        - observation shortcode
+        - smiles
+        - path_to_ligand_mol
+        - path_to_pdb
+
+        :param out_path: path to output CSV
+        :param path_root: paths in CSV will be relative to here
+
+        """
+
+        from os.path import relpath
+        from pathlib import Path
+
+        out_path = Path(out_path).resolve()
+        path_root = Path(path_root).resolve()
+        mrich.var("out_path", out_path)
+        mrich.var("path_root", path_root)
+
+        assert out_path.name.endswith(".csv")
+
+        with open(out_path, "wt") as f:
+
+            mrich.writing(out_path)
+
+            for pose in self:
+
+                assert pose.alias
+                assert "hits" in pose.tags
+
+                mol = relpath(pose.mol_path, path_root)
+                pdb = relpath(pose.apo_path, path_root)
+
+                data = [pose.alias, pose.compound.smiles, mol, pdb]
+
+                f.write(",".join(data))
+                f.write("\n")
+
     ### OUTPUT
 
     def interactive(
