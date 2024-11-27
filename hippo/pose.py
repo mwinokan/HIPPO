@@ -236,7 +236,9 @@ class Pose:
                     mol_path = mol_path[0]
                     from rdkit.Chem import MolFromMolFile
 
-                    mol = MolFromMolFile(str(mol_path.resolve()))
+                    self._mol_path = mol_path.resolve()
+
+                    mol = MolFromMolFile(str(self._mol_path))
 
                 elif len(mol_path) == 0:
 
@@ -530,6 +532,34 @@ class Pose:
             self._total_changes = self.db.total_changes
             return True
         return False
+
+    @property
+    def mol_path(self):
+        path = Path(self.path)
+        if path.name.endswith(".pdb"):
+            mol_path = path.parent / path.name.replace("_hippo.pdb", ".pdb").replace(
+                ".pdb", "_ligand.mol"
+            )
+            if not mol_path.exists():
+                return None
+            return mol_path
+        elif path.name.endswith(".mol"):
+            return path
+        else:
+            raise NotImplementedError
+
+    @property
+    def apo_path(self):
+        path = Path(self.path)
+        if path.name.endswith(".pdb"):
+            apo_path = path.parent / path.name.replace("_hippo.pdb", ".pdb").replace(
+                ".pdb", "_apo-desolv.pdb"
+            )
+            if not apo_path.exists():
+                return None
+            return apo_path
+        else:
+            raise NotImplementedError
 
     ### METHODS
 
@@ -1243,6 +1273,11 @@ class Pose:
             value=int(fp),
             commit=commit,
         )
+
+    def posebusters(self, debug: bool = False) -> bool:
+        from .posebusters import check_mol
+
+        return check_mol(self.mol, debug=debug)
 
     ### DUNDERS
 

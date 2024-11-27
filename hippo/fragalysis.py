@@ -45,6 +45,7 @@ def generate_header(
 
 def download_target(
     target_name: str,
+    target_access_string: str,
     *,
     destination: "str | Path" = ".",
     stack: str = "production",
@@ -90,6 +91,7 @@ def download_target(
         "single_sdf_file": True,
         "static_link": False,
         "target_name": target_name,
+        "target_access_string": target_access_string,
         "trans_matrix_info": False,
     }
 
