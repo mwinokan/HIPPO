@@ -115,17 +115,11 @@ with mrich.loading("Pose"):
             metadata=legacy_pose.metadata.data,
         )  # , smiles=legacy_pose.smiles, mol=legacy_pose.mol)
 
+        pose.full_clean()
+        pose.save()
+
         if inspirations:
             pose.inspirations.set(inspirations)
-
-        try:
-            pose.full_clean()
-            pose.save()
-        except ValidationError as e:
-            print(e)
-            pose = Pose._objects.get(alias=legacy_pose.alias)
-
-        # break
 
 ### Quote
 
