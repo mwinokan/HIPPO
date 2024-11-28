@@ -12,12 +12,12 @@ class AbstractModel(models.Model):
 
     _id = models.BigAutoField(primary_key=True)
 
-    def __init__(self, auto_save: bool = False, *args, **kwargs):
+    # def __init__(self, auto_save: bool = False, *args, **kwargs):
 
-        #     # set up parent instance
-        #     super().__setattr__("_auto_save", False)
-        super().__init__(*args, **kwargs)
-        self._wrapped_field_names = None
+    #     #     # set up parent instance
+    #     #     super().__setattr__("_auto_save", False)
+    #     super().__init__(*args, **kwargs)
+    #     self._wrapped_field_names = None
 
     #     super().__setattr__("_auto_save", auto_save)
 
@@ -115,11 +115,11 @@ class AbstractModel(models.Model):
     def shorthand(self) -> str | None:
         return self._shorthand
 
-    @property
-    def wrapped_field_names(self):
-        if not self._wrapped_field_names:
-            self._wrapped_field_names = self.get_wrapped_field_names()
-        return self._wrapped_field_names
+    # @property
+    # def wrapped_field_names(self):
+    #     if not self._wrapped_field_names:
+    #         self._wrapped_field_names = self.get_wrapped_field_names()
+    #     return self._wrapped_field_names
 
     ### METHODS
 
@@ -143,7 +143,7 @@ class AbstractModel(models.Model):
         from rich.box import SIMPLE_HEAVY
         from rich.table import Table
 
-        fields = self.wrapped_field_names
+        fields = self.get_wrapped_field_names()
 
         table = Table(title=self.__rich__(), box=SIMPLE_HEAVY)
         table.add_column("Field", style="var_name")
