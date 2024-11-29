@@ -281,6 +281,29 @@ class Database:
         except Error as e:
             raise
 
+    def executemany(self, sql, payload, *, retry: float | None = 1) -> None:
+        """Execute arbitrary SQL
+
+        :param sql: SQL query
+        :param retry: If truthy, keep trying to executemany every `retry` seconds if the Database is locked
+        :param payload: Payload for insertion, etc. (Default value = None)
+
+        """
+        try:
+            return self.cursor.executemany(sql, payload)
+        except sqlite3.OperationalError as e:
+            if "database is locked" in str(e) and retry:
+                with mrich.clock(
+                    f"SQLite Database is locked, waiting {retry} second(s)..."
+                ):
+                    time.sleep(retry)
+                mrich.print("[debug]SQLite Database was locked, retrying...")
+                return self.executemany(sql=sql, payload=payload, retry=retry)
+            else:
+                raise
+        except Error as e:
+            raise
+
     def commit(self, *, retry: float | None = 1) -> None:
         """Commit changes to the database
 
@@ -2142,6 +2165,11 @@ class Database:
         if id is None:
             id = self.get_pose_id(inchikey=inchikey, alias=alias)
 
+        if isinstance(id, list):
+            from .pset import PoseSet
+
+            return PoseSet(self, id)
+
         if not id:
             mrich.error(f"Invalid {id=}")
             return None
@@ -2173,7 +2201,7 @@ class Database:
             )
             if len(entries) != 1:
                 mrich.warning(f"Multiple poses with {inchikey=}")
-                return entries
+                return [i for i, in entries]
             else:
                 entry = entries[0]
 
