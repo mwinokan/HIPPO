@@ -45,6 +45,13 @@ class CompoundModel(AbstractModel):
         db_persist=True,
     )
 
+    _suppliers = models.ManyToManyField(
+        "Supplier",
+        through="Quote",
+        through_fields=("compound", "supplier"),
+        related_name="_compounds",
+    )
+
     _scaffolds = models.ManyToManyField("Compound", related_name="_elaborations")
     _tags = models.ManyToManyField("Tag", related_name="_compounds")
 
@@ -93,7 +100,6 @@ class QuoteModel(AbstractModel):
     from .price.price import CURRENCIES
 
     amount = models.FloatField(validators=[MinValueValidator(0.0)])
-    supplier = models.CharField(max_length=60, blank=False)
     catalogue = models.CharField(max_length=60, blank=True)
     entry = models.CharField(max_length=60, blank=True)
     lead_time = models.FloatField(
@@ -108,9 +114,15 @@ class QuoteModel(AbstractModel):
     )
     currency = models.CharField(max_length=3, blank=True, choices=CURRENCIES)
     date = models.DateField(default=date.today)
+
     compound = models.ForeignKey(
-        "Compound", on_delete=models.CASCADE, related_name="_quotes"
+        "Compound", on_delete=models.RESTRICT, related_name="_quotes"
     )
+
+    supplier = models.ForeignKey(
+        "Supplier", on_delete=models.RESTRICT, related_name="_quotes"
+    )
+
     purity = models.FloatField(
         blank=True,
         null=True,
@@ -145,10 +157,6 @@ class ReactionModel(AbstractModel):
         through_fields=("reaction", "compound"),
         related_name="_reactions",
     )
-
-    # product = models.ForeignKey(
-    #     "Compound", on_delete=models.CASCADE, related_name="_reactions"
-    # )
 
     yield_fraction = models.FloatField(
         default=1.0, validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
@@ -216,6 +224,7 @@ class ReactantModel(AbstractModel):
     )
 
     _shorthand = None
+    _name_field = Nonet
 
 
 class FeatureModel(AbstractModel):
@@ -326,6 +335,17 @@ class ObservationModel(AbstractModel):
 
 
 class SolventModel(AbstractModel):
+    class Meta:
+        app_label = "hippo"
+        abstract = True
+
+    name = models.CharField(max_length=30, unique=True)
+
+    _shorthand = None
+    _name_field = "name"
+
+
+class SupplierModel(AbstractModel):
     class Meta:
         app_label = "hippo"
         abstract = True

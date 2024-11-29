@@ -285,6 +285,14 @@ Product._objects.first().summary()
 Reactant._objects.first().summary()
 Tag._objects.first().summary()
 Solvent._objects.first().summary()
+
+print(animal.P2.observations)
+print(animal.P2.subsites)
+
+print(Subsite._objects.first().poses)
+print(Subsite._objects.first().observations)
+
+
 ### Tags
 
 ## Fake Data
