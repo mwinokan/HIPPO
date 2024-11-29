@@ -681,6 +681,7 @@ class Pose:
                 data["mol"] = None
 
         data["compound"] = self.compound.name
+        data["compound_id"] = self.compound.id
         data["target"] = self.target.name
 
         if tags:
@@ -1275,9 +1276,34 @@ class Pose:
         )
 
     def posebusters(self, debug: bool = False) -> bool:
-        from .posebusters import check_mol
+        # if debug:
+        #     mrich.debug(self, "posebusters")
+        # from .posebusters import check_mol
+        # return check_mol(self.mol, debug=debug)
 
-        return check_mol(self.mol, debug=debug)
+        # use syndirella implementation
+        from syndirella.slipper import intra_geometry, flatness
+
+        geometries: Dict = intra_geometry.check_geometry(self.mol, threshold_clash=0.4)
+        flat_results: Dict = flatness.check_flatness(self.mol)
+
+        if not geometries["results"]["bond_lengths_within_bounds"]:
+            if debug:
+                mrich.debug(self, "did not pass bond length checks.")
+            return False
+        if not geometries["results"]["bond_angles_within_bounds"]:
+            if debug:
+                mrich.debug(self, "did not pass bond angle checks.")
+            return False
+        if not geometries["results"]["no_internal_clash"]:
+            if debug:
+                mrich.debug(self, "did not pass internal clash checks.")
+            return False
+        if not flat_results["results"]["flatness_passes"]:
+            if debug:
+                mrich.debug(self, "did not pass flatness checks.")
+            return False
+        return True
 
     ### DUNDERS
 
