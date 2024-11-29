@@ -1249,6 +1249,8 @@ class PoseSet:
         sort_reverse: bool = False,
         generate_pdbs: bool = False,
         ingredients: IngredientSet = None,
+        skip_no_reference: bool = True,
+        skip_no_inspirations: bool = True,
         tags: bool = True,
         extra_cols: dict[str, list] = None,
         name_col: str = "name",
@@ -1283,34 +1285,70 @@ class PoseSet:
 
         # make sure references are defined:
 
-        values = self.db.select_where(
-            table="pose",
-            query="DISTINCT pose_id",
-            key=f"pose_reference IS NULL and pose_id in {self.str_ids}",
-            multiple=True,
-            none="quiet",
-        )
+        # values = self.db.select_where(
+        #     table="pose",
+        #     query="DISTINCT pose_id",
+        #     key=f"pose_reference IS NULL and pose_id in {self.str_ids}",
+        #     multiple=True,
+        #     none="quiet",
+        # )
 
-        if values:
-            poses_missing_refs = set(v for v, in values)
-            added_refs = PoseSet(self.db)
+        # if values:
+        #     poses_missing_refs = set(v for v, in values)
+        #     added_refs = PoseSet(self.db)
 
-            for pose in PoseSet(self.db, poses_missing_refs):
-                if "hits" in pose.tags:
-                    pose.reference = pose.id
-                    added_refs._indices.append(pose.id)
+        #     for pose in PoseSet(self.db, poses_missing_refs):
+        #         if "hits" in pose.tags:
+        #             pose.reference = pose.id
+        #             added_refs._indices.append(pose.id)
 
-            poses_missing_refs -= set(added_refs.ids)
-        else:
-            poses_missing_refs = None
+        #     poses_missing_refs -= set(added_refs.ids)
+        # else:
+        #     poses_missing_refs = None
 
-        if poses_missing_refs:
-            mrich.warning(f"{len(poses_missing_refs)} Poses missing reference")
-            mrich.var("poses w/o reference", poses_missing_refs)
-            poses = PoseSet(self.db, set(self.ids) - poses_missing_refs)
+        # if poses_missing_refs:
+        #     mrich.warning(f"{len(poses_missing_refs)} Poses missing reference")
+        #     mrich.var("poses w/o reference", poses_missing_refs)
+        #     poses = PoseSet(self.db, set(self.ids) - poses_missing_refs)
 
-        else:
+        mrich.debug(len(self), "poses in set")
+        poses = None
+
+        if skip_no_reference:
+
+            values = self.db.select_where(
+                table="pose",
+                query="DISTINCT pose_id",
+                key=f"pose_reference IS NOT NULL and pose_id in {self.str_ids}",
+                multiple=True,
+                none="error",
+            )
+
+            poses = PoseSet(self.db, [i for i, in values])
+
+            mrich.debug(len(poses), "remaining after skipping null reference")
+
+        if skip_no_inspirations:
+
+            if not poses:
+                poses = self
+
+            values = self.db.select_where(
+                table="inspiration",
+                query="DISTINCT inspiration_derivative",
+                key=f"inspiration_derivative IN {poses.str_ids}",
+                multiple=True,
+                none="error",
+            )
+
+            poses = PoseSet(self.db, [i for i, in values])
+
+            mrich.debug(len(poses), "remaining after skipping null inspirations")
+
+        if not poses:
             poses = PoseSet(self.db, self.ids)
+
+        mrich.var("#poses", len(poses))
 
         # get the dataframe of poses
 
@@ -1341,7 +1379,8 @@ class PoseSet:
         pose_df.rename(
             inplace=True,
             columns={
-                "id": "HIPPO ID",
+                "id": "HIPPO Pose ID",
+                "compound_id": "HIPPO Compound ID",
                 "mol": mol_col,
                 "inspirations": "ref_mols",
                 "reference": "ref_pdb",
@@ -1351,9 +1390,13 @@ class PoseSet:
         )
 
         extras = {
+            "HIPPO Pose ID": "HIPPO Pose ID",
+            "HIPPO Compound ID": "HIPPO Compound ID",
             "smiles": "smiles",
+            "ref_pdb": "protein reference",
             "ref_mols": "fragment inspirations",
             "original ID": "original ID",
+            "compound inchikey": "compound inchikey",
         }
 
         if extra_cols:

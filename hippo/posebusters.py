@@ -1,7 +1,11 @@
 import mrich
+
+
+mrich.debug("importing posebusters.PoseBusters")
 from posebusters import PoseBusters
 
 # setup posebusters
+mrich.debug("Setting up PoseBusters(config='mol')")
 MOL_ENGINE = PoseBusters(config="mol")
 MOL_ENGINE._initialize_modules()
 MOL_ENGINE.module_name.pop(0)
