@@ -1706,6 +1706,7 @@ class HIPPO:
         split_PDB: bool = False,
         duplicate_alias: str = "modify",
         resolve_path: bool = True,
+        load_mol: bool = False,
     ) -> Pose:
         """Add a :class:`.Pose` to the :class:`.Database`. If it already exists return the pose
 
@@ -1727,6 +1728,7 @@ class HIPPO:
         :param split_PDB: Register a :class:`.Pose` for every ligand residue in the PDB, defaults to ``False``
         :param duplicate_alias: In the case of a duplicate, define the behaviour for the ``alias`` property, defaults to ``'modify'`` which appends ``_copy`` to the alias. Set to ``error`` to raise an Exception.
         :param resolve_path: Resolve to an absoltue path, default = True.
+        :param load_mol: Parse the input file and load the ligand rdkit.Chem.Mol
         :returns: The registered/existing :class:`.Pose` object or its ID (depending on ``return_pose``)
         """
 
@@ -1779,6 +1781,7 @@ class HIPPO:
                         check_RMSD=check_RMSD,
                         RMSD_tolerance=RMSD_tolerance,
                         split_PDB=False,
+                        load_mol=load_mol,
                     )
 
                     results.append(result)
@@ -1907,11 +1910,14 @@ class HIPPO:
 
             raise Exception
 
-        if return_pose or (metadata and not overwrite_metadata):
+        if return_pose or (metadata and not overwrite_metadata) or load_mol:
             pose = self.poses[pose_id]
 
             if metadata:
                 pose.metadata.update(metadata)
+
+            if load_mol:
+                pose.mol
 
         else:
             pose = pose_id
