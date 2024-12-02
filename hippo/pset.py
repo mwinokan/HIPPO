@@ -756,6 +756,7 @@ class PoseSet:
             table="inspiration",
             query="DISTINCT inspiration_original",
             key=f"inspiration_derivative IN {self.str_ids}",
+            multiple=True,
         )
 
         if not records:
