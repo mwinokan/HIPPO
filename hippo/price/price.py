@@ -1,0 +1,5 @@
+CURRENCIES = {
+    "EUR": "€",
+    "USD": "$",
+    "GBP": "£",
+}
