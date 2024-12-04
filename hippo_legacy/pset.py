@@ -744,6 +744,20 @@ class PoseSet:
         return count
 
     @property
+    def inspirations(self) -> int:
+        """Return the number of unique inspirations for poses in this set"""
+        records = self.db.select_where(
+            table="inspiration",
+            query="DISTINCT inspiration_original",
+            key=f"inspiration_derivative IN {self.str_ids}",
+        )
+
+        if not records:
+            return None
+
+        return PoseSet(self.db, [i for i, in records])
+
+    @property
     def str_ids(self) -> str:
         """Return an SQL formatted tuple string of the :class:`.Compound` IDs"""
         return str(tuple(self.ids)).replace(",)", ")")

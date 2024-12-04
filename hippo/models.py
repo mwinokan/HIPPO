@@ -52,8 +52,10 @@ class CompoundModel(AbstractModel):
         related_name="_compounds",
     )
 
-    _scaffolds = models.ManyToManyField("Compound", related_name="_elaborations")
-    _tags = models.ManyToManyField("Tag", related_name="_compounds")
+    _scaffolds = models.ManyToManyField(
+        "Compound", related_name="_elaborations", blank=True
+    )
+    _tags = models.ManyToManyField("Tag", related_name="_compounds", blank=True)
 
     _shorthand = "C"
     _name_field = "alias"
