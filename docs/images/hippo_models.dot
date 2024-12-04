@@ -4,7 +4,7 @@
 [2mDEBUG: pydot core module initializing[0m
 digraph model_graph {
   // Dotfile by Django-Extensions graph_models
-  // Created: 2024-12-04 15:02
+  // Created: 2024-12-04 15:05
   // Cli Options: hippo --no-inheritance --exclude-models AbstractModel,TargetModel,CompoundModel,SupplierModel,PoseModel,QuoteModel,TagModel,ReactionModel,ProductModel,ReactantModel,FeatureModel,InteractionModel,SubsiteModel,ObservationModel,SolventModel,SupplierModel
 
   fontname = "Roboto"
