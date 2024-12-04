@@ -9,6 +9,8 @@ tests/targets
 # C extensions
 *.so
 
+hippo/migrations
+
 # Distribution / packaging
 .Python
 build/
