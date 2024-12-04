@@ -9,7 +9,7 @@ tests/targets
 # C extensions
 *.so
 
-hippo/migrations
+# hippo/migrations
 
 # Distribution / packaging
 .Python
