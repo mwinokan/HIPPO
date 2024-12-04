@@ -4,8 +4,8 @@
 [2mDEBUG: pydot core module initializing[0m
 digraph model_graph {
   // Dotfile by Django-Extensions graph_models
-  // Created: 2024-12-04 11:10
-  // Cli Options: hippo --no-inheritance --exclude-models TargetModel,CompoundModel,SupplierModel,PoseModel,QuoteModel,TagModel,ReactionModel,ProductModel,ReactantModel,FeatureModel,InteractionModel,SubsiteModel,ObservationModel,SolventModel,SupplierModel
+  // Created: 2024-12-04 15:02
+  // Cli Options: hippo --no-inheritance --exclude-models AbstractModel,TargetModel,CompoundModel,SupplierModel,PoseModel,QuoteModel,TagModel,ReactionModel,ProductModel,ReactantModel,FeatureModel,InteractionModel,SubsiteModel,ObservationModel,SolventModel,SupplierModel
 
   fontname = "Roboto"
   fontsize = 8
@@ -25,6 +25,596 @@ digraph model_graph {
 
   // Labels
 
+
+  hippo_models_Campaign [label=<
+    <TABLE BGCOLOR="white" BORDER="1" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD COLSPAN="2" CELLPADDING="5" ALIGN="CENTER" BGCOLOR="#1b563f">
+    <FONT FACE="Roboto" COLOR="white" POINT-SIZE="10"><B>
+    Campaign<BR/>&lt;<FONT FACE="Roboto"><I>AbstractModel</I></FONT>&gt;
+    </B></FONT></TD></TR>
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I><B>_id</B></I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I><B>BigAutoField</B></I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto">name</FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto">CharField</FONT>
+    </TD></TR>
+  
+  
+    </TABLE>
+    >]
+
+  hippo_models_Iteration [label=<
+    <TABLE BGCOLOR="white" BORDER="1" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD COLSPAN="2" CELLPADDING="5" ALIGN="CENTER" BGCOLOR="#1b563f">
+    <FONT FACE="Roboto" COLOR="white" POINT-SIZE="10"><B>
+    Iteration<BR/>&lt;<FONT FACE="Roboto"><I>AbstractModel</I></FONT>&gt;
+    </B></FONT></TD></TR>
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I><B>_id</B></I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I><B>BigAutoField</B></I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><B>campaign</B></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><B>ForeignKey (_id)</B></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto">number</FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto">PositiveSmallIntegerField</FONT>
+    </TD></TR>
+  
+  
+    </TABLE>
+    >]
+
+  hippo_models_Structure [label=<
+    <TABLE BGCOLOR="white" BORDER="1" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD COLSPAN="2" CELLPADDING="5" ALIGN="CENTER" BGCOLOR="#1b563f">
+    <FONT FACE="Roboto" COLOR="white" POINT-SIZE="10"><B>
+    Structure<BR/>&lt;<FONT FACE="Roboto"><I>AbstractModel</I></FONT>&gt;
+    </B></FONT></TD></TR>
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I><B>_id</B></I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I><B>BigAutoField</B></I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><B>target</B></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><B>ForeignKey (_id)</B></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT COLOR="#7B7B7B" FACE="Roboto">alias</FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT COLOR="#7B7B7B" FACE="Roboto">CharField</FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto">is_experimental</FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto">BooleanField</FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto">path</FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto">FilePathField</FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT COLOR="#7B7B7B" FACE="Roboto">pdbblock</FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT COLOR="#7B7B7B" FACE="Roboto">TextField</FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT COLOR="#7B7B7B" FACE="Roboto">resolution</FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT COLOR="#7B7B7B" FACE="Roboto">FloatField</FONT>
+    </TD></TR>
+  
+  
+    </TABLE>
+    >]
+
+  hippo_models_PlacementAttempt [label=<
+    <TABLE BGCOLOR="white" BORDER="1" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD COLSPAN="2" CELLPADDING="5" ALIGN="CENTER" BGCOLOR="#1b563f">
+    <FONT FACE="Roboto" COLOR="white" POINT-SIZE="10"><B>
+    PlacementAttempt<BR/>&lt;<FONT FACE="Roboto"><I>AbstractModel</I></FONT>&gt;
+    </B></FONT></TD></TR>
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I><B>_id</B></I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I><B>BigAutoField</B></I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><B>compound</B></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><B>ForeignKey (_id)</B></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><B>pose</B></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><B>ForeignKey (_id)</B></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><B>structure</B></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><B>ForeignKey (_id)</B></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto">metadata</FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto">JSONField</FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto">method</FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto">TextField</FONT>
+    </TD></TR>
+  
+  
+    </TABLE>
+    >]
+
+  hippo_models_TagType [label=<
+    <TABLE BGCOLOR="white" BORDER="1" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD COLSPAN="2" CELLPADDING="5" ALIGN="CENTER" BGCOLOR="#1b563f">
+    <FONT FACE="Roboto" COLOR="white" POINT-SIZE="10"><B>
+    TagType<BR/>&lt;<FONT FACE="Roboto"><I>AbstractModel</I></FONT>&gt;
+    </B></FONT></TD></TR>
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I><B>_id</B></I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I><B>BigAutoField</B></I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto">name</FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto">CharField</FONT>
+    </TD></TR>
+  
+  
+    </TABLE>
+    >]
+
+  hippo_models_Route [label=<
+    <TABLE BGCOLOR="white" BORDER="1" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD COLSPAN="2" CELLPADDING="5" ALIGN="CENTER" BGCOLOR="#1b563f">
+    <FONT FACE="Roboto" COLOR="white" POINT-SIZE="10"><B>
+    Route<BR/>&lt;<FONT FACE="Roboto"><I>AbstractModel</I></FONT>&gt;
+    </B></FONT></TD></TR>
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I><B>_id</B></I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I><B>BigAutoField</B></I></FONT>
+    </TD></TR>
+  
+  
+    </TABLE>
+    >]
+
+  hippo_models_RouteStep [label=<
+    <TABLE BGCOLOR="white" BORDER="1" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD COLSPAN="2" CELLPADDING="5" ALIGN="CENTER" BGCOLOR="#1b563f">
+    <FONT FACE="Roboto" COLOR="white" POINT-SIZE="10"><B>
+    RouteStep<BR/>&lt;<FONT FACE="Roboto"><I>AbstractModel</I></FONT>&gt;
+    </B></FONT></TD></TR>
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I><B>_id</B></I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I><B>BigAutoField</B></I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><B>reaction</B></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><B>ForeignKey (_id)</B></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><B>route</B></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><B>ForeignKey (_id)</B></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto">is_leaf</FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto">BooleanField</FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto">is_root</FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto">BooleanField</FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto">multiplier</FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto">FloatField</FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto">number</FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto">PositiveSmallIntegerField</FONT>
+    </TD></TR>
+  
+  
+    </TABLE>
+    >]
+
+  hippo_models_RandomRecipeGenerator [label=<
+    <TABLE BGCOLOR="white" BORDER="1" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD COLSPAN="2" CELLPADDING="5" ALIGN="CENTER" BGCOLOR="#1b563f">
+    <FONT FACE="Roboto" COLOR="white" POINT-SIZE="10"><B>
+    RandomRecipeGenerator<BR/>&lt;<FONT FACE="Roboto"><I>AbstractModel</I></FONT>&gt;
+    </B></FONT></TD></TR>
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I><B>_id</B></I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I><B>BigAutoField</B></I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><B>origin</B></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><B>ForeignKey (_id)</B></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT COLOR="#7B7B7B" FACE="Roboto">budget</FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT COLOR="#7B7B7B" FACE="Roboto">DecimalField</FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT COLOR="#7B7B7B" FACE="Roboto">currency</FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT COLOR="#7B7B7B" FACE="Roboto">CharField</FONT>
+    </TD></TR>
+  
+  
+    </TABLE>
+    >]
+
+  hippo_models_Recipe [label=<
+    <TABLE BGCOLOR="white" BORDER="1" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD COLSPAN="2" CELLPADDING="5" ALIGN="CENTER" BGCOLOR="#1b563f">
+    <FONT FACE="Roboto" COLOR="white" POINT-SIZE="10"><B>
+    Recipe<BR/>&lt;<FONT FACE="Roboto"><I>AbstractModel</I></FONT>&gt;
+    </B></FONT></TD></TR>
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I><B>_id</B></I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I><B>BigAutoField</B></I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><B>generator</B></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><B>ForeignKey (_id)</B></FONT>
+    </TD></TR>
+  
+  
+    </TABLE>
+    >]
+
+  hippo_models_RecipeComponent [label=<
+    <TABLE BGCOLOR="white" BORDER="1" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD COLSPAN="2" CELLPADDING="5" ALIGN="CENTER" BGCOLOR="#1b563f">
+    <FONT FACE="Roboto" COLOR="white" POINT-SIZE="10"><B>
+    RecipeComponent<BR/>&lt;<FONT FACE="Roboto"><I>AbstractModel</I></FONT>&gt;
+    </B></FONT></TD></TR>
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I><B>_id</B></I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I><B>BigAutoField</B></I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><B>recipe</B></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><B>ForeignKey (_id)</B></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><B>route</B></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><B>ForeignKey (_id)</B></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto">multiplier</FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto">FloatField</FONT>
+    </TD></TR>
+  
+  
+    </TABLE>
+    >]
+
+  hippo_models_RecipeScore [label=<
+    <TABLE BGCOLOR="white" BORDER="1" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD COLSPAN="2" CELLPADDING="5" ALIGN="CENTER" BGCOLOR="#1b563f">
+    <FONT FACE="Roboto" COLOR="white" POINT-SIZE="10"><B>
+    RecipeScore<BR/>&lt;<FONT FACE="Roboto"><I>AbstractModel</I></FONT>&gt;
+    </B></FONT></TD></TR>
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I><B>_id</B></I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I><B>BigAutoField</B></I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><B>recipe</B></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><B>ForeignKey (_id)</B></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><B>scorer</B></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><B>ForeignKey (_id)</B></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto">score</FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto">FloatField</FONT>
+    </TD></TR>
+  
+  
+    </TABLE>
+    >]
+
+  hippo_models_RecipeScorer [label=<
+    <TABLE BGCOLOR="white" BORDER="1" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD COLSPAN="2" CELLPADDING="5" ALIGN="CENTER" BGCOLOR="#1b563f">
+    <FONT FACE="Roboto" COLOR="white" POINT-SIZE="10"><B>
+    RecipeScorer<BR/>&lt;<FONT FACE="Roboto"><I>AbstractModel</I></FONT>&gt;
+    </B></FONT></TD></TR>
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I><B>_id</B></I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I><B>BigAutoField</B></I></FONT>
+    </TD></TR>
+  
+  
+    </TABLE>
+    >]
+
+  hippo_models_ScoringAttribute [label=<
+    <TABLE BGCOLOR="white" BORDER="1" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD COLSPAN="2" CELLPADDING="5" ALIGN="CENTER" BGCOLOR="#1b563f">
+    <FONT FACE="Roboto" COLOR="white" POINT-SIZE="10"><B>
+    ScoringAttribute<BR/>&lt;<FONT FACE="Roboto"><I>AbstractModel</I></FONT>&gt;
+    </B></FONT></TD></TR>
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I><B>_id</B></I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I><B>BigAutoField</B></I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto">attribute</FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto">CharField</FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto">name</FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto">CharField</FONT>
+    </TD></TR>
+  
+  
+    </TABLE>
+    >]
+
+  hippo_models_AttributeValue [label=<
+    <TABLE BGCOLOR="white" BORDER="1" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD COLSPAN="2" CELLPADDING="5" ALIGN="CENTER" BGCOLOR="#1b563f">
+    <FONT FACE="Roboto" COLOR="white" POINT-SIZE="10"><B>
+    AttributeValue<BR/>&lt;<FONT FACE="Roboto"><I>AbstractModel</I></FONT>&gt;
+    </B></FONT></TD></TR>
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I><B>_id</B></I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I><B>BigAutoField</B></I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><B>attribute</B></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><B>ForeignKey (_id)</B></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><B>recipe</B></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><B>ForeignKey (_id)</B></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto">value</FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto">FloatField</FONT>
+    </TD></TR>
+  
+  
+    </TABLE>
+    >]
+
+  hippo_models_ScoringAttributeWeight [label=<
+    <TABLE BGCOLOR="white" BORDER="1" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD COLSPAN="2" CELLPADDING="5" ALIGN="CENTER" BGCOLOR="#1b563f">
+    <FONT FACE="Roboto" COLOR="white" POINT-SIZE="10"><B>
+    ScoringAttributeWeight<BR/>&lt;<FONT FACE="Roboto"><I>AbstractModel</I></FONT>&gt;
+    </B></FONT></TD></TR>
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I><B>_id</B></I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I><B>BigAutoField</B></I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><B>attribute</B></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><B>ForeignKey (_id)</B></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><B>scorer</B></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><B>ForeignKey (_id)</B></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto">is_inversed</FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto">BooleanField</FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto">weight</FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto">FloatField</FONT>
+    </TD></TR>
+  
+  
+    </TABLE>
+    >]
 
   hippo_target_target_Target [label=<
     <TABLE BGCOLOR="white" BORDER="1" CELLBORDER="0" CELLSPACING="0">
@@ -143,30 +733,6 @@ digraph model_graph {
   
   
     <TR><TD ALIGN="LEFT" BORDER="0">
-    <FONT FACE="Roboto"><I><B>compound</B></I></FONT>
-    </TD><TD ALIGN="LEFT">
-    <FONT FACE="Roboto"><I><B>ForeignKey (_id)</B></I></FONT>
-    </TD></TR>
-  
-  
-  
-    <TR><TD ALIGN="LEFT" BORDER="0">
-    <FONT COLOR="#7B7B7B" FACE="Roboto"><I><B>reference</B></I></FONT>
-    </TD><TD ALIGN="LEFT">
-    <FONT COLOR="#7B7B7B" FACE="Roboto"><I><B>ForeignKey (_id)</B></I></FONT>
-    </TD></TR>
-  
-  
-  
-    <TR><TD ALIGN="LEFT" BORDER="0">
-    <FONT FACE="Roboto"><I><B>target</B></I></FONT>
-    </TD><TD ALIGN="LEFT">
-    <FONT FACE="Roboto"><I><B>ForeignKey (_id)</B></I></FONT>
-    </TD></TR>
-  
-  
-  
-    <TR><TD ALIGN="LEFT" BORDER="0">
     <FONT COLOR="#7B7B7B" FACE="Roboto"><I>alias</I></FONT>
     </TD><TD ALIGN="LEFT">
     <FONT COLOR="#7B7B7B" FACE="Roboto"><I>CharField</I></FONT>
@@ -191,7 +757,15 @@ digraph model_graph {
   
   
     <TR><TD ALIGN="LEFT" BORDER="0">
-    <FONT FACE="Roboto"><I>fingerprinted</I></FONT>
+    <FONT COLOR="#7B7B7B" FACE="Roboto"><I>inchikey</I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT COLOR="#7B7B7B" FACE="Roboto"><I>CharField</I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I>is_experimental</I></FONT>
     </TD><TD ALIGN="LEFT">
     <FONT FACE="Roboto"><I>BooleanField</I></FONT>
     </TD></TR>
@@ -199,9 +773,9 @@ digraph model_graph {
   
   
     <TR><TD ALIGN="LEFT" BORDER="0">
-    <FONT COLOR="#7B7B7B" FACE="Roboto"><I>inchikey</I></FONT>
+    <FONT FACE="Roboto"><I>is_fingerprinted</I></FONT>
     </TD><TD ALIGN="LEFT">
-    <FONT COLOR="#7B7B7B" FACE="Roboto"><I>CharField</I></FONT>
+    <FONT FACE="Roboto"><I>BooleanField</I></FONT>
     </TD></TR>
   
   
@@ -355,6 +929,14 @@ digraph model_graph {
   
   
     <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I><B>type</B></I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I><B>ForeignKey (_id)</B></I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
     <FONT FACE="Roboto"><I>name</I></FONT>
     </TD><TD ALIGN="LEFT">
     <FONT FACE="Roboto"><I>CharField</I></FONT>
@@ -432,6 +1014,14 @@ digraph model_graph {
   
     <TR><TD ALIGN="LEFT" BORDER="0">
     <FONT FACE="Roboto"><I><B>pose</B></I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I><B>ForeignKey (_id)</B></I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I><B>structure</B></I></FONT>
     </TD><TD ALIGN="LEFT">
     <FONT FACE="Roboto"><I><B>ForeignKey (_id)</B></I></FONT>
     </TD></TR>
@@ -811,20 +1401,68 @@ digraph model_graph {
 
   // Relations
 
+  hippo_models_Campaign -> hippo_target_target_Target
+  [label=" _targets (_campaigns)"] [arrowhead=dot arrowtail=dot, dir=both];
+
+  hippo_models_Iteration -> hippo_models_Campaign
+  [label=" campaign (_iterations)"] [arrowhead=none, arrowtail=dot, dir=both];
+
+  hippo_models_Structure -> hippo_target_target_Target
+  [label=" target (_structures)"] [arrowhead=none, arrowtail=dot, dir=both];
+
+  hippo_models_PlacementAttempt -> hippo_models_Structure
+  [label=" structure (_placement_attempts)"] [arrowhead=none, arrowtail=dot, dir=both];
+
+  hippo_models_PlacementAttempt -> hippo_pose_pose_Pose
+  [label=" pose (_placement_attempts)"] [arrowhead=none, arrowtail=dot, dir=both];
+
+  hippo_models_PlacementAttempt -> hippo_compound_compound_Compound
+  [label=" compound (_placement_attempts)"] [arrowhead=none, arrowtail=dot, dir=both];
+
+  hippo_models_RouteStep -> hippo_models_Route
+  [label=" route (_steps)"] [arrowhead=none, arrowtail=dot, dir=both];
+
+  hippo_models_RouteStep -> hippo_reaction_reaction_Reaction
+  [label=" reaction (_steps)"] [arrowhead=none, arrowtail=dot, dir=both];
+
+  hippo_models_RandomRecipeGenerator -> hippo_models_Recipe
+  [label=" origin (_generators)"] [arrowhead=none, arrowtail=dot, dir=both];
+
+  hippo_models_RandomRecipeGenerator -> hippo_supplier_supplier_Supplier
+  [label=" _suppliers (_hippo_randomrecipegenerator__suppliers_+)"] [arrowhead=dot arrowtail=dot, dir=both];
+
+  hippo_models_Recipe -> hippo_models_RandomRecipeGenerator
+  [label=" generator (_recipes)"] [arrowhead=none, arrowtail=dot, dir=both];
+
+  hippo_models_RecipeComponent -> hippo_models_Recipe
+  [label=" recipe (_recipe_components)"] [arrowhead=none, arrowtail=dot, dir=both];
+
+  hippo_models_RecipeComponent -> hippo_models_Route
+  [label=" route (_recipe_components)"] [arrowhead=none, arrowtail=dot, dir=both];
+
+  hippo_models_RecipeScore -> hippo_models_Recipe
+  [label=" recipe (_scores)"] [arrowhead=none, arrowtail=dot, dir=both];
+
+  hippo_models_RecipeScore -> hippo_models_RecipeScorer
+  [label=" scorer (_scores)"] [arrowhead=none, arrowtail=dot, dir=both];
+
+  hippo_models_AttributeValue -> hippo_models_ScoringAttribute
+  [label=" attribute (_values)"] [arrowhead=none, arrowtail=dot, dir=both];
+
+  hippo_models_AttributeValue -> hippo_models_Recipe
+  [label=" recipe (+)"] [arrowhead=none, arrowtail=dot, dir=both];
+
+  hippo_models_ScoringAttributeWeight -> hippo_models_ScoringAttribute
+  [label=" attribute (+)"] [arrowhead=none, arrowtail=dot, dir=both];
+
+  hippo_models_ScoringAttributeWeight -> hippo_models_RecipeScorer
+  [label=" scorer (_attribute_weights)"] [arrowhead=none, arrowtail=dot, dir=both];
+
   hippo_compound_compound_Compound -> hippo_compound_compound_Compound
   [label=" _scaffolds (_elaborations)"] [arrowhead=dot arrowtail=dot, dir=both];
 
   hippo_compound_compound_Compound -> hippo_tag_tag_Tag
   [label=" _tags (_compounds)"] [arrowhead=dot arrowtail=dot, dir=both];
-
-  hippo_pose_pose_Pose -> hippo_pose_pose_Pose
-  [label=" reference (+)"] [arrowhead=none, arrowtail=dot, dir=both];
-
-  hippo_pose_pose_Pose -> hippo_compound_compound_Compound
-  [label=" compound (_poses)"] [arrowhead=none, arrowtail=dot, dir=both];
-
-  hippo_pose_pose_Pose -> hippo_target_target_Target
-  [label=" target (_poses)"] [arrowhead=none, arrowtail=dot, dir=both];
 
   hippo_pose_pose_Pose -> hippo_pose_pose_Pose
   [label=" _inspirations (_derivatives)"] [arrowhead=dot arrowtail=dot, dir=both];
@@ -838,11 +1476,17 @@ digraph model_graph {
   hippo_quote_quote_Quote -> hippo_supplier_supplier_Supplier
   [label=" supplier (_quotes)"] [arrowhead=none, arrowtail=dot, dir=both];
 
+  hippo_tag_tag_Tag -> hippo_models_TagType
+  [label=" type (_tags)"] [arrowhead=none, arrowtail=dot, dir=both];
+
   hippo_subsite_subsite_Subsite -> hippo_target_target_Target
   [label=" target (_subsites)"] [arrowhead=none, arrowtail=dot, dir=both];
 
   hippo_interaction_interaction_Interaction -> hippo_pose_pose_Pose
   [label=" pose (_interactions)"] [arrowhead=none, arrowtail=dot, dir=both];
+
+  hippo_interaction_interaction_Interaction -> hippo_models_Structure
+  [label=" structure (_interactions)"] [arrowhead=none, arrowtail=dot, dir=both];
 
   hippo_interaction_interaction_Interaction -> hippo_feature_feature_Feature
   [label=" feature (_interactions)"] [arrowhead=none, arrowtail=dot, dir=both];
@@ -857,19 +1501,19 @@ digraph model_graph {
   [label=" pose (_observations)"] [arrowhead=none, arrowtail=dot, dir=both];
 
   hippo_reactant_reactant_Reactant -> hippo_reaction_reaction_Reaction
-  [label=" reaction (+)"] [arrowhead=none, arrowtail=dot, dir=both];
+  [label=" reaction (_reactants)"] [arrowhead=none, arrowtail=dot, dir=both];
 
   hippo_reactant_reactant_Reactant -> hippo_compound_compound_Compound
-  [label=" compound (+)"] [arrowhead=none, arrowtail=dot, dir=both];
+  [label=" compound (_reaction_reactants)"] [arrowhead=none, arrowtail=dot, dir=both];
 
   hippo_reactant_reactant_Reactant -> hippo_solvent_solvent_Solvent
   [label=" solvent (_reactants)"] [arrowhead=none, arrowtail=dot, dir=both];
 
   hippo_product_product_Product -> hippo_reaction_reaction_Reaction
-  [label=" reaction (+)"] [arrowhead=none, arrowtail=dot, dir=both];
+  [label=" reaction (_products)"] [arrowhead=none, arrowtail=dot, dir=both];
 
   hippo_product_product_Product -> hippo_compound_compound_Compound
-  [label=" compound (+)"] [arrowhead=none, arrowtail=dot, dir=both];
+  [label=" compound (_reaction_products)"] [arrowhead=none, arrowtail=dot, dir=both];
 
   hippo_product_product_Product -> hippo_solvent_solvent_Solvent
   [label=" solvent (_products)"] [arrowhead=none, arrowtail=dot, dir=both];

@@ -17,6 +17,8 @@ from .reactant import Reactant
 from .product import Product
 from .supplier import Supplier
 
+from .models import Campaign, Iteration, Structure, PlacementAttempt, TagType
+
 admin.site.register(Target)
 admin.site.register(Compound)
 admin.site.register(Pose)
@@ -31,3 +33,8 @@ admin.site.register(Reaction)
 admin.site.register(Reactant)
 admin.site.register(Product)
 admin.site.register(Supplier)
+admin.site.register(Campaign)
+admin.site.register(Iteration)
+admin.site.register(Structure)
+admin.site.register(PlacementAttempt)
+admin.site.register(TagType)
