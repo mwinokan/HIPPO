@@ -985,12 +985,17 @@ class PoseSet:
         data = []
 
         if len(self) > 100:
-            gen = mrich.track(self, prefix="PoseSet --> DataFrame")
+            gen = mrich.track(enumerate(self), prefix="PoseSet --> DataFrame")
+            track = True
         else:
-            gen = self
+            gen = enumerate(self)
+            track = False
 
-        for pose in gen:
+        for i, pose in gen:
+
             d = pose.get_dict(reference=reference, **kwargs)
+
+            mrich.set_progress_field("progress", f"{i+1}/{len(self)}")
 
             if skip_no_mol and not d["mol"]:
                 mrich.warning(f'Skipping pose with no mol: {d["id"]} {d["name"]}')
