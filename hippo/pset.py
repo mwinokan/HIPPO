@@ -923,26 +923,41 @@ class PoseSet:
             ids = [v for v, in values if v and v in self.ids]
         return PoseSet(self.db, ids)
 
-    def get_by_metadata(self, key: str, value: str | None = None) -> "PoseSet":
+    def get_by_metadata(self, key: str, value: str | None = None, debug: bool = False) -> "PoseSet":
         """Get all child poses with by their metadata. If no value is passed, then simply containing the key in the metadata dictionary is sufficient
 
         :param key: metadata key to search for
         :param value: metadata value, if ``None`` return poses with the metadata key regardless of value (Default value = None)
 
         """
-        results = self.db.select(
-            query="pose_id, pose_metadata", table="pose", multiple=True
+        results = self.db.select_where(
+            query="pose_id, pose_metadata", key=f"pose_id IN {self.str_ids}", table="pose", multiple=True
         )
+
         if value is None:
-            ids = [i for i, d in results if d and f'"{key}":' in d and i in self.ids]
+            ids = [i for i, d in results if d and f'"{key}":' in d]
+        
         else:
             if isinstance(value, str):
                 value = f'"{value}"'
-            ids = [
-                i
-                for i, d in results
-                if d and f'"{key}": {value}' in d and i in self.ids
-            ]
+
+            ids = []
+
+            for i, d in results:
+                if not d:
+                    continue
+                
+                if debug:
+                    mrich.print(i, d, f'"{key}": {value}' in d)
+
+                if f'"{key}": {value}' in d:
+                    ids.append(i)
+                else:
+                    continue
+
+                if debug:
+                    break
+
         return PoseSet(self.db, ids)
 
     def get_by_inspiration(self, inspiration: int | Pose, inverse: bool = False):
@@ -972,7 +987,7 @@ class PoseSet:
         return PoseSet(self.db, ids)
 
     def get_df(
-        self, skip_no_mol=True, reference: str = "name", **kwargs
+        self, skip_no_mol=True, reference: str = "name", mol: bool = False, **kwargs
     ) -> "pandas.DataFrame":
         """Get a DataFrame of the poses in this set. Keyword arguments passed to :meth:`.Pose.get_dict`.
 
@@ -990,9 +1005,9 @@ class PoseSet:
             gen = self
 
         for pose in gen:
-            d = pose.get_dict(reference=reference, **kwargs)
+            d = pose.get_dict(reference=reference, mol=mol, **kwargs)
 
-            if skip_no_mol and not d["mol"]:
+            if mol and skip_no_mol and not d["mol"]:
                 mrich.warning(f'Skipping pose with no mol: {d["id"]} {d["name"]}')
                 continue
             data.append(d)
@@ -1224,6 +1239,7 @@ class PoseSet:
         out_path: str,
         name_col: str = "name",
         inspirations: bool | str = "fragalysis",
+        **kwargs,
     ) -> None:
         """Write an SDF
 
@@ -1235,7 +1251,7 @@ class PoseSet:
 
         from pathlib import Path
 
-        df = self.get_df(mol=True, inspirations=inspirations)
+        df = self.get_df(mol=True, inspirations=inspirations, **kwargs)
 
         df.rename(inplace=True, columns={name_col: "_Name", "mol": "ROMol"})
 
@@ -1660,6 +1676,43 @@ class PoseSet:
 
                 f.write(",".join(data))
                 f.write("\n")
+
+    def to_syndirella(self, out_key: "str | Path") -> "DataFrame":
+
+        from pandas import DataFrame
+        from pathlib import Path
+        
+        out_dir = Path(out_key).parent
+        out_key = Path(out_key).name
+
+        data = []
+        for pose in self:
+
+            comp = pose.compound
+            
+            d = dict(
+                smiles=comp.smiles,
+                template=pose.reference.path,
+                compound_set=out_key,
+            )
+
+            for i,p in enumerate(pose.inspirations):
+                d[f"hit{i+1}"] = p.name
+            
+            data.append(d)
+
+        df = DataFrame(data)
+
+        csv_name = out_dir / f"{out_key}_syndirella_input.csv"
+        mrich.writing(csv_name)
+        df.to_csv(csv_name, index=False)
+
+        inspirations = self.inspirations
+
+        sdf_name = out_dir / f"{out_key}_syndirella_inspiration_hits.sdf"
+        inspirations.write_sdf(sdf_name, inspirations=False, tags=False, metadata=False, reference=False)
+
+        return df
 
     ### OUTPUT
 
