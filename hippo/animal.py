@@ -1619,7 +1619,7 @@ class HIPPO:
                 mrich.error(f"Could not sanitise {s=}")
                 continue
 
-            inchikey = inchikey_from_smiles(s)
+            inchikey = inchikey_from_smiles(new_smiles)
             values.append((inchikey, new_smiles))
 
         sql = """
@@ -2227,6 +2227,85 @@ class HIPPO:
         from .plotting import plot_pose_interactions
 
         return plot_pose_interactions(self, **kwargs)
+
+    ### COMPOUND DESIGN
+
+    # def fragmenstein_merge(self,
+    #     reference: Pose,
+    #     hits: PoseSet,
+    #     combination_size: int = 2,
+    #     timeout=300,
+    #     n_cores: int = 1,
+    #     scratch_dir: str = "fragmenstein_scratch",
+    #     require_outome: str = "acceptable",
+    #     return_df: bool = False,
+    #     bulkdock_csv: str = "",
+    # ) -> PoseSet:
+
+    #     mrich.var("reference", reference)
+    #     mrich.var("combination_size", combination_size)
+    #     mrich.var("require_outome", require_outome)
+    #     mrich.var("n_cores", n_cores)
+    #     mrich.var("timeout", timeout)
+    #     mrich.var("scratch_dir", scratch_dir)
+    #     mrich.var("protein_path", reference.apo_path)
+    #     mrich.var("bulkdock_csv", bulkdock_csv)
+
+    #     from .fstein import setup_wictor_laboratory, pure_merge
+        
+    #     lab = setup_wictor_laboratory(
+    #         scratch_dir=scratch_dir,
+    #         protein_path=reference.apo_path,
+    #     )
+
+    #     df = pure_merge(
+    #         lab, 
+    #         hits.mols, 
+    #         n_cores=n_cores, 
+    #         timeout=timeout, 
+    #         combination_size=combination_size,
+    #     )
+
+    #     if not len(filtered):
+    #         mrich.error(f"No merges")
+    #         return None
+
+    #     if require_outome:
+    #         filtered = df[df["outcome"] == require_outome]
+
+    #         if not len(filtered):
+    #             mrich.error(f"No merges with 'outcome' == {require_outome}")
+    #             if return_df:
+    #                 return None, df
+    #             return None
+
+    #         df = filtered
+
+    #     # register the poses
+    #     n = len(self.compounds)
+    #     compound_ids = []
+    #     # inspirations = []
+    #     for i,row in df.iterrows():
+    #         smiles = row.smiles
+    #         compound = self.register_compound(smiles=smiles, tags=["Fragmenstein pure merge"])
+    #         compound_ids.append(compound.id)
+    #         # hit_mols = row.hit_names
+    #         # print(row)
+    #         # raise NotImplementedError
+
+    #     compounds = self.compounds[compound_ids]
+
+    #     d = len(self.compounds) - n
+
+    #     if d:
+    #         mrich.success(f"Found and registered {d} new merges")
+    #     else:
+    #         mrich.success(f"Found and registered {d} new merges")
+
+    #     if return_df:
+    #         return compounds, df
+
+    #     return compounds
 
     ### OTHER
 
