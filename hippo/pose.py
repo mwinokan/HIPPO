@@ -567,7 +567,8 @@ class Pose:
         self,
         debug: bool = False,
         draw: bool = False,
-    ) -> float:
+        return_all: bool = False,
+    ) -> float | dict:
         """Score how well this Pose recapitulates the pharmacophoric features of its inspirations.
 
         :param debug: Increased verbosity for debugging (Default value = False)
@@ -578,7 +579,11 @@ class Pose:
         from molparse.rdkit import SuCOS_score
 
         multi_sucos = SuCOS_score(
-            self.inspirations.mols, self.mol, print_scores=debug, draw=draw
+            self.inspirations.mols,
+            self.mol,
+            print_scores=debug,
+            draw=draw,
+            return_all=return_all,
         )
 
         if debug:
