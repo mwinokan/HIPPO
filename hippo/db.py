@@ -255,7 +255,7 @@ class Database:
         self._connection = conn
         self._cursor = conn.cursor()
 
-    def execute(self, sql, payload=None, *, retry: float | None = 1) -> None:
+    def execute(self, sql, payload=None, *, retry: float | None = 1, debug: bool = False) -> None:
         """Execute arbitrary SQL
 
         :param sql: SQL query
@@ -263,6 +263,12 @@ class Database:
         :param payload: Payload for insertion, etc. (Default value = None)
 
         """
+
+        if debug:
+            mrich.debug(sql)
+            # if "INSERT" in sql:
+            #     raise Exception
+
         try:
             if payload:
                 return self.cursor.execute(sql, payload)

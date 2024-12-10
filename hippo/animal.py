@@ -1188,6 +1188,117 @@ class HIPPO:
 
         return df
 
+    def add_syndirella_routes(
+        self,
+        pickle_path: str | Path,
+        CAR_only: bool = True,
+        pick_first: bool = True,
+        check_chemistry: bool = True,
+        register_routes: bool = True,
+    ) -> pd.DataFrame:
+        """Add routes found from syndirella --just_retro query"""
+
+        from .recipe import Recipe
+        from .cset import IngredientSet
+        from .rset import ReactionSet
+        from .chem import InvalidChemistryError, UnsupportedChemistryError
+
+        df = pd.read_pickle(pickle_path)
+
+        for i, row in df.iterrows():
+
+            d = row.to_dict()
+
+            comp = self.compounds(smiles=d["smiles"])
+
+            n_routes = 0
+            for key in d:
+                if not key.startswith("route"):
+                    continue
+
+                if not key.endswith("_names"):
+                    continue
+
+                v = d[key]
+
+                if isinstance(v, float) and pd.isna(v):
+                    break
+
+                n_routes += 1
+
+            if not n_routes:
+                # mrich.warning(comp, "#routes =", n_routes)
+                continue
+
+            routes = []
+            for j in range(n_routes):
+
+                route_str = f"route{j}"
+
+                route = d[route_str]
+
+                if CAR_only and not d[route_str + "_CAR"]:
+                    continue
+
+                reactions = ReactionSet(self.db)
+                reactants = IngredientSet(self.db)
+                intermediates = IngredientSet(self.db)
+                products = IngredientSet(self.db)
+
+                try:
+                    for k, reaction in enumerate(route):
+
+                        reaction_type = reaction["name"]
+
+                        product = self.compounds(smiles=reaction["productSmiles"])
+
+                        mrich.print(i, j, k, reaction_type, product)
+
+                        rs = []
+                        for reactant_s in reaction["reactantSmiles"]:
+                            reactant = self.register_compound(smiles=reactant_s)
+                            rs.append(reactant.id)
+
+                        # register the reaction
+                        reaction = self.register_reaction(
+                            type=reaction_type,
+                            product=product,
+                            reactants=rs,
+                            check_chemistry=check_chemistry,
+                        )
+
+                        for r_id in rs:
+                            if r_id in reactants:
+                                intermediates.add(compound_id=r_id, amount=1)
+                            else:
+                                reactants.add(compound_id=r_id, amount=1)
+
+                        reactions.add(reaction)
+                except InvalidChemistryError:
+                    continue
+                except UnsupportedChemistryError:
+                    mrich.warning("Skipping unsupported chemistry:", reaction_type)
+                    continue
+
+                products.add(product.as_ingredient(amount=1))
+
+                recipe = Recipe(
+                    db=self.db,
+                    reactions=reactions,
+                    reactants=reactants,
+                    intermediates=intermediates,
+                    products=products,
+                )
+
+                if register_routes:
+                    route_id = self.register_route(recipe=recipe)
+                    mrich.success("registered route", route_id)
+
+                if pick_first:
+                    break
+
+        return df
+
     def add_enamine_quote(
         self,
         path: str | Path,
@@ -1619,7 +1730,7 @@ class HIPPO:
                 mrich.error(f"Could not sanitise {s=}")
                 continue
 
-            inchikey = inchikey_from_smiles(s)
+            inchikey = inchikey_from_smiles(new_smiles)
             values.append((inchikey, new_smiles))
 
         sql = """
@@ -1664,7 +1775,11 @@ class HIPPO:
         ### CHECK REACTION VALIDITY
 
         if check_chemistry:
-            from .chem import check_chemistry, InvalidChemistryError
+            from .chem import (
+                check_chemistry,
+                InvalidChemistryError,
+                UnsupportedChemistryError,
+            )
 
             if not isinstance(product, Compound):
                 product = self.db.get_compound(id=product)
@@ -2227,6 +2342,85 @@ class HIPPO:
         from .plotting import plot_pose_interactions
 
         return plot_pose_interactions(self, **kwargs)
+
+    ### COMPOUND DESIGN
+
+    # def fragmenstein_merge(self,
+    #     reference: Pose,
+    #     hits: PoseSet,
+    #     combination_size: int = 2,
+    #     timeout=300,
+    #     n_cores: int = 1,
+    #     scratch_dir: str = "fragmenstein_scratch",
+    #     require_outome: str = "acceptable",
+    #     return_df: bool = False,
+    #     bulkdock_csv: str = "",
+    # ) -> PoseSet:
+
+    #     mrich.var("reference", reference)
+    #     mrich.var("combination_size", combination_size)
+    #     mrich.var("require_outome", require_outome)
+    #     mrich.var("n_cores", n_cores)
+    #     mrich.var("timeout", timeout)
+    #     mrich.var("scratch_dir", scratch_dir)
+    #     mrich.var("protein_path", reference.apo_path)
+    #     mrich.var("bulkdock_csv", bulkdock_csv)
+
+    #     from .fstein import setup_wictor_laboratory, pure_merge
+
+    #     lab = setup_wictor_laboratory(
+    #         scratch_dir=scratch_dir,
+    #         protein_path=reference.apo_path,
+    #     )
+
+    #     df = pure_merge(
+    #         lab,
+    #         hits.mols,
+    #         n_cores=n_cores,
+    #         timeout=timeout,
+    #         combination_size=combination_size,
+    #     )
+
+    #     if not len(filtered):
+    #         mrich.error(f"No merges")
+    #         return None
+
+    #     if require_outome:
+    #         filtered = df[df["outcome"] == require_outome]
+
+    #         if not len(filtered):
+    #             mrich.error(f"No merges with 'outcome' == {require_outome}")
+    #             if return_df:
+    #                 return None, df
+    #             return None
+
+    #         df = filtered
+
+    #     # register the poses
+    #     n = len(self.compounds)
+    #     compound_ids = []
+    #     # inspirations = []
+    #     for i,row in df.iterrows():
+    #         smiles = row.smiles
+    #         compound = self.register_compound(smiles=smiles, tags=["Fragmenstein pure merge"])
+    #         compound_ids.append(compound.id)
+    #         # hit_mols = row.hit_names
+    #         # print(row)
+    #         # raise NotImplementedError
+
+    #     compounds = self.compounds[compound_ids]
+
+    #     d = len(self.compounds) - n
+
+    #     if d:
+    #         mrich.success(f"Found and registered {d} new merges")
+    #     else:
+    #         mrich.success(f"Found and registered {d} new merges")
+
+    #     if return_df:
+    #         return compounds, df
+
+    #     return compounds
 
     ### OTHER
 
