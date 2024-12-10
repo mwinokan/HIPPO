@@ -1188,6 +1188,106 @@ class HIPPO:
 
         return df
 
+    def add_syndirella_routes(self, pickle_path: str | Path, CAR_only: bool = True, pick_first: bool = True, check_chemistry: bool = True, register_routes: bool = True) -> pd.DataFrame:
+
+        """Add routes found from syndirella --just_retro query"""
+
+        from .recipe import Recipe
+        from .cset import IngredientSet
+        from .rset import ReactionSet
+        from .chem import InvalidChemistryError, UnsupportedChemistryError
+
+        df = pd.read_pickle(pickle_path)
+
+        for i,row in df.iterrows():
+
+            d = row.to_dict()
+
+            comp = self.compounds(smiles=d["smiles"])
+
+            n_routes = 0
+            for key in d:
+                if not key.startswith("route"):
+                    continue
+                
+                if not key.endswith("_names"):
+                    continue
+
+                v = d[key]
+
+                if isinstance(v, float) and pd.isna(v):
+                    break
+
+                n_routes += 1
+
+            if not n_routes:
+                # mrich.warning(comp, "#routes =", n_routes)
+                continue
+
+            routes = []
+            for j in range(n_routes):
+
+                route_str = f"route{j}"
+
+                route = d[route_str]
+
+                if CAR_only and not d[route_str + "_CAR"]:
+                    continue
+
+                reactions = ReactionSet(self.db)
+                reactants = IngredientSet(self.db)
+                intermediates = IngredientSet(self.db)
+                products = IngredientSet(self.db)
+
+                try:
+                    for k, reaction in enumerate(route):
+
+                        reaction_type = reaction["name"]
+
+                        product = self.compounds(smiles=reaction["productSmiles"])
+                        
+                        mrich.print(i,j,k, reaction_type, product)
+                        
+                        rs = []
+                        for reactant_s in reaction["reactantSmiles"]:
+                            reactant = self.register_compound(smiles=reactant_s)
+                            rs.append(reactant.id)
+
+                        # register the reaction
+                        reaction = self.register_reaction(
+                            type=reaction_type,
+                            product=product,
+                            reactants=rs,
+                            check_chemistry=check_chemistry,
+                        )
+
+                        for r_id in rs:
+                            if r_id in reactants:
+                                intermediates.add(compound_id=r_id, amount=1)
+                            else:
+                                reactants.add(compound_id=r_id, amount=1)
+
+                        reactions.add(reaction)
+                except InvalidChemistryError:
+                    continue
+                except UnsupportedChemistryError:
+                    mrich.warning("Skipping unsupported chemistry:", reaction_type)
+                    continue
+
+                products.add(product.as_ingredient(amount=1))    
+
+                recipe = Recipe(db=self.db, reactions=reactions, reactants=reactants, intermediates=intermediates, products=products)
+
+                if register_routes:
+                    route_id = self.register_route(recipe=recipe)
+                    mrich.success("registered route", route_id)
+
+                if pick_first:
+                    break
+
+        return df
+
+
     def add_enamine_quote(
         self,
         path: str | Path,
@@ -1664,7 +1764,7 @@ class HIPPO:
         ### CHECK REACTION VALIDITY
 
         if check_chemistry:
-            from .chem import check_chemistry, InvalidChemistryError
+            from .chem import check_chemistry, InvalidChemistryError, UnsupportedChemistryError
 
             if not isinstance(product, Compound):
                 product = self.db.get_compound(id=product)
