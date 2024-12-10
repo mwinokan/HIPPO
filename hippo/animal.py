@@ -1188,8 +1188,14 @@ class HIPPO:
 
         return df
 
-    def add_syndirella_routes(self, pickle_path: str | Path, CAR_only: bool = True, pick_first: bool = True, check_chemistry: bool = True, register_routes: bool = True) -> pd.DataFrame:
-
+    def add_syndirella_routes(
+        self,
+        pickle_path: str | Path,
+        CAR_only: bool = True,
+        pick_first: bool = True,
+        check_chemistry: bool = True,
+        register_routes: bool = True,
+    ) -> pd.DataFrame:
         """Add routes found from syndirella --just_retro query"""
 
         from .recipe import Recipe
@@ -1199,7 +1205,7 @@ class HIPPO:
 
         df = pd.read_pickle(pickle_path)
 
-        for i,row in df.iterrows():
+        for i, row in df.iterrows():
 
             d = row.to_dict()
 
@@ -1209,7 +1215,7 @@ class HIPPO:
             for key in d:
                 if not key.startswith("route"):
                     continue
-                
+
                 if not key.endswith("_names"):
                     continue
 
@@ -1245,9 +1251,9 @@ class HIPPO:
                         reaction_type = reaction["name"]
 
                         product = self.compounds(smiles=reaction["productSmiles"])
-                        
-                        mrich.print(i,j,k, reaction_type, product)
-                        
+
+                        mrich.print(i, j, k, reaction_type, product)
+
                         rs = []
                         for reactant_s in reaction["reactantSmiles"]:
                             reactant = self.register_compound(smiles=reactant_s)
@@ -1274,9 +1280,15 @@ class HIPPO:
                     mrich.warning("Skipping unsupported chemistry:", reaction_type)
                     continue
 
-                products.add(product.as_ingredient(amount=1))    
+                products.add(product.as_ingredient(amount=1))
 
-                recipe = Recipe(db=self.db, reactions=reactions, reactants=reactants, intermediates=intermediates, products=products)
+                recipe = Recipe(
+                    db=self.db,
+                    reactions=reactions,
+                    reactants=reactants,
+                    intermediates=intermediates,
+                    products=products,
+                )
 
                 if register_routes:
                     route_id = self.register_route(recipe=recipe)
@@ -1286,7 +1298,6 @@ class HIPPO:
                     break
 
         return df
-
 
     def add_enamine_quote(
         self,
@@ -1764,7 +1775,11 @@ class HIPPO:
         ### CHECK REACTION VALIDITY
 
         if check_chemistry:
-            from .chem import check_chemistry, InvalidChemistryError, UnsupportedChemistryError
+            from .chem import (
+                check_chemistry,
+                InvalidChemistryError,
+                UnsupportedChemistryError,
+            )
 
             if not isinstance(product, Compound):
                 product = self.db.get_compound(id=product)
@@ -2352,17 +2367,17 @@ class HIPPO:
     #     mrich.var("bulkdock_csv", bulkdock_csv)
 
     #     from .fstein import setup_wictor_laboratory, pure_merge
-        
+
     #     lab = setup_wictor_laboratory(
     #         scratch_dir=scratch_dir,
     #         protein_path=reference.apo_path,
     #     )
 
     #     df = pure_merge(
-    #         lab, 
-    #         hits.mols, 
-    #         n_cores=n_cores, 
-    #         timeout=timeout, 
+    #         lab,
+    #         hits.mols,
+    #         n_cores=n_cores,
+    #         timeout=timeout,
     #         combination_size=combination_size,
     #     )
 

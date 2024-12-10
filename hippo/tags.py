@@ -90,13 +90,12 @@ class TagSet(MutableSet):
         for tag in tags:
             if tag not in self._elements:
                 self._elements.append(tag)
-        
+
         # for tag in tags:
         #     self.add(tag, commit=False)
 
         # if commit:
         #     self.db.commit()
-
 
     ### FACTORIES
 
