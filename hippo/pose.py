@@ -568,7 +568,7 @@ class Pose:
         debug: bool = False,
         draw: bool = False,
         return_all: bool = False,
-    ) -> float | dict:
+    ) -> float:
         """Score how well this Pose recapitulates the pharmacophoric features of its inspirations.
 
         :param debug: Increased verbosity for debugging (Default value = False)
