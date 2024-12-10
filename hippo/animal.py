@@ -2315,6 +2315,7 @@ GENERATED_TAG_COLS = [
     "Crystalforms short tag",
     "Centroid res",
     "Experiment code",
+    "Pose",
 ]
 
 
