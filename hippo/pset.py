@@ -1255,8 +1255,28 @@ class PoseSet:
         """
 
         from pathlib import Path
+        import json
 
         df = self.get_df(mol=True, inspirations=inspirations, **kwargs)
+
+        if name_col not in ["name", "alias", "inchikey", "id"]:
+            # try getting name from metadata
+            records = self.db.select_where(table='pose', query="pose_id, pose_metadata", key=f"pose_id IN {self.str_ids}", multiple=True)
+            
+            longcode_lookup = {}
+            for i,d in records:
+                if d:
+                    metadata = json.loads(d)
+                else:
+                    metadata = {}
+
+                longcode_lookup[i] = metadata.get(name_col, None) 
+
+            values = []
+            for i,row in df.iterrows():
+                values.append(longcode_lookup[row["id"]])
+
+            df[name_col] = values
 
         df.rename(inplace=True, columns={name_col: "_Name", "mol": "ROMol"})
 
@@ -1690,8 +1710,14 @@ class PoseSet:
         out_dir = Path(out_key).parent
         out_key = Path(out_key).name
 
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        # mrich.var("out_dir", out_dir)
+        mrich.var("out_key", out_key)
+        mrich.var("#poses", len(self))
+
         data = []
-        for pose in self:
+        for pose in mrich.track(self, prefix="Fetching data..."):
 
             comp = pose.compound
             
@@ -1715,7 +1741,7 @@ class PoseSet:
         inspirations = self.inspirations
 
         sdf_name = out_dir / f"{out_key}_syndirella_inspiration_hits.sdf"
-        inspirations.write_sdf(sdf_name, inspirations=False, tags=False, metadata=False, reference=False)
+        inspirations.write_sdf(sdf_name, inspirations=False, tags=False, metadata=False, reference=False, name_col="observation_longname")
 
         return df
 
