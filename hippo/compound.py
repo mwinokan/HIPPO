@@ -1128,7 +1128,7 @@ class Ingredient:
                     min_amount=self.amount,
                     max_lead_time=self.max_lead_time,
                     supplier=self.supplier,
-                    none="error",
+                    none="quiet",
                 )
 
                 if not q:
