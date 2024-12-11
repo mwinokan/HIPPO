@@ -251,6 +251,7 @@ class HIPPO:
         target_name: str,
         metadata_csv: str | Path,
         aligned_directory: str | Path,
+        tags: list | None = None,
         skip: list | None = None,
         debug: bool = False,
         load_pose_mols: bool = False,
@@ -277,6 +278,7 @@ class HIPPO:
         target = self.register_target(name=target_name)
 
         skip = skip or []
+        tags = tags or ["hits"]
 
         mrich.var("aligned_directory", aligned_directory)
 
@@ -362,7 +364,7 @@ class HIPPO:
             # create the molecule / pose
             compound_id = self.db.insert_compound(
                 smiles=smiles,
-                tags=["hits"],
+                tags=tags,
                 warn_duplicate=debug,
                 commit=False,
             )
@@ -394,7 +396,6 @@ class HIPPO:
 
             assert len(meta_row)
 
-            tags = ["hits"]
             for tag in curated_tag_cols:
                 if meta_row[tag].values[0]:
                     tags.append(tag)
