@@ -295,6 +295,8 @@ class HIPPO:
 
         mrich.var("curated_tag_cols", curated_tag_cols)
 
+        n_poses = self.num_poses
+
         for path in mrich.track(
             list(aligned_directory.iterdir()), prefix="Adding hits..."
         ):
@@ -399,32 +401,28 @@ class HIPPO:
                 if meta_row[tag].values[0]:
                     tags.append(tag)
 
-            metadata = {"observation_longname": observation_longname}
+            metadata = {"observation_longname": meta_row["Long code"].values[0]}
+
             for tag in GENERATED_TAG_COLS:
                 if tag in meta_row.columns:
                     metadata[tag] = meta_row[tag].values[0]
 
-            pose_id = self.db.insert_pose(
+            pose = self.register_pose(
                 compound=compound,
                 alias=observation_shortname,
                 target=target.id,
                 path=pose_path,
                 tags=tags,
                 metadata=metadata,
-                commit=False,
+                duplicate_alias="skip",
             )
 
-            if pose_id:
-                count_poses_registered += 1
-
-            if pose_id and load_pose_mols:
-                self.poses[pose_id].mol
-
-        self.db.commit()
+            if load_pose_mols:
+                pose.mol
 
         mrich.var("#directories parsed", count_directories_tried)
         mrich.var("#compounds registered", count_compound_registered)
-        mrich.var("#poses registered", count_poses_registered)
+        mrich.var("#poses registered", self.num_poses - n_poses)
 
     def add_compounds(
         self,
@@ -1903,7 +1901,7 @@ class HIPPO:
         :returns: The registered/existing :class:`.Pose` object or its ID (depending on ``return_pose``)
         """
 
-        assert duplicate_alias in ["error", "modify"]
+        assert duplicate_alias in ["error", "modify", "skip"]
 
         from molparse import parse
 
@@ -2061,6 +2059,9 @@ class HIPPO:
                     pose_data["alias"] = new_alias
                     pose_id = self.db.insert_pose(**pose_data)
 
+                elif result and duplicate_alias == "skip":
+                    (pose_id,) = result
+
                 else:
                     (pose_id,) = result
             else:
@@ -2095,7 +2096,7 @@ class HIPPO:
 
         if overwrite_metadata:
             self.db.insert_metadata(
-                table="pose", id=compound_id, payload=metadata, commit=commit
+                table="pose", id=pose_id, payload=metadata, commit=commit
             )
 
         inspirations = inspirations or []
