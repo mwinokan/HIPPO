@@ -16,8 +16,26 @@ from .reaction import Reaction
 from .reactant import Reactant
 from .product import Product
 from .supplier import Supplier
+from .models import TagType
 
-from .models import Campaign, Iteration, Structure, PlacementAttempt, TagType
+from .models import (
+    Campaign,
+    Iteration,
+    TagType,
+    Inspiration,
+    CompoundScore,
+    CompoundScoreType,
+    PoseScore,
+    PoseScoreType,
+    Inspiration,
+    InspirationScore,
+    InspirationScoreType,
+)
+
+from .file import File
+
+from .structure import Structure
+from .placement import Placement
 
 admin.site.register(Target)
 admin.site.register(Compound)
@@ -36,5 +54,6 @@ admin.site.register(Supplier)
 admin.site.register(Campaign)
 admin.site.register(Iteration)
 admin.site.register(Structure)
-admin.site.register(PlacementAttempt)
+admin.site.register(Placement)
 admin.site.register(TagType)
+admin.site.register(File)

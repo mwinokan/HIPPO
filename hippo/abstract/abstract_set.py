@@ -25,7 +25,7 @@ class AbstractQuerySet(models.QuerySet, AbstractTable):
     #     return super().filter(*args, **kwargs)
 
     def filter(self, *args, **kwargs):
-        kwargs = self._add_prefix_in_kwargs(kwargs)
+        # kwargs = self._add_prefix_in_kwargs(kwargs)
         return super().filter(*args, **kwargs)
 
     ### DUNDERS

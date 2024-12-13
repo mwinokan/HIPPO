@@ -28,15 +28,15 @@ class AbstractTable:
 
     ### METHODS
 
-    def _add_prefix_in_kwargs(self, kwargs):
-        return {("_" + k if k.startswith("id") else k): v for k, v in kwargs.items()}
+    # def _add_prefix_in_kwargs(self, kwargs):
+    #     return {("_" + k if k.startswith("id") else k): v for k, v in kwargs.items()}
 
     def get(self, *args, **kwargs):
-        kwargs = self._add_prefix_in_kwargs(kwargs)
+        # kwargs = self._add_prefix_in_kwargs(kwargs)
         return self._all_objects.get(*args, **kwargs)
 
     def filter(self, *args, **kwargs):
-        kwargs = self._add_prefix_in_kwargs(kwargs)
+        # kwargs = self._add_prefix_in_kwargs(kwargs)
         return self._all_objects.filter(*args, **kwargs)
 
     # def all(self):

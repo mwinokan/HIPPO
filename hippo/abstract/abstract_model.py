@@ -10,7 +10,7 @@ class AbstractModel(models.Model):
         app_label = "hippo"
         abstract = True
 
-    _id = models.BigAutoField(primary_key=True)
+    id = models.BigAutoField(primary_key=True)
 
     # def __init__(self, auto_save: bool = False, *args, **kwargs):
 
@@ -24,13 +24,14 @@ class AbstractModel(models.Model):
     ### MODEL SETUP
 
     @classmethod
-    def _setup_wrappers(cls):
+    def _setup_wrappers(cls, debug: bool = False):
 
         name = cls.__name__
 
         for field in dir(cls):
 
-            mrich.debug(name, field, str(type(getattr(cls, field))))
+            if debug:
+                mrich.debug(name, field, str(type(getattr(cls, field))))
 
             if field == "objects":
                 mrich.warning(f"No custom Manager defined for {name}")
@@ -102,8 +103,20 @@ class AbstractModel(models.Model):
         return cls._objects.all()
 
     @classmethod
-    def filter(cls):
-        return cls._objects.filter()
+    def filter(cls, **kwargs):
+        return cls._objects.filter(**kwargs)
+
+    @classmethod
+    def get_or_create(cls, **kwargs):
+        return cls._objects.get_or_create(**kwargs)
+
+    @classmethod
+    def get(cls, *args, **kwargs):
+        return cls._objects.get(*args, **kwargs)
+
+    @classmethod
+    def bulk_create(cls, *args, **kwargs):
+        return cls._objects.bulk_create(*args, **kwargs)
 
     ### PROPERTIES
 
@@ -166,6 +179,10 @@ class AbstractModel(models.Model):
         panel = Panel(table, expand=False)
         mrich.print(panel)
 
+    def clean_and_save(self, debug: bool = False):
+        self.full_clean()
+        self.save()
+
     # def save(self, full_clean: bool = True, *args, **kwargs):
     #     if full_clean:
     #         self.full_clean()
@@ -183,13 +200,17 @@ class AbstractModel(models.Model):
 
     def __str__(self) -> str:
 
+        id_str = self.id or "?"
+
         if sh := self.shorthand:
-            s = f"{self.shorthand}{self.id}"
+            s = f"{self.shorthand}{id_str}"
         else:
-            s = f"{self.__name__}_{self.id}"
+            s = f"{self.__name__}_{id_str}"
 
         if field := self._name_field:
-            return f'{s} "{getattr(self, field)}"'
+            name_str = getattr(self, field)
+            if name_str:
+                return f'{s} "{name_str}"'
 
         # if hasattr(self, "name") and (name := self.name):
         # return f'{s} "{name}"'

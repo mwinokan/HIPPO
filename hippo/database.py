@@ -57,6 +57,9 @@ class Database:
         from .reactant import Reactant
         from .product import Product
         from .supplier import Supplier
+        from .structure import Structure
+        from .placement import Placement
+        from .file import File
 
         # define the table names
         self.MODELS = [
@@ -73,6 +76,9 @@ class Database:
             Reaction,
             Reactant,
             Product,
+            Structure,
+            Placement,
+            File,
         ]
 
         # setup custom attribute wrappers
