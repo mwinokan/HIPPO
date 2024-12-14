@@ -338,7 +338,6 @@ class QuoteModel(AbstractModel):
     )
 
     _shorthand = "Q"
-    _name_field = None
 
 
 class SupplierModel(AbstractModel):
@@ -348,7 +347,6 @@ class SupplierModel(AbstractModel):
 
     name = models.CharField(max_length=30, unique=True)
 
-    _shorthand = None
     _name_field = "name"
 
 
@@ -410,9 +408,6 @@ class ProductModel(AbstractModel):
         related_name="_products",
     )
 
-    _shorthand = None
-    _name_field = None
-
 
 class ReactantModel(AbstractModel):
     class Meta:
@@ -436,9 +431,6 @@ class ReactantModel(AbstractModel):
         related_name="_reactants",
     )
 
-    _shorthand = None
-    _name_field = None
-
 
 class SolventModel(AbstractModel):
     class Meta:
@@ -447,7 +439,6 @@ class SolventModel(AbstractModel):
 
     name = models.CharField(max_length=30, unique=True)
 
-    _shorthand = None
     _name_field = "name"
 
 
@@ -462,7 +453,6 @@ class TagModel(AbstractModel):
     name = models.CharField(max_length=60, blank=False, unique=True)
     type = models.ForeignKey("TagType", on_delete=models.RESTRICT, related_name="_tags")
 
-    _shorthand = None
     _name_field = "name"
 
 
@@ -471,7 +461,7 @@ class TagTypeModel(AbstractModel):
         abstract = True
 
     name = models.CharField(max_length=30, blank=False, unique=True)
-    _shorthand = None
+
     _name_field = "name"
 
 
@@ -537,7 +527,6 @@ class SubsiteModel(AbstractModel):
         related_name="_subsites",
     )
 
-    _shorthand = None
     _name_field = "name"
 
 
@@ -557,7 +546,6 @@ class ObservationModel(AbstractModel):
     metadata = models.JSONField(default=dict, blank=True)
 
     _shorthand = "O"
-    _name_field = None
 
 
 class PlacementModel(AbstractModel):
@@ -581,9 +569,6 @@ class PlacementModel(AbstractModel):
     method = models.TextField(blank=True, null=True)
 
     metadata = models.JSONField(default=dict, blank=True)
-
-    _shorthand = None
-    _name_field = None
 
 
 ### FILE MANAGEMENT
@@ -636,7 +621,6 @@ class FileModel(AbstractModel):
         max_length=10, choices=[(k, v) for k, v in FILE_PURPOSES.items()]
     )
 
-    _shorthand = None
     _name_field = "name"
 
 
@@ -660,7 +644,7 @@ class Iteration(AbstractModel):
     )
 
 
-### RECIPES & SCORING
+### RECIPES
 
 
 class Route(AbstractModel):
@@ -737,6 +721,9 @@ class RecipeComponent(AbstractModel):
     )
 
     multiplier = models.FloatField(default=1.0)
+
+
+### SCORING
 
 
 class RecipeScore(AbstractModel):

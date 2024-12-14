@@ -1,6 +1,6 @@
 digraph model_graph {
   // Dotfile by Django-Extensions graph_models
-  // Created: 2024-12-14 12:54
+  // Created: 2024-12-14 13:27
   
 
   fontname = "Roboto"
@@ -609,6 +609,172 @@ digraph model_graph {
     <TR><TD COLSPAN="2" CELLPADDING="5" ALIGN="CENTER" BGCOLOR="#1b563f">
     <FONT FACE="Roboto" COLOR="white" POINT-SIZE="10"><B>
     CompoundScoreType<BR/>&lt;<FONT FACE="Roboto"><I>CompoundScoreTypeModel</I></FONT>&gt;
+    </B></FONT></TD></TR>
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><B>id</B></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><B>BigAutoField</B></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I>description</I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I>CharField</I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I>method</I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I>CharField</I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I>name</I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I>CharField</I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I>unit</I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I>CharField</I></FONT>
+    </TD></TR>
+  
+  
+    </TABLE>
+    >]
+
+  hippo_pose_pose_Pose [label=<
+    <TABLE BGCOLOR="white" BORDER="1" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD COLSPAN="2" CELLPADDING="5" ALIGN="CENTER" BGCOLOR="#1b563f">
+    <FONT FACE="Roboto" COLOR="white" POINT-SIZE="10"><B>
+    Pose<BR/>&lt;<FONT FACE="Roboto"><I>PoseModel</I></FONT>&gt;
+    </B></FONT></TD></TR>
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><B>id</B></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><B>BigAutoField</B></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT COLOR="#7B7B7B" FACE="Roboto"><I>alias</I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT COLOR="#7B7B7B" FACE="Roboto"><I>CharField</I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT COLOR="#7B7B7B" FACE="Roboto"><I>inchikey</I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT COLOR="#7B7B7B" FACE="Roboto"><I>CharField</I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I>is_fingerprinted</I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I>BooleanField</I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT COLOR="#7B7B7B" FACE="Roboto"><I>metadata</I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT COLOR="#7B7B7B" FACE="Roboto"><I>JSONField</I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT COLOR="#7B7B7B" FACE="Roboto"><I>mol</I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT COLOR="#7B7B7B" FACE="Roboto"><I>MolField</I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I>origin</I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I>CharField</I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT COLOR="#7B7B7B" FACE="Roboto"><I>smiles</I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT COLOR="#7B7B7B" FACE="Roboto"><I>CharField</I></FONT>
+    </TD></TR>
+  
+  
+    </TABLE>
+    >]
+
+  hippo_pose_pose_score_PoseScore [label=<
+    <TABLE BGCOLOR="white" BORDER="1" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD COLSPAN="2" CELLPADDING="5" ALIGN="CENTER" BGCOLOR="#1b563f">
+    <FONT FACE="Roboto" COLOR="white" POINT-SIZE="10"><B>
+    PoseScore<BR/>&lt;<FONT FACE="Roboto"><I>PoseScoreModel</I></FONT>&gt;
+    </B></FONT></TD></TR>
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><B>id</B></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><B>BigAutoField</B></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I><B>pose</B></I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I><B>ForeignKey (id)</B></I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I><B>score_type</B></I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I><B>ForeignKey (id)</B></I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I>value</I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I>FloatField</I></FONT>
+    </TD></TR>
+  
+  
+    </TABLE>
+    >]
+
+  hippo_pose_pose_score_type_PoseScoreType [label=<
+    <TABLE BGCOLOR="white" BORDER="1" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD COLSPAN="2" CELLPADDING="5" ALIGN="CENTER" BGCOLOR="#1b563f">
+    <FONT FACE="Roboto" COLOR="white" POINT-SIZE="10"><B>
+    PoseScoreType<BR/>&lt;<FONT FACE="Roboto"><I>PoseScoreTypeModel</I></FONT>&gt;
     </B></FONT></TD></TR>
   
   
@@ -1446,172 +1612,6 @@ digraph model_graph {
     </TABLE>
     >]
 
-  hippo_pose_pose_Pose [label=<
-    <TABLE BGCOLOR="white" BORDER="1" CELLBORDER="0" CELLSPACING="0">
-    <TR><TD COLSPAN="2" CELLPADDING="5" ALIGN="CENTER" BGCOLOR="#1b563f">
-    <FONT FACE="Roboto" COLOR="white" POINT-SIZE="10"><B>
-    Pose<BR/>&lt;<FONT FACE="Roboto"><I>PoseModel</I></FONT>&gt;
-    </B></FONT></TD></TR>
-  
-  
-    <TR><TD ALIGN="LEFT" BORDER="0">
-    <FONT FACE="Roboto"><B>id</B></FONT>
-    </TD><TD ALIGN="LEFT">
-    <FONT FACE="Roboto"><B>BigAutoField</B></FONT>
-    </TD></TR>
-  
-  
-  
-    <TR><TD ALIGN="LEFT" BORDER="0">
-    <FONT COLOR="#7B7B7B" FACE="Roboto"><I>alias</I></FONT>
-    </TD><TD ALIGN="LEFT">
-    <FONT COLOR="#7B7B7B" FACE="Roboto"><I>CharField</I></FONT>
-    </TD></TR>
-  
-  
-  
-    <TR><TD ALIGN="LEFT" BORDER="0">
-    <FONT COLOR="#7B7B7B" FACE="Roboto"><I>inchikey</I></FONT>
-    </TD><TD ALIGN="LEFT">
-    <FONT COLOR="#7B7B7B" FACE="Roboto"><I>CharField</I></FONT>
-    </TD></TR>
-  
-  
-  
-    <TR><TD ALIGN="LEFT" BORDER="0">
-    <FONT FACE="Roboto"><I>is_fingerprinted</I></FONT>
-    </TD><TD ALIGN="LEFT">
-    <FONT FACE="Roboto"><I>BooleanField</I></FONT>
-    </TD></TR>
-  
-  
-  
-    <TR><TD ALIGN="LEFT" BORDER="0">
-    <FONT COLOR="#7B7B7B" FACE="Roboto"><I>metadata</I></FONT>
-    </TD><TD ALIGN="LEFT">
-    <FONT COLOR="#7B7B7B" FACE="Roboto"><I>JSONField</I></FONT>
-    </TD></TR>
-  
-  
-  
-    <TR><TD ALIGN="LEFT" BORDER="0">
-    <FONT COLOR="#7B7B7B" FACE="Roboto"><I>mol</I></FONT>
-    </TD><TD ALIGN="LEFT">
-    <FONT COLOR="#7B7B7B" FACE="Roboto"><I>MolField</I></FONT>
-    </TD></TR>
-  
-  
-  
-    <TR><TD ALIGN="LEFT" BORDER="0">
-    <FONT FACE="Roboto"><I>origin</I></FONT>
-    </TD><TD ALIGN="LEFT">
-    <FONT FACE="Roboto"><I>CharField</I></FONT>
-    </TD></TR>
-  
-  
-  
-    <TR><TD ALIGN="LEFT" BORDER="0">
-    <FONT COLOR="#7B7B7B" FACE="Roboto"><I>smiles</I></FONT>
-    </TD><TD ALIGN="LEFT">
-    <FONT COLOR="#7B7B7B" FACE="Roboto"><I>CharField</I></FONT>
-    </TD></TR>
-  
-  
-    </TABLE>
-    >]
-
-  hippo_pose_pose_score_PoseScore [label=<
-    <TABLE BGCOLOR="white" BORDER="1" CELLBORDER="0" CELLSPACING="0">
-    <TR><TD COLSPAN="2" CELLPADDING="5" ALIGN="CENTER" BGCOLOR="#1b563f">
-    <FONT FACE="Roboto" COLOR="white" POINT-SIZE="10"><B>
-    PoseScore<BR/>&lt;<FONT FACE="Roboto"><I>PoseScoreModel</I></FONT>&gt;
-    </B></FONT></TD></TR>
-  
-  
-    <TR><TD ALIGN="LEFT" BORDER="0">
-    <FONT FACE="Roboto"><B>id</B></FONT>
-    </TD><TD ALIGN="LEFT">
-    <FONT FACE="Roboto"><B>BigAutoField</B></FONT>
-    </TD></TR>
-  
-  
-  
-    <TR><TD ALIGN="LEFT" BORDER="0">
-    <FONT FACE="Roboto"><I><B>pose</B></I></FONT>
-    </TD><TD ALIGN="LEFT">
-    <FONT FACE="Roboto"><I><B>ForeignKey (id)</B></I></FONT>
-    </TD></TR>
-  
-  
-  
-    <TR><TD ALIGN="LEFT" BORDER="0">
-    <FONT FACE="Roboto"><I><B>score_type</B></I></FONT>
-    </TD><TD ALIGN="LEFT">
-    <FONT FACE="Roboto"><I><B>ForeignKey (id)</B></I></FONT>
-    </TD></TR>
-  
-  
-  
-    <TR><TD ALIGN="LEFT" BORDER="0">
-    <FONT FACE="Roboto"><I>value</I></FONT>
-    </TD><TD ALIGN="LEFT">
-    <FONT FACE="Roboto"><I>FloatField</I></FONT>
-    </TD></TR>
-  
-  
-    </TABLE>
-    >]
-
-  hippo_pose_pose_score_type_PoseScoreType [label=<
-    <TABLE BGCOLOR="white" BORDER="1" CELLBORDER="0" CELLSPACING="0">
-    <TR><TD COLSPAN="2" CELLPADDING="5" ALIGN="CENTER" BGCOLOR="#1b563f">
-    <FONT FACE="Roboto" COLOR="white" POINT-SIZE="10"><B>
-    PoseScoreType<BR/>&lt;<FONT FACE="Roboto"><I>PoseScoreTypeModel</I></FONT>&gt;
-    </B></FONT></TD></TR>
-  
-  
-    <TR><TD ALIGN="LEFT" BORDER="0">
-    <FONT FACE="Roboto"><B>id</B></FONT>
-    </TD><TD ALIGN="LEFT">
-    <FONT FACE="Roboto"><B>BigAutoField</B></FONT>
-    </TD></TR>
-  
-  
-  
-    <TR><TD ALIGN="LEFT" BORDER="0">
-    <FONT FACE="Roboto"><I>description</I></FONT>
-    </TD><TD ALIGN="LEFT">
-    <FONT FACE="Roboto"><I>CharField</I></FONT>
-    </TD></TR>
-  
-  
-  
-    <TR><TD ALIGN="LEFT" BORDER="0">
-    <FONT FACE="Roboto"><I>method</I></FONT>
-    </TD><TD ALIGN="LEFT">
-    <FONT FACE="Roboto"><I>CharField</I></FONT>
-    </TD></TR>
-  
-  
-  
-    <TR><TD ALIGN="LEFT" BORDER="0">
-    <FONT FACE="Roboto"><I>name</I></FONT>
-    </TD><TD ALIGN="LEFT">
-    <FONT FACE="Roboto"><I>CharField</I></FONT>
-    </TD></TR>
-  
-  
-  
-    <TR><TD ALIGN="LEFT" BORDER="0">
-    <FONT FACE="Roboto"><I>unit</I></FONT>
-    </TD><TD ALIGN="LEFT">
-    <FONT FACE="Roboto"><I>CharField</I></FONT>
-    </TD></TR>
-  
-  
-    </TABLE>
-    >]
-
   hippo_structure_structure_Structure [label=<
     <TABLE BGCOLOR="white" BORDER="1" CELLBORDER="0" CELLSPACING="0">
     <TR><TD COLSPAN="2" CELLPADDING="5" ALIGN="CENTER" BGCOLOR="#1b563f">
@@ -1798,6 +1798,18 @@ digraph model_graph {
   hippo_compound_compound_score_CompoundScore -> hippo_compound_compound_score_type_CompoundScoreType
   [label=" score_type (_values)"] [arrowhead=none, arrowtail=dot, dir=both];
 
+  hippo_pose_pose_Pose -> hippo_file_file_File
+  [label=" _files (_poses)"] [arrowhead=dot arrowtail=dot, dir=both];
+
+  hippo_pose_pose_Pose -> hippo_tag_tag_Tag
+  [label=" _tags (_poses)"] [arrowhead=dot arrowtail=dot, dir=both];
+
+  hippo_pose_pose_score_PoseScore -> hippo_pose_pose_Pose
+  [label=" pose (_scores)"] [arrowhead=none, arrowtail=dot, dir=both];
+
+  hippo_pose_pose_score_PoseScore -> hippo_pose_pose_score_type_PoseScoreType
+  [label=" score_type (_values)"] [arrowhead=none, arrowtail=dot, dir=both];
+
   hippo_quote_quote_Quote -> hippo_compound_compound_Compound
   [label=" compound (_quotes)"] [arrowhead=none, arrowtail=dot, dir=both];
 
@@ -1856,18 +1868,6 @@ digraph model_graph {
   [label=" inspiration (_scores)"] [arrowhead=none, arrowtail=dot, dir=both];
 
   hippo_inspiration_inspiration_score_InspirationScore -> hippo_inspiration_inspiration_score_type_InspirationScoreType
-  [label=" score_type (_values)"] [arrowhead=none, arrowtail=dot, dir=both];
-
-  hippo_pose_pose_Pose -> hippo_file_file_File
-  [label=" _files (_poses)"] [arrowhead=dot arrowtail=dot, dir=both];
-
-  hippo_pose_pose_Pose -> hippo_tag_tag_Tag
-  [label=" _tags (_poses)"] [arrowhead=dot arrowtail=dot, dir=both];
-
-  hippo_pose_pose_score_PoseScore -> hippo_pose_pose_Pose
-  [label=" pose (_scores)"] [arrowhead=none, arrowtail=dot, dir=both];
-
-  hippo_pose_pose_score_PoseScore -> hippo_pose_pose_score_type_PoseScoreType
   [label=" score_type (_values)"] [arrowhead=none, arrowtail=dot, dir=both];
 
   hippo_structure_structure_Structure -> hippo_target_target_Target

@@ -4,8 +4,7 @@ from django.contrib import admin
 
 from .target import Target
 from .compound import Compound, CompoundScore, CompoundScoreType
-
-# from .pose import Pose
+from .pose import Pose, PoseScore, PoseScoreType
 from .quote import Quote
 from .tag import Tag, TagType
 from .subsite import Subsite
@@ -18,15 +17,7 @@ from .reactant import Reactant
 from .product import Product
 from .supplier import Supplier
 from .inspiration import Inspiration, InspirationScore, InspirationScoreType
-
-from .models import (
-    Campaign,
-    Iteration,
-)
-
 from .file import File
-from .pose import Pose, PoseScore, PoseScoreType
-
 from .structure import Structure
 from .placement import Placement
 
@@ -44,8 +35,6 @@ admin.site.register(Reaction)
 admin.site.register(Reactant)
 admin.site.register(Product)
 admin.site.register(Supplier)
-admin.site.register(Campaign)
-admin.site.register(Iteration)
 admin.site.register(Structure)
 admin.site.register(Placement)
 admin.site.register(TagType)
@@ -54,3 +43,6 @@ admin.site.register(PoseScore)
 admin.site.register(PoseScoreType)
 admin.site.register(CompoundScore)
 admin.site.register(CompoundScoreType)
+
+# admin.site.register(Campaign)
+# admin.site.register(Iteration)

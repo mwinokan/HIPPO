@@ -16,7 +16,10 @@ class Command(BaseCommand):
         mrich.h3("Starting database reset...")
 
         # Step 1: Empty the database
-        self._delete_database()
+        try:
+            self._delete_database()
+        except FileNotFoundError:
+            mrich.warning("No database to delete")
 
         # Step 2: Delete migration files
         self._delete_migration_files()
@@ -33,7 +36,8 @@ class Command(BaseCommand):
     def _delete_migration_files(self):
         """Delete migration files from all apps."""
         migrations_deleted = 0
-        for app in settings.INSTALLED_APPS:
+        for app in settings.INSTALLED_APPS + ["hippo"]:
+
             # Skip non-app entries (e.g., middleware or custom settings)
             if not os.path.exists(os.path.join(app, "migrations")):
                 continue

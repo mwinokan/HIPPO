@@ -5,5 +5,7 @@ from .compound_set import CompoundSet
 
 
 class Compound(CompoundModel):
+    class Meta:
+        app_label = "hippo"
 
     _objects = CompoundSet.as_manager()

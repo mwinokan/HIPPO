@@ -21,6 +21,9 @@ class AbstractModel(models.Model):
 
     #     super().__setattr__("_auto_save", auto_save)
 
+    _shorthand = None
+    _name_field = None
+
     ### MODEL SETUP
 
     @classmethod
@@ -73,7 +76,11 @@ class AbstractModel(models.Model):
         """Set the _table property on the child <model> Model to point to the <model>Table class if defined"""
 
         # define names
-        module_name = cls.__name__.lower()
+        if hasattr(cls, "_module_name"):
+            module_name = cls._module_name
+        else:
+            module_name = cls.__name__.lower()
+
         model_name = cls.__name__
         table_class = f"{model_name}Table"
 
@@ -117,6 +124,11 @@ class AbstractModel(models.Model):
     @classmethod
     def bulk_create(cls, *args, **kwargs):
         return cls._objects.bulk_create(*args, **kwargs)
+
+    @classmethod
+    @property
+    def objects(self):
+        return self._objects
 
     ### PROPERTIES
 

@@ -39,6 +39,9 @@ class AbstractTable:
         # kwargs = self._add_prefix_in_kwargs(kwargs)
         return self._all_objects.filter(*args, **kwargs)
 
+    def count(self, *args, **kwargs):
+        return self._all_objects.count(*args, **kwargs)
+
     # def all(self):
     #     # kwargs = {(f"_{k}" if not k.startswith("_") else k):v for k,v in kwargs.items()}
     #     # mrich.debug(self.__class__.__name__, "all", args, kwargs)
