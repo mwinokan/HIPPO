@@ -45,7 +45,7 @@ class Database:
         # import the models
         from .target import Target
         from .compound import Compound
-        from .pose import Pose
+        from .pose import Pose, PoseScore, PoseScoreType
         from .quote import Quote
         from .tag import Tag
         from .subsite import Subsite
@@ -79,6 +79,8 @@ class Database:
             Structure,
             Placement,
             File,
+            PoseScore,
+            PoseScoreType,
         ]
 
         # setup custom attribute wrappers

@@ -3,10 +3,11 @@ from django.contrib import admin
 # Register your models here.
 
 from .target import Target
-from .compound import Compound
-from .pose import Pose
+from .compound import Compound, CompoundScore, CompoundScoreType
+
+# from .pose import Pose
 from .quote import Quote
-from .tag import Tag
+from .tag import Tag, TagType
 from .subsite import Subsite
 from .interaction import Interaction
 from .feature import Feature
@@ -16,23 +17,15 @@ from .reaction import Reaction
 from .reactant import Reactant
 from .product import Product
 from .supplier import Supplier
-from .models import TagType
+from .inspiration import Inspiration, InspirationScore, InspirationScoreType
 
 from .models import (
     Campaign,
     Iteration,
-    TagType,
-    Inspiration,
-    CompoundScore,
-    CompoundScoreType,
-    PoseScore,
-    PoseScoreType,
-    Inspiration,
-    InspirationScore,
-    InspirationScoreType,
 )
 
 from .file import File
+from .pose import Pose, PoseScore, PoseScoreType
 
 from .structure import Structure
 from .placement import Placement
@@ -57,3 +50,7 @@ admin.site.register(Structure)
 admin.site.register(Placement)
 admin.site.register(TagType)
 admin.site.register(File)
+admin.site.register(PoseScore)
+admin.site.register(PoseScoreType)
+admin.site.register(CompoundScore)
+admin.site.register(CompoundScoreType)

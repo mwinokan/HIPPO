@@ -2,13 +2,16 @@
 
 from pathlib import Path
 from datetime import date
+
 from django.db import models
+from django.core.validators import MinValueValidator, MaxValueValidator
+
 from .orm.expressions import MolFromSmiles, MolPatternBfpFromSmiles
 from .orm.fields import MolField
 from .orm.validators import validate_list_of_integers, validate_coord
+from .abstract import AbstractModel
+
 from molparse.rdkit.features import FEATURE_FAMILIES, INTERACTION_TYPES
-from django.core.validators import MinValueValidator, MaxValueValidator
-from .abstract import AbstractModel, AbstractQuerySet
 
 
 class TargetModel(AbstractModel):
@@ -498,7 +501,10 @@ class PlacementModel(AbstractModel):
     _name_field = None
 
 
-class TagType(AbstractModel):
+class TagTypeModel(AbstractModel):
+    class Meta:
+        abstract = True
+
     name = models.CharField(max_length=30, blank=False, unique=True)
     _shorthand = None
     _name_field = "name"
@@ -651,14 +657,20 @@ class ScoringAttributeWeight(AbstractModel):
     )
 
 
-class PoseScoreType(AbstractModel):
+class PoseScoreTypeModel(AbstractModel):
+    class Meta:
+        abstract = True
+
     name = models.CharField(max_length=30)
     method = models.CharField(max_length=30)
     unit = models.CharField(max_length=30)
     description = models.CharField(max_length=120)
 
 
-class PoseScore(AbstractModel):
+class PoseScoreModel(AbstractModel):
+
+    class Meta:
+        abstract = True
 
     pose = models.ForeignKey("Pose", on_delete=models.CASCADE, related_name="_scores")
     score_type = models.ForeignKey(
@@ -668,14 +680,19 @@ class PoseScore(AbstractModel):
     value = models.FloatField()
 
 
-class InspirationScoreType(AbstractModel):
+class InspirationScoreTypeModel(AbstractModel):
+    class Meta:
+        abstract = True
+
     name = models.CharField(max_length=30)
     method = models.CharField(max_length=30)
     unit = models.CharField(max_length=30)
     description = models.CharField(max_length=120)
 
 
-class InspirationScore(AbstractModel):
+class InspirationScoreModel(AbstractModel):
+    class Meta:
+        abstract = True
 
     inspiration = models.ForeignKey(
         "Inspiration", on_delete=models.CASCADE, related_name="_scores"
@@ -687,14 +704,19 @@ class InspirationScore(AbstractModel):
     value = models.FloatField()
 
 
-class CompoundScoreType(AbstractModel):
+class CompoundScoreTypeModel(AbstractModel):
+    class Meta:
+        abstract = True
+
     name = models.CharField(max_length=30)
     method = models.CharField(max_length=30)
     unit = models.CharField(max_length=30)
     description = models.CharField(max_length=120)
 
 
-class CompoundScore(AbstractModel):
+class CompoundScoreModel(AbstractModel):
+    class Meta:
+        abstract = True
 
     compound = models.ForeignKey(
         "Compound", on_delete=models.CASCADE, related_name="_scores"
@@ -757,7 +779,9 @@ class FileModel(AbstractModel):
     _name_field = "name"
 
 
-class Inspiration(AbstractModel):
+class InspirationModel(AbstractModel):
+    class Meta:
+        abstract = True
 
     original = models.ForeignKey("Pose", on_delete=models.CASCADE, related_name="+")
 
