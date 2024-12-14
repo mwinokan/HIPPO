@@ -36,9 +36,6 @@ class AbstractModel(models.Model):
             if debug:
                 mrich.debug(name, field, str(type(getattr(cls, field))))
 
-            if field == "objects":
-                mrich.warning(f"No custom Manager defined for {name}")
-
             elif isinstance(
                 getattr(cls, field),
                 models.fields.related_descriptors.ReverseManyToOneDescriptor,
@@ -81,11 +78,16 @@ class AbstractModel(models.Model):
         else:
             module_name = cls.__name__.lower()
 
+        if hasattr(cls, "_parent_module"):
+            parent_module = cls._parent_module
+        else:
+            parent_module = cls.__name__.lower()
+
         model_name = cls.__name__
         table_class = f"{model_name}Table"
 
         # import submodule
-        module = importlib.import_module(f"..{module_name}", package=__package__)
+        module = importlib.import_module(f"..{parent_module}", package=__package__)
 
         def get_table_wrapper():
             """Get an instance of the <model>Table"""

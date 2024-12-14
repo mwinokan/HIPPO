@@ -18,10 +18,10 @@ class HIPPO:
         # DB must be initialised before importing any models
         self._db = Database(path=db_path, **kwargs)
 
-        from .compound import CompoundTable
-        from .pose import PoseTable
-        from .target import TargetTable
-        from .reaction import ReactionTable
+        from .compound.compound_table import CompoundTable
+        from .pose.pose_table import PoseTable
+        from .protein.target_table import TargetTable
+        from .chemistry.reaction_table import ReactionTable
 
         self.compounds = CompoundTable()
         self.poses = PoseTable()
@@ -141,7 +141,7 @@ class HIPPO:
 
         metadata = dict_formatter(metadata)
 
-        from .target import Target
+        from .protein import Target
 
         instance, created = Target.get_or_create(name=name, metadata=metadata)
 
@@ -213,10 +213,10 @@ class HIPPO:
 
         atom_names = list_formatter(atom_names)
 
-        from .feature import Feature
+        from .interactions import Feature
 
         # get related
-        from .target import Target
+        from .protein import Target
 
         if isinstance(target, int):
             target = Target.get(id=target)
@@ -256,10 +256,10 @@ class HIPPO:
         metadata = dict_formatter(metadata)
         # description = str_formatter(metadata)
 
-        from .subsite import Subsite
+        from .annotation import Subsite
 
         # get related
-        from .target import Target
+        from .protein import Target
 
         if isinstance(target, int):
             target = Target.get(id=target)
@@ -339,9 +339,8 @@ class HIPPO:
     ) -> "Structure":
 
         from .orm.formatters import path_formatter, dict_formatter  # , str_formatter
-        from .structure import Structure
-        from .target import Target
-        from .file import File, guess_file_format
+        from .protein import Target, Structure
+        from .files import File, guess_file_format
 
         # format values
         protein_file = path_formatter(protein_file)
@@ -403,8 +402,8 @@ class HIPPO:
     ) -> "Placement":
 
         from .orm.formatters import path_formatter, dict_formatter  # , str_formatter
-        from .placement import Placement
-        from .structure import Structure
+        from .annotation import Placement
+        from .protein import Structure
         from .compound import Compound
         from .pose import Pose
 
@@ -483,12 +482,11 @@ class HIPPO:
         from .tools import sanitise_smiles
         from .orm.formatters import path_formatter, dict_formatter
 
-        from .target import Target
+        from .protein import Target, Structure
         from .compound import Compound
-        from .structure import Structure
-        from .placement import Placement
+        from .annotation import Placement
         from .pose import Pose
-        from .file import File, guess_file_format
+        from .files import File, guess_file_format
 
         # sanitise / format
 
@@ -696,7 +694,6 @@ class HIPPO:
         from .compound import Compound
         from .tools import inchikey_from_smiles, sanitise_smiles  # , SanitisationError
         from .orm.formatters import dict_formatter
-        from django.db.models import Case, When
 
         count_before = len(self.compounds)
 
@@ -740,13 +737,6 @@ class HIPPO:
             with mrich.loading("Assigning ID's..."):
                 for obj in created_objs:
                     obj._id = inchikey_map[obj.inchikey]
-
-                # queried_objs = Compound.filter(inchikey__in=inchikeys).order_by(
-                #     Case(*[When(inchikey=key, then=pos) for pos, key in enumerate(inchikeys)])
-                # )
-
-                # for inchikey,obj in zip(inchikeys,queried_objs):
-                #     mrich.print(inchikey, obj, obj.inchikey, inchikey==obj.inchikey)
 
         num_created = len(self.compounds) - count_before
 

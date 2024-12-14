@@ -6,3 +6,4 @@ class CompoundScore(CompoundScoreModel):
 
     _objects = CompoundScoreSet.as_manager()
     _module_name = "compound_score"
+    _parent_module = "compound"

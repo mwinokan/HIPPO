@@ -2,24 +2,14 @@ from django.contrib import admin
 
 # Register your models here.
 
-from .target import Target
-from .compound import Compound, CompoundScore, CompoundScoreType
-from .pose import Pose, PoseScore, PoseScoreType
-from .quote import Quote
-from .tag import Tag, TagType
-from .subsite import Subsite
-from .interaction import Interaction
-from .feature import Feature
-from .solvent import Solvent
-from .observation import Observation
-from .reaction import Reaction
-from .reactant import Reactant
-from .product import Product
-from .supplier import Supplier
-from .inspiration import Inspiration, InspirationScore, InspirationScoreType
-from .file import File
-from .structure import Structure
-from .placement import Placement
+from .protein import *
+from .compound import *
+from .pose import *
+from .quoting import *
+from .annotation import *
+from .interactions import *
+from .chemistry import *
+from .files import *
 
 admin.site.register(Target)
 admin.site.register(Compound)

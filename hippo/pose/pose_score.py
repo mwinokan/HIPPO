@@ -7,3 +7,4 @@ class PoseScore(PoseScoreModel):
     _objects = PoseScoreSet.as_manager()
 
     _module_name = "pose_score"
+    _parent_module = "pose"

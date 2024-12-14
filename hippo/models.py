@@ -13,6 +13,12 @@ from .abstract import AbstractModel
 
 from molparse.rdkit.features import FEATURE_FAMILIES, INTERACTION_TYPES
 
+CURRENCIES = {
+    "EUR": "€",
+    "USD": "$",
+    "GBP": "£",
+}
+
 ### PROTEIN
 
 
@@ -68,7 +74,7 @@ class StructureModel(AbstractModel):
     _name_field = "alias"
 
 
-### LIGAND
+### LIGAND (2D)
 
 
 class CompoundModel(AbstractModel):
@@ -138,6 +144,9 @@ class CompoundScoreModel(AbstractModel):
     )
 
     value = models.FloatField()
+
+
+### LIGAND (3D)
 
 
 class PoseModel(AbstractModel):
@@ -304,8 +313,6 @@ class QuoteModel(AbstractModel):
         app_label = "hippo"
         abstract = True
         unique_together = ("amount", "supplier", "catalogue", "entry")
-
-    from .price.price import CURRENCIES
 
     amount = models.FloatField(validators=[MinValueValidator(0.0)])
     catalogue = models.CharField(max_length=60, blank=True)
@@ -673,8 +680,6 @@ class RouteStep(AbstractModel):
 
 
 class RandomRecipeGenerator(AbstractModel):
-
-    from .price.price import CURRENCIES
 
     _suppliers = models.ManyToManyField(
         "Supplier",

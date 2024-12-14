@@ -43,24 +43,23 @@ class Database:
             setup_django(databases, debug=django_debug, **kwargs)
 
         # import the models
-        from .target import Target
+        from .protein import Target, Structure
         from .compound import Compound, CompoundScore, CompoundScoreType
         from .pose import Pose, PoseScore, PoseScoreType
-        from .quote import Quote
-        from .tag import Tag
-        from .subsite import Subsite
-        from .interaction import Interaction
-        from .inspiration import Inspiration, InspirationScore, InspirationScoreType
-        from .feature import Feature
-        from .solvent import Solvent
-        from .observation import Observation
-        from .reaction import Reaction
-        from .reactant import Reactant
-        from .product import Product
-        from .supplier import Supplier
-        from .structure import Structure
-        from .placement import Placement
-        from .file import File
+        from .quoting import Quote, Supplier
+        from .annotation import (
+            Tag,
+            TagType,
+            Subsite,
+            Inspiration,
+            InspirationScore,
+            InspirationScoreType,
+            Observation,
+            Placement,
+        )
+        from .interactions import Interaction, Feature
+        from .chemistry import Solvent, Reaction, Reactant, Product
+        from .files import File
 
         # define the table names
         self.MODELS = [

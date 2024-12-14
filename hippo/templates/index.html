@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HIPPO</title>
+</head>
+<body>
+    <h1>HIPPO</h1>
+    <h2>Model Statistics</h2>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Model Name</th>
+                <th>Record Count</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for stat in model_stats %}
+                <tr>
+                    <td>{{ stat.model_name }}</td>
+                    <td>{{ stat.model_count }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
