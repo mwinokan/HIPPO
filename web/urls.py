@@ -20,6 +20,8 @@ from django.urls import include, path
 from hippo import views
 
 urlpatterns = [
-    path("hippo/", include("hippo.urls")),
+    # index
+    path("", include("hippo.urls")),
+    # admin
     path("admin/", admin.site.urls),
 ]

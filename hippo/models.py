@@ -616,11 +616,12 @@ class FileModel(AbstractModel):
         "CONTEXT": "Context",
     }
 
-    path = models.FilePathField(Path("/"), max_length=200, unique=True)
+    path = models.CharField(max_length=300, blank=False, unique=True)
 
     format_type = models.CharField(
         max_length=10, choices=[(k, v) for k, v in FILE_FORMATS.items()]
     )
+
     content_type = models.CharField(
         max_length=10, choices=[(k, v) for k, v in FILE_CONTENTS.items()]
     )
