@@ -44,12 +44,13 @@ class Database:
 
         # import the models
         from .target import Target
-        from .compound import Compound
+        from .compound import Compound, CompoundScore, CompoundScoreType
         from .pose import Pose, PoseScore, PoseScoreType
         from .quote import Quote
         from .tag import Tag
         from .subsite import Subsite
         from .interaction import Interaction
+        from .inspiration import Inspiration, InspirationScore, InspirationScoreType
         from .feature import Feature
         from .solvent import Solvent
         from .observation import Observation
@@ -81,6 +82,11 @@ class Database:
             File,
             PoseScore,
             PoseScoreType,
+            CompoundScore,
+            CompoundScoreType,
+            Inspiration,
+            InspirationScore,
+            InspirationScoreType,
         ]
 
         # setup custom attribute wrappers
