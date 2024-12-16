@@ -635,13 +635,31 @@ class FileModel(AbstractModel):
 ### PROJECT MANAGEMENT
 
 
-class Campaign(AbstractModel):
+class CampaignModel(AbstractModel):
+
+    class Meta:
+        abstract = True
 
     name = models.CharField(max_length=30, unique=True)
     _targets = models.ManyToManyField("Target", related_name="_campaigns", blank=False)
 
+    _name_field = "name"
 
-class Iteration(AbstractModel):
+
+class IterationModel(AbstractModel):
+
+    class Meta:
+        abstract = True
+
+    ITERATION_STATUS = [
+        ("P", "PENDING"),
+        ("D", "DESIGN"),
+        ("M", "MAKE"),
+        ("T", "TEST"),
+        ("A", "ANALYSE"),
+        ("F", "FINISHED"),
+        ("C", "CANCELLED"),
+    ]
 
     number = models.PositiveSmallIntegerField(validators=[MinValueValidator(1)])
 
@@ -650,6 +668,10 @@ class Iteration(AbstractModel):
         on_delete=models.CASCADE,
         related_name="_iterations",
     )
+
+    status = models.CharField(max_length=1, choices=ITERATION_STATUS)
+
+    _name_field = "long_name"
 
 
 ### RECIPES
