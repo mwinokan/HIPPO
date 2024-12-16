@@ -13,7 +13,7 @@ def load_chemicalite(connection, **kwargs) -> None:
         return
     connection.connection.enable_load_extension(True)
     connection.connection.load_extension("chemicalite")
-    mrich.debug("(hippo.signals.load_chemicalite) Enabled chemicalite extension")
+    # mrich.debug("(hippo.signals.load_chemicalite) Enabled chemicalite extension")
 
 
 # @receiver(pre_save)
