@@ -17,11 +17,12 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import include, path
-from hippo import views
+from . import views
 
 urlpatterns = [
     # index
-    path("", include("hippo.urls")),
+    # path("", include("hippo.urls")),
+    path("", views.index, name="index"),
     # admin
     path("admin/", admin.site.urls),
 ]

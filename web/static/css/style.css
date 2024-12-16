@@ -1,0 +1,90 @@
+:root {
+        --color-primary: hsl(206 68.7% 67.5%); /* light blue */
+        --color-secondary: hsl(207 49.5% 42.7%); /* dark steel blue */
+        --color-tertiary: hsl(207, 20%, 10%); /* mud */
+        --color-accent: hsl(36 81.8% 49.6%); /* orange */
+        --color-accent2: hsl(44 81.8% 49.6%); /* orange */
+        --color-accent3: hsl(27 81.8% 49.6%); /* orange */
+/*        --color-tertiary: hsl(44, 20%, 40%); /* mud */
+        
+        --color-white-overlay: hsla(0, 0%, 100%, 20%); /* light blue */
+        --color-primary-overlay: hsla(207, 50%, 90%, 20%); /* light blue */
+        --color-secondary-overlay: hsla(207, 20%, 40%, 20%); /* light blue */
+}
+
+body {
+    background: var(--color-primary);
+    color: var(--color-tertiary);
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    line-height: 1.6;
+}
+
+header {
+    padding: 1rem;
+    text-align: center;
+}
+
+main {
+    padding: 2rem;
+}
+
+.card {
+    margin: 1rem;
+    background-color: var(--color-white-overlay);
+    border-radius: 32px;
+/*    background-color: var(--color-accent);*/
+/*    opacity: 10%;*/
+    padding: 2rem;
+}
+
+.center {
+    text-align: center;
+}
+
+footer {
+    background: var(--color-tertiary);
+    color: var(--color-primary);
+    text-align: center;
+    padding: 1rem 0;
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+}
+
+table {
+    border-collapse:collapse;
+    border-spacing:0;
+    border:none;
+    width:100%;
+    display:table;
+}
+
+th, td {
+    padding:8px 32px;
+    display:table-cell;
+    text-align:left;
+    vertical-align:top;
+    background: none;
+}
+
+tr {
+    width: 100%;
+    border-radius: 10px !important;
+}
+
+tr:hover {
+    background-color:var(--color-accent);
+/*    transition: background-color 0.3s ease;*/
+    border-radius: 32px;
+}
+
+table tr:hover th:first-child, td:first-child{
+    border-top-left-radius: 32px;
+    border-bottom-left-radius: 32px;
+}
+table tr:hover th:last-child, td:last-child {
+    border-top-right-radius: 32px;
+    border-bottom-right-radius: 32px;
+}
