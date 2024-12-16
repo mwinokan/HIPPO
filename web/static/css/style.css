@@ -10,6 +10,16 @@
         --color-white-overlay: hsla(0, 0%, 100%, 20%); /* light blue */
         --color-primary-overlay: hsla(207, 50%, 90%, 20%); /* light blue */
         --color-secondary-overlay: hsla(207, 20%, 40%, 20%); /* light blue */
+
+        --color-status-good: hsl(103 100% 35%);
+        --color-status-medium: hsl(34 100% 35%);
+        --color-status-bad: hsl(360 100% 35%);
+        --color-status-neutral: hsl(103 0% 35%);
+
+        --text-color-status-good: var(--color-tertiary);
+        --text-color-status-medium: white;
+        --text-color-status-bad: white;
+        --text-color-status-neutral: white;
 }
 
 body {
@@ -22,12 +32,15 @@ body {
 }
 
 header {
-    padding: 1rem;
+/*    padding: 1rem;*/
     text-align: center;
 }
 
 main {
-    padding: 2rem;
+    padding-top: 0rem;
+    padding-left: 2rem;
+    padding-right: 2rem;
+    padding-botoom: 2rem;
 }
 
 .card {
@@ -44,11 +57,11 @@ main {
 }
 
 footer {
-    background: var(--color-tertiary);
-    color: var(--color-primary);
+/*    background: var(--color-tertiary);*/
+/*    color: var(--color-primary);*/
     text-align: center;
     padding: 1rem 0;
-    position: fixed;
+    position: relative;
     bottom: 0;
     width: 100%;
 }
@@ -59,6 +72,18 @@ table {
     border:none;
     width:100%;
     display:table;
+}
+
+.right {
+    text-align: right;
+}
+
+.span-pill {
+    padding-left: 8px;
+    padding-right: 8px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+    border-radius: 32px;
 }
 
 th, td {
