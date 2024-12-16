@@ -8,4 +8,4 @@ class Tag(TagModel):
     _parent_module = "annotation"
 
     def __str__(self):
-        return f'"{self.name}"'
+        return f'"{self.name}" [{self.type.name}]'

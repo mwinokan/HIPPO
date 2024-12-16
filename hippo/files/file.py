@@ -22,6 +22,6 @@ def guess_file_format(path) -> str:
         if path.name.endswith(suffix):
             format_type = suffix
             break
-        else:
-            raise ValueError(f"Unknown file extension: {path}")
+    else:
+        raise ValueError(f"Unknown file extension: {path}")
     return format_type

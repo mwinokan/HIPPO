@@ -3,6 +3,8 @@ from .database import Database
 from django.core.exceptions import ObjectDoesNotExist
 import molparse as mp
 import re
+from pathlib import Path
+import mcol
 
 
 class HIPPO:
@@ -68,6 +70,120 @@ class HIPPO:
     def num_targets(self) -> int:
         """Total number of targets in the Database"""
         return len(self.targets)
+
+    ### DATA LOADING
+
+    def add_hits(
+        self,
+        target_name: str,
+        target_access_string: str | None = None,
+        download_directory: "str | Path | None" = None,
+        metadata_csv: "str | Path | None" = None,
+        aligned_dir: "str | Path | None" = None,
+        stack: str = "production",
+    ):
+
+        import pandas as pd
+        from rdkit.Chem import PandasTools
+        from .annotation import Tag, TagType
+        from .io.fragalysis import POSE_META_TAG_FIELDS
+
+        if target_access_string:
+
+            from .io.fragalysis import download_target
+            from django.conf import settings
+
+            # mrich.print(settings.BASE_DIR)
+
+            assert download_directory, "download_directory required"
+
+            download_directory = Path(download_directory)
+
+            if not download_directory.exists():
+                download_directory.mkdir()
+
+            target_dir = download_target(
+                target_name=target_name,
+                target_access_string=target_access_string,
+                destination=download_directory,
+                stack=stack,
+            )
+
+            metadata_csv = target_dir / "metadata.csv"
+            aligned_dir = target_dir / "aligned_files"
+
+        else:
+
+            assert metadata_csv
+            assert aligned_dir
+            metadata_csv = Path(metadata_csv)
+            aligned_dir = Path(aligned_dir)
+
+        assert metadata_csv.exists()
+        assert aligned_dir.exists()
+
+        meta_df = pd.read_csv(metadata_csv)
+
+        target = self.register_target(name=target_name)
+
+        shortcodes = set(meta_df["Code"].values)
+
+        poses = []
+
+        for subdir in aligned_dir.iterdir():
+
+            if subdir.name not in shortcodes:
+                mrich.debug("Skipping", subdir)
+
+            alias = subdir.name
+
+            meta = meta_df[meta_df["Code"] == alias].iloc[0].to_dict()
+
+            # files = list(subdir.iterdir())
+
+            combi_sdf = subdir / f"{alias}.sdf"
+            complex_pdb = subdir / f"{alias}.pdb"
+            apo_pdb = subdir / f"{alias}_apo-desolv.pdb"
+
+            mol_df = PandasTools.LoadSDF(
+                str(combi_sdf),
+                molColName="ROMol",
+                idName="ID",
+                strictParsing=True,
+            )
+
+            assert len(mol_df) == 1, "Combi-soaks not yet supported"
+
+            mol = mol_df.ROMol[0]
+
+            pose = self.register_pose(
+                smiles=meta["Smiles"],
+                mol=mol,
+                complex_file=complex_pdb,
+                protein_file=apo_pdb,
+                mol_file=combi_sdf,
+                alias=alias,
+                origin="EXPERIMENT",
+                is_fingerprinted=False,
+                metadata=None,
+                target=target,
+                compound_alias=meta["Compound code"],
+                structure_origin="EXPERIMENT",
+            )
+
+            def add_tag(key, type):
+                tagtype, _ = TagType.get_or_create(name=type)
+                tag, created = Tag.get_or_create(name=meta[key], type=tagtype)
+                if created:
+                    tag.clean_and_save()
+                pose.tags.add(tag)
+
+            for key, type in POSE_META_TAG_FIELDS.items():
+                add_tag(key, type)
+
+            poses.append(pose)
+
+        mrich.success("Loaded", len(poses), "poses for target:", target)
 
     ### METHODS
 
@@ -281,48 +397,6 @@ class HIPPO:
             mrich.debug("Retrieved", instance)
 
         return instance
-
-    # def register_file(self,
-    #     *,
-    #     path: "str | Path",
-    #     purpose: str,
-    #     format_type: str,
-    #     content_type: str,
-    #     debug: bool = True,
-    # ) -> "File":
-
-    #     from .orm.formatters import path_formatter
-    #     from .file import File
-
-    #     # format values
-    #     path = path_formatter(path)
-
-    #     for suffix in File.FILE_FORMATS:
-    #         if path.name.endswith(suffix):
-    #             format_type = suffix
-    #             break
-    #     else:
-    #         raise NotImplementedError(f"Unknown file extension: {path}")
-
-    #     # assert purpose in File.FILE_PURPOSES
-    #     # assert format_type in File.FILE_FORMATS
-
-    #     instance, created = File.get_or_create(
-    #         path=path,
-    #         format_type=format_type,
-    #         content_type=content_type,
-    #     )
-
-    #     if created:
-    #         instance.clean_and_save()
-
-    #         if debug:
-    #             mrich.debug("Created", instance)
-
-    #     elif debug:
-    #         mrich.debug("Retrieved", instance)
-
-    #     return instance
 
     def register_structure(
         self,

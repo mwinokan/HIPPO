@@ -456,8 +456,9 @@ class TagModel(AbstractModel):
     class Meta:
         app_label = "hippo"
         abstract = True
+        unique_together = ("name", "type")
 
-    name = models.CharField(max_length=60, blank=False, unique=True)
+    name = models.CharField(max_length=60, blank=False)
     type = models.ForeignKey("TagType", on_delete=models.RESTRICT, related_name="_tags")
 
     _name_field = "name"
@@ -468,6 +469,7 @@ class TagTypeModel(AbstractModel):
         abstract = True
 
     name = models.CharField(max_length=30, blank=False, unique=True)
+    origin = models.CharField(max_length=30, blank=True, null=True)
 
     _name_field = "name"
 

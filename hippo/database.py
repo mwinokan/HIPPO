@@ -28,11 +28,17 @@ class Database:
         setup_django: bool = True,
         debug: bool = True,
         django_debug: bool = False,
+        allow_async_unsafe: bool = True,
         **kwargs,
     ) -> None:
 
         self._db_alias = db_alias
         self._path = Path(path).resolve()
+
+        if allow_async_unsafe:
+            import os
+
+            os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
 
         if setup_django:
             from .orm.setup import setup_django
@@ -100,7 +106,11 @@ class Database:
         #     model._setup_wrappers()
 
         # create the tables
-        self._create_tables()
+        try:
+            self._create_tables()
+        except Exception as e:
+            mrich.error("Could not create tables")
+            mrich.error(e)
 
         mrich.success(f'Connected Database "{db_alias}" @', f"[file]{path}")
 
