@@ -6,11 +6,3 @@ class QuoteTable(AbstractTable):
 
     _name = "all quotes"
     _model = Quote
-
-    ### FACTORIES
-
-    ### PROPERTIES
-
-    ### METHODS
-
-    ### DUNDERS
