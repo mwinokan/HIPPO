@@ -60,6 +60,7 @@ class Database:
         from .interactions import Interaction, Feature
         from .chemistry import Solvent, Reaction, Reactant, Product
         from .files import File
+        from .projects import Campaign, Iteration
 
         # define the table names
         self.MODELS = [
@@ -86,11 +87,17 @@ class Database:
             Inspiration,
             InspirationScore,
             InspirationScoreType,
+            Campaign,
+            Iteration,
         ]
 
-        # setup custom attribute wrappers
-        for model in self.MODELS:
-            model._setup_wrappers()
+        from .orm.setup import setup_models
+
+        setup_models()
+
+        # # setup custom attribute wrappers
+        # for model in self.MODELS:
+        #     model._setup_wrappers()
 
         # create the tables
         self._create_tables()

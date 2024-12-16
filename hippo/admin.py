@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-# Register your models here.
+# import models
 
 from .protein import *
 from .compound import *
@@ -10,6 +10,15 @@ from .annotation import *
 from .interactions import *
 from .chemistry import *
 from .files import *
+from .projects import *
+
+# setup custom wrappers
+
+from .orm.setup import setup_models
+
+setup_models()
+
+# register models
 
 admin.site.register(Target)
 admin.site.register(Compound)
@@ -33,6 +42,5 @@ admin.site.register(PoseScore)
 admin.site.register(PoseScoreType)
 admin.site.register(CompoundScore)
 admin.site.register(CompoundScoreType)
-
-# admin.site.register(Campaign)
-# admin.site.register(Iteration)
+admin.site.register(Campaign)
+admin.site.register(Iteration)
