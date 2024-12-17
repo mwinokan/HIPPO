@@ -6,11 +6,3 @@ class FileTable(AbstractTable):
 
     _name = "all files"
     _model = File
-
-    ### FACTORIES
-
-    ### PROPERTIES
-
-    ### METHODS
-
-    ### DUNDERS

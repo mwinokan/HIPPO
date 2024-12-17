@@ -580,7 +580,7 @@ class PlacementModel(AbstractModel):
     metadata = models.JSONField(default=dict, blank=True)
 
 
-### FILE MANAGEMENT
+### RESOURCE MANAGEMENT
 
 
 class FileModel(AbstractModel):
@@ -632,6 +632,14 @@ class FileModel(AbstractModel):
     )
 
     _name_field = "name"
+
+
+class LinkModel(AbstractModel):
+    class Meta:
+        abstract = True
+
+    url = models.CharField(max_length=300)
+    description = models.CharField(max_length=300)
 
 
 ### PROJECT MANAGEMENT

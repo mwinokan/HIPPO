@@ -105,53 +105,7 @@ def setup_django(
 def setup_models():
 
     # import the models
-    from ..protein import Target, Structure
-    from ..compound import Compound, CompoundScore, CompoundScoreType
-    from ..pose import Pose, PoseScore, PoseScoreType
-    from ..quoting import Quote, Supplier
-    from ..annotation import (
-        Tag,
-        TagType,
-        Subsite,
-        Inspiration,
-        InspirationScore,
-        InspirationScoreType,
-        Observation,
-        Placement,
-    )
-    from ..interactions import Interaction, Feature
-    from ..chemistry import Solvent, Reaction, Reactant, Product
-    from ..files import File
-    from ..projects import Campaign, Iteration
-
-    # define the table names
-    MODELS = [
-        Target,
-        Compound,
-        Pose,
-        Quote,
-        Tag,
-        Subsite,
-        Interaction,
-        Feature,
-        Observation,
-        Solvent,
-        Reaction,
-        Reactant,
-        Product,
-        Structure,
-        Placement,
-        File,
-        PoseScore,
-        PoseScoreType,
-        CompoundScore,
-        CompoundScoreType,
-        Inspiration,
-        InspirationScore,
-        InspirationScoreType,
-        Campaign,
-        Iteration,
-    ]
+    from ..custom_models import *
 
     # setup custom attribute wrappers
     for model in MODELS:

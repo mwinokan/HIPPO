@@ -6,7 +6,7 @@ from pathlib import Path
 class File(FileModel):
 
     _objects = FileSet.as_manager()
-    _parent_module = "files"
+    _parent_module = "resources"
 
     @property
     def name(self):

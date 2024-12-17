@@ -2,15 +2,7 @@ from django.contrib import admin
 
 # import models
 
-from .protein import *
-from .compound import *
-from .pose import *
-from .quoting import *
-from .annotation import *
-from .interactions import *
-from .chemistry import *
-from .files import *
-from .projects import *
+from .custom_models import *
 
 # setup custom wrappers
 

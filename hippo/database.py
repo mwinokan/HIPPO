@@ -49,53 +49,10 @@ class Database:
             setup_django(databases, debug=django_debug, **kwargs)
 
         # import the models
-        from .protein import Target, Structure
-        from .compound import Compound, CompoundScore, CompoundScoreType
-        from .pose import Pose, PoseScore, PoseScoreType
-        from .quoting import Quote, Supplier
-        from .annotation import (
-            Tag,
-            TagType,
-            Subsite,
-            Inspiration,
-            InspirationScore,
-            InspirationScoreType,
-            Observation,
-            Placement,
-        )
-        from .interactions import Interaction, Feature
-        from .chemistry import Solvent, Reaction, Reactant, Product
-        from .files import File
-        from .projects import Campaign, Iteration
+        from .custom_models import *
 
         # define the table names
-        self.MODELS = [
-            Target,
-            Compound,
-            Pose,
-            Quote,
-            Tag,
-            Subsite,
-            Interaction,
-            Feature,
-            Observation,
-            Solvent,
-            Reaction,
-            Reactant,
-            Product,
-            Structure,
-            Placement,
-            File,
-            PoseScore,
-            PoseScoreType,
-            CompoundScore,
-            CompoundScoreType,
-            Inspiration,
-            InspirationScore,
-            InspirationScoreType,
-            Campaign,
-            Iteration,
-        ]
+        self.MODELS = MODELS
 
         from .orm.setup import setup_models
 
