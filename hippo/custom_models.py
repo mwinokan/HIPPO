@@ -23,6 +23,7 @@ MODELS = [
     Pose,
     Quote,
     Tag,
+    Link,
     Subsite,
     Interaction,
     Feature,

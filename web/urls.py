@@ -25,4 +25,20 @@ urlpatterns = [
     path("", views.index, name="index"),
     # admin
     path("admin/", admin.site.urls),
+    # path("targets/", views.TargetListView.as_view(), name="target-list"),
+    # path("target/<int:pk>/", views.TargetDetailView.as_view(), name="target-detail"),
 ]
+
+for model_name, model_views in views.GENERATED_VIEWS.items():
+    urlpatterns += [
+        path(
+            f"{model_name}/",
+            model_views["list_view"].as_view(),
+            name=f"{model_name}_list",
+        ),
+        path(
+            f"{model_name}/<int:pk>/",
+            model_views["detail_view"].as_view(),
+            name=f"{model_name}_detail",
+        ),
+    ]

@@ -105,7 +105,7 @@ def setup_django(
 def setup_models():
 
     # import the models
-    from ..custom_models import *
+    from ..custom_models import MODELS
 
     # setup custom attribute wrappers
     for model in MODELS:

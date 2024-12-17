@@ -1,6 +1,6 @@
 digraph model_graph {
   // Dotfile by Django-Extensions graph_models
-  // Created: 2024-12-17 17:44
+  // Created: 2024-12-17 18:00
   
 
   fontname = "Roboto"
@@ -1634,7 +1634,7 @@ digraph model_graph {
     </TABLE>
     >]
 
-  hippo_files_file_File [label=<
+  hippo_resources_file_File [label=<
     <TABLE BGCOLOR="white" BORDER="1" CELLBORDER="0" CELLSPACING="0">
     <TR><TD COLSPAN="2" CELLPADDING="5" ALIGN="CENTER" BGCOLOR="#1b563f">
     <FONT FACE="Roboto" COLOR="white" POINT-SIZE="10"><B>
@@ -1676,6 +1676,40 @@ digraph model_graph {
   
     <TR><TD ALIGN="LEFT" BORDER="0">
     <FONT FACE="Roboto"><I>purpose</I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I>CharField</I></FONT>
+    </TD></TR>
+  
+  
+    </TABLE>
+    >]
+
+  hippo_resources_link_Link [label=<
+    <TABLE BGCOLOR="white" BORDER="1" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD COLSPAN="2" CELLPADDING="5" ALIGN="CENTER" BGCOLOR="#1b563f">
+    <FONT FACE="Roboto" COLOR="white" POINT-SIZE="10"><B>
+    Link<BR/>&lt;<FONT FACE="Roboto"><I>LinkModel</I></FONT>&gt;
+    </B></FONT></TD></TR>
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><B>id</B></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><B>BigAutoField</B></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I>description</I></FONT>
+    </TD><TD ALIGN="LEFT">
+    <FONT FACE="Roboto"><I>CharField</I></FONT>
+    </TD></TR>
+  
+  
+  
+    <TR><TD ALIGN="LEFT" BORDER="0">
+    <FONT FACE="Roboto"><I>url</I></FONT>
     </TD><TD ALIGN="LEFT">
     <FONT FACE="Roboto"><I>CharField</I></FONT>
     </TD></TR>
@@ -1799,7 +1833,7 @@ digraph model_graph {
   hippo_protein_structure_Structure -> hippo_protein_target_Target
   [label=" target (_structures)"] [arrowhead=none, arrowtail=dot, dir=both];
 
-  hippo_protein_structure_Structure -> hippo_files_file_File
+  hippo_protein_structure_Structure -> hippo_resources_file_File
   [label=" _files (_structures)"] [arrowhead=dot arrowtail=dot, dir=both];
 
   hippo_compound_compound_Compound -> hippo_compound_compound_Compound
@@ -1814,7 +1848,7 @@ digraph model_graph {
   hippo_compound_compound_score_CompoundScore -> hippo_compound_compound_score_type_CompoundScoreType
   [label=" score_type (_values)"] [arrowhead=none, arrowtail=dot, dir=both];
 
-  hippo_pose_pose_Pose -> hippo_files_file_File
+  hippo_pose_pose_Pose -> hippo_resources_file_File
   [label=" _files (_poses)"] [arrowhead=dot arrowtail=dot, dir=both];
 
   hippo_pose_pose_Pose -> hippo_annotation_tag_Tag
@@ -1894,6 +1928,42 @@ digraph model_graph {
 
   hippo_chemistry_product_Product -> hippo_chemistry_solvent_Solvent
   [label=" solvent (_products)"] [arrowhead=none, arrowtail=dot, dir=both];
+
+  hippo_resources_link_Link -> hippo_projects_iteration_Iteration
+  [label=" _iterations (_links)"] [arrowhead=dot arrowtail=dot, dir=both];
+
+  hippo_resources_link_Link -> hippo_pose_pose_Pose
+  [label=" _poses (_links)"] [arrowhead=dot arrowtail=dot, dir=both];
+
+  hippo_resources_link_Link -> hippo_protein_target_Target
+  [label=" _targets (_links)"] [arrowhead=dot arrowtail=dot, dir=both];
+
+  hippo_resources_link_Link -> hippo_projects_campaign_Campaign
+  [label=" _campaigns (_links)"] [arrowhead=dot arrowtail=dot, dir=both];
+
+  hippo_resources_link_Link -> hippo_annotation_subsite_Subsite
+  [label=" _subsites (_links)"] [arrowhead=dot arrowtail=dot, dir=both];
+
+  hippo_resources_link_Link -> hippo_protein_structure_Structure
+  [label=" _structures (_links)"] [arrowhead=dot arrowtail=dot, dir=both];
+
+  hippo_resources_link_Link -> hippo_resources_file_File
+  [label=" _files (_links)"] [arrowhead=dot arrowtail=dot, dir=both];
+
+  hippo_resources_link_Link -> hippo_annotation_tag_Tag
+  [label=" _tags (_links)"] [arrowhead=dot arrowtail=dot, dir=both];
+
+  hippo_resources_link_Link -> hippo_pose_pose_score_type_PoseScoreType
+  [label=" _posescoretypes (_links)"] [arrowhead=dot arrowtail=dot, dir=both];
+
+  hippo_resources_link_Link -> hippo_compound_compound_Compound
+  [label=" _compounds (_links)"] [arrowhead=dot arrowtail=dot, dir=both];
+
+  hippo_resources_link_Link -> hippo_quoting_supplier_Supplier
+  [label=" _suppliers (_links)"] [arrowhead=dot arrowtail=dot, dir=both];
+
+  hippo_resources_link_Link -> hippo_quoting_quote_Quote
+  [label=" _quotes (_links)"] [arrowhead=dot arrowtail=dot, dir=both];
 
   hippo_projects_campaign_Campaign -> hippo_protein_target_Target
   [label=" _targets (_campaigns)"] [arrowhead=dot arrowtail=dot, dir=both];

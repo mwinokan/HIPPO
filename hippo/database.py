@@ -49,7 +49,7 @@ class Database:
             setup_django(databases, debug=django_debug, **kwargs)
 
         # import the models
-        from .custom_models import *
+        from .custom_models import MODELS
 
         # define the table names
         self.MODELS = MODELS

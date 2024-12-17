@@ -120,6 +120,7 @@ class CompoundModel(AbstractModel):
 
     _shorthand = "C"
     _name_field = "alias"
+    _detail_view_skip_fields = ["pattern_bfp", "mol"]
 
 
 class CompoundScoreTypeModel(AbstractModel):
@@ -640,6 +641,21 @@ class LinkModel(AbstractModel):
 
     url = models.CharField(max_length=300)
     description = models.CharField(max_length=300)
+
+    _iterations = models.ManyToManyField("Iteration", related_name="_links", blank=True)
+    _poses = models.ManyToManyField("Pose", related_name="_links", blank=True)
+    _targets = models.ManyToManyField("Target", related_name="_links", blank=True)
+    _campaigns = models.ManyToManyField("Campaign", related_name="_links", blank=True)
+    _subsites = models.ManyToManyField("Subsite", related_name="_links", blank=True)
+    _structures = models.ManyToManyField("Structure", related_name="_links", blank=True)
+    _files = models.ManyToManyField("File", related_name="_links", blank=True)
+    _tags = models.ManyToManyField("Tag", related_name="_links", blank=True)
+    _posescoretypes = models.ManyToManyField(
+        "PoseScoreType", related_name="_links", blank=True
+    )
+    _compounds = models.ManyToManyField("Compound", related_name="_links", blank=True)
+    _suppliers = models.ManyToManyField("Supplier", related_name="_links", blank=True)
+    _quotes = models.ManyToManyField("Quote", related_name="_links", blank=True)
 
 
 ### PROJECT MANAGEMENT

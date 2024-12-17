@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="card">
+
+    <h2 class="center">{{ model_name|title }} List</h2>
+
+    <ul>
+        {% for obj in object_list %}
+            
+            <li><a href="{% url model_name|add:'_detail' obj.pk %}">{{ obj.html|default:obj|safe }}</a> </li>
+
+        {% endfor %}
+    </ul>
+
+</div>
+
+{% endblock %}

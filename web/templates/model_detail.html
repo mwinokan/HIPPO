@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="card">
+
+    <h1 class="center">{{ object }}</h1>
+
+    <table>
+        <!-- <thead> -->
+            <!-- <tr> -->
+                <!-- <th>Model Name</th> -->
+                <!-- <th class="right">Record Count</th> -->
+            <!-- </tr> -->
+        <!-- </thead> -->
+        <tbody>
+            {% for field_name, value in fields %}
+                <tr>
+                    <td>{{ field_name }}</td>
+                    <td>{{ value }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <ul>
+        {% for field_name, members in related_fields %}
+        <h2>{{ field_name }}</h2>
+        
+            {% for member in members %}
+                <li>{{ member }}</li>
+            {% endfor %}
+            
+        {% endfor %}
+    </ul>
+
+    <a href="{% url model_name|add:'_list' %}">Back to List</a>
+
+</div>
+
+{% endblock %}
