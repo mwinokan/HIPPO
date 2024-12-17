@@ -142,6 +142,14 @@ class AbstractModel(models.Model):
     def shorthand(self) -> str | None:
         return self._shorthand
 
+    @property
+    def html(self):
+        return f"""
+        <div class="model-pill" 
+        style="background:var(--color-{self.__name__.lower()}, var(--color-{self._parent_module}));
+        color:var(--text-color-{self.__name__.lower()}, var(--text-color-{self._parent_module}));">
+        {self}</div>"""
+
     # @property
     # def wrapped_field_names(self):
     #     if not self._wrapped_field_names:

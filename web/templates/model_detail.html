@@ -28,7 +28,7 @@
         <h2>{{ field_name }}</h2>
         
             {% for member in members %}
-                <li>{{ member }}</li>
+                <li>{{ member.html|default:member|safe }}</li>
             {% endfor %}
             
         {% endfor %}

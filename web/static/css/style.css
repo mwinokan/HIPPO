@@ -20,6 +20,35 @@
         --text-color-status-medium: white;
         --text-color-status-bad: white;
         --text-color-status-neutral: white;
+
+        /* color by module */
+        --color-protein: hsl(11 100% 26%);
+        --text-color-protein: hsl(11 100% 90%);
+
+        --color-compound: hsl(42 100% 39%);
+        --text-color-compound: hsl(42 100% 90%);
+        
+        --color-pose: hsl(209 100% 39%);
+        --text-color-pose: hsl(209 100% 90%);
+
+        --color-quoting: hsl(153 100% 39%);
+        --text-color-quoting: hsl(153 100% 90%);
+
+        --color-annotation: hsl(335 100% 39%);
+        --text-color-annotation: hsl(335 100% 90%);
+
+        --color-interactions: hsl(71 100% 39%);
+        --text-color-interactions: hsl(71 100% 90%);
+
+        --color-chemistry: hsl(132 100% 39%);
+
+        --color-resources: hsl(132 0% 39%);
+        --text-color-resources: hsl(132 0% 90%);
+        --text-color-chemistry: hsl(132 100% 90%);
+
+        --color-projects: hsl(290 100% 39%);
+        --text-color-projects: hsl(290 100% 90%);
+
 }
 
 body {
@@ -84,6 +113,16 @@ table {
     padding-top: 4px;
     padding-bottom: 4px;
     border-radius: 32px;
+}
+
+.model-pill {
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    border-radius: 32px;
+    display:inline-block;
+    margin:4px;
 }
 
 th, td {

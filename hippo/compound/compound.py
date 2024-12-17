@@ -9,3 +9,4 @@ class Compound(CompoundModel):
         app_label = "hippo"
 
     _objects = CompoundSet.as_manager()
+    _parent_module = "compound"
