@@ -121,6 +121,14 @@ class AbstractModel(models.Model):
     #         self._wrapped_field_names = self.get_wrapped_field_names()
     #     return self._wrapped_field_names
 
+    @property
+    def html(self):
+        return f"""
+        <div class="model-pill" 
+        style="background:var(--color-{self.__name__.lower()}, var(--color-{self._parent_module}));
+        color:var(--text-color-{self.__name__.lower()}, var(--text-color-{self._parent_module}));">
+        {self}</div>"""
+
     ### METHODS
 
     def get_wrapped_field_names(self) -> set[str]:
