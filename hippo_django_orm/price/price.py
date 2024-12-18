@@ -1,5 +1,0 @@
-CURRENCIES = {
-    "EUR": "€",
-    "USD": "$",
-    "GBP": "£",
-}

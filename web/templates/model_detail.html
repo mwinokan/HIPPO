@@ -16,8 +16,15 @@
         <tbody>
             {% for field_name, value in fields %}
                 <tr>
-                    <td>{{ field_name }}</td>
+                    <td style="font-weight:bold;">{{ field_name.capitalize }}</td>
                     <td>{{ value }}</td>
+                </tr>
+            {% endfor %}
+
+            {% for field_name, value in foreign_fields %}
+                <tr>
+                    <td style="font-weight:bold;vertical-align:middle;">{{ field_name }}</td>
+                    <td><a href="{{ value.get_absolute_url }}">{{ value.html|default:value|safe }}</a></td>
                 </tr>
             {% endfor %}
         </tbody>
@@ -25,10 +32,10 @@
 
     <ul>
         {% for field_name, members in related_fields %}
-        <h2>{{ field_name }}</h2>
+        <h2>{{ field_name }} ({{ members|length }})</h2>
         
             {% for member in members %}
-                <li>{{ member.html|default:member|safe }}</li>
+                <li><a href="{{ member.get_absolute_url }}">{{ member.html|default:member|safe }}</a></li>
             {% endfor %}
             
         {% endfor %}

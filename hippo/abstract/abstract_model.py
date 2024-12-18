@@ -1,6 +1,7 @@
 import mcol
 import mrich
 from django.db import models
+from django.urls import reverse
 import importlib
 from ..orm.managers import ManagerRouter
 
@@ -171,6 +172,9 @@ class AbstractModel(models.Model):
             names.append(name)
 
         return set(names)
+
+    def get_absolute_url(self):
+        return reverse(f"{self.__name__.lower()}_detail", args=[str(self.id)])
 
     def summary(self):
 

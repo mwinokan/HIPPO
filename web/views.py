@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.http import HttpResponse
 from django.apps import apps
+from django.db.models.fields.related import ForeignKey
 
 
 ### function based views
@@ -91,25 +92,44 @@ def generate_views_for_model(model):
             fields = [
                 (field.name, getattr(self.object, field.name, None))
                 for field in self.model._meta.fields
-                if field.name not in skip_fields
+                if field.name not in skip_fields and not isinstance(field, ForeignKey)
             ]
             context["fields"] = fields
 
             ### related fields
+            foreign_fields = []
             related_fields = []
             for field in self.model._meta.get_fields():
                 if not field.is_relation:
                     continue
 
-                members = getattr(self.object, field.name).all()
+                print(self.object, field.name, type(field))
 
-                if not members:
-                    continue
+                if isinstance(field, ForeignKey):
 
-                related_fields.append(
-                    (field.name.removeprefix("_").capitalize(), members)
-                )
+                    related = getattr(self.object, field.name)
 
+                    if not related:
+                        continue
+
+                    foreign_fields.append(
+                        (field.name.removeprefix("_").capitalize(), related)
+                    )
+
+                else:
+
+                    members = getattr(self.object, field.name).all()
+
+                    if not members:
+                        continue
+
+                    # print(members)
+
+                    related_fields.append(
+                        (field.name.removeprefix("_").capitalize(), members)
+                    )
+
+            context["foreign_fields"] = foreign_fields
             context["related_fields"] = related_fields
 
             return context
