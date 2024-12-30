@@ -13,6 +13,11 @@ from .abstract import AbstractModel
 
 from molparse.rdkit.features import FEATURE_FAMILIES, INTERACTION_TYPES
 
+import sys
+
+sys.path.append("..")
+from web.rendertypes import FieldRenderType, ContentRenderType
+
 CURRENCIES = {
     "EUR": "€",
     "USD": "$",
@@ -120,7 +125,14 @@ class CompoundModel(AbstractModel):
 
     _shorthand = "C"
     _name_field = "alias"
-    _detail_view_skip_fields = ["pattern_bfp", "mol"]
+
+
+CompoundModel._field_render_types.update(
+    {
+        "pattern_bfp": dict(type=FieldRenderType.HIDDEN),
+        "mol": dict(type=FieldRenderType.HIDDEN),
+    }
+)
 
 
 class CompoundScoreTypeModel(AbstractModel):
@@ -209,6 +221,14 @@ class PoseModel(AbstractModel):
 
     _shorthand = "P"
     _name_field = "alias"
+
+
+CompoundModel._field_render_types.update(
+    {
+        "mol": dict(type=FieldRenderType.HIDDEN),
+        "origin": dict(content=ContentRenderType.TEXT_MONOSPACE),
+    }
+)
 
 
 class PoseScoreTypeModel(AbstractModel):

@@ -3,6 +3,7 @@ from django.http import HttpResponse
 from django.apps import apps
 from django.db.models.fields.related import ForeignKey
 
+import mrich
 
 ### function based views
 
@@ -84,53 +85,73 @@ def generate_views_for_model(model):
             context["model_name"] = self.model._meta.model_name
             # context['fields'] = [field.name for field in self.model._meta.fields]
 
-            if hasattr(self.model, "_detail_view_skip_fields"):
-                skip_fields = self.model._detail_view_skip_fields
-            else:
-                skip_fields = []
+            # if hasattr(self.model, "_detail_view_skip_fields"):
+            #     skip_fields = self.model._detail_view_skip_fields
+            # else:
+            #     skip_fields = []
 
-            fields = [
-                (field.name, getattr(self.object, field.name, None))
-                for field in self.model._meta.fields
-                if field.name not in skip_fields and not isinstance(field, ForeignKey)
-            ]
-            context["fields"] = fields
+            # fields = [
+            #     (field.name, getattr(self.object, field.name, None))
+            #     for field in self.model._meta.fields
+            #     if field.name not in skip_fields and not isinstance(field, ForeignKey)
+            # ]
+            # context["fields"] = fields
+
+            # fields = [
+            #     (field.name, getattr(self.object, field.name, None), str(self.object.get_field_render_type(field.name)))
+            #     for field in self.model._meta.fields
+            #     # if field.name not in skip_fields# and not isinstance(field, ForeignKey)
+            # ]
+            # context["fields"] = fields
 
             ### related fields
-            foreign_fields = []
-            related_fields = []
+            fields = []
             for field in self.model._meta.get_fields():
+
+                field_name = field.name
+                render_dict = self.object.get_field_render_type(field)
+                value = None
+
                 if not field.is_relation:
-                    continue
+                    value = getattr(self.object, field_name, None)
 
-                print(self.object, field.name, type(field))
+                elif isinstance(field, ForeignKey):
 
-                if isinstance(field, ForeignKey):
+                    related = getattr(self.object, field_name)
 
-                    related = getattr(self.object, field.name)
+                    # if not related:
+                    # continue
 
-                    if not related:
-                        continue
+                    field_name = field_name.removeprefix("_")  # .capitalize()
+                    value = related
 
-                    foreign_fields.append(
-                        (field.name.removeprefix("_").capitalize(), related)
-                    )
+                    mrich.print(field_name, value)
 
                 else:
 
                     members = getattr(self.object, field.name).all()
 
-                    if not members:
-                        continue
+                    # if not members:
+                    #     continue
 
                     # print(members)
 
-                    related_fields.append(
-                        (field.name.removeprefix("_").capitalize(), members)
-                    )
+                    field_name = field_name.removeprefix("_").capitalize()
+                    value = members
 
-            context["foreign_fields"] = foreign_fields
-            context["related_fields"] = related_fields
+                if value is None:
+                    continue
+
+                elif hasattr(value, "__len__") and len(value) == 0:
+                    continue
+
+                fields.append((field_name, value, render_dict))
+
+            # mrich.print(fields)
+
+            # context["foreign_fields"] = foreign_fields
+            # context["related_fields"] = related_fields
+            context["fields"] = fields
 
             return context
 

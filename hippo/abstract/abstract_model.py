@@ -5,6 +5,11 @@ from django.urls import reverse
 import importlib
 from ..orm.managers import ManagerRouter
 
+import sys
+
+sys.path.append("..")
+from web.rendertypes import FieldRenderType, ContentRenderType, DEFAULTS
+
 
 class AbstractModel(models.Model):
     class Meta:
@@ -24,6 +29,18 @@ class AbstractModel(models.Model):
 
     _shorthand = None
     _name_field = None
+
+    _field_render_types = {
+        "smiles": dict(
+            type=FieldRenderType.TABLE, content=ContentRenderType.TEXT_MONOSPACE
+        ),
+        "inchikey": dict(
+            type=FieldRenderType.TABLE, content=ContentRenderType.TEXT_MONOSPACE
+        ),
+        "metadata": dict(
+            type=FieldRenderType.TOGGLE_CARD, content=ContentRenderType.DICT_TABLE
+        ),
+    }
 
     ### MODEL SETUP
 
@@ -144,7 +161,7 @@ class AbstractModel(models.Model):
         return self._shorthand
 
     @property
-    def html(self):
+    def model_pill_html(self):
         return f"""
         <div class="model-pill" 
         style="background:var(--color-{self.__name__.lower()}, var(--color-{self._parent_module}));
@@ -209,6 +226,32 @@ class AbstractModel(models.Model):
         self.full_clean()
         self.save()
 
+    def get_field_render_type(self, field):
+
+        if field.name in self._field_render_types:
+            data = self._field_render_types[field.name]
+
+        else:
+            data = DEFAULTS.get(str(type(field)), None)
+
+        if not data:
+            data = {}
+
+        if "type" not in data:
+            mrich.warning("No default field render type", field.name, str(type(field)))
+            data["type"] = "FieldRenderType.TABLE"
+
+        if "content" not in data:
+            mrich.warning(
+                "No default content render type", field.name, str(type(field))
+            )
+            data["content"] = "ContentRenderType.TEXT_NORMAL"
+
+        data["type"] = str(data["type"])
+        data["content"] = str(data["content"])
+
+        return data
+
     # def save(self, full_clean: bool = True, *args, **kwargs):
     #     if full_clean:
     #         self.full_clean()
@@ -221,6 +264,9 @@ class AbstractModel(models.Model):
     #     super().save(*args, **kwargs)
     #     if auto:
     #         super().__setattr__("_auto_save", True)
+
+    def get_admin_url(self):
+        return reverse(f"admin:hippo_{self.__name__.lower()}_change", args=[(self.id)])
 
     ### DUNDERS
 

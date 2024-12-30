@@ -9,7 +9,7 @@
     <ul>
         {% for obj in object_list %}
             
-            <li><a href="{% url model_name|add:'_detail' obj.pk %}">{{ obj.html|default:obj|safe }}</a> </li>
+            <li><a href="{% url model_name|add:'_detail' obj.pk %}">{{ obj.model_pill_html|default:obj|safe }}</a> </li>
 
         {% endfor %}
     </ul>
