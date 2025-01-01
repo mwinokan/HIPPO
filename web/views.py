@@ -3,6 +3,8 @@ from django.http import HttpResponse
 from django.apps import apps
 from django.db.models.fields.related import ForeignKey
 
+# from .rendertypes import ContentRenderType
+
 import mrich
 
 ### function based views
@@ -83,28 +85,7 @@ def generate_views_for_model(model):
 
             context = super().get_context_data(**kwargs)
             context["model_name"] = self.model._meta.model_name
-            # context['fields'] = [field.name for field in self.model._meta.fields]
 
-            # if hasattr(self.model, "_detail_view_skip_fields"):
-            #     skip_fields = self.model._detail_view_skip_fields
-            # else:
-            #     skip_fields = []
-
-            # fields = [
-            #     (field.name, getattr(self.object, field.name, None))
-            #     for field in self.model._meta.fields
-            #     if field.name not in skip_fields and not isinstance(field, ForeignKey)
-            # ]
-            # context["fields"] = fields
-
-            # fields = [
-            #     (field.name, getattr(self.object, field.name, None), str(self.object.get_field_render_type(field.name)))
-            #     for field in self.model._meta.fields
-            #     # if field.name not in skip_fields# and not isinstance(field, ForeignKey)
-            # ]
-            # context["fields"] = fields
-
-            ### related fields
             fields = []
             for field in self.model._meta.get_fields():
 
@@ -119,22 +100,12 @@ def generate_views_for_model(model):
 
                     related = getattr(self.object, field_name)
 
-                    # if not related:
-                    # continue
-
                     field_name = field_name.removeprefix("_")  # .capitalize()
                     value = related
-
-                    mrich.print(field_name, value)
 
                 else:
 
                     members = getattr(self.object, field.name).all()
-
-                    # if not members:
-                    #     continue
-
-                    # print(members)
 
                     field_name = field_name.removeprefix("_").capitalize()
                     value = members
@@ -147,10 +118,6 @@ def generate_views_for_model(model):
 
                 fields.append((field_name, value, render_dict))
 
-            # mrich.print(fields)
-
-            # context["foreign_fields"] = foreign_fields
-            # context["related_fields"] = related_fields
             context["fields"] = fields
 
             return context

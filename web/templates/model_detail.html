@@ -32,6 +32,10 @@
 
                         <td><a href="{{ value.get_absolute_url }}">{{ value.model_pill_html|default:value|safe }}</a></td>
 
+                    {% elif render_dict.content == "ContentRenderType.MOL_2D_SVG" %}
+
+                        <td>{{ object.get_mol_svg_text|safe }}</td>
+
                     {% else %}
 
                         <td>UNSUPPORTED CONTENT TYPE {{render_dict.content}}</td>

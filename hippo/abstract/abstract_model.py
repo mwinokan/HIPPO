@@ -18,15 +18,6 @@ class AbstractModel(models.Model):
 
     id = models.BigAutoField(primary_key=True)
 
-    # def __init__(self, auto_save: bool = False, *args, **kwargs):
-
-    #     #     # set up parent instance
-    #     #     super().__setattr__("_auto_save", False)
-    #     super().__init__(*args, **kwargs)
-    #     self._wrapped_field_names = None
-
-    #     super().__setattr__("_auto_save", auto_save)
-
     _shorthand = None
     _name_field = None
 
@@ -37,6 +28,7 @@ class AbstractModel(models.Model):
         "inchikey": dict(
             type=FieldRenderType.TABLE, content=ContentRenderType.TEXT_MONOSPACE
         ),
+        "mol": dict(type=FieldRenderType.TABLE, content=ContentRenderType.MOL_2D_SVG),
         "metadata": dict(
             type=FieldRenderType.TOGGLE_CARD, content=ContentRenderType.DICT_TABLE
         ),

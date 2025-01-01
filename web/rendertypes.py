@@ -16,6 +16,7 @@ class ContentRenderType(Enum):
     INSTANCE_PILL = 3
     LIST_INSTANCE_PILLS = 4
     DICT_TABLE = 5
+    MOL_2D_SVG = 6
 
 
 DEFAULTS = {

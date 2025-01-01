@@ -14,6 +14,7 @@ from .abstract import AbstractModel
 from molparse.rdkit.features import FEATURE_FAMILIES, INTERACTION_TYPES
 
 import sys
+import mrich
 
 sys.path.append("..")
 from web.rendertypes import FieldRenderType, ContentRenderType
@@ -126,13 +127,13 @@ class CompoundModel(AbstractModel):
     _shorthand = "C"
     _name_field = "alias"
 
-
-CompoundModel._field_render_types.update(
-    {
-        "pattern_bfp": dict(type=FieldRenderType.HIDDEN),
-        "mol": dict(type=FieldRenderType.HIDDEN),
-    }
-)
+    _field_render_types = AbstractModel._field_render_types.copy()
+    _field_render_types.update(
+        {
+            "pattern_bfp": dict(type=FieldRenderType.HIDDEN),
+            # "mol": dict(type=FieldRenderType.HIDDEN),
+        }
+    )
 
 
 class CompoundScoreTypeModel(AbstractModel):
@@ -221,14 +222,6 @@ class PoseModel(AbstractModel):
 
     _shorthand = "P"
     _name_field = "alias"
-
-
-CompoundModel._field_render_types.update(
-    {
-        "mol": dict(type=FieldRenderType.HIDDEN),
-        "origin": dict(content=ContentRenderType.TEXT_MONOSPACE),
-    }
-)
 
 
 class PoseScoreTypeModel(AbstractModel):
