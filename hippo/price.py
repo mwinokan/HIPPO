@@ -121,7 +121,7 @@ class Price:
         :returns: :class:`.Price` object
 
         """
-        
+
         if other is None:
             return self
 

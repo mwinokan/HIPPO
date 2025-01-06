@@ -815,7 +815,7 @@ class PoseSet:
 
     @property
     def interaction_overlap_score(self):
-        
+
         sql = f"""
         SELECT DISTINCT interaction_pose, feature_id, interaction_type FROM interaction 
         INNER JOIN feature ON interaction_feature = feature_id
@@ -839,21 +839,20 @@ class PoseSet:
             iset_j = ISETS[pose_j]
             for pose_k in ids:
                 iset_k = ISETS[pose_k]
-                
+
                 # try:
                 # except KeyError:
                 #     mrich.error("No interactions for pose with id", pose_k, "Has it been fingerprinted?")
                 #     continue
-                
+
                 intersection = iset_j & iset_k
                 diff1 = iset_j - iset_k
                 diff2 = iset_k - iset_j
-                
+
                 if intersection and diff1 and diff2:
                     count += 1
 
         return count
-    
 
     @property
     def num_fingerprinted(self) -> int:

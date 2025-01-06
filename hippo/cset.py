@@ -1095,8 +1095,12 @@ class CompoundSet:
         h = Checkbox(description="quotes", value=False)
         i = Checkbox(description="Metadata", value=False)
 
-        ui1 = GridBox([b, c, d, e], layout=Layout(grid_template_columns="repeat(4, 100px)"))
-        ui2 = GridBox([f, g, h, i], layout=Layout(grid_template_columns="repeat(4, 100px)"))
+        ui1 = GridBox(
+            [b, c, d, e], layout=Layout(grid_template_columns="repeat(4, 100px)")
+        )
+        ui2 = GridBox(
+            [f, g, h, i], layout=Layout(grid_template_columns="repeat(4, 100px)")
+        )
         ui = VBox([a, ui1, ui2])
 
         def widget(
@@ -1431,10 +1435,13 @@ class CompoundSet:
         )
 
         if tags:
-            data = [dict(id=id, smiles=smiles, tags=TAGS.get(id, [])) for id, smiles in records]
+            data = [
+                dict(id=id, smiles=smiles, tags=TAGS.get(id, []))
+                for id, smiles in records
+            ]
         else:
             data = [dict(id=id, smiles=smiles) for id, smiles in records]
-            
+
         df = DataFrame(data)
         mrich.writing(file)
         df.to_csv(file, index=False)
@@ -2106,7 +2113,7 @@ class IngredientSet:
         else:
 
             quoted = Price.null()
-        
+
         if debug:
             mrich.debug("quoted", quoted)
 
@@ -2425,7 +2432,7 @@ class IngredientSet:
     def __getattr__(self, key: str):
         """For missing attributes try getting from associated :class:`.CompoundSet`"""
         # if hasattr(self, key):
-            # return getattr(self, key)
+        # return getattr(self, key)
         # else:
         return getattr(self.compounds, key)
 

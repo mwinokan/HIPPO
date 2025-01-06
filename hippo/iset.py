@@ -303,7 +303,7 @@ class InteractionSet:
 
         d = defaultdict(int)
 
-        for pose_id, in records:
+        for (pose_id,) in records:
             d[pose_id] += 1
 
         return mean(list(d.values()))

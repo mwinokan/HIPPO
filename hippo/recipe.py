@@ -372,7 +372,10 @@ class Recipe:
         mrich.var("#compounds", n_comps)
 
         for comp, a in mrich.track(
-                zip(compounds, amount), prefix="Solving individual compound recipes...", total = n_comps):
+            zip(compounds, amount),
+            prefix="Solving individual compound recipes...",
+            total=n_comps,
+        ):
 
             comp_options = []
 
@@ -1342,17 +1345,19 @@ class Recipe:
             )
 
             if quote:
-                d.update(dict(
-                    quoted_amount=quote.amount,
-                    quote_currency=quote.currency,
-                    quote_price=quote.price.amount,
-                    quote_lead_time_days=quote.lead_time,
-                    quote_supplier=quote.supplier,
-                    quote_catalogue=quote.catalogue,
-                    quote_entry=quote.entry,
-                    quoted_smiles=quote.smiles,
-                    quoted_purity=quote.purity,
-                ))
+                d.update(
+                    dict(
+                        quoted_amount=quote.amount,
+                        quote_currency=quote.currency,
+                        quote_price=quote.price.amount,
+                        quote_lead_time_days=quote.lead_time,
+                        quote_supplier=quote.supplier,
+                        quote_catalogue=quote.catalogue,
+                        quote_entry=quote.entry,
+                        quoted_smiles=quote.smiles,
+                        quoted_purity=quote.purity,
+                    )
+                )
 
             downstream_routes = []
             downstream_reactions = []
