@@ -1341,9 +1341,14 @@ class HIPPO:
             )
 
         assert smiles_col in df.columns, unexpected_column("smiles_col", smiles_col)
-        assert orig_name_col in df.columns, unexpected_column(
-            "orig_name_col", orig_name_col
-        )
+
+        if orig_name_col is not None:
+            assert orig_name_col in df.columns, unexpected_column(
+                "orig_name_col", orig_name_col
+            )
+        else:
+            orig_name_is_hippo_id = False
+
         assert entry_col in df.columns, unexpected_column("entry_col", entry_col)
         assert purity_col in df.columns, unexpected_column("purity_col", purity_col)
 
@@ -2068,7 +2073,7 @@ class HIPPO:
             else:
                 (pose_id,) = result
 
-            assert pose_id
+            assert pose_id, (result, pose_id)
 
         if not pose_id:
             mrich.var("compound", compound)
