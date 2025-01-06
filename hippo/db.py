@@ -255,7 +255,9 @@ class Database:
         self._connection = conn
         self._cursor = conn.cursor()
 
-    def execute(self, sql, payload=None, *, retry: float | None = 1, debug: bool = False) -> None:
+    def execute(
+        self, sql, payload=None, *, retry: float | None = 1, debug: bool = False
+    ) -> None:
         """Execute arbitrary SQL
 
         :param sql: SQL query
@@ -266,8 +268,6 @@ class Database:
 
         if debug:
             mrich.debug(sql)
-            # if "INSERT" in sql:
-            #     raise Exception
 
         try:
             if payload:
@@ -1878,13 +1878,13 @@ class Database:
     def delete_poses(self, poses: "PoseSet") -> None:
         """Delete all database records related to a set of poses"""
 
-        raise NotImplementedError("Needs more dev")
+        # raise NotImplementedError("Needs more dev")
 
         str_ids = poses.str_ids
 
-        self.db.delete_where(table="pose", key=f"pose_id IN {str_ids}")
-        self.db.delete_where(table="tag", key=f"tag_pose IN {str_ids}")
-        self.db.delete_where(
+        self.delete_where(table="pose", key=f"pose_id IN {str_ids}")
+        self.delete_where(table="tag", key=f"tag_pose IN {str_ids}")
+        self.delete_where(
             table="inspiration", key=f"inspiration_derivative IN {str_ids}"
         )
         # interactions?

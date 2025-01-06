@@ -1091,12 +1091,13 @@ class CompoundSet:
         d = Checkbox(description="2D", value=True)
         e = Checkbox(description="poses", value=False)
         f = Checkbox(description="reactions", value=False)
-        g = Checkbox(description="Metadata", value=False)
+        g = Checkbox(description="tags", value=False)
+        h = Checkbox(description="quotes", value=False)
+        i = Checkbox(description="Metadata", value=False)
 
-        ui = GridBox(
-            [b, c, d, e, f, g], layout=Layout(grid_template_columns="repeat(6, 100px)")
-        )
-        ui = VBox([a, ui])
+        ui1 = GridBox([b, c, d, e], layout=Layout(grid_template_columns="repeat(4, 100px)"))
+        ui2 = GridBox([f, g, h, i], layout=Layout(grid_template_columns="repeat(4, 100px)"))
+        ui = VBox([a, ui1, ui2])
 
         def widget(
             i,
@@ -1105,6 +1106,8 @@ class CompoundSet:
             draw=True,
             poses=True,
             reactions=True,
+            tags=True,
+            quotes=True,
             metadata=True,
         ):
             """
@@ -1124,7 +1127,7 @@ class CompoundSet:
                 print(repr(comp))
 
             if summary:
-                comp.summary(metadata=False, draw=False)
+                comp.summary(metadata=False, draw=False, tags=False)
 
             if draw:
                 comp.draw()
@@ -1139,6 +1142,14 @@ class CompoundSet:
                     print(repr(r))
                     r.draw()
 
+            if tags:
+                mrich.title("Tags")
+                mrich.print(comp.tags)
+
+            if quotes:
+                mrich.title("Quotes")
+                display(comp.get_quotes(df=True))
+
             if metadata:
                 mrich.title("Metadata:")
                 pprint(comp.metadata)
@@ -1152,7 +1163,9 @@ class CompoundSet:
                 "draw": d,
                 "poses": e,
                 "reactions": f,
-                "metadata": g,
+                "tags": g,
+                "quotes": h,
+                "metadata": i,
             },
         )
 
@@ -1387,13 +1400,28 @@ class CompoundSet:
         """Get a dictionary object with all serialisable data needed to reconstruct this set"""
         return dict(db=str(self.db.path.resolve()), indices=self.indices)
 
-    def write_smiles_csv(self, file: str) -> None:
+    def write_smiles_csv(self, file: str, tags: bool = True) -> None:
         """Write a CSV of the smiles contained in this set to a file
 
         :param file: path of the CSV file
 
         """
         from pandas import DataFrame
+
+        if tags:
+            records = self.db.select_where(
+                table="tag",
+                query="tag_compound, tag_name",
+                key=f"tag_compound IN {self.str_ids}",
+                multiple=True,
+                none="quiet",
+            )
+            TAGS = {}
+            if records:
+                for compound_id, tag_name in records:
+                    if compound_id not in TAGS:
+                        TAGS[compound_id] = set()
+                    TAGS[compound_id].add(tag_name)
 
         records = self.db.select_where(
             table=self.table,
@@ -1402,7 +1430,11 @@ class CompoundSet:
             multiple=True,
         )
 
-        data = [dict(id=id, smiles=smiles) for id, smiles in records]
+        if tags:
+            data = [dict(id=id, smiles=smiles, tags=TAGS.get(id, [])) for id, smiles in records]
+        else:
+            data = [dict(id=id, smiles=smiles) for id, smiles in records]
+            
         df = DataFrame(data)
         mrich.writing(file)
         df.to_csv(file, index=False)
@@ -2030,7 +2062,7 @@ class IngredientSet:
     ### METHODS
 
     def get_price(
-        self, supplier: str | list[str] = None, none: str = "error"
+        self, supplier: str | list[str] = None, none: str = "error", debug: bool = False
     ) -> "Price":
         """Calculate the price with a given supplier
 
@@ -2043,6 +2075,9 @@ class IngredientSet:
         pairs = {i: q for i, q in enumerate(self.df["quote_id"])}
 
         quote_ids = [q for q in pairs.values() if q is not None and not isnan(q)]
+
+        if debug:
+            mrich.debug("quote_ids", quote_ids)
 
         if quote_ids:
 
@@ -2071,6 +2106,9 @@ class IngredientSet:
         else:
 
             quoted = Price.null()
+        
+        if debug:
+            mrich.debug("quoted", quoted)
 
         unquoted = [i for i, q in pairs.items() if q is None or isnan(q)]
 
@@ -2080,14 +2118,20 @@ class IngredientSet:
 
             ingredient = self[i]
 
+            if debug:
+                mrich.debug("unquoted", i, ingredient)
+
             p = ingredient.price
 
             unquoted_price += p
 
+            if debug:
+                mrich.debug(unquoted_price)
+
             quote = ingredient.quote
 
             if not quote:
-                mrich.warning(f"NULL Quote: {ingredient=}")
+                mrich.warning("NULL Quote:", ingredient)
                 continue
 
             self.df.loc[i, "quote_id"] = quote.id
@@ -2095,6 +2139,11 @@ class IngredientSet:
             assert quote.amount
 
             self.df.loc[i, "quoted_amount"] = quote.amount
+
+        if debug:
+            mrich.debug("quoted", quoted)
+            mrich.debug("unquoted_price", unquoted_price)
+            mrich.error("end of IngredientSet.get_price()")
 
         return quoted + unquoted_price
 
@@ -2375,10 +2424,10 @@ class IngredientSet:
 
     def __getattr__(self, key: str):
         """For missing attributes try getting from associated :class:`.CompoundSet`"""
-        if hasattr(self, key):
-            return getattr(self, key)
-        else:
-            return getattr(self.compounds, key)
+        # if hasattr(self, key):
+            # return getattr(self, key)
+        # else:
+        return getattr(self.compounds, key)
 
     def __contains__(self, other: Compound | Ingredient | int):
         """Check if compound or ingredient is a member of this set"""

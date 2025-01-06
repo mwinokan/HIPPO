@@ -121,12 +121,15 @@ class Price:
         :returns: :class:`.Price` object
 
         """
-
-        if self.is_null:
-            return other
+        
+        if other is None:
+            return self
 
         if other.is_null:
             return self
+
+        if self.is_null:
+            return other
 
         if self.currency != other.currency:
             raise NotImplementedError(

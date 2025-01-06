@@ -371,14 +371,8 @@ class Recipe:
 
         mrich.var("#compounds", n_comps)
 
-        if n_comps > 1:
-            generator = mrich.track(
-                zip(compounds, amount), prefix="Solving individual compound recipes..."
-            )
-        else:
-            generator = zip(compounds, amount)
-
-        for comp, a in generator:
+        for comp, a in mrich.track(
+                zip(compounds, amount), prefix="Solving individual compound recipes...", total = n_comps):
 
             comp_options = []
 
@@ -1345,16 +1339,20 @@ class Recipe:
                 smiles=reactant.smiles,
                 inchikey=reactant.inchikey,
                 required_amount_mg=reactant.amount,
-                quoted_amount=quote.amount,
-                quote_currency=quote.currency,
-                quote_price=quote.price.amount,
-                quote_lead_time_days=quote.lead_time,
-                quote_supplier=quote.supplier,
-                quote_catalogue=quote.catalogue,
-                quote_entry=quote.entry,
-                quoted_smiles=quote.smiles,
-                quoted_purity=quote.purity,
             )
+
+            if quote:
+                d.update(dict(
+                    quoted_amount=quote.amount,
+                    quote_currency=quote.currency,
+                    quote_price=quote.price.amount,
+                    quote_lead_time_days=quote.lead_time,
+                    quote_supplier=quote.supplier,
+                    quote_catalogue=quote.catalogue,
+                    quote_entry=quote.entry,
+                    quoted_smiles=quote.smiles,
+                    quoted_purity=quote.purity,
+                ))
 
             downstream_routes = []
             downstream_reactions = []

@@ -576,9 +576,10 @@ class Pose:
 
         """
 
-        from molparse.rdkit import SuCOS_score
+        # from molparse.rdkit import SuCOS_score
+        from mucos import MuCOS_score
 
-        multi_sucos = SuCOS_score(
+        multi_sucos = MuCOS_score(
             self.inspirations.mols,
             self.mol,
             print_scores=debug,
@@ -593,7 +594,7 @@ class Pose:
             for inspiration in self.inspirations:
                 mrich.var(
                     f"{inspiration} SuCOS",
-                    SuCOS_score(inspiration.mol, self.mol, print_scores=debug),
+                    MuCOS_score(inspiration.mol, self.mol, print_scores=debug),
                 )
 
             mrich.var(f"multi SuCOS", multi_sucos)
