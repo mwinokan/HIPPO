@@ -15,3 +15,8 @@ def endswith(text, ends):
     if isinstance(text, str):
         return text.endswith(ends)
     return False
+
+
+@register.filter("get")
+def get(obj, attr):
+    return getattr(obj, attr)

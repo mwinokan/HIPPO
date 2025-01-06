@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 
+{% load custom_tags %}
+
 {% block content %}
 
 <div class="card">
@@ -7,11 +9,72 @@
     <h2 class="center">{{ model_name|title }} List</h2>
 
     <ul>
-        {% for obj in object_list %}
-            
-            <li><a href="{% url model_name|add:'_detail' obj.pk %}">{{ obj.model_pill_html|default:obj|safe }}</a> </li>
 
-        {% endfor %}
+        <table>
+
+            <thead>
+                
+                <tr>
+                    
+                    <th>{{ model_name|title }}</th>
+
+                    {% for field_name, render_dict in fields %}
+
+                        <th>
+                            {{ field_name|title }}
+                        </th>
+
+                    {% endfor %}
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+                
+                {% for obj in object_list %}
+                    
+                    <tr>
+
+                        <td>
+                            <a href="{% url model_name|add:'_detail' obj.pk %}">
+                                {{ obj.model_pill_html|default:obj|safe }}
+                            </a>
+                        </td>
+
+                        {% for field_name, render_dict in fields %}
+
+                            {% if render_dict.content == "ContentRenderType.TEXT_NORMAL" %}
+
+                                <td>{{ obj|get:field_name }}</td>
+                    
+                            {% elif render_dict.content == "ContentRenderType.TEXT_MONOSPACE" %}
+
+                                <td><span class="monospace">{{ obj|get:field_name }}</span></td>
+
+                            {% elif render_dict.content == "ContentRenderType.MOL_2D_SVG" %}
+
+                                <td>{{ obj.get_mol_svg_text|safe }}</td>
+
+                            {% elif render_dict.content == "ContentRenderType.INSTANCE_PILL" %}
+
+                                <td><a>{{ obj|get:field_name|get:"model_pill_html"|default:"N/A"|safe }}</a></td>
+
+                            {% else %}
+
+                                <td>UNSUPPORTED CONTENT TYPE {{render_dict.content}}</td>
+
+                            {% endif %}
+
+                        {% endfor %}
+
+                    </tr>                    
+
+                {% endfor %}
+            
+            </tbody>
+
+        </table>
     </ul>
 
 </div>

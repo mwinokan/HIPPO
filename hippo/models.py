@@ -135,6 +135,9 @@ class CompoundModel(AbstractModel):
         }
     )
 
+    # _list_view_fields = AbstractModel._field_render_types.copy()
+    # _list_view_fields += [ "" ]
+
 
 class CompoundScoreTypeModel(AbstractModel):
     class Meta:
@@ -476,6 +479,9 @@ class TagModel(AbstractModel):
     type = models.ForeignKey("TagType", on_delete=models.RESTRICT, related_name="_tags")
 
     _name_field = "name"
+
+    # _list_view_fields = AbstractModel._field_render_types.copy()
+    _list_view_fields = ["name", "type"]
 
 
 class TagTypeModel(AbstractModel):

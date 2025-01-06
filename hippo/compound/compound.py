@@ -1,6 +1,7 @@
 from ..models import CompoundModel
 from .compound_set import CompoundSet
-import mrich
+
+# import mrich
 
 
 class Compound(CompoundModel):

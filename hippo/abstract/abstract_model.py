@@ -22,6 +22,7 @@ class AbstractModel(models.Model):
     _name_field = None
 
     _field_render_types = {
+        # "pill": dict(type=FieldRenderType.HIDDEN, content=ContentRenderType.INSTANCE_PILL),
         "smiles": dict(
             type=FieldRenderType.TABLE, content=ContentRenderType.TEXT_MONOSPACE
         ),
@@ -33,6 +34,8 @@ class AbstractModel(models.Model):
             type=FieldRenderType.TOGGLE_CARD, content=ContentRenderType.DICT_TABLE
         ),
     }
+
+    _list_view_fields = ["smiles", "inchikey", "mol"]
 
     ### MODEL SETUP
 

@@ -74,6 +74,46 @@ def generate_views_for_model(model):
         def get_context_data(self, **kwargs):
             context = super().get_context_data(**kwargs)
             context["model_name"] = self.model._meta.model_name
+
+            fields = []
+            for field in self.model._meta.get_fields():
+
+                field_name = field.name
+
+                render_dict = self.model.get_field_render_type(self.model, field)
+
+                if field_name in self.model._list_view_fields:
+                    # if not field.is_relation and field_name in self.model._list_view_fields:
+                    #     # value = getattr(self.object, field_name, None)
+                    # print(field_name, render_dict)
+                    fields.append((field_name, render_dict))
+
+                else:
+                    continue
+                #     pass
+
+                # elif isinstance(field, ForeignKey):
+
+                #     related = getattr(self.object, field_name)
+
+                #     field_name = field_name.removeprefix("_")  # .capitalize()
+                #     value = related
+
+                # else:
+
+                #     members = getattr(self.object, field.name).all()
+
+                #     field_name = field_name.removeprefix("_").capitalize()
+                #     value = members
+
+                # if value is None:
+                #     continue
+
+                # elif hasattr(value, "__len__") and len(value) == 0:
+                #     continue
+
+            context["fields"] = fields
+
             return context
 
     class ModelDetailView(DetailView):
