@@ -1032,41 +1032,6 @@ class Pose:
         elif debug:
             mrich.warning(f"{self} is already fingerprinted, no new calculation")
 
-    def calculate_prolif_interactions(self) -> "prolif.Fingerprint":
-        """Use ProLIF to populate the interactions table"""
-
-        import prolif as plf
-        from MDAnalysis import Universe
-        from tempfile import NamedTemporaryFile
-
-        ## prepare inputs
-
-        # protonated protein
-        protein_file = self.protein_system.add_hydrogens(return_file=True)
-        universe = Universe(protein_file.name)
-        protein_mol = plf.Molecule.from_mda(universe)
-
-        # ligand
-        ligand_file = NamedTemporaryFile(mode="w+t", suffix=".sdf")
-        writer = Chem.SDWriter(ligand_file.name)
-        writer.write(self.mol)
-        writer.close()
-        ligand_iterable = plf.sdf_supplier(ligand_file.name)
-
-        ## run prolif
-
-        fp = plf.Fingerprint(count=True)
-        fp.run_from_iterable(ligand_iterable, protein_mol)
-
-        ## parse outputs
-
-        mrich.print(fp.ifp[0])
-
-        protein_file.close()
-        ligand_file.close()
-
-        return fp, ligand_iterable, protein_mol
-
     def calculate_classic_fingerprint(
         self,
         debug: bool = False,
