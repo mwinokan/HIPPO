@@ -223,7 +223,6 @@ def plot_interaction_punchcard(
     poses=None,
     subtitle=None,
     opacity=1.0,
-    group="pose_name",
     ignore_chains=False,
 ):
     """
@@ -316,6 +315,147 @@ def plot_interaction_punchcard(
     fig.update_layout(scattermode="group", scattergap=0.75)
 
     return add_punchcard_logo(fig)
+
+
+# @hippo_graph
+def plot_interaction_punchcard_by_tags(
+    animal,
+    tags: dict[str, str] | list[str],
+    yaxis_title: str = "Tag",
+    subtitle=None,
+    opacity=0.7,
+    group="type",
+    marginal_histogram_x: bool = False,
+    marginal_histogram_y: bool = False,
+    counts: bool = True,
+    ignore_chains=True,
+    backbone_only: bool = False,
+    sidechain_only: bool = False,
+):
+    """
+
+    :param animal:
+    :param poses:  (Default value = None)
+    :param subtitle:  (Default value = None)
+    :param opacity:  (Default value = 1.0)
+    :param group:  (Default value = 'pose_name')
+    :param ignore_chains:  (Default value = False)
+
+    """
+
+    import plotly
+    import numpy as np
+
+    if isinstance(tags, list):
+        tags = {v: v for v in tags}
+
+    dfs = []
+    for group_name, tag in tags.items():
+        poses = animal.poses(tag=tag)
+        name_lookup = poses.id_name_dict
+
+        df = poses.interactions.df
+        df["tag"] = tag
+        df["group_name"] = group_name
+        df["pose_name"] = [name_lookup[pose_id] for pose_id in df["pose_id"].values]
+
+        dfs.append(df)
+
+    plot_data = pd.concat(dfs, ignore_index=True)
+
+    if backbone_only:
+        plot_data = plot_data[plot_data["backbone"] == True]
+    if sidechain_only:
+        plot_data = plot_data[plot_data["sidechain"] == True]
+
+    if ignore_chains:
+        x = "res_name_number"
+        plot_data[x] = plot_data[["residue_name", "residue_number"]].agg(
+            lambda x: " ".join([str(i) for i in x]), axis=1
+        )
+        plot_data = plot_data.sort_values([group, x, "residue_number"])
+        sort_key = lambda x: x[1]
+    else:
+        x = "chain_res_name_number_str"
+        plot_data[x] = plot_data[["chain_name", "residue_name", "residue_number"]].agg(
+            lambda x: " ".join([str(i) for i in x]), axis=1
+        )
+        sort_key = lambda x: (x[2], x[1])
+
+    if counts:
+        if ignore_chains:
+            plot_data = (
+                plot_data.groupby(["group_name", "type", x, "residue_number"])
+                .size()
+                .reset_index(name="count")
+            )
+        else:
+            plot_data = (
+                plot_data.groupby(
+                    ["group_name", "type", x, "residue_number", "chain_name"]
+                )
+                .size()
+                .reset_index(name="count")
+            )
+
+        plot_data["size"] = np.sqrt(plot_data["count"])
+
+    title = "Interaction Punch-Card"
+
+    if subtitle:
+        title = f"<b>{animal.name}</b>: {title}<br><sup><i>{subtitle}</i></sup>"
+    else:
+        title = f"<b>{animal.name}</b>: {title}"
+
+    fig = px.scatter(
+        plot_data,
+        x=x,
+        y="group_name",
+        marginal_x="histogram" if marginal_histogram_x else None,
+        marginal_y="histogram" if marginal_histogram_y else None,
+        hover_data=plot_data.columns,
+        color=group,
+        size="size" if counts else None,
+    )
+
+    # fig.update_layout(title=title, title_automargin=False, title_yref="container")
+
+    fig.update_layout(xaxis_title="Residue", yaxis_title=yaxis_title)
+
+    # x-axis sorting
+    if ignore_chains:
+        categoryarray = plot_data[[x, "residue_number"]].agg(tuple, axis=1)
+    else:
+        categoryarray = plot_data[[x, "residue_number", "chain_name"]].agg(
+            tuple, axis=1
+        )
+    categoryarray = sorted([v for v in categoryarray.values], key=sort_key)
+    categoryarray = [v[0] for v in categoryarray]
+
+    # sort axes
+    fig.update_xaxes(categoryorder="array", categoryarray=categoryarray)
+    fig.update_yaxes(categoryorder="category descending")
+
+    for trace in fig.data:
+        if type(trace) == plotly.graph_objs._histogram.Histogram:
+            trace.opacity = 1
+            trace.xbins.size = 1
+        else:
+            # trace["marker"]["size"] = 10
+            trace["marker"]["opacity"] = opacity
+
+    # add ticks to marginals:
+
+    # fig.update_layout(
+    #     xaxis2=dict(showticklabels=True),  # Show ticks on the x-axis marginal
+    #     # yaxis2=dict(showticklabels=True)   # Show ticks on the y-axis marginal
+    # )
+
+    fig.update_layout(barmode="stack")
+    # fig.update_layout(scattermode="group", scattergap=0.75)
+
+    # return add_punchcard_logo(fig)
+    return fig
 
 
 @hippo_graph

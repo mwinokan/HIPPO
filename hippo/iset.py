@@ -265,6 +265,73 @@ class InteractionSet:
         return self.db.execute(sql).fetchall()
 
     @property
+    def avg_num_residues_per_pose(self) -> list[tuple]:
+        """Get a list of ``(residue_number, chain_name)`` tuples"""
+
+        sql = f"""
+        SELECT DISTINCT interaction_pose, feature_residue_number, feature_chain_name FROM {self.table}
+        INNER JOIN feature
+        ON feature_id = interaction_feature
+        WHERE interaction_id IN {self.str_ids}
+        """
+
+        records = self.db.execute(sql).fetchall()
+
+        from collections import defaultdict
+        from numpy import mean
+
+        d = defaultdict(set)
+
+        for pose_id, res_num, chain_name in records:
+            d[pose_id].add((res_num, chain_name))
+
+        return mean(list(len(v) for v in d.values()))
+
+    @property
+    def avg_num_interactions_per_pose(self) -> list[tuple]:
+        """Get a list of ``(residue_number, chain_name)`` tuples"""
+
+        sql = f"""
+        SELECT interaction_pose FROM {self.table}
+        WHERE interaction_id IN {self.str_ids}
+        """
+
+        records = self.db.execute(sql).fetchall()
+
+        from collections import defaultdict
+        from numpy import mean
+
+        d = defaultdict(int)
+
+        for (pose_id,) in records:
+            d[pose_id] += 1
+
+        return mean(list(d.values()))
+
+    @property
+    def avg_num_interaction_type_residue_pairs_per_pose(self) -> list[tuple]:
+        """Get a list of ``(residue_number, chain_name)`` tuples"""
+
+        sql = f"""
+        SELECT DISTINCT interaction_pose, interaction_type, feature_residue_number, feature_chain_name FROM {self.table}
+        INNER JOIN feature
+        ON feature_id = interaction_feature
+        WHERE interaction_id IN {self.str_ids}
+        """
+
+        records = self.db.execute(sql).fetchall()
+
+        from collections import defaultdict
+        from numpy import mean
+
+        d = defaultdict(set)
+
+        for pose_id, type, res_num, chain_name in records:
+            d[pose_id].add((res_num, type, chain_name))
+
+        return mean(list(len(v) for v in d.values()))
+
+    @property
     def type_residue_number_chain_triples(self) -> list[tuple]:
         """Get a list of ``(interaction_type, residue_number, chain_name)`` tuples"""
 
@@ -664,6 +731,9 @@ def df_from_interaction_records(
 
         d["prot_atoms"] = feature.atom_names
         d["lig_atoms"] = atom_ids
+
+        d["backbone"] = feature.backbone
+        d["sidechain"] = feature.sidechain
 
         data.append(d)
 

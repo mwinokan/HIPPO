@@ -85,13 +85,17 @@ class TagSet(MutableSet):
         self._immutable = immutable
         self._parent = parent
 
-        tags = tags or ()
+        tags = tags or []
 
         for tag in tags:
-            self.add(tag, commit=False)
+            if tag not in self._elements:
+                self._elements.append(tag)
 
-        if commit:
-            self.db.commit()
+        # for tag in tags:
+        #     self.add(tag, commit=False)
+
+        # if commit:
+        #     self.db.commit()
 
     ### FACTORIES
 

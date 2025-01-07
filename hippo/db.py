@@ -255,7 +255,9 @@ class Database:
         self._connection = conn
         self._cursor = conn.cursor()
 
-    def execute(self, sql, payload=None, *, retry: float | None = 1) -> None:
+    def execute(
+        self, sql, payload=None, *, retry: float | None = 1, debug: bool = False
+    ) -> None:
         """Execute arbitrary SQL
 
         :param sql: SQL query
@@ -263,6 +265,10 @@ class Database:
         :param payload: Payload for insertion, etc. (Default value = None)
 
         """
+
+        if debug:
+            mrich.debug(sql)
+
         try:
             if payload:
                 return self.cursor.execute(sql, payload)
@@ -1872,13 +1878,13 @@ class Database:
     def delete_poses(self, poses: "PoseSet") -> None:
         """Delete all database records related to a set of poses"""
 
-        raise NotImplementedError("Needs more dev")
+        # raise NotImplementedError("Needs more dev")
 
         str_ids = poses.str_ids
 
-        self.db.delete_where(table="pose", key=f"pose_id IN {str_ids}")
-        self.db.delete_where(table="tag", key=f"tag_pose IN {str_ids}")
-        self.db.delete_where(
+        self.delete_where(table="pose", key=f"pose_id IN {str_ids}")
+        self.delete_where(table="tag", key=f"tag_pose IN {str_ids}")
+        self.delete_where(
             table="inspiration", key=f"inspiration_derivative IN {str_ids}"
         )
         # interactions?
@@ -2548,6 +2554,25 @@ class Database:
             d[pose_id] = d.get(pose_id, set())
             d[pose_id].add(interaction_id)
         return d
+
+    def get_pose_id_interaction_tuples_dict(self, pset: "PoseSet") -> dict[int, set]:
+        """Get a dictionary mapping :class:`.Pose` ID's to lists of `(interaction_type, feature_id)` tuples describing their interactions"""
+
+        sql = f"""
+        SELECT DISTINCT interaction_pose, feature_id, interaction_type FROM interaction 
+        INNER JOIN feature ON interaction_feature = feature_id
+        WHERE interaction_pose IN {pset.str_ids}
+        """
+
+        records = self.execute(sql).fetchall()
+
+        ISETS = {}
+        for pose_id, feature_id, interaction_type in records:
+            values = ISETS.get(pose_id, set())
+            values.add((interaction_type, feature_id))
+            ISETS[pose_id] = values
+
+        return ISETS
 
     def get_compound_id_inspiration_ids_dict(self) -> dict[int, set]:
 

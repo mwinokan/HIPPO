@@ -814,6 +814,47 @@ class PoseSet:
         return self._interactions
 
     @property
+    def interaction_overlap_score(self):
+
+        sql = f"""
+        SELECT DISTINCT interaction_pose, feature_id, interaction_type FROM interaction 
+        INNER JOIN feature ON interaction_feature = feature_id
+        WHERE interaction_pose IN {self.str_ids}
+        """
+
+        # mrich.print(sql)
+
+        records = self.db.execute(sql).fetchall()
+
+        ISETS = {}
+        for pose_id, feature_id, interaction_type in records:
+            values = ISETS.get(pose_id, set())
+            values.add((interaction_type, feature_id))
+            ISETS[pose_id] = values
+
+        ids = [i for i in self.ids if i in ISETS]
+
+        count = 0
+        for pose_j in ids:
+            iset_j = ISETS[pose_j]
+            for pose_k in ids:
+                iset_k = ISETS[pose_k]
+
+                # try:
+                # except KeyError:
+                #     mrich.error("No interactions for pose with id", pose_k, "Has it been fingerprinted?")
+                #     continue
+
+                intersection = iset_j & iset_k
+                diff1 = iset_j - iset_k
+                diff2 = iset_k - iset_j
+
+                if intersection and diff1 and diff2:
+                    count += 1
+
+        return count
+
+    @property
     def num_fingerprinted(self) -> int:
         """Count the number of fingerprinted poses in this set"""
         return self.db.count_where(
@@ -923,26 +964,46 @@ class PoseSet:
             ids = [v for v, in values if v and v in self.ids]
         return PoseSet(self.db, ids)
 
-    def get_by_metadata(self, key: str, value: str | None = None) -> "PoseSet":
+    def get_by_metadata(
+        self, key: str, value: str | None = None, debug: bool = False
+    ) -> "PoseSet":
         """Get all child poses with by their metadata. If no value is passed, then simply containing the key in the metadata dictionary is sufficient
 
         :param key: metadata key to search for
         :param value: metadata value, if ``None`` return poses with the metadata key regardless of value (Default value = None)
 
         """
-        results = self.db.select(
-            query="pose_id, pose_metadata", table="pose", multiple=True
+        results = self.db.select_where(
+            query="pose_id, pose_metadata",
+            key=f"pose_id IN {self.str_ids}",
+            table="pose",
+            multiple=True,
         )
+
         if value is None:
-            ids = [i for i, d in results if d and f'"{key}":' in d and i in self.ids]
+            ids = [i for i, d in results if d and f'"{key}":' in d]
+
         else:
             if isinstance(value, str):
                 value = f'"{value}"'
-            ids = [
-                i
-                for i, d in results
-                if d and f'"{key}": {value}' in d and i in self.ids
-            ]
+
+            ids = []
+
+            for i, d in results:
+                if not d:
+                    continue
+
+                if debug:
+                    mrich.print(i, d, f'"{key}": {value}' in d)
+
+                if f'"{key}": {value}' in d:
+                    ids.append(i)
+                else:
+                    continue
+
+                if debug:
+                    break
+
         return PoseSet(self.db, ids)
 
     def get_by_inspiration(self, inspiration: int | Pose, inverse: bool = False):
@@ -972,7 +1033,7 @@ class PoseSet:
         return PoseSet(self.db, ids)
 
     def get_df(
-        self, skip_no_mol=True, reference: str = "name", **kwargs
+        self, skip_no_mol=True, reference: str = "name", mol: bool = False, **kwargs
     ) -> "pandas.DataFrame":
         """Get a DataFrame of the poses in this set. Keyword arguments passed to :meth:`.Pose.get_dict`.
 
@@ -984,13 +1045,18 @@ class PoseSet:
 
         data = []
 
-        if len(self) > 100:
-            gen = mrich.track(self, prefix="PoseSet --> DataFrame")
-        else:
-            gen = self
+        # if len(self) > 100:
+        gen = mrich.track(enumerate(self), prefix="PoseSet --> DataFrame")
+        track = True
+        # else:
+        #     gen = enumerate(self)
+        #     track = False
 
-        for pose in gen:
-            d = pose.get_dict(reference=reference, **kwargs)
+        for i, pose in gen:
+
+            d = pose.get_dict(reference=reference, mol=mol, **kwargs)
+
+            mrich.set_progress_field("progress", f"{i+1}/{len(self)}")
 
             if skip_no_mol and not d["mol"]:
                 mrich.warning(f'Skipping pose with no mol: {d["id"]} {d["name"]}')
@@ -1224,6 +1290,7 @@ class PoseSet:
         out_path: str,
         name_col: str = "name",
         inspirations: bool | str = "fragalysis",
+        **kwargs,
     ) -> None:
         """Write an SDF
 
@@ -1234,8 +1301,33 @@ class PoseSet:
         """
 
         from pathlib import Path
+        import json
 
-        df = self.get_df(mol=True, inspirations=inspirations)
+        df = self.get_df(mol=True, inspirations=inspirations, **kwargs)
+
+        if name_col not in ["name", "alias", "inchikey", "id"]:
+            # try getting name from metadata
+            records = self.db.select_where(
+                table="pose",
+                query="pose_id, pose_metadata",
+                key=f"pose_id IN {self.str_ids}",
+                multiple=True,
+            )
+
+            longcode_lookup = {}
+            for i, d in records:
+                if d:
+                    metadata = json.loads(d)
+                else:
+                    metadata = {}
+
+                longcode_lookup[i] = metadata.get(name_col, None)
+
+            values = []
+            for i, row in df.iterrows():
+                values.append(longcode_lookup[row["id"]])
+
+            df[name_col] = values
 
         df.rename(inplace=True, columns={name_col: "_Name", "mol": "ROMol"})
 
@@ -1660,6 +1752,56 @@ class PoseSet:
 
                 f.write(",".join(data))
                 f.write("\n")
+
+    def to_syndirella(self, out_key: "str | Path") -> "DataFrame":
+
+        from pandas import DataFrame
+        from pathlib import Path
+
+        out_dir = Path(out_key).parent
+        out_key = Path(out_key).name
+
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        # mrich.var("out_dir", out_dir)
+        mrich.var("out_key", out_key)
+        mrich.var("#poses", len(self))
+
+        data = []
+        for pose in mrich.track(self, prefix="Fetching data..."):
+
+            comp = pose.compound
+
+            d = dict(
+                smiles=comp.smiles,
+                template=pose.reference.path,
+                compound_set=out_key,
+            )
+
+            for i, p in enumerate(pose.inspirations):
+                d[f"hit{i+1}"] = p.name
+
+            data.append(d)
+
+        df = DataFrame(data)
+
+        csv_name = out_dir / f"{out_key}_syndirella_input.csv"
+        mrich.writing(csv_name)
+        df.to_csv(csv_name, index=False)
+
+        inspirations = self.inspirations
+
+        sdf_name = out_dir / f"{out_key}_syndirella_inspiration_hits.sdf"
+        inspirations.write_sdf(
+            sdf_name,
+            inspirations=False,
+            tags=False,
+            metadata=False,
+            reference=False,
+            name_col="observation_longname",
+        )
+
+        return df
 
     ### OUTPUT
 

@@ -567,6 +567,7 @@ class Pose:
         self,
         debug: bool = False,
         draw: bool = False,
+        return_all: bool = False,
     ) -> float:
         """Score how well this Pose recapitulates the pharmacophoric features of its inspirations.
 
@@ -575,10 +576,15 @@ class Pose:
 
         """
 
-        from molparse.rdkit import SuCOS_score
+        # from molparse.rdkit import SuCOS_score
+        from mucos import MuCOS_score
 
-        multi_sucos = SuCOS_score(
-            self.inspirations.mols, self.mol, print_scores=debug, draw=draw
+        multi_sucos = MuCOS_score(
+            self.inspirations.mols,
+            self.mol,
+            print_scores=debug,
+            draw=draw,
+            return_all=return_all,
         )
 
         if debug:
@@ -588,7 +594,7 @@ class Pose:
             for inspiration in self.inspirations:
                 mrich.var(
                     f"{inspiration} SuCOS",
-                    SuCOS_score(inspiration.mol, self.mol, print_scores=debug),
+                    MuCOS_score(inspiration.mol, self.mol, print_scores=debug),
                 )
 
             mrich.var(f"multi SuCOS", multi_sucos)

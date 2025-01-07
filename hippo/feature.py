@@ -1,4 +1,5 @@
 import mcol
+import mrich
 
 from dataclasses import dataclass
 
@@ -50,5 +51,32 @@ class Feature:
         return f"{self.residue_name} {self.residue_number}"
 
     @property
+    def res_number_name_tuple(self) -> str:
+        """Return a tuple representation of the feature"""
+        return (self.residue_number, self.residue_name)
+
+    @property
     def res_name_number_family_str(self) -> str:
         return f"{self.residue_name} {self.residue_number} {self.family}"
+
+    @property
+    def backbone(self) -> bool:
+        """Are any of the atoms referenced by this feature on the backbone?"""
+        from molparse.amino import BB_NAMES
+
+        for atom_name in self.atom_names.split(","):
+            if atom_name in BB_NAMES:
+                return True
+
+        return False
+
+    @property
+    def sidechain(self) -> bool:
+        """Are any of the atoms referenced by this feature on the sidechain?"""
+        from molparse.amino import BB_NAMES
+
+        for atom_name in self.atom_names.split(","):
+            if atom_name not in BB_NAMES:
+                return True
+
+        return False
