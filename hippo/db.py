@@ -2555,6 +2555,25 @@ class Database:
             d[pose_id].add(interaction_id)
         return d
 
+    def get_pose_id_interaction_tuples_dict(self, pset: "PoseSet") -> dict[int, set]:
+        """Get a dictionary mapping :class:`.Pose` ID's to lists of `(interaction_type, feature_id)` tuples describing their interactions"""
+
+        sql = f"""
+        SELECT DISTINCT interaction_pose, feature_id, interaction_type FROM interaction 
+        INNER JOIN feature ON interaction_feature = feature_id
+        WHERE interaction_pose IN {pset.str_ids}
+        """
+
+        records = self.execute(sql).fetchall()
+
+        ISETS = {}
+        for pose_id, feature_id, interaction_type in records:
+            values = ISETS.get(pose_id, set())
+            values.add((interaction_type, feature_id))
+            ISETS[pose_id] = values
+
+        return ISETS
+
     def get_compound_id_inspiration_ids_dict(self) -> dict[int, set]:
 
         sql = """
