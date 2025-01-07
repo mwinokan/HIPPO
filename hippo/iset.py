@@ -732,6 +732,9 @@ def df_from_interaction_records(
         d["prot_atoms"] = feature.atom_names
         d["lig_atoms"] = atom_ids
 
+        d["backbone"] = feature.backbone
+        d["sidechain"] = feature.sidechain
+
         data.append(d)
 
     df = DataFrame.from_records(data=data)
