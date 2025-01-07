@@ -316,6 +316,9 @@ class HIPPO:
             if not sdfs:
                 sdfs = list(path.glob("*.sdf"))
 
+            if len(sdfs) > 1:
+                sdfs = [sorted(sdfs, key=lambda x: len(x.name))[0]]
+
             assert len(sdfs) == 1, (path, sdfs)
 
             pdbs = [
