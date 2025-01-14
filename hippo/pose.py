@@ -324,6 +324,21 @@ class Pose:
         self.db.update(table="pose", id=self.id, key="pose_mol", value=m.ToBinary())
 
     @property
+    def protonated_mol(self) -> "rdkit.Chem.Mol":
+        """Guess hydrogen positions"""
+        from rdkit.Chem import AllChem
+
+        mol = self.mol
+        protonated_mol = Chem.AddHs(mol)
+        try:
+            protonated_mol = AllChem.ConstrainedEmbed(protonated_mol, mol)
+        except Exception as e:
+            mrich.error("Error while embedding protonated molecule")
+            mrich.error(e)
+            return mol
+        return protonated_mol
+
+    @property
     def protein_system(self) -> "molparse.System":
         """Returns the pose's protein molparse.System"""
         if self._protein_system is None and self.path.endswith(".pdb"):
@@ -804,6 +819,7 @@ class Pose:
                 table="interaction", key="pose", value=self.id, commit=commit
             )
             self.set_has_fingerprint(False, commit=commit)
+            self._interactions = None
 
             ### create temporary table
 
@@ -884,13 +900,22 @@ class Pose:
                     continue
 
                 ### calculate protein coordinate
-                prot_atoms = [
-                    prot_residue.get_atom(a) for a in prot_feature.atom_names.split(" ")
-                ]
+                prot_atoms = []
+                for atom_name in prot_feature.atom_names.split(" "):
+                    atom = prot_residue.get_atom(atom_name, verbosity=0)
+                    if atom:
+                        prot_atoms.append(atom)
 
                 prot_coords = [a.np_pos for a in prot_atoms if a is not None]
 
+                if not prot_coords:
+                    # mrich.warning("Skipping feature with no atoms")
+                    continue
+
                 prot_coord = np.array(np.sum(prot_coords, axis=0) / len(prot_atoms))
+
+                if prot_family not in COMPLEMENTARY_FEATURES:
+                    continue
 
                 complementary_families = COMPLEMENTARY_FEATURES[prot_family]
 
@@ -1032,40 +1057,132 @@ class Pose:
         elif debug:
             mrich.warning(f"{self} is already fingerprinted, no new calculation")
 
-    def calculate_prolif_interactions(self) -> "prolif.Fingerprint":
+    def calculate_prolif_interactions(
+        self,
+        return_all: bool = False,
+        max_retry: int = 5,
+        use_mda: bool = False,
+        force: bool = False,
+        clear_existing: bool = True,
+        debug: bool = False,
+        resolve: bool = True,
+    ) -> "prolif.Fingerprint":
         """Use ProLIF to populate the interactions table"""
 
-        import prolif as plf
-        from MDAnalysis import Universe
-        from tempfile import NamedTemporaryFile
+        if not self.has_fingerprint or force:
 
-        ## prepare inputs
+            ### clear old interactions
 
-        # protonated protein
-        protein_file = self.protein_system.add_hydrogens(return_file=True)
-        universe = Universe(protein_file.name)
-        protein_mol = plf.Molecule.from_mda(universe)
+            if clear_existing:
+                self.db.delete_where(
+                    table="interaction", key="pose", value=self.id, commit=False
+                )
+                self.set_has_fingerprint(False, commit=False)
 
-        # ligand
-        ligand_file = NamedTemporaryFile(mode="w+t", suffix=".sdf")
-        writer = Chem.SDWriter(ligand_file.name)
-        writer.write(self.mol)
-        writer.close()
-        ligand_iterable = plf.sdf_supplier(ligand_file.name)
+            ### create temporary table
 
-        ## run prolif
+            table = "temp_interaction"
 
-        fp = plf.Fingerprint(count=True)
-        fp.run_from_iterable(ligand_iterable, protein_mol)
+            if "temp_interaction" in self.db.table_names:
+                mrich.warning("Deleting existing temp_interaction table")
+                self.db.execute("DROP TABLE temp_interaction")
 
-        ## parse outputs
+            self.db.create_table_interaction(table="temp_interaction", debug=False)
 
-        mrich.print(fp.ifp[0])
+            if not clear_existing:
+                self.db.copy_interactions_to_temp(pose_id=self.id)
 
-        protein_file.close()
-        ligand_file.close()
+            # clear cached InteractionSet
+            self._interactions = None
 
-        return fp, ligand_iterable, protein_mol
+            import prolif as plf
+            from tempfile import NamedTemporaryFile
+            from .prolif import parse_prolif_interactions
+            from MDAnalysis import Universe
+            import logging
+
+            mdanalysis_logger = logging.getLogger("MDAnalysis")
+            mdanalysis_logger.setLevel(logging.WARNING)
+
+            ## prepare inputs
+
+            # decide if MDA is needed
+            unprotonated_sys = self.protein_system
+            residue_names = set(r.name for r in unprotonated_sys.residues)
+            nonstandard = ["HID", "HIE", "HSE", "HSD", "HSP"]
+            if any(r in residue_names for r in nonstandard):
+                mrich.debug("Using MDA")
+                use_mda = True
+
+            # protonated protein
+            for i in range(max_retry):
+                try:
+                    protonated_sys, protein_file = unprotonated_sys.add_hydrogens(
+                        return_file=True
+                    )
+
+                    if use_mda:
+                        with mrich.loading("Creating MDAnalysis.Universe"):
+                            universe = Universe(protein_file.name)
+                            protein_mol = plf.Molecule.from_mda(universe)
+                    else:
+                        with mrich.loading("Creating protein rdkit.Chem.Mol"):
+                            rdkit_prot = Chem.MolFromPDBFile(
+                                protein_file.name, removeHs=False
+                            )
+                            protein_mol = plf.Molecule(rdkit_prot)
+
+                    break
+
+                except Exception as e:
+                    mrich.warning(
+                        f"Could not create satisfactory protein molecule, attempts = {i+1}/{max_retry}"
+                    )
+                    mrich.warning(e)
+                    use_mda = True
+                    continue
+            else:
+                mrich.error(
+                    f"Tried {max_retry} times to create protein molecule and failed"
+                )
+                return None
+
+            # ligand
+            ligand_file = NamedTemporaryFile(mode="w+t", suffix=".sdf")
+            writer = Chem.SDWriter(ligand_file.name)
+            writer.write(self.protonated_mol)
+            writer.close()
+            ligand_iterable = plf.sdf_supplier(ligand_file.name)
+
+            ## run prolif
+
+            fp = plf.Fingerprint(count=True)
+            fp.run_from_iterable(ligand_iterable, protein_mol, progress=False, n_jobs=1)
+
+            ## parse outputs and insert Feature and Interaction records
+            parse_prolif_interactions(
+                self, fp, protonated_sys, debug=debug, table=table
+            )
+
+            if resolve:
+                from .iset import InteractionSet
+
+                interactions = InteractionSet.from_pose(self, table="temp_interaction")
+                interactions.resolve(debug=debug)
+
+            self.db.copy_temp_interactions()
+            self.set_has_fingerprint(True, commit=True)
+
+            ### delete temporary table
+
+            self.db.execute("DROP TABLE temp_interaction")
+
+            ## close files
+            protein_file.close()
+            ligand_file.close()
+
+            if return_all:
+                return fp, ligand_iterable, protein_mol
 
     def calculate_classic_fingerprint(
         self,
