@@ -325,8 +325,9 @@ def plot_interaction_punchcard_by_tags(
     subtitle=None,
     opacity=0.7,
     group="type",
-    marginal_histogram_x: bool = False,
-    marginal_histogram_y: bool = False,
+    marginal_histogram_x: bool = True,
+    # marginal_histogram_y: bool = False,
+    sizeref=0.08,
     counts: bool = True,
     ignore_chains=True,
     backbone_only: bool = False,
@@ -383,6 +384,8 @@ def plot_interaction_punchcard_by_tags(
         sort_key = lambda x: (x[2], x[1])
 
     if counts:
+        orig_data = plot_data.copy()
+
         if ignore_chains:
             plot_data = (
                 plot_data.groupby(["group_name", "type", x, "residue_number"])
@@ -400,23 +403,39 @@ def plot_interaction_punchcard_by_tags(
 
         plot_data["size"] = np.sqrt(plot_data["count"])
 
-    title = "Interaction Punch-Card"
+    # add a size reference
 
-    if subtitle:
-        title = f"<b>{animal.name}</b>: {title}<br><sup><i>{subtitle}</i></sup>"
-    else:
-        title = f"<b>{animal.name}</b>: {title}"
+    type_str = "Size"
+    sizes = [1, 50, 100, 250]
+
+    dicts = []
+    for group_name, size in zip(sorted(tags.keys()), sizes):
+        dicts.append(
+            dict(
+                group_name=group_name,
+                type="type_str",
+                res_name_number="",
+                residue_number=999,
+                count=size,
+                size=np.sqrt(size),
+                text=size,
+            )
+        )
+
+    plot_data = pd.concat([plot_data, pd.DataFrame(dicts)])
 
     fig = px.scatter(
         plot_data,
         x=x,
         y="group_name",
-        marginal_x="histogram" if marginal_histogram_x else None,
-        marginal_y="histogram" if marginal_histogram_y else None,
         hover_data=plot_data.columns,
         color=group,
         size="size" if counts else None,
+        text="text",
+        # color_discrete_sequence=px.colors.qualitative.Dark2
     )
+
+    fig.update_traces(textposition="middle right")
 
     # fig.update_layout(title=title, title_automargin=False, title_yref="container")
 
@@ -434,24 +453,83 @@ def plot_interaction_punchcard_by_tags(
 
     # sort axes
     fig.update_xaxes(categoryorder="array", categoryarray=categoryarray)
-    fig.update_yaxes(categoryorder="category descending")
 
     for trace in fig.data:
         if type(trace) == plotly.graph_objs._histogram.Histogram:
             trace.opacity = 1
             trace.xbins.size = 1
         else:
-            # trace["marker"]["size"] = 10
             trace["marker"]["opacity"] = opacity
 
-    # add ticks to marginals:
+    if marginal_histogram_x:
 
-    # fig.update_layout(
-    #     xaxis2=dict(showticklabels=True),  # Show ticks on the x-axis marginal
-    #     # yaxis2=dict(showticklabels=True)   # Show ticks on the y-axis marginal
-    # )
+        from plotly.subplots import make_subplots
 
-    fig.update_layout(barmode="stack")
+        subplot_fig = make_subplots(
+            rows=2,
+            cols=1,
+            specs=[[{"type": "histogram"}], [{"type": "scatter"}]],
+            shared_xaxes=True,
+            shared_yaxes=False,
+            vertical_spacing=0.02,
+            horizontal_spacing=0.02,
+        )
+
+        # add in scatter traces
+        for trace in fig.data:
+            trace.yaxis = "y2"
+            trace.showlegend = False
+            trace.marker.sizeref = sizeref
+            trace.marker.line.width = 0
+            subplot_fig.add_trace(trace)
+
+        # aggregate data for histogram plot
+        plot_data = (
+            orig_data.groupby(["type", x, "residue_number"])
+            .size()
+            .reset_index(name="count")
+        )
+
+        # generate histogram
+        fig2 = px.histogram(plot_data, x=x, y="count", color="type")
+
+        # add in histogram traces
+        for trace in fig2.data:
+            trace.yaxis = "y1"
+            subplot_fig.add_trace(trace)
+
+        # clean up the axes
+        subplot_fig.update_layout(
+            xaxis=dict(anchor="y2", visible=True, showticklabels=True, side="bottom"),
+            # xaxis2=dict(visible=True, showticklabels=True, side="bottom"),
+            yaxis2=dict(
+                anchor="x",
+                overlaying="x",
+                side="top",
+                categoryorder="category descending",
+            ),  # Secondary y-axis for x marginal
+        )
+
+        # x-axis sorting
+        if ignore_chains:
+            categoryarray = plot_data[[x, "residue_number"]].agg(tuple, axis=1)
+        else:
+            raise NotImplementedError
+        categoryarray = sorted([v for v in categoryarray.values], key=sort_key)
+        categoryarray = [v[0] for v in categoryarray]
+
+        # sort axes
+        subplot_fig.update_xaxes(categoryorder="array", categoryarray=categoryarray)
+
+        # stack histogram bars on top of each other
+        subplot_fig.update_layout(barmode="stack")
+
+        subplot_fig.update_layout(
+            margin=dict(l=20, r=20, t=20, b=20),
+        )
+
+        return subplot_fig
+
     # fig.update_layout(scattermode="group", scattergap=0.75)
 
     # return add_punchcard_logo(fig)
