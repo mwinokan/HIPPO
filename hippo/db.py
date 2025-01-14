@@ -282,6 +282,10 @@ class Database:
                     time.sleep(retry)
                 mrich.print("[debug]SQLite Database was locked, retrying...")
                 return self.execute(sql=sql, payload=payload, retry=retry)
+            if "syntax error" in str(e):
+                mrich.error(sql)
+                mrich.error(payload)
+                raise
             else:
                 raise
         except Error as e:
