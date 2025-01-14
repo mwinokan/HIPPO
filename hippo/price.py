@@ -157,6 +157,26 @@ class Price:
 
         raise TypeError(f"Division not supported between Price and {type(other)}")
 
+    def __mul__(self, other: "Price | float | int") -> "Price | float":
+        """Multiply this :class:`.Price` by another object
+
+        :param other: :class:`.Price` or float or int
+        :returns: :class:`.Price` object or float
+
+        """
+
+        if isinstance(other, int) or isinstance(other, float):
+            if self.is_null:
+                return self
+            return Price(amount=self.amount * other, currency=self.currency)
+
+        # elif isinstance(other, Price):
+            # assert self.currency == other.currency
+            # assert not other.is_null
+            # return self.amount * other.amount
+
+        raise TypeError(f"Multiplication not supported between Price and {type(other)}")
+
     def __eq__(self, other: "Price") -> bool:
         """Compare two :class:`.Price` objects"""
 
