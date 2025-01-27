@@ -80,7 +80,9 @@ class Compound:
     @property
     def name(self) -> str:
         """Returns the compound's InChiKey"""
-        return self._inchikey
+        if self.alias:
+            return self.alias
+        return self.inchikey
 
     @property
     def smiles(self) -> str:
