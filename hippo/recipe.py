@@ -453,6 +453,9 @@ class Recipe:
             if debug:
                 mrich.debug(f"Combination of {len(combo)} recipes")
 
+            if not combo:
+                continue
+
             solution = combo[0]
 
             for i, recipe in enumerate(combo[1:]):
@@ -463,14 +466,16 @@ class Recipe:
             solutions.append(solution)
 
         if not solutions:
-            mrich.error("No solutions!")
+            mrich.error("No solutions")
+            return None
 
         if pick_first:
             return solutions[0]
 
         if pick_cheapest:
-            mrich.print("Picking cheapest...")
+            mrich.debug("Calculating prices...")
             priced = [r for r in solutions if r.price]
+            mrich.print("Picking cheapest from", len(priced), "options")
             if not priced:
                 mrich.error("0 recipes with prices, can't choose cheapest")
                 return solutions
@@ -763,6 +768,18 @@ class Recipe:
     @property
     def num_products(self):
         return len(self.products)
+
+    @property
+    def num_reactions(self):
+        return len(self.reactions)
+
+    @property
+    def num_reactants(self):
+        return len(self.reactants)
+
+    @property
+    def num_intermediates(self):
+        return len(self.intermediates)
 
     @property
     def hash(self):
@@ -1274,6 +1291,10 @@ class Recipe:
 
         df = DataFrame(rows)
 
+        if len(df[df.duplicated()]):
+            mrich.warning("Removing duplicates from CAR DataFrame")
+            df = df.drop_duplicates()
+
         df = df.convert_dtypes()
 
         for n_steps in set(df["no-steps"]):
@@ -1700,7 +1721,28 @@ class Recipe:
 
     def check_integrity(self, debug: bool = False) -> bool:
 
+        # no duplicate ingredients
+
+        if debug:
+            mrich.debug("Checking integrity:", self)
+            mrich.debug("Checking for duplicate compounds")
+
+        if len(self.reactants.compound_ids) != len(set(self.reactants.compound_ids)):
+            mrich.error("Reactant compound ID's are not unique")
+            return False
+        if len(self.intermediates.compound_ids) != len(
+            set(self.intermediates.compound_ids)
+        ):
+            mrich.error("Intermediate compound ID's are not unique")
+            return False
+        if len(self.products.compound_ids) != len(set(self.products.compound_ids)):
+            mrich.error("Product compound ID's are not unique")
+            return False
+
         # all references should exist
+
+        if debug:
+            mrich.debug("Checking for missing references")
 
         if self.db.count_where(
             table="reaction", key=f"reaction_id IN {self.reactions.str_ids}"
@@ -1731,6 +1773,9 @@ class Recipe:
         reaction_products = self.reactions.products
         reaction_reactants = self.reactions.reactants
 
+        if debug:
+            mrich.debug("Checking for missing reactions")
+
         # all products should have a reaction
         for product in self.products:
             if product not in reaction_products:
@@ -1752,6 +1797,9 @@ class Recipe:
                 return False
 
         # all reactions should have enough reactant
+
+        if debug:
+            mrich.debug("Checking reactant quantities")
 
         for reaction in self.reactions:
 
@@ -1777,6 +1825,9 @@ class Recipe:
                         f"Not enough of {reactant_ingredient.compound}: {reactant_ingredient.amount} < {required_amount}"
                     )
                     return False
+
+        if debug:
+            mrich.success(self, "OK")
 
         return True
 

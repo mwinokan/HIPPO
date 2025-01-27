@@ -170,11 +170,6 @@ class Price:
                 return self
             return Price(amount=self.amount * other, currency=self.currency)
 
-        # elif isinstance(other, Price):
-            # assert self.currency == other.currency
-            # assert not other.is_null
-            # return self.amount * other.amount
-
         raise TypeError(f"Multiplication not supported between Price and {type(other)}")
 
     def __eq__(self, other: "Price") -> bool:
