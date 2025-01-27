@@ -28,6 +28,7 @@ class ProjectPage:
         title: str | None = None,
         scaffold_tag: str = "Syndirella base",
         extra_recipe_dir: str | Path = None,
+        skip_existing: bool = True,
     ):
 
         # setup directories
@@ -54,6 +55,8 @@ class ProjectPage:
         self._scaffold_poses = None
 
         self._title = title or animal.name
+
+        self._skip_existing = skip_existing
 
         self.setup_page()
         self.write_html()
@@ -183,6 +186,10 @@ class ProjectPage:
     @property
     def extra_recipe_dir(self):
         return self._extra_recipe_dir
+
+    @property
+    def skip_existing(self) -> bool:
+        return self._skip_existing
 
     ### METHODS
 
@@ -356,7 +363,7 @@ class ProjectPage:
         with self.tag("div", klass="w3-panel w3-border w3-white"):
             function()
 
-    def plotly_graph(self, figure, filename):
+    def plotly_graph(self, figure, filename, write):
 
         # from plotly.offline import plot
         from hippo_plot import write_html
@@ -368,7 +375,8 @@ class ProjectPage:
         path = self.resource_dir / filename
         rel_path = Path(self.resource_dir.name) / filename
 
-        write_html(path, figure)
+        if write:
+            write_html(path, figure)
 
         # embed the graph
         with self.tag("div"):
@@ -856,17 +864,27 @@ class ProjectPage:
 
         for proposal in self.proposals:
 
+            filename = f"proposal_{proposal.hash}.html"
+            path = self.resource_dir / filename
+
             self.section_header(str(proposal), "h3")
 
             from .plotting import plot_compound_tsnee
 
-            fig = plot_compound_tsnee(
-                proposal.products.compounds,
-                logo=False,
-                legend=False,
-                title="Product Clustering",
-            )
-            self.plotly_graph(fig, f"proposal_{proposal.hash}.html")
+            if path.exists() and self.skip_existing:
+
+                self.plotly_graph(None, filename, write=False)
+
+            else:
+
+                fig = plot_compound_tsnee(
+                    proposal.products.compounds,
+                    logo=False,
+                    legend=False,
+                    title="Product Clustering",
+                )
+
+                self.plotly_graph(fig, filename)
 
             self.recipe_subsection(
                 proposal, f"Recipe {proposal.hash}", sankey=False, show_title=False
@@ -942,7 +960,9 @@ class ProjectPage:
 
             filename = f"Recipe_{proposal.hash}_reactants"
             path = self.resource_dir / f"{filename}.csv"
-            proposal.write_reactant_csv(path)
+
+            if not path.exists() or not self.skip_existing:
+                proposal.write_reactant_csv(path)
 
             rel_path = Path(self.resource_dir.name) / path.name
 
@@ -958,7 +978,9 @@ class ProjectPage:
 
             filename = f"Recipe_{proposal.hash}_products"
             path = self.resource_dir / f"{filename}.csv"
-            proposal.write_product_csv(path)
+
+            if not path.exists() or not self.skip_existing:
+                proposal.write_product_csv(path)
 
             rel_path = Path(self.resource_dir.name) / path.name
 
@@ -974,7 +996,9 @@ class ProjectPage:
 
             filename = f"Recipe_{proposal.hash}_chemistry"
             path = self.resource_dir / f"{filename}.csv"
-            proposal.write_chemistry_csv(path)
+
+            if not path.exists() or not self.skip_existing:
+                proposal.write_chemistry_csv(path)
 
             rel_path = Path(self.resource_dir.name) / path.name
 
