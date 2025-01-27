@@ -353,17 +353,23 @@ def plot_interaction_punchcard_by_tags(
     dfs = []
     for group_name, tag in tags.items():
         poses = animal.poses(tag=tag)
+        mrich.debug(group_name, poses)
+
         name_lookup = poses.id_name_dict
 
-        df = poses.interactions.df
+        with mrich.loading("Getting interactions dataframe"):
+            df = poses.interactions.df
+
         df["tag"] = tag
         df["group_name"] = group_name
         df["pose_name"] = [name_lookup[pose_id] for pose_id in df["pose_id"].values]
 
         dfs.append(df)
 
+    mrich.debug("Concatenating dataframes")
     plot_data = pd.concat(dfs, ignore_index=True)
 
+    mrich.debug("Building plot_data")
     if backbone_only:
         plot_data = plot_data[plot_data["backbone"] == True]
     if sidechain_only:
@@ -384,6 +390,7 @@ def plot_interaction_punchcard_by_tags(
         sort_key = lambda x: (x[2], x[1])
 
     if counts:
+        mrich.debug("Summing by residue")
         orig_data = plot_data.copy()
 
         if ignore_chains:
@@ -424,6 +431,7 @@ def plot_interaction_punchcard_by_tags(
 
     plot_data = pd.concat([plot_data, pd.DataFrame(dicts)])
 
+    mrich.debug("Making scatter plot")
     fig = px.scatter(
         plot_data,
         x=x,
@@ -517,9 +525,11 @@ def plot_interaction_punchcard_by_tags(
             raise NotImplementedError
         categoryarray = sorted([v for v in categoryarray.values], key=sort_key)
         categoryarray = [v[0] for v in categoryarray]
-
-        # sort axes
         subplot_fig.update_xaxes(categoryorder="array", categoryarray=categoryarray)
+
+        # y-axis sorting
+        categoryarray = list(reversed(tags.keys()))
+        subplot_fig.update_yaxes(categoryorder="array", categoryarray=categoryarray)
 
         # stack histogram bars on top of each other
         subplot_fig.update_layout(barmode="stack")
