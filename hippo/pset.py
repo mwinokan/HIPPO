@@ -1755,6 +1755,7 @@ class PoseSet:
 
     def to_syndirella(self, out_key: "str | Path") -> "DataFrame":
 
+        import shutil
         from pandas import DataFrame
         from pathlib import Path
 
@@ -1762,6 +1763,10 @@ class PoseSet:
         out_key = Path(out_key).name
 
         out_dir.mkdir(parents=True, exist_ok=True)
+
+        template_dir = out_dir / "templates"
+        mrich.writing(template_dir)
+        template_dir.mkdir(parents=True, exist_ok=True)
 
         # mrich.var("out_dir", out_dir)
         mrich.var("out_key", out_key)
@@ -1772,11 +1777,17 @@ class PoseSet:
 
             comp = pose.compound
 
+            ref = pose.reference
+
             d = dict(
                 smiles=comp.smiles,
-                template=pose.reference.path,
+                # template=ref.path,
+                template=ref.name,
                 compound_set=out_key,
             )
+
+            mrich.writing(template_dir / ref.apo_path.name)
+            shutil.copy(ref.apo_path, template_dir / ref.apo_path.name)
 
             for i, p in enumerate(pose.inspirations):
                 d[f"hit{i+1}"] = p.name
@@ -1860,8 +1871,8 @@ class PoseSet:
             def widget(i):
                 pose = self[i]
                 if print_name:
-                    print(repr(pose))
-                display(function(pose))
+                    display(pose)
+                function(pose)
 
             return interactive(
                 widget,
