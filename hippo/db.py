@@ -2113,6 +2113,58 @@ class Database:
         self.execute(sql, dict(component_amount=1.0, component_type=2))
         self.execute(sql, dict(component_amount=1.0, component_type=3))
 
+    def prune_duplicate_routes(self) -> None:
+
+        from collections import Counter
+
+        sql = """
+        SELECT route_id, route_product, component_ref, component_type FROM route
+        INNER JOIN component ON route_id = component_route
+        """
+
+        records = self.execute(sql).fetchall()
+
+        routes = {}
+
+        for route_id, route_product, component_ref, component_type in records:
+            if route_id not in routes:
+                routes[route_id] = (route_product, set())
+
+            key = (component_ref, component_type)
+            routes[route_id][1].add(key)
+
+        routes = {key: (value[0], tuple(value[1])) for key, value in routes.items()}
+
+        flat_routes = [value for key, value in routes.items()]
+
+        mrich.var("#routes", len(flat_routes))
+
+        counter = Counter(flat_routes)
+        duplicates = {item: count for item, count in counter.items() if count > 1}
+
+        mrich.var("products with duplicate routes", len(duplicates))
+
+        if not duplicates:
+            mrich.success("No duplicate routes found")
+            return None
+
+        delete = set()
+        for dupe in duplicates:
+            matched_ids = [k for k, v in routes.items() if v == dupe]
+            mrich.print(
+                "compound", dupe[0], "has", len(matched_ids), "duplicate routes"
+            )
+            for route_id in matched_ids[1:]:
+                delete.add(route_id)
+
+        str_ids = str(tuple(delete)).replace(",)", ")")
+        self.delete_where(table="component", key=f"component_route IN {str_ids}")
+        self.delete_where(table="route", key=f"route_id IN {str_ids}")
+
+        mrich.success("Deleted", len(delete), "duplicate routes")
+
+        return delete
+
     ### GETTERS
 
     def get_compound(
