@@ -1713,7 +1713,9 @@ class PoseSet:
 
         return "; ".join(commands)
 
-    def to_knitwork(self, out_path: str, path_root: str = ".") -> None:
+    def to_knitwork(
+        self, out_path: str, path_root: str = ".", aligned_files_dir: str | None = None
+    ) -> None:
         """Knitwork takes a CSV input with:
 
         - observation shortcode
@@ -1733,6 +1735,7 @@ class PoseSet:
         path_root = Path(path_root).resolve()
         mrich.var("out_path", out_path)
         mrich.var("path_root", path_root)
+        mrich.var("aligned_files_dir", aligned_files_dir)
 
         assert out_path.name.endswith(".csv")
 
@@ -1745,8 +1748,25 @@ class PoseSet:
                 assert pose.alias
                 assert "hits" in pose.tags
 
-                mol = relpath(pose.mol_path, path_root)
-                pdb = relpath(pose.apo_path, path_root)
+                if aligned_files_dir:
+
+                    mol = str(pose.mol_path)
+                    pdb = str(pose.apo_path)
+
+                    assert "aligned_files" in mol
+                    assert "aligned_files" in pdb
+
+                    mol = mol.split("aligned_files/")[-1]
+                    pdb = pdb.split("aligned_files/")[-1]
+
+                    aligned_files_dir = Path(aligned_files_dir)
+
+                    mol = relpath(aligned_files_dir / mol, path_root)
+                    pdb = relpath(aligned_files_dir / pdb, path_root)
+
+                else:
+                    mol = relpath(pose.mol_path, path_root)
+                    pdb = relpath(pose.apo_path, path_root)
 
                 data = [pose.alias, pose.compound.smiles, mol, pdb]
 
@@ -1809,7 +1829,7 @@ class PoseSet:
             tags=False,
             metadata=False,
             reference=False,
-            name_col="observation_longname",
+            name_col="name",
         )
 
         return df
