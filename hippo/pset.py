@@ -2077,8 +2077,12 @@ class PoseSet:
         other: "PoseSet",
     ) -> "PoseSet":
         """Add a :class:`.PoseSet` to this set"""
-        assert isinstance(other, PoseSet)
-        return PoseSet(self.db, self.ids + other.ids, sort=False)
+        if isinstance(other, PoseSet):
+            return PoseSet(self.db, self.ids + other.ids, sort=False)
+        elif isinstance(other, Pose):
+            return PoseSet(self.db, self.ids + [other.id], sort=False)
+        else:
+            raise NotImplementedError
 
     def __sub__(
         self,
