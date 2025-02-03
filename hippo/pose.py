@@ -556,7 +556,11 @@ class Pose:
                 ".pdb", "_ligand.mol"
             )
             if not mol_path.exists():
-                return None
+                mol_path = path.parent / path.name.replace(
+                    "_hippo.pdb", ".pdb"
+                ).replace(".pdb", "_ligand.sdf")
+                if not mol_path.exists():
+                    return None
             return mol_path
         elif path.name.endswith(".mol"):
             return path
