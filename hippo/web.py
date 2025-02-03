@@ -363,7 +363,7 @@ class ProjectPage:
         with self.tag("div", klass="w3-panel w3-border w3-white"):
             function()
 
-    def plotly_graph(self, figure, filename, write):
+    def plotly_graph(self, figure, filename, write: bool = True):
 
         # from plotly.offline import plot
         from hippo_plot import write_html
