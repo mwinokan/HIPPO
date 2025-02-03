@@ -321,6 +321,7 @@ def plot_interaction_punchcard(
 def plot_interaction_punchcard_by_tags(
     animal,
     tags: dict[str, str] | list[str],
+    permitted_residues: dict[str, list[int]],
     yaxis_title: str = "Tag",
     subtitle=None,
     opacity=0.7,
@@ -341,6 +342,7 @@ def plot_interaction_punchcard_by_tags(
     :param opacity:  (Default value = 1.0)
     :param group:  (Default value = 'pose_name')
     :param ignore_chains:  (Default value = False)
+    :param permitted_residues: dictionary mapping with keys matching `tags` mapping to list of IDs for residues to include for each tag
 
     """
 
@@ -349,6 +351,8 @@ def plot_interaction_punchcard_by_tags(
 
     if isinstance(tags, list):
         tags = {v: v for v in tags}
+
+    permitted_residues = permitted_residues or {}
 
     dfs = []
     for group_name, tag in tags.items():
@@ -364,10 +368,50 @@ def plot_interaction_punchcard_by_tags(
         df["group_name"] = group_name
         df["pose_name"] = [name_lookup[pose_id] for pose_id in df["pose_id"].values]
 
+        if group_name in permitted_residues:
+            subset = df[df["residue_number"].isin(permitted_residues[group_name])]
+            diff = len(df) - len(subset)
+            if diff:
+                mrich.warning(
+                    "Skipping",
+                    diff,
+                    "markers due unpermitted residue numbers for: ",
+                    group_name,
+                )
+                df = subset
+
         dfs.append(df)
 
     mrich.debug("Concatenating dataframes")
     plot_data = pd.concat(dfs, ignore_index=True)
+
+    ### add permitted residues
+
+    if permitted_residues and ignore_chains:
+
+        permitted_df = []
+        for group_name, ids in permitted_residues.items():
+
+            unique_combinations = plot_data[plot_data["group_name"] == group_name][
+                ["residue_name", "residue_number"]
+            ].drop_duplicates()
+
+            for resid in ids:
+
+                try:
+                    resname = unique_combinations[
+                        unique_combinations["residue_number"] == resid
+                    ]["residue_name"].values[0]
+                except IndexError:
+                    continue
+
+                # if plot_data[['residue_name', 'residue_number']]
+
+                permitted_df.append(
+                    dict(res_name_number=f"{resname} {resid}", group_name=group_name)
+                )
+
+        permitted_df = pd.DataFrame(permitted_df)
 
     mrich.debug("Building plot_data")
     if backbone_only:
@@ -416,7 +460,7 @@ def plot_interaction_punchcard_by_tags(
     sizes = [1, 50, 100, 250]
 
     dicts = []
-    for group_name, size in zip(sorted(tags.keys()), sizes):
+    for group_name, size in zip(tags.keys(), sizes):
         dicts.append(
             dict(
                 group_name=group_name,
@@ -505,6 +549,19 @@ def plot_interaction_punchcard_by_tags(
         for trace in fig2.data:
             trace.yaxis = "y1"
             subplot_fig.add_trace(trace)
+
+        # if permitted_residues and ignore_chains:
+        #     trace = go.Scatter(
+        #         name="Subsite Residues",
+        #         x=permitted_df[x],
+        #         y=permitted_df["group_name"],
+        #         mode="markers",
+        #         marker_symbol="square-open",
+        #         marker_size=25,
+        #         marker_color="grey")
+
+        #     trace.yaxis="y2"
+        #     subplot_fig.add_trace(trace)
 
         # clean up the axes
         subplot_fig.update_layout(
