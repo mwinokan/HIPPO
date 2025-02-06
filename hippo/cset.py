@@ -2,15 +2,13 @@
 
 from .compound import Compound, Ingredient
 from .db import Database
-
 from .recipe import Recipe
 
 from numpy import int64, nan, isnan, mean, std
-
-import mcol
+from typing import Callable
 
 import os
-
+import mcol
 import mrich
 
 
@@ -403,7 +401,7 @@ class CompoundTable:
                     return self.db.get_compound(id=key)
 
             case str():
-                comp = self.db.get_compound(inchikey=key)
+                comp = self.db.get_compound(inchikey=key, none="quiet")
                 if not comp:
                     comp = self.db.get_compound(alias=key)
                 return comp
@@ -1061,7 +1059,10 @@ class CompoundSet:
         mrich.var("#poses", self.num_poses)
         mrich.var("tags", self.tags)
 
-    def interactive(self) -> None:
+    def interactive(
+        self,
+        function: Callable | None = None,
+    ) -> None:
         """Creates a ipywidget to interactively navigate this PoseSet."""
 
         from ipywidgets import (
@@ -1077,103 +1078,124 @@ class CompoundSet:
         from IPython.display import display
         from pprint import pprint
 
-        a = BoundedIntText(
-            value=0,
-            min=0,
-            max=len(self) - 1,
-            step=1,
-            description=f"Comp (/{len(self)}):",
-            disabled=False,
-        )
+        if function:
 
-        b = Checkbox(description="Name", value=True)
-        c = Checkbox(description="Summary", value=False)
-        d = Checkbox(description="2D", value=True)
-        e = Checkbox(description="poses", value=False)
-        f = Checkbox(description="reactions", value=False)
-        g = Checkbox(description="tags", value=False)
-        h = Checkbox(description="quotes", value=False)
-        i = Checkbox(description="Metadata", value=False)
+            def widget(i):
+                compound = self[i]
+                display(compound)
+                function(compound)
 
-        ui1 = GridBox(
-            [b, c, d, e], layout=Layout(grid_template_columns="repeat(4, 100px)")
-        )
-        ui2 = GridBox(
-            [f, g, h, i], layout=Layout(grid_template_columns="repeat(4, 100px)")
-        )
-        ui = VBox([a, ui1, ui2])
+            return interactive(
+                widget,
+                i=BoundedIntText(
+                    value=0,
+                    min=0,
+                    max=len(self) - 1,
+                    step=1,
+                    description=f"Comp (/{len(self)}):",
+                    disabled=False,
+                ),
+            )
 
-        def widget(
-            i,
-            name=True,
-            summary=True,
-            draw=True,
-            poses=True,
-            reactions=True,
-            tags=True,
-            quotes=True,
-            metadata=True,
-        ):
-            """
+        else:
 
-            :param i: param name:  (Default value = True)
-            :param summary: Default value = True)
-            :param draw: Default value = True)
-            :param poses: Default value = True)
-            :param reactions: Default value = True)
-            :param metadata: Default value = True)
-            :param name:  (Default value = True)
+            a = BoundedIntText(
+                value=0,
+                min=0,
+                max=len(self) - 1,
+                step=1,
+                description=f"Comp (/{len(self)}):",
+                disabled=False,
+            )
 
-            """
-            comp = self[i]
+            b = Checkbox(description="Name", value=True)
+            c = Checkbox(description="Summary", value=False)
+            d = Checkbox(description="2D", value=True)
+            e = Checkbox(description="poses", value=False)
+            f = Checkbox(description="reactions", value=False)
+            g = Checkbox(description="tags", value=False)
+            h = Checkbox(description="quotes", value=False)
+            i = Checkbox(description="Metadata", value=False)
 
-            if name and not summary:
-                print(repr(comp))
+            ui1 = GridBox(
+                [b, c, d, e], layout=Layout(grid_template_columns="repeat(4, 100px)")
+            )
+            ui2 = GridBox(
+                [f, g, h, i], layout=Layout(grid_template_columns="repeat(4, 100px)")
+            )
+            ui = VBox([a, ui1, ui2])
 
-            if summary:
-                comp.summary(metadata=False, draw=False, tags=False)
+            def widget(
+                i,
+                name=True,
+                summary=True,
+                draw=True,
+                poses=True,
+                reactions=True,
+                tags=True,
+                quotes=True,
+                metadata=True,
+            ):
+                """
 
-            if draw:
-                comp.draw()
+                :param i: param name:  (Default value = True)
+                :param summary: Default value = True)
+                :param draw: Default value = True)
+                :param poses: Default value = True)
+                :param reactions: Default value = True)
+                :param metadata: Default value = True)
+                :param name:  (Default value = True)
 
-            if poses and (pset := comp.poses):
-                for p in pset:
-                    print(repr(p))
-                pset.draw()
+                """
+                comp = self[i]
 
-            if reactions and (reactions := comp.reactions):
-                for r in reactions:
-                    print(repr(r))
-                    r.draw()
+                if name and not summary:
+                    print(repr(comp))
 
-            if tags:
-                mrich.title("Tags")
-                mrich.print(comp.tags)
+                if summary:
+                    comp.summary(metadata=False, draw=False, tags=False)
 
-            if quotes:
-                mrich.title("Quotes")
-                display(comp.get_quotes(df=True))
+                if draw:
+                    comp.draw()
 
-            if metadata:
-                mrich.title("Metadata:")
-                pprint(comp.metadata)
+                if poses and (pset := comp.poses):
+                    for p in pset:
+                        print(repr(p))
+                    pset.draw()
 
-        out = interactive_output(
-            widget,
-            {
-                "i": a,
-                "name": b,
-                "summary": c,
-                "draw": d,
-                "poses": e,
-                "reactions": f,
-                "tags": g,
-                "quotes": h,
-                "metadata": i,
-            },
-        )
+                if reactions and (reactions := comp.reactions):
+                    for r in reactions:
+                        print(repr(r))
+                        r.draw()
 
-        display(ui, out)
+                if tags:
+                    mrich.title("Tags")
+                    mrich.print(comp.tags)
+
+                if quotes:
+                    mrich.title("Quotes")
+                    display(comp.get_quotes(df=True))
+
+                if metadata:
+                    mrich.title("Metadata:")
+                    pprint(comp.metadata)
+
+            out = interactive_output(
+                widget,
+                {
+                    "i": a,
+                    "name": b,
+                    "summary": c,
+                    "draw": d,
+                    "poses": e,
+                    "reactions": f,
+                    "tags": g,
+                    "quotes": h,
+                    "metadata": i,
+                },
+            )
+
+            display(ui, out)
 
     ### OTHER METHODS
 
@@ -1221,7 +1243,7 @@ class CompoundSet:
 
     def get_routes(
         self,
-        permitted_reactions: "ReactionSet",
+        permitted_reactions: "None | ReactionSet" = None,
         debug: bool = True,
     ):
 
@@ -1229,43 +1251,62 @@ class CompoundSet:
             mrich.error("route table not in Database")
             raise NotImplementedError
 
-        sql = f"""
-        SELECT route_id, route_product, component_ref FROM route
-        INNER JOIN component ON route_id = component_route
-        WHERE route_product IN {self.str_ids}
-        AND component_type = 1
-        """
+        if permitted_reactions is not None:
 
-        permitted_reactions = set(permitted_reactions.ids)
+            sql = f"""
+            SELECT route_id, route_product, component_ref FROM route
+            INNER JOIN component ON route_id = component_route
+            WHERE route_product IN {self.str_ids}
+            AND component_type = 1
+            """
 
-        if debug:
-            mrich.debug("Querying database for routes")
-        records = self.db.execute(sql).fetchall()
+            permitted_reactions = set(permitted_reactions.ids)
 
-        if debug:
-            mrich.debug("Assembling route dictionary")
+            if debug:
+                mrich.debug("Querying database for routes")
+            records = self.db.execute(sql).fetchall()
 
-        routes = {}
-        for route_id, route_product, reaction_id in records:
-            if route_id not in routes:
-                routes[route_id] = dict(product=route_product, reactions=set())
-            assert routes[route_id]["product"] == route_product
-            routes[route_id]["reactions"].add(reaction_id)
+            if debug:
+                mrich.debug("Assembling route dictionary")
 
-        if debug:
-            mrich.debug("Checking availability")
-        available_routes = set()
-        for route_id, route_dict in routes.items():
-            product = route_dict["product"]
-            assert product in self
-            reactions = route_dict["reactions"]
-            if all(r in permitted_reactions for r in reactions):
-                available_routes.add(route_id)
+            routes = {}
+            for route_id, route_product, reaction_id in records:
+                if route_id not in routes:
+                    routes[route_id] = dict(product=route_product, reactions=set())
+                assert routes[route_id]["product"] == route_product
+                routes[route_id]["reactions"].add(reaction_id)
 
-        routes = [
-            self.db.get_route(id=route_id)
-            for route_id in mrich.track(available_routes, prefix="Getting routes")
-        ]
+            if debug:
+                mrich.debug("Checking availability")
+
+            available_routes = set()
+            for route_id, route_dict in routes.items():
+                product = route_dict["product"]
+                assert product in self
+                reactions = route_dict["reactions"]
+                if all(r in permitted_reactions for r in reactions):
+                    available_routes.add(route_id)
+
+            routes = [
+                self.db.get_route(id=route_id)
+                for route_id in mrich.track(available_routes, prefix="Getting routes")
+            ]
+
+        else:
+
+            sql = f"""
+            SELECT route_id FROM route
+            WHERE route_product IN {self.str_ids}
+            """
+
+            if debug:
+                mrich.debug("Querying database for routes")
+            records = self.db.execute(sql).fetchall()
+
+            routes = [
+                self.db.get_route(id=route_id)
+                for route_id, in mrich.track(records, prefix="Getting routes")
+            ]
 
         from .recipe import RouteSet
 

@@ -398,9 +398,11 @@ class HIPPO:
 
             assert len(meta_row)
 
+            pose_tags = set(tags)
+
             for tag in curated_tag_cols:
                 if meta_row[tag].values[0]:
-                    tags.append(tag)
+                    pose_tags.add(tag)
 
             metadata = {"observation_longname": meta_row["Long code"].values[0]}
 
@@ -413,7 +415,7 @@ class HIPPO:
                 alias=observation_shortname,
                 target=target.id,
                 path=pose_path,
-                tags=tags,
+                tags=pose_tags,
                 metadata=metadata,
                 duplicate_alias="skip",
             )

@@ -1713,7 +1713,9 @@ class PoseSet:
 
         return "; ".join(commands)
 
-    def to_knitwork(self, out_path: str, path_root: str = ".") -> None:
+    def to_knitwork(
+        self, out_path: str, path_root: str = ".", aligned_files_dir: str | None = None
+    ) -> None:
         """Knitwork takes a CSV input with:
 
         - observation shortcode
@@ -1733,6 +1735,7 @@ class PoseSet:
         path_root = Path(path_root).resolve()
         mrich.var("out_path", out_path)
         mrich.var("path_root", path_root)
+        mrich.var("aligned_files_dir", aligned_files_dir)
 
         assert out_path.name.endswith(".csv")
 
@@ -1745,8 +1748,25 @@ class PoseSet:
                 assert pose.alias
                 assert "hits" in pose.tags
 
-                mol = relpath(pose.mol_path, path_root)
-                pdb = relpath(pose.apo_path, path_root)
+                if aligned_files_dir:
+
+                    mol = str(pose.mol_path)
+                    pdb = str(pose.apo_path)
+
+                    assert "aligned_files" in mol
+                    assert "aligned_files" in pdb
+
+                    mol = mol.split("aligned_files/")[-1]
+                    pdb = pdb.split("aligned_files/")[-1]
+
+                    aligned_files_dir = Path(aligned_files_dir)
+
+                    mol = relpath(aligned_files_dir / mol, path_root)
+                    pdb = relpath(aligned_files_dir / pdb, path_root)
+
+                else:
+                    mol = relpath(pose.mol_path, path_root)
+                    pdb = relpath(pose.apo_path, path_root)
 
                 data = [pose.alias, pose.compound.smiles, mol, pdb]
 
@@ -1755,6 +1775,7 @@ class PoseSet:
 
     def to_syndirella(self, out_key: "str | Path") -> "DataFrame":
 
+        import shutil
         from pandas import DataFrame
         from pathlib import Path
 
@@ -1762,6 +1783,10 @@ class PoseSet:
         out_key = Path(out_key).name
 
         out_dir.mkdir(parents=True, exist_ok=True)
+
+        template_dir = out_dir / "templates"
+        mrich.writing(template_dir)
+        template_dir.mkdir(parents=True, exist_ok=True)
 
         # mrich.var("out_dir", out_dir)
         mrich.var("out_key", out_key)
@@ -1772,11 +1797,17 @@ class PoseSet:
 
             comp = pose.compound
 
+            ref = pose.reference
+
             d = dict(
                 smiles=comp.smiles,
-                template=pose.reference.path,
+                # template=ref.path,
+                template=ref.name,
                 compound_set=out_key,
             )
+
+            mrich.writing(template_dir / ref.apo_path.name)
+            shutil.copy(ref.apo_path, template_dir / ref.apo_path.name)
 
             for i, p in enumerate(pose.inspirations):
                 d[f"hit{i+1}"] = p.name
@@ -1798,7 +1829,7 @@ class PoseSet:
             tags=False,
             metadata=False,
             reference=False,
-            name_col="observation_longname",
+            name_col="name",
         )
 
         return df
@@ -1860,8 +1891,8 @@ class PoseSet:
             def widget(i):
                 pose = self[i]
                 if print_name:
-                    print(repr(pose))
-                display(function(pose))
+                    display(pose)
+                function(pose)
 
             return interactive(
                 widget,
@@ -1958,7 +1989,7 @@ class PoseSet:
         mols = [p.mol for p in self]
 
         drawing = draw_mols(mols)
-        display(drawing)
+        # display(drawing)
 
     def grid(self) -> None:
         """Draw a grid of all contained molecules"""
@@ -2066,8 +2097,12 @@ class PoseSet:
         other: "PoseSet",
     ) -> "PoseSet":
         """Add a :class:`.PoseSet` to this set"""
-        assert isinstance(other, PoseSet)
-        return PoseSet(self.db, self.ids + other.ids, sort=False)
+        if isinstance(other, PoseSet):
+            return PoseSet(self.db, self.ids + other.ids, sort=False)
+        elif isinstance(other, Pose):
+            return PoseSet(self.db, self.ids + [other.id], sort=False)
+        else:
+            raise NotImplementedError
 
     def __sub__(
         self,

@@ -282,6 +282,10 @@ class Database:
                     time.sleep(retry)
                 mrich.print("[debug]SQLite Database was locked, retrying...")
                 return self.execute(sql=sql, payload=payload, retry=retry)
+            if "syntax error" in str(e):
+                mrich.error(sql)
+                mrich.error(payload)
+                raise
             else:
                 raise
         except Error as e:
@@ -589,7 +593,7 @@ class Database:
             interaction_distance REAL NOT NULL,
             interaction_angle REAL,
             interaction_energy REAL,
-            CONSTRAINT UC_interaction UNIQUE (interaction_feature, interaction_pose, interaction_family, interaction_atom_ids)
+            CONSTRAINT UC_interaction UNIQUE (interaction_feature, interaction_pose, interaction_type, interaction_family, interaction_atom_ids)
         );
         """
 
@@ -1235,7 +1239,8 @@ class Database:
         residue_name: str,
         residue_number: int,
         atom_names: list[str],
-        commit: bool,
+        warn_duplicate: bool = False,
+        commit: bool = True,
     ) -> int:
         """Insert an entry into the feature table
 
@@ -1259,16 +1264,19 @@ class Database:
             target = self.get_target_id(name=target)
         assert isinstance(target, int)
 
-        from molparse.rdkit.features import FEATURE_FAMILIES
+        from .prolif import FEATURE_FAMILIES
 
-        assert family in FEATURE_FAMILIES, f"Unsupported {family=}"
+        if family:
+            assert family in FEATURE_FAMILIES, f"Unsupported {family=}"
+        else:
+            family = "Unknown"
 
         sql = """
         INSERT INTO feature(feature_family, feature_target, feature_chain_name, feature_residue_name, feature_residue_number, feature_atom_names)
         VALUES(?1, ?2, ?3, ?4, ?5, ?6)
         """
 
-        atom_names = " ".join(atom_names)
+        atom_names = " ".join(sorted(atom_names))
 
         try:
             self.execute(
@@ -1277,6 +1285,16 @@ class Database:
             )
 
         except sqlite3.IntegrityError as e:
+
+            if warn_duplicate:
+                mrich.warning(str(e))
+                mrich.var("family", family)
+                mrich.var("target", target)
+                mrich.var("chain_name", chain_name)
+                mrich.var("residue_name", residue_name)
+                mrich.var("residue_number", residue_number)
+                mrich.var("atom_names", atom_names)
+
             return None
 
         except Exception as e:
@@ -1456,10 +1474,14 @@ class Database:
         if isinstance(pose, Pose):
             pose = pose.id
 
-        from molparse.rdkit.features import FEATURE_FAMILIES, INTERACTION_TYPES
+        from .prolif import FEATURE_FAMILIES, INTERACTION_TYPES
 
-        assert family in FEATURE_FAMILIES, f"Unsupported {family=}"
-        assert type in INTERACTION_TYPES.values(), f"Unsupported {type=}"
+        if family:
+            assert family in FEATURE_FAMILIES, f"Unsupported {family=}"
+        else:
+            family = "Unknown"
+
+        # assert type in INTERACTION_TYPES.values(), f"Unsupported {type=}"
 
         assert isinstance(atom_ids, list), f"Unsupported {atom_ids=}"
         assert not any(
@@ -1467,15 +1489,15 @@ class Database:
         ), f"Unsupported {atom_ids=}"
         atom_ids = json.dumps(atom_ids)
 
-        prot_coord = list(prot_coord)
-        assert len(prot_coord) == 3, f"Unsupported {prot_coord=}"
+        prot_coord = list(prot_coord) if prot_coord is not None else []
+        assert len(prot_coord) == 3 or not prot_coord, f"Unsupported {prot_coord=}"
         assert not any(
             [not isinstance(i, float) for i in prot_coord]
         ), f"Unsupported {prot_coord=}"
         prot_coord = json.dumps(prot_coord)
 
-        lig_coord = list(lig_coord)
-        assert len(lig_coord) == 3, f"Unsupported {lig_coord=}"
+        lig_coord = list(lig_coord) if lig_coord is not None else []
+        assert len(lig_coord) == 3 or not lig_coord, f"Unsupported {lig_coord=}"
         assert not any(
             [not isinstance(i, float) for i in lig_coord]
         ), f"Unsupported {lig_coord=}"
@@ -1534,6 +1556,7 @@ class Database:
             )
 
         except sqlite3.IntegrityError as e:
+            mrich.error(e)
             if warn_duplicate:
                 # mrich.warning(f"Skipping existing interaction: {(feature, pose, family, atom_ids, prot_coord, lig_coord, distance, energy)}")
                 mrich.warning(
@@ -1893,10 +1916,13 @@ class Database:
     def delete_interactions(self) -> None:
         """Delete all calculated interactions and set pose_fingerprint appropriately"""
 
-        import pickle
-
         self.delete_where(table="interaction", key="interaction_id > 0")
         self.update_all(table="pose", key="pose_fingerprint", value=0)
+
+    def delete_features(self) -> None:
+        """Delete all protein features"""
+
+        self.delete_where(table="feature", key="feature_id > 0")
 
     ### UPDATE
 
@@ -1978,7 +2004,7 @@ class Database:
 
         cursor = self.execute(
             """
-            INSERT INTO interaction(
+            INSERT OR IGNORE INTO interaction(
                 interaction_feature, 
                 interaction_pose, 
                 interaction_type, 
@@ -2001,6 +2027,43 @@ class Database:
                 interaction_angle, 
                 interaction_energy 
             FROM temp_interaction
+        """
+        )
+
+        return cursor.lastrowid
+
+    def copy_interactions_to_temp(self, pose_id: int) -> int:
+        """Copy the records from the 'temp_interaction' table to the 'interaction' table
+
+        :returns: ID of the last inserted :class:`.Interaction`
+        """
+
+        cursor = self.execute(
+            f"""
+            INSERT OR IGNORE INTO temp_interaction(
+                interaction_feature, 
+                interaction_pose, 
+                interaction_type, 
+                interaction_family, 
+                interaction_atom_ids, 
+                interaction_prot_coord, 
+                interaction_lig_coord, 
+                interaction_distance, 
+                interaction_angle, 
+                interaction_energy
+            )
+            SELECT interaction_feature, 
+                interaction_pose, 
+                interaction_type, 
+                interaction_family, 
+                interaction_atom_ids, 
+                interaction_prot_coord, 
+                interaction_lig_coord, 
+                interaction_distance, 
+                interaction_angle, 
+                interaction_energy 
+            FROM interaction
+            WHERE interaction_pose = {pose_id}
         """
         )
 
@@ -2049,6 +2112,58 @@ class Database:
         self.execute(sql, dict(component_amount=None, component_type=1))
         self.execute(sql, dict(component_amount=1.0, component_type=2))
         self.execute(sql, dict(component_amount=1.0, component_type=3))
+
+    def prune_duplicate_routes(self) -> None:
+
+        from collections import Counter
+
+        sql = """
+        SELECT route_id, route_product, component_ref, component_type FROM route
+        INNER JOIN component ON route_id = component_route
+        """
+
+        records = self.execute(sql).fetchall()
+
+        routes = {}
+
+        for route_id, route_product, component_ref, component_type in records:
+            if route_id not in routes:
+                routes[route_id] = (route_product, set())
+
+            key = (component_ref, component_type)
+            routes[route_id][1].add(key)
+
+        routes = {key: (value[0], tuple(value[1])) for key, value in routes.items()}
+
+        flat_routes = [value for key, value in routes.items()]
+
+        mrich.var("#routes", len(flat_routes))
+
+        counter = Counter(flat_routes)
+        duplicates = {item: count for item, count in counter.items() if count > 1}
+
+        mrich.var("products with duplicate routes", len(duplicates))
+
+        if not duplicates:
+            mrich.success("No duplicate routes found")
+            return None
+
+        delete = set()
+        for dupe in duplicates:
+            matched_ids = [k for k, v in routes.items() if v == dupe]
+            mrich.print(
+                "compound", dupe[0], "has", len(matched_ids), "duplicate routes"
+            )
+            for route_id in matched_ids[1:]:
+                delete.add(route_id)
+
+        str_ids = str(tuple(delete)).replace(",)", ")")
+        self.delete_where(table="component", key=f"component_route IN {str_ids}")
+        self.delete_where(table="route", key=f"route_id IN {str_ids}")
+
+        mrich.success("Deleted", len(delete), "duplicate routes")
+
+        return delete
 
     ### GETTERS
 
@@ -3248,8 +3363,21 @@ class Database:
 
         """
 
+        # mrich.print(self.cursor.fetchall())
+
+        from rich.table import Table
+
+        tab = Table()
+
+        for col in self.column_names(table):
+            tab.add_column(col.removeprefix(table).removeprefix("_"))
+
         self.execute(f"SELECT * FROM {table}")
-        pprint(self.cursor.fetchall())
+        for record in self.cursor.fetchall():
+            record = [str(v) for v in record]
+            tab.add_row(*record)
+
+        mrich.print(tab)
 
     def table_info(
         self,

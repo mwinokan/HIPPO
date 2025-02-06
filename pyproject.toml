@@ -26,6 +26,9 @@ dependencies = [
     "chardet",
     "pandas",
     "yattag",
+    "hirsch",
+    "hippo_plot",
+    "scikit-learn",
 ]
 [project.urls]
 "Homepage" = "https://hippo.winokan.com"

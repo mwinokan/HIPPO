@@ -321,12 +321,14 @@ def plot_interaction_punchcard(
 def plot_interaction_punchcard_by_tags(
     animal,
     tags: dict[str, str] | list[str],
+    permitted_residues: dict[str, list[int]],
     yaxis_title: str = "Tag",
     subtitle=None,
     opacity=0.7,
     group="type",
-    marginal_histogram_x: bool = False,
-    marginal_histogram_y: bool = False,
+    marginal_histogram_x: bool = True,
+    # marginal_histogram_y: bool = False,
+    sizeref=0.08,
     counts: bool = True,
     ignore_chains=True,
     backbone_only: bool = False,
@@ -340,6 +342,7 @@ def plot_interaction_punchcard_by_tags(
     :param opacity:  (Default value = 1.0)
     :param group:  (Default value = 'pose_name')
     :param ignore_chains:  (Default value = False)
+    :param permitted_residues: dictionary mapping with keys matching `tags` mapping to list of IDs for residues to include for each tag
 
     """
 
@@ -349,20 +352,68 @@ def plot_interaction_punchcard_by_tags(
     if isinstance(tags, list):
         tags = {v: v for v in tags}
 
+    permitted_residues = permitted_residues or {}
+
     dfs = []
     for group_name, tag in tags.items():
         poses = animal.poses(tag=tag)
+        mrich.debug(group_name, poses)
+
         name_lookup = poses.id_name_dict
 
-        df = poses.interactions.df
+        with mrich.loading("Getting interactions dataframe"):
+            df = poses.interactions.df
+
         df["tag"] = tag
         df["group_name"] = group_name
         df["pose_name"] = [name_lookup[pose_id] for pose_id in df["pose_id"].values]
 
+        if group_name in permitted_residues:
+            subset = df[df["residue_number"].isin(permitted_residues[group_name])]
+            diff = len(df) - len(subset)
+            if diff:
+                mrich.warning(
+                    "Skipping",
+                    diff,
+                    "markers due unpermitted residue numbers for: ",
+                    group_name,
+                )
+                df = subset
+
         dfs.append(df)
 
+    mrich.debug("Concatenating dataframes")
     plot_data = pd.concat(dfs, ignore_index=True)
 
+    ### add permitted residues
+
+    if permitted_residues and ignore_chains:
+
+        permitted_df = []
+        for group_name, ids in permitted_residues.items():
+
+            unique_combinations = plot_data[plot_data["group_name"] == group_name][
+                ["residue_name", "residue_number"]
+            ].drop_duplicates()
+
+            for resid in ids:
+
+                try:
+                    resname = unique_combinations[
+                        unique_combinations["residue_number"] == resid
+                    ]["residue_name"].values[0]
+                except IndexError:
+                    continue
+
+                # if plot_data[['residue_name', 'residue_number']]
+
+                permitted_df.append(
+                    dict(res_name_number=f"{resname} {resid}", group_name=group_name)
+                )
+
+        permitted_df = pd.DataFrame(permitted_df)
+
+    mrich.debug("Building plot_data")
     if backbone_only:
         plot_data = plot_data[plot_data["backbone"] == True]
     if sidechain_only:
@@ -383,6 +434,9 @@ def plot_interaction_punchcard_by_tags(
         sort_key = lambda x: (x[2], x[1])
 
     if counts:
+        mrich.debug("Summing by residue")
+        orig_data = plot_data.copy()
+
         if ignore_chains:
             plot_data = (
                 plot_data.groupby(["group_name", "type", x, "residue_number"])
@@ -400,23 +454,40 @@ def plot_interaction_punchcard_by_tags(
 
         plot_data["size"] = np.sqrt(plot_data["count"])
 
-    title = "Interaction Punch-Card"
+    # add a size reference
 
-    if subtitle:
-        title = f"<b>{animal.name}</b>: {title}<br><sup><i>{subtitle}</i></sup>"
-    else:
-        title = f"<b>{animal.name}</b>: {title}"
+    type_str = "Size"
+    sizes = [1, 50, 100, 250]
 
+    dicts = []
+    for group_name, size in zip(tags.keys(), sizes):
+        dicts.append(
+            dict(
+                group_name=group_name,
+                type="type_str",
+                res_name_number="",
+                residue_number=999,
+                count=size,
+                size=np.sqrt(size),
+                text=size,
+            )
+        )
+
+    plot_data = pd.concat([plot_data, pd.DataFrame(dicts)])
+
+    mrich.debug("Making scatter plot")
     fig = px.scatter(
         plot_data,
         x=x,
         y="group_name",
-        marginal_x="histogram" if marginal_histogram_x else None,
-        marginal_y="histogram" if marginal_histogram_y else None,
         hover_data=plot_data.columns,
         color=group,
         size="size" if counts else None,
+        text="text",
+        # color_discrete_sequence=px.colors.qualitative.Dark2
     )
+
+    fig.update_traces(textposition="middle right")
 
     # fig.update_layout(title=title, title_automargin=False, title_yref="container")
 
@@ -434,24 +505,98 @@ def plot_interaction_punchcard_by_tags(
 
     # sort axes
     fig.update_xaxes(categoryorder="array", categoryarray=categoryarray)
-    fig.update_yaxes(categoryorder="category descending")
 
     for trace in fig.data:
         if type(trace) == plotly.graph_objs._histogram.Histogram:
             trace.opacity = 1
             trace.xbins.size = 1
         else:
-            # trace["marker"]["size"] = 10
             trace["marker"]["opacity"] = opacity
 
-    # add ticks to marginals:
+    if marginal_histogram_x:
 
-    # fig.update_layout(
-    #     xaxis2=dict(showticklabels=True),  # Show ticks on the x-axis marginal
-    #     # yaxis2=dict(showticklabels=True)   # Show ticks on the y-axis marginal
-    # )
+        from plotly.subplots import make_subplots
 
-    fig.update_layout(barmode="stack")
+        subplot_fig = make_subplots(
+            rows=2,
+            cols=1,
+            specs=[[{"type": "histogram"}], [{"type": "scatter"}]],
+            shared_xaxes=True,
+            shared_yaxes=False,
+            vertical_spacing=0.02,
+            horizontal_spacing=0.02,
+        )
+
+        # add in scatter traces
+        for trace in fig.data:
+            trace.yaxis = "y2"
+            trace.showlegend = False
+            trace.marker.sizeref = sizeref
+            trace.marker.line.width = 0
+            subplot_fig.add_trace(trace)
+
+        # aggregate data for histogram plot
+        plot_data = (
+            orig_data.groupby(["type", x, "residue_number"])
+            .size()
+            .reset_index(name="count")
+        )
+
+        # generate histogram
+        fig2 = px.histogram(plot_data, x=x, y="count", color="type")
+
+        # add in histogram traces
+        for trace in fig2.data:
+            trace.yaxis = "y1"
+            subplot_fig.add_trace(trace)
+
+        # if permitted_residues and ignore_chains:
+        #     trace = go.Scatter(
+        #         name="Subsite Residues",
+        #         x=permitted_df[x],
+        #         y=permitted_df["group_name"],
+        #         mode="markers",
+        #         marker_symbol="square-open",
+        #         marker_size=25,
+        #         marker_color="grey")
+
+        #     trace.yaxis="y2"
+        #     subplot_fig.add_trace(trace)
+
+        # clean up the axes
+        subplot_fig.update_layout(
+            xaxis=dict(anchor="y2", visible=True, showticklabels=True, side="bottom"),
+            # xaxis2=dict(visible=True, showticklabels=True, side="bottom"),
+            yaxis2=dict(
+                anchor="x",
+                overlaying="x",
+                side="top",
+                categoryorder="category descending",
+            ),  # Secondary y-axis for x marginal
+        )
+
+        # x-axis sorting
+        if ignore_chains:
+            categoryarray = plot_data[[x, "residue_number"]].agg(tuple, axis=1)
+        else:
+            raise NotImplementedError
+        categoryarray = sorted([v for v in categoryarray.values], key=sort_key)
+        categoryarray = [v[0] for v in categoryarray]
+        subplot_fig.update_xaxes(categoryorder="array", categoryarray=categoryarray)
+
+        # y-axis sorting
+        categoryarray = list(reversed(tags.keys()))
+        subplot_fig.update_yaxes(categoryorder="array", categoryarray=categoryarray)
+
+        # stack histogram bars on top of each other
+        subplot_fig.update_layout(barmode="stack")
+
+        subplot_fig.update_layout(
+            margin=dict(l=20, r=20, t=20, b=20),
+        )
+
+        return subplot_fig
+
     # fig.update_layout(scattermode="group", scattergap=0.75)
 
     # return add_punchcard_logo(fig)

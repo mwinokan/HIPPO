@@ -255,7 +255,7 @@ def dt_hash():
         + dt.microsecond / 10000
     )
     timehash = "".join([ALPHANUMERIC_CHARS[v] for v in numberToBase(x, 36)])
-    return timehash
+    return f"{timehash:>07}"
 
 
 class SanitisationError(Exception):
