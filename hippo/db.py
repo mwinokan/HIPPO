@@ -288,7 +288,7 @@ class Database:
                 raise
             else:
                 raise
-        except Error as e:
+        except Exception as e:
             raise
 
     def executemany(self, sql, payload, *, retry: float | None = 1) -> None:
@@ -299,6 +299,13 @@ class Database:
         :param payload: Payload for insertion, etc. (Default value = None)
 
         """
+
+        if "RETURNING" in sql:
+            from .apsw import executemany
+
+            mrich.debug("Using apsw")
+            return executemany(self.path, sql, payload)
+
         try:
             return self.cursor.executemany(sql, payload)
         except sqlite3.OperationalError as e:
@@ -311,7 +318,9 @@ class Database:
                 return self.executemany(sql=sql, payload=payload, retry=retry)
             else:
                 raise
-        except Error as e:
+        except Exception as e:
+            mrich.print(sql)
+            mrich.print(payload[0])
             raise
 
     def commit(self, *, retry: float | None = 1) -> None:
@@ -751,7 +760,7 @@ class Database:
         self,
         *,
         compound: Compound | int,
-        target: int | str,
+        target: Target | int | str,
         path: str,
         inchikey: str | None = None,
         alias: str | None = None,
@@ -788,6 +797,9 @@ class Database:
 
         if isinstance(reference, Pose):
             reference = reference.id
+
+        if isinstance(target, Target):
+            target = target.id
 
         if isinstance(target, str):
             target = self.get_target_id(name=target)
@@ -2599,6 +2611,22 @@ class Database:
             d[comp_id].add(pose_id)
         return d
 
+    def get_compound_inchikey_id_dict(self, inchikeys: list[str]):
+        """Get a dictionary mapping :class:`.Compound` inchikeys to their ID's"""
+
+        inchikey_str = str(tuple(inchikeys)).replace(",)", ")")
+
+        records = self.select_where(
+            table="compound",
+            multiple=True,
+            query="compound_inchikey, compound_id",
+            key=f"compound_inchikey IN {inchikey_str}",
+        )
+
+        return {
+            compound_inchikey: compound_id for compound_inchikey, compound_id in records
+        }
+
     def get_compound_cluster_dict(
         self,
         cset: "CompoundSet | None" = None,
@@ -2750,6 +2778,37 @@ class Database:
             energy=energy,
             table=table,
         )
+
+    def get_reaction_map_from_products(
+        self, product_ids: list[int]
+    ) -> dict[tuple[str, int], set[int]]:
+        """Get a dictionary mapping (reaction_type, product_id) tuples to sets of reactant_ids"""
+
+        str_ids = str(tuple(product_ids)).replace(",)", ")")
+
+        records = self.execute(
+            f"""
+            SELECT reaction_type, reaction_product, reaction_id, reactant_compound
+            FROM reaction INNER JOIN reactant
+            ON reaction_id = reactant_reaction
+            WHERE reaction_product IN {str_ids}
+        """
+        ).fetchall()
+
+        mapping = {}
+        for reaction_type, reaction_product, reaction_id, reactant_compound in records:
+
+            key = (reaction_type, reaction_product)
+
+            if key not in mapping:
+                mapping[key] = {}
+
+            if reaction_id not in mapping[key]:
+                mapping[key][reaction_id] = set()
+
+            mapping[key][reaction_id].add(reactant_compound)
+
+        return mapping
 
     def get_possible_reaction_ids(
         self,

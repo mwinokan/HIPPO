@@ -1042,7 +1042,7 @@ class HIPPO:
                                 case dict():
                                     try:
                                         inspiration = inspiration_map[inspiration]
-                                    
+
                                     except KeyError:
 
                                         inspiration = self.poses[inspiration]
@@ -1086,7 +1086,9 @@ class HIPPO:
                                                         )
 
                                                     inspiration_map[inspiration] = (
-                                                        inspiration_map[close_matches[0]]
+                                                        inspiration_map[
+                                                            close_matches[0]
+                                                        ]
                                                     )
                                                     inspiration = inspiration_map[
                                                         inspiration
@@ -1119,7 +1121,8 @@ class HIPPO:
                                                         mrich.var(
                                                             "inspiration_map",
                                                             dumps(
-                                                                inspiration_map, indent=2
+                                                                inspiration_map,
+                                                                indent=2,
                                                             ),
                                                         )
                                                         raise
@@ -1193,6 +1196,179 @@ class HIPPO:
             mrich.warning(f"Loaded {n_reactions} new reactions from {df_path.name}")
 
         return df
+
+    def bulk_elabs(
+        self,
+        df_path: str | Path,
+        tags: list[str] | None = None,
+    ) -> None:
+        """Use bulk SQL queries for insertions"""
+
+        from .syndirella import reactions_from_row
+
+        df_path = Path(df_path)
+        mrich.h3(df_path.name)
+
+        mrich.reading(df_path)
+        df = pd.read_pickle(df_path)
+
+        tags = tags or []
+
+        # work out number of reaction steps
+        num_steps = max(
+            [int(s.split("_")[0]) for s in df.columns if "_product_smiles" in s]
+        )
+        mrich.var("num_steps", num_steps)
+
+        # add is_scaffold row
+        df["is_scaffold"] = df[f"{num_steps}_product_name"].str.contains("scaffold")
+
+        ###### PREP ######
+
+        # inspirations
+        inspiration_sets = set(tuple(sorted(i)) for i in df["regarded"].to_list())
+        assert len(inspiration_sets) == 1, "Varying inspirations not supported"
+        (inspiration_set,) = inspiration_sets
+        inspirations = self.poses[inspiration_set]
+        assert len(inspirations) == len(inspiration_set)
+
+        # reference
+        template_paths = set(df["template"].to_list())
+        assert len(template_paths) == 1, "Multiple references not supported"
+        (template_path,) = template_paths
+        template_path = Path(template_path)
+        mrich.var("template_path", template_path)
+        base_name = template_path.name.removesuffix(".pdb").removesuffix("_apo-desolv")
+        reference = self.poses[base_name]
+        assert reference, "Could not determine reference structure"
+        mrich.var("reference", reference)
+
+        target = reference.target
+
+        ###### SCAFFOLD ######
+
+        # subset of rows
+        scaffold_df = df[df["is_scaffold"]]
+        elab_df = df[df["is_scaffold"]]
+        mrich.var("#scaffold entries", len(scaffold_df))
+        mrich.var("#elab entries", len(elab_df))
+
+        # if len(scaffold_df) != 1:
+        #     raise NotImplementedError("Multiple scaffold rows are not yet supported")
+
+        # scaffold_poses = PoseSet(self.db)
+        # for i, scaffold_row in mrich.track(
+        #     scaffold_df.iterrows(), total=len(scaffold_df), prefix="Loading scaffolds"
+        # ):
+
+        #     # check smiles
+        #     scaffold_smiles = scaffold_row.scaffold_smiles
+        #     mrich.var("scaffold_smiles", scaffold_smiles)
+
+        #     # register scaffold compound
+        #     scaffold = self.register_compound(
+        #         smiles=scaffold_smiles,
+        #         tags=["syndirella scaffold"] + tags,
+        #     )
+
+        #     # register reaction and reactants
+        #     scaffold_reactions = reactions_from_row(
+        #         animal=self, row=scaffold_row, num_steps=num_steps
+        #     )
+
+        #     # register pose
+        #     pose = self.register_pose(
+        #         compound=scaffold,
+        #         target=target.id,
+        #         path=Path(scaffold_row["path_to_mol"]),
+        #         inspirations=inspirations,
+        #         tags=tags,
+        #         warn_duplicate=False,
+        #         energy_score=scaffold_row["∆∆G"],
+        #         distance_score=scaffold_row["comRMSD"],
+        #         reference=reference,
+        #     )
+
+        #     scaffold_poses += pose
+
+        # # print scaffold overview
+        # mrich.var("scaffold", scaffold)
+        # mrich.var("scaffold_reactions", scaffold_reactions)
+        # mrich.var("scaffold_poses", scaffold_poses.ids)
+
+        ###### ELABS ######
+
+        # bulk register compounds
+
+        smiles_cols = [
+            c for c in df.columns if c.endswith("_smiles") and c != "scaffold_smiles"
+        ]
+
+        for smiles_col in smiles_cols:
+
+            mrich.bold(f"Registering compounds from column: {smiles_col}")
+
+            inchikey_col = smiles_col.replace("_smiles", "_inchikey")
+            compound_id_col = smiles_col.replace("_smiles", "_compound_id")
+
+            values = self.register_compounds(
+                smiles=df[smiles_col].values,
+                radical=False,
+                sanitisation_verbosity=False,
+            )
+
+            inchikeys = [inchikey for inchikey, smiles in values]
+            df[inchikey_col] = inchikeys
+
+            # get associated IDs
+            compound_inchikey_id_dict = self.db.get_compound_inchikey_id_dict(inchikeys)
+            df[compound_id_col] = [
+                compound_inchikey_id_dict[inchikey] for inchikey in inchikeys
+            ]
+
+        # bulk register reactions
+
+        for step in range(num_steps):
+
+            step += 1
+
+            reactant_id_sets = []
+            for r1_id, r2_id in df[
+                [f"{step}_r1_compound_id", f"{step}_r2_compound_id"]
+            ].values:
+
+                id_set = set()
+
+                if r1_id := int(r1_id):
+                    assert isinstance(r1_id, int), type(r1_id)
+                    id_set.add(r1_id)
+
+                if r2_id := int(r2_id):
+                    assert isinstance(r2_id, int), type(r2_id)
+                    id_set.add(r2_id)
+
+                assert id_set
+                reactant_id_sets.append(id_set)
+
+            reaction_ids = self.register_reactions(
+                types=df[f"{step}_reaction"],
+                product_ids=df[f"{step}_product_compound_id"],
+                reactant_id_lists=reactant_id_sets,
+            )
+
+            break
+
+        # bulk register scaffolds
+        # bulk register poses
+        # bulk register inspirations
+
+        # for i,elab_row in elab_df.iterrows():
+
+        #     display(elab_row)
+
+        #     break
+
+        return reaction_ids
 
     def add_syndirella_routes(
         self,
@@ -1569,7 +1745,7 @@ class HIPPO:
 
         return ingredients
 
-    ### SINGLE INSERTION
+    ### REGISTRATION
 
     def register_compound(
         self,
@@ -1707,7 +1883,12 @@ class HIPPO:
             return _return(compound_id, duplicate, return_compound, return_duplicate)
 
     def register_compounds(
-        self, *, smiles: list[str], return_values: bool = False
+        self,
+        *,
+        smiles: list[str],
+        radical: str = "warning",
+        sanitisation_verbosity: bool = True,
+        debug: bool = False,
     ) -> list[tuple[str, str]]:
         """Insert many compounds at once
 
@@ -1716,7 +1897,8 @@ class HIPPO:
 
         """
 
-        mrich.var("#smiles", len(smiles))
+        if debug:
+            mrich.var("#smiles", len(smiles))
 
         n_before = self.num_compounds
 
@@ -1731,7 +1913,10 @@ class HIPPO:
 
             try:
                 new_smiles = sanitise_smiles(
-                    s, sanitisation_failed="error", radical="warning", verbosity=True
+                    s,
+                    sanitisation_failed="error",
+                    radical=radical,
+                    verbosity=sanitisation_verbosity,
                 )
             except SanitisationError as e:
                 mrich.error(f"Could not sanitise {s=}")
@@ -1749,7 +1934,9 @@ class HIPPO:
         VALUES(?1, ?2, mol_from_smiles(?2), mol_pattern_bfp(mol_from_smiles(?2), 2048), mol_morgan_bfp(mol_from_smiles(?2), 2, 2048))
         """
 
-        mrich.debug("Inserting...")
+        if debug:
+            mrich.debug("Inserting...")
+
         self.db.executemany(sql, values)
         self.db.commit()
 
@@ -1811,7 +1998,11 @@ class HIPPO:
         reactant_ids = set(v.id if isinstance(v, Compound) else v for v in reactants)
 
         pairs = self.db.execute(
-            f'SELECT reactant_reaction, reactant_compound FROM reactant INNER JOIN reaction ON reactant.reactant_reaction = reaction.reaction_id WHERE reaction_type="{type}" AND reaction_product = {product}'
+            f"""SELECT reactant_reaction, reactant_compound 
+                FROM reactant INNER JOIN reaction 
+                ON reactant.reactant_reaction = reaction.reaction_id 
+                WHERE reaction_type="{type}" 
+                AND reaction_product = {product}"""
         ).fetchall()
 
         if pairs:
@@ -1844,6 +2035,115 @@ class HIPPO:
             )
 
         return self.reactions[reaction_id]
+
+    def register_reactions(
+        self,
+        *,
+        types: list[str],
+        product_ids: list[list[int]],
+        reactant_id_lists: list[list[int]],
+    ):
+        """Insert many reactions at once
+
+        :param types: list of reaction type strings
+        :param reactant_id_lists: list of reactant compound id lists
+        :param product_ids: list of product compound ids
+        :returns: list of reaction ids
+        """
+
+        assert len(types) == len(reactant_id_lists) == len(product_ids)
+
+        # assert not any(not isinstance(t, str) for t in types)
+        # assert not any(not isinstance(t, int) for t in product_ids)
+        # assert not any(not any(not isinstance(i, int) for i in t) for t in reactant_id_lists)
+
+        types = [str(t) for t in types]
+        product_ids = [int(i) for i in product_ids]
+        reactant_id_lists = [set(int(i) for i in r) for r in reactant_id_lists]
+
+        n_before = self.num_reactions
+
+        # get possible duplicates
+        existing = self.db.get_reaction_map_from_products(product_ids)
+
+        non_duplicates = {}
+
+        existing_count = 0
+
+        for reaction_type, product_id, reactant_ids in zip(
+            types, product_ids, reactant_id_lists
+        ):
+
+            key = (reaction_type, product_id)
+
+            reactant_ids = set(reactant_ids)
+
+            possible_matches = {k: v for k, v in existing.items() if k == key}
+
+            assert len(possible_matches) < 2
+
+            if possible_matches:
+                possible_matches = list(possible_matches.values())[0]
+
+            if any(reactant_ids == v for v in possible_matches.values()):
+                existing_count += 1
+                continue
+
+            non_duplicates[key] = reactant_ids
+
+        if existing_count:
+            mrich.warning("Skipped", existing_count, "existing reactions")
+
+        if not non_duplicates:
+            mrich.warning("All reactions are duplicates")
+            return None
+
+        # insert reaction records
+        sql = """
+        INSERT INTO reaction(reaction_type, reaction_product, reaction_product_yield)
+        VALUES(?1, ?2, 1)
+        RETURNING reaction_id
+        """
+
+        records = self.db.executemany(sql, list(non_duplicates.keys()))
+        reaction_ids = [r_id for r_id, in records]
+
+        # insert reactant records
+        sql = """
+        INSERT OR IGNORE INTO reactant(reactant_amount, reactant_reaction, reactant_compound)
+        VALUES(1.0, ?1, ?2)
+        """
+
+        payload = []
+        for reaction_id, ((reaction_type, product_id), reactant_ids) in zip(
+            reaction_ids, non_duplicates.items()
+        ):
+            for reactant_id in reactant_ids:
+                payload.append((reaction_id, reactant_id))
+
+        self.db.executemany(sql, payload)
+        self.db.commit()
+
+        diff = self.num_reactions - n_before
+
+        # delete orphaned reactions
+
+        sql = """
+        SELECT reaction_id FROM reaction
+        LEFT JOIN reactant ON reaction_id = reactant_reaction
+        WHERE reactant_compound IS NULL
+        """
+
+        records = self.db.execute(sql).fetchall()
+        orphaned_str_ids = str(tuple(r for r, in records)).replace(",)", ")")
+        self.db.execute(f"DELETE FROM reaction WHERE reaction_id IN {orphaned_str_ids}")
+
+        if diff:
+            mrich.success(f"Inserted {diff} new reactions")
+        else:
+            mrich.warning(f"Inserted {diff} new reactions")
+
+        return reaction_ids
 
     def register_target(
         self,
