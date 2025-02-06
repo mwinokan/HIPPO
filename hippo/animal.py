@@ -730,479 +730,19 @@ class HIPPO:
     def add_syndirella_elabs(
         self,
         df_path: str | Path,
-        *,
-        inspiration_map: dict | None = None,
-        base_only: bool = False,
-        tags: None | list[str] = None,
-        reaction_yield_map: dict | None = None,
-        require_truthy_bases: None | list[str] = None,
-        # warn_nontruthy_bases: None | list[str] = None,
-        require_truthy_elabs: None | list[str] = None,
-        warn_nonzero_truthy_bases: None | list[str] = None,
-        stop_after: None | int = None,
-        check_chemistry: bool = True,
-        base_designator: str = "scaffold",
-        target: int | str = 1,
-        allow_missing_inspirations: bool = False,
-        reference: int | Pose | None = None,
-        inspiration_close_match_cutoff: float = 0.96,
-    ) -> None:
+        max_energy_score: float | None = 0.0,
+        max_distance_score: float | None = 2.0,
+        require_intra_geometry_pass: bool = True,
+    ) -> "pd.DataFrame":
         """
         Load Syndirella elaboration compounds and poses from a pickled DataFrame
 
         :param df_path: Path to the pickled DataFrame
-        :param inspiration_map: Dictionary or callable mapping between inspiration strings found in ``inspiration_col`` and :class:`.Pose` ids, defaults to None
-        :param base_only: Only load the base compound, defaults to ``False``
-        :param tags: list of tags to assign to compounds and poses, defaults to ``None``
-        :param reaction_yield_map: dictionary mapping reaction type strings to their yield ratio, defaults to ``None``
-        :param require_truthy_bases: List of columns that should be truthy to load the given base, defaults to ``['path_to_mol', 'intra_geometry_pass']``
-        :param require_truthy_elabs: List of columns that should be truthy to load the given elaboration, defaults to ``['path_to_mol', 'intra_geometry_pass']``
-        :param warn_nonzero_truthy_bases: List of columns that should have a truthy value for at least one of the base molecules, defaults to ``['path_to_mol', 'intra_geometry_pass']``
-        :param stop_after: Stop after given number of rows, defaults to ``None``
-        :param check_chemistry: check the reaction chemistry, defaults to ``True``
-        :param reference: reference :class:`.Pose` object or ID to assign to poses, defaults to ``None``
+        :param max_energy_score: Filter out poses with `∆∆G` above this value
+        :param max_distance_score: Filter out poses with `comRMSD` above this value
+        :param require_intra_geometry_pass: Filter out poses with falsy `intra_geometry_pass` values
+        :returns: annotated DataFrame
         """
-
-        from .chem import check_reaction_types, InvalidChemistryError
-        from .fragalysis import find_observation_longcode_matches
-
-        if inspiration_map is None:
-            inspiration_map = self.db.create_metadata_id_map(
-                table="pose", key="observation_longname"
-            )
-
-        tags = tags or []
-        require_truthy_bases = require_truthy_bases or [
-            "path_to_mol",
-            "intra_geometry_pass",
-        ]
-        require_truthy_bases = require_truthy_bases or [
-            "path_to_mol",
-            "intra_geometry_pass",
-        ]
-        require_truthy_elabs = require_truthy_elabs or [
-            "path_to_mol",
-            "intra_geometry_pass",
-        ]
-        warn_nonzero_truthy_bases = warn_nonzero_truthy_bases or [
-            "path_to_mol",
-            "intra_geometry_pass",
-        ]
-        assert all([k in require_truthy_bases for k in warn_nonzero_truthy_bases])
-
-        if isinstance(df_path, str):
-            df_path = Path(df_path)
-        df = pd.read_pickle(df_path)
-
-        # work out number of reaction steps
-        n_steps = max(
-            [int(s.split("_")[0]) for s in df.columns if "_product_smiles" in s]
-        )
-
-        # check chemistries
-        if check_chemistry:
-            chemistries = set(
-                sum(
-                    [
-                        df[df[f"{j+1}_reaction"].notnull()][f"{j+1}_reaction"].tolist()
-                        for j in range(n_steps)
-                    ],
-                    [],
-                )
-            )
-            mrich.var("Present reactions", str(chemistries))
-            check_reaction_types(chemistries)
-
-        if f"{n_steps}_num_atom_diff" not in df.columns:
-            mrich.error(df_path)
-            mrich.error(f"{n_steps}_num_atom_diff not in columns:")
-            print(df.columns)
-            raise NotImplementedError
-
-        base_df = df[df[f"{n_steps}_product_name"].str.contains(base_designator)]
-
-        if not len(base_df):
-            mrich.error(f"No base/scaffold rows found in {df_path.name}")
-            return df
-
-        for key in warn_nonzero_truthy_bases:
-            if not any(base_df[key].values):
-                mrich.warning(f"No bases have truthy {key}. Inserting them anyway")
-                require_truthy_bases.pop(require_truthy_bases.index(key))
-
-        base_id = None
-        base_reactants = {}
-
-        if base_only:
-            generator = df.iterrows()
-        else:
-            generator = mrich.track(
-                df.iterrows(),
-                prefix="Processing DataFrame rows...",
-                total=len(df),
-            )
-
-        n_comps = len(self.compounds)
-        n_poses = len(self.poses)
-        n_reactions = len(self.reactions)
-
-        skipped_smaller = 0
-        skipped_reactions = 0
-        skipped_invalid_smiles = 0
-
-        try:
-
-            for i, row in generator:
-
-                path_to_mol = row.path_to_mol
-
-                product_name = row[f"{n_steps}_product_name"]
-
-                this_row_is_a_base = base_designator in product_name
-
-                # skip entries that have non-truthy columns
-                if this_row_is_a_base:
-
-                    if any(not row[key] for key in require_truthy_bases):
-                        mrich.warning(f"Skipping (row {i=}) which has {key}={row[key]}")
-                        continue
-
-                elif any(not row[key] for key in require_truthy_elabs):
-                    continue
-
-                if row[f"{n_steps}_num_atom_diff"] <= 0 and not this_row_is_a_base:
-                    skipped_smaller += 1
-                    continue
-
-                if base_only and not this_row_is_a_base:
-                    continue
-
-                if base_only and base_id and not this_row_is_a_base:
-                    break
-
-                # mrich.debug(f'{i=} {this_row_is_a_base=}')
-
-                if this_row_is_a_base and skipped_smaller and not base_id:
-                    mrich.warning(
-                        f"Skipped {skipped_smaller} elaborations that are smaller than the base compound"
-                    )
-
-                elabs_registered = set()
-
-                try:
-
-                    # loop over each reaction step
-                    for j in range(n_steps):
-
-                        j += 1
-
-                        reactants = []
-
-                        reactant_previous_product = row[f"{j}_r_previous_product"]
-
-                        # reactant 1
-                        if reactant_previous_product == 1:
-                            reactant1_id = product_id
-                            reactants.append(reactant1_id)
-                        elif smiles := row[f"{j}_r1_smiles"]:
-
-                            if not isinstance(smiles, str):
-                                raise InvalidRowError(f"non-string {j}_r1_smiles")
-
-                            try:
-                                base = (
-                                    base_reactants[j][1]
-                                    if not this_row_is_a_base
-                                    else None
-                                )
-                            except KeyError:
-                                print(row)
-                                mrich.error(
-                                    f"Expected base_reactants to contain data when {this_row_is_a_base=}"
-                                )
-                                raise
-
-                            reactant1_id, duplicate = self.register_compound(
-                                smiles=smiles,
-                                commit=False,
-                                return_compound=False,
-                                tags=tags,
-                                bases=[base],
-                                register_base_if_duplicate=True,
-                                return_duplicate=True,
-                            )
-
-                            reactants.append(reactant1_id)
-
-                        # reactant 2
-                        if reactant_previous_product == 2:
-                            reactant2_id = product_id
-                            reactants.append(reactant2_id)
-
-                        elif smiles := row[f"{j}_r2_smiles"]:
-
-                            if not isinstance(smiles, str):
-                                raise InvalidRowError(f"non-string {j}_r2_smiles")
-
-                            if this_row_is_a_base:
-                                base = None
-                            else:
-                                base = base_reactants[j][2]
-                                assert base
-
-                            reactant2_id, duplicate = self.register_compound(
-                                smiles=smiles,
-                                commit=False,
-                                return_compound=False,
-                                tags=tags,
-                                bases=[base],
-                                register_base_if_duplicate=True,
-                                return_duplicate=True,
-                            )
-
-                            reactants.append(reactant2_id)
-
-                        else:
-                            reactant2_id = None
-
-                        # product
-                        if smiles := row[f"{j}_product_smiles"]:
-                            if not isinstance(smiles, str):
-                                raise InvalidRowError(f"non-string {j}_product_smiles")
-
-                            if j != n_steps:
-                                this_tags = tags
-                                base = None
-
-                            elif this_row_is_a_base:
-                                this_tags = ["Syndirella scaffold"] + tags
-                                base = None
-
-                            else:
-                                this_tags = tags
-                                base = base_id
-
-                            product_id, duplicate = self.register_compound(
-                                smiles=smiles,
-                                tags=this_tags,
-                                commit=False,
-                                return_compound=False,
-                                bases=[base],
-                                register_base_if_duplicate=True,
-                                return_duplicate=True,
-                            )
-
-                            if not base_id:
-                                base_reactants[j] = {
-                                    1: reactant1_id,
-                                    2: reactant2_id,
-                                    "product": product_id,
-                                }
-
-                            if not base_id and j == n_steps and this_row_is_a_base:
-                                base_id = product_id
-
-                        # register the reaction
-                        if reaction_yield_map:
-                            product_yield = reaction_yield_map[row[f"{j}_reaction"]]
-                        else:
-                            product_yield = 1.0
-
-                        try:
-                            # print(reactants, product_id, row[f"{j}_reaction"])
-                            self.register_reaction(
-                                reactants=reactants,
-                                product=product_id,
-                                type=row[f"{j}_reaction"],
-                                commit=False,
-                                product_yield=product_yield,
-                                check_chemistry=check_chemistry,
-                            )
-                        except InvalidChemistryError as e:
-                            skipped_reactions += 1
-
-                except InvalidRowError as e:
-                    mrich.error(f"Skipping invalid row {i=}: {e}")
-                    skipped_invalid_smiles += 1
-                    continue
-
-                # pose metadata
-                metadata = {}
-
-                # inspirations
-                inspirations = []
-
-                if isinstance(row.regarded, float) and pd.isna(row.regarded):
-                    mrich.warning(f"Null inspiration {i=}")
-
-                else:
-                    for inspiration in row.regarded:
-                        if inspiration_map:
-                            match inspiration_map:
-                                case dict():
-                                    try:
-                                        inspiration = inspiration_map[inspiration]
-
-                                    except KeyError:
-
-                                        inspiration = self.poses[inspiration]
-
-                                        if not inspiration:
-
-                                            matches = find_observation_longcode_matches(
-                                                inspiration, inspiration_map.keys()
-                                            )
-
-                                            if len(matches) == 1:
-                                                pose_id = inspiration_map[matches[0]]
-                                                inspiration_map[inspiration] = pose_id
-                                                inspiration = pose_id
-
-                                            elif len(matches) > 1:
-                                                mrich.error(
-                                                    "Multiple matchs for {inspiration=}"
-                                                )
-                                                from json import dumps
-
-                                                dumps(matches, indent=2),
-
-                                            if len(matches) == 0:
-
-                                                import difflib
-
-                                                inspiration_close_match_cutoff = 0.95
-
-                                                close_matches = difflib.get_close_matches(
-                                                    inspiration,
-                                                    inspiration_map.keys(),
-                                                    n=5,
-                                                    cutoff=inspiration_close_match_cutoff,
-                                                )
-
-                                                if len(close_matches) > 0:
-                                                    if len(close_matches) > 1:
-                                                        mrich.warning(
-                                                            f"Taking closest match: {inspiration=} --> {close_matches[0]}"
-                                                        )
-
-                                                    inspiration_map[inspiration] = (
-                                                        inspiration_map[
-                                                            close_matches[0]
-                                                        ]
-                                                    )
-                                                    inspiration = inspiration_map[
-                                                        inspiration
-                                                    ]
-
-                                                if isinstance(inspiration, str):
-                                                    if allow_missing_inspirations:
-                                                        mrich.warning(
-                                                            f"{inspiration=} not found in inspiration_map"
-                                                        )
-
-                                                        inspiration = None
-
-                                                    else:
-                                                        # mrich.error(
-                                                        # f"{inspiration=} not found in inspiration_map, try a smaller inspiration_close_match_cutoff?"
-                                                        # )
-                                                        from json import dumps
-
-                                                        mrich.var(
-                                                            "matches",
-                                                            dumps(matches, indent=2),
-                                                        )
-
-                                                        mrich.var(
-                                                            "close_matches",
-                                                            dumps(matches, indent=2),
-                                                        )
-
-                                                        mrich.var(
-                                                            "inspiration_map",
-                                                            dumps(
-                                                                inspiration_map,
-                                                                indent=2,
-                                                            ),
-                                                        )
-                                                        raise
-                                case _:
-                                    inspiration = inspiration_map(inspiration)
-
-                        else:
-                            # this is really expensive
-                            inspiration = self.poses[inspiration]
-                        if inspiration:
-                            inspirations.append(inspiration)
-
-                if path_to_mol and not pd.isna(path_to_mol):
-
-                    path_to_mol = path_to_mol.replace("//", "/")
-
-                    # print(row)
-                    # raise NotImplementedError
-
-                    # register the pose
-                    self.register_pose(
-                        compound=product_id,
-                        target=target,
-                        path=path_to_mol,
-                        inspirations=inspirations,
-                        metadata=metadata,
-                        tags=this_tags,
-                        commit=False,
-                        return_pose=False,
-                        overwrite_metadata=True,
-                        warn_duplicate=False,
-                        energy_score=row["∆∆G"],
-                        distance_score=row["comRMSD"],
-                        reference=reference,
-                    )
-
-                if stop_after and i > stop_after:
-                    break
-
-        except KeyboardInterrupt:
-            mrich.error("KeyboardInterrupt")
-
-        self.db.commit()
-
-        n_comps = len(self.compounds) - n_comps
-        n_poses = len(self.poses) - n_poses
-        n_reactions = len(self.reactions) - n_reactions
-
-        if skipped_reactions:
-            mrich.warning(f"Skipped {skipped_reactions} invalid reactions")
-
-        if skipped_invalid_smiles:
-            mrich.warning(f"Skipped {skipped_invalid_smiles} rows with NaN smiles")
-
-        if n_comps:
-            if not base_only:
-                mrich.success(f"Loaded {n_comps} new compounds from {df_path.name}")
-        else:
-            mrich.warning(f"Loaded {n_comps} new compounds from {df_path.name}")
-
-        if n_poses:
-            if not base_only:
-                mrich.success(f"Loaded {n_poses} new poses from {df_path.name}")
-        else:
-            mrich.warning(f"Loaded {n_poses} new poses from {df_path.name}")
-
-        if n_reactions:
-            if not base_only:
-                mrich.success(f"Loaded {n_reactions} new reactions from {df_path.name}")
-        else:
-            mrich.warning(f"Loaded {n_reactions} new reactions from {df_path.name}")
-
-        return df
-
-    def bulk_elabs(
-        self,
-        df_path: str | Path,
-        tags: list[str] | None = None,
-    ) -> None:
-        """Use bulk SQL queries for insertions"""
 
         from .syndirella import reactions_from_row
 
@@ -1211,8 +751,6 @@ class HIPPO:
 
         mrich.reading(df_path)
         df = pd.read_pickle(df_path)
-
-        tags = tags or []
 
         # work out number of reaction steps
         num_steps = max(
@@ -1245,56 +783,11 @@ class HIPPO:
 
         target = reference.target
 
-        ###### SCAFFOLD ######
-
         # subset of rows
         scaffold_df = df[df["is_scaffold"]]
-        elab_df = df[df["is_scaffold"]]
+        elab_df = df[~df["is_scaffold"]]
         mrich.var("#scaffold entries", len(scaffold_df))
         mrich.var("#elab entries", len(elab_df))
-
-        # if len(scaffold_df) != 1:
-        #     raise NotImplementedError("Multiple scaffold rows are not yet supported")
-
-        # scaffold_poses = PoseSet(self.db)
-        # for i, scaffold_row in mrich.track(
-        #     scaffold_df.iterrows(), total=len(scaffold_df), prefix="Loading scaffolds"
-        # ):
-
-        #     # check smiles
-        #     scaffold_smiles = scaffold_row.scaffold_smiles
-        #     mrich.var("scaffold_smiles", scaffold_smiles)
-
-        #     # register scaffold compound
-        #     scaffold = self.register_compound(
-        #         smiles=scaffold_smiles,
-        #         tags=["syndirella scaffold"] + tags,
-        #     )
-
-        #     # register reaction and reactants
-        #     scaffold_reactions = reactions_from_row(
-        #         animal=self, row=scaffold_row, num_steps=num_steps
-        #     )
-
-        #     # register pose
-        #     pose = self.register_pose(
-        #         compound=scaffold,
-        #         target=target.id,
-        #         path=Path(scaffold_row["path_to_mol"]),
-        #         inspirations=inspirations,
-        #         tags=tags,
-        #         warn_duplicate=False,
-        #         energy_score=scaffold_row["∆∆G"],
-        #         distance_score=scaffold_row["comRMSD"],
-        #         reference=reference,
-        #     )
-
-        #     scaffold_poses += pose
-
-        # # print scaffold overview
-        # mrich.var("scaffold", scaffold)
-        # mrich.var("scaffold_reactions", scaffold_reactions)
-        # mrich.var("scaffold_poses", scaffold_poses.ids)
 
         ###### ELABS ######
 
@@ -1356,19 +849,121 @@ class HIPPO:
                 reactant_id_lists=reactant_id_sets,
             )
 
-            break
+        scaffold_df = df[df["is_scaffold"]]
+        elab_df = df[~df["is_scaffold"]]
 
-        # bulk register scaffolds
+        # bulk register scaffold relationships
+
+        for step in range(num_steps):
+            step += 1
+            for role in ["r1", "r2", "product"]:
+
+                key = f"{step}_{role}_compound_id"
+
+                scaffold_ids = set(scaffold_df[key].to_list())
+                assert len(scaffold_ids) == 1
+                (scaffold_id,) = scaffold_ids
+
+                superstructure_ids = set(elab_df[key].to_list())
+                superstructure_ids = [i for i in superstructure_ids if i != scaffold_id]
+
+                sql = """
+                INSERT OR IGNORE INTO scaffold(scaffold_base, scaffold_superstructure)
+                VALUES(?1, ?2)
+                """
+
+                self.db.executemany(sql, [(scaffold_id, i) for i in superstructure_ids])
+                self.db.commit()
+
+        # filter poses
+
+        ok = df
+
+        if require_intra_geometry_pass:
+            mrich.var(
+                "#poses !intra_geometry_pass", len(df[~df["intra_geometry_pass"]])
+            )
+            ok = ok[ok["intra_geometry_pass"]]
+
+        if max_energy_score is not None:
+            mrich.var(
+                f"#poses ∆∆G > {max_energy_score}",
+                len(df[df["∆∆G"] > max_energy_score]),
+            )
+            ok = ok[ok["∆∆G"] <= max_energy_score]
+
+        if max_distance_score is not None:
+            mrich.var(
+                f"#poses comRMSD > {max_distance_score}",
+                len(df[df["comRMSD"] > max_energy_score]),
+            )
+            ok = ok[ok["comRMSD"] <= max_distance_score]
+
+        mrich.var("#acceptable poses", len(ok))
+
         # bulk register poses
+
+        payload = []
+
+        for i, row in ok.iterrows():
+
+            path = Path(row.path_to_mol).resolve()
+
+            if not path.exists():
+                mrich.warning("Skipping pose w/ non-exising file:", path)
+                continue
+
+            pose_tuple = (
+                int(reference.id),
+                str(path),
+                int(row[f"{num_steps}_product_compound_id"]),
+                int(target.id),
+                float(row["∆∆G"]),
+                float(row["comRMSD"]),
+            )
+
+            payload.append(pose_tuple)
+
+        sql = """
+        INSERT OR IGNORE INTO pose(
+            pose_reference,
+            pose_path,
+            pose_compound,
+            pose_target,
+            pose_energy_score,
+            pose_distance_score
+        )
+        VALUES(?1, ?2, ?3, ?4, ?5, ?6)
+        RETURNING pose_id
+        """
+
+        n_before = self.num_poses
+        pose_ids = self.db.executemany(sql, payload)
+        pose_ids = [i for i, in pose_ids]
+        self.db.commit()
+        diff = self.num_poses - n_before
+
+        if diff:
+            mrich.success("Registered", diff, "new poses")
+        else:
+            mrich.warning("Registered", diff, "new poses")
+
         # bulk register inspirations
 
-        # for i,elab_row in elab_df.iterrows():
+        payload = set()
+        for pose_id in pose_ids:
+            for inspiration in inspirations.ids:
+                payload.add(tuple(inspiration, pose_id))
 
-        #     display(elab_row)
+        sql = """
+        INSERT OR IGNORE INTO inspiration(inspiration_original, inspiration_derivative)
+        VALUES(?1, ?2)
+        """
 
-        #     break
+        self.db.executemany(sql, list(payload))
+        self.db.commit()
 
-        return reaction_ids
+        return df
 
     def add_syndirella_routes(
         self,
