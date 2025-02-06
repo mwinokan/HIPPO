@@ -303,7 +303,6 @@ class Database:
         if "RETURNING" in sql:
             from .apsw import executemany
 
-            mrich.debug("Using apsw")
             return executemany(self.path, sql, payload)
 
         try:

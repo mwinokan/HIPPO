@@ -953,7 +953,7 @@ class HIPPO:
         payload = set()
         for pose_id in pose_ids:
             for inspiration in inspirations.ids:
-                payload.add(tuple(inspiration, pose_id))
+                payload.add((inspiration, pose_id))
 
         sql = """
         INSERT OR IGNORE INTO inspiration(inspiration_original, inspiration_derivative)
