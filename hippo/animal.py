@@ -1045,82 +1045,87 @@ class HIPPO:
                                 case dict():
                                     try:
                                         inspiration = inspiration_map[inspiration]
+                                    
                                     except KeyError:
 
-                                        matches = find_observation_longcode_matches(
-                                            inspiration, inspiration_map.keys()
-                                        )
+                                        inspiration = self.poses[inspiration]
 
-                                        if len(matches) == 1:
-                                            pose_id = inspiration_map[matches[0]]
-                                            inspiration_map[inspiration] = pose_id
-                                            inspiration = pose_id
+                                        if not inspiration:
 
-                                        elif len(matches) > 1:
-                                            mrich.error(
-                                                "Multiple matchs for {inspiration=}"
-                                            )
-                                            from json import dumps
-
-                                            dumps(matches, indent=2),
-
-                                        if len(matches) == 0:
-
-                                            import difflib
-
-                                            inspiration_close_match_cutoff = 0.95
-
-                                            close_matches = difflib.get_close_matches(
-                                                inspiration,
-                                                inspiration_map.keys(),
-                                                n=5,
-                                                cutoff=inspiration_close_match_cutoff,
+                                            matches = find_observation_longcode_matches(
+                                                inspiration, inspiration_map.keys()
                                             )
 
-                                            if len(close_matches) > 0:
-                                                if len(close_matches) > 1:
-                                                    mrich.warning(
-                                                        f"Taking closest match: {inspiration=} --> {close_matches[0]}"
-                                                    )
+                                            if len(matches) == 1:
+                                                pose_id = inspiration_map[matches[0]]
+                                                inspiration_map[inspiration] = pose_id
+                                                inspiration = pose_id
 
-                                                inspiration_map[inspiration] = (
-                                                    inspiration_map[close_matches[0]]
+                                            elif len(matches) > 1:
+                                                mrich.error(
+                                                    "Multiple matchs for {inspiration=}"
                                                 )
-                                                inspiration = inspiration_map[
-                                                    inspiration
-                                                ]
+                                                from json import dumps
 
-                                            if isinstance(inspiration, str):
-                                                if allow_missing_inspirations:
-                                                    mrich.warning(
-                                                        f"{inspiration=} not found in inspiration_map"
+                                                dumps(matches, indent=2),
+
+                                            if len(matches) == 0:
+
+                                                import difflib
+
+                                                inspiration_close_match_cutoff = 0.95
+
+                                                close_matches = difflib.get_close_matches(
+                                                    inspiration,
+                                                    inspiration_map.keys(),
+                                                    n=5,
+                                                    cutoff=inspiration_close_match_cutoff,
+                                                )
+
+                                                if len(close_matches) > 0:
+                                                    if len(close_matches) > 1:
+                                                        mrich.warning(
+                                                            f"Taking closest match: {inspiration=} --> {close_matches[0]}"
+                                                        )
+
+                                                    inspiration_map[inspiration] = (
+                                                        inspiration_map[close_matches[0]]
                                                     )
+                                                    inspiration = inspiration_map[
+                                                        inspiration
+                                                    ]
 
-                                                    inspiration = None
+                                                if isinstance(inspiration, str):
+                                                    if allow_missing_inspirations:
+                                                        mrich.warning(
+                                                            f"{inspiration=} not found in inspiration_map"
+                                                        )
 
-                                                else:
-                                                    # mrich.error(
-                                                    # f"{inspiration=} not found in inspiration_map, try a smaller inspiration_close_match_cutoff?"
-                                                    # )
-                                                    from json import dumps
+                                                        inspiration = None
 
-                                                    mrich.var(
-                                                        "matches",
-                                                        dumps(matches, indent=2),
-                                                    )
+                                                    else:
+                                                        # mrich.error(
+                                                        # f"{inspiration=} not found in inspiration_map, try a smaller inspiration_close_match_cutoff?"
+                                                        # )
+                                                        from json import dumps
 
-                                                    mrich.var(
-                                                        "close_matches",
-                                                        dumps(matches, indent=2),
-                                                    )
+                                                        mrich.var(
+                                                            "matches",
+                                                            dumps(matches, indent=2),
+                                                        )
 
-                                                    mrich.var(
-                                                        "inspiration_map",
-                                                        dumps(
-                                                            inspiration_map, indent=2
-                                                        ),
-                                                    )
-                                                    raise
+                                                        mrich.var(
+                                                            "close_matches",
+                                                            dumps(matches, indent=2),
+                                                        )
+
+                                                        mrich.var(
+                                                            "inspiration_map",
+                                                            dumps(
+                                                                inspiration_map, indent=2
+                                                            ),
+                                                        )
+                                                        raise
                                 case _:
                                     inspiration = inspiration_map(inspiration)
 
