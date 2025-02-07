@@ -410,6 +410,14 @@ class Compound:
         )
         return TagSet(self, {t[0] for t in tags}, commit=False)
 
+    def add_tag(
+        self,
+        tag: str,
+    ) -> None:
+        """Add this tag to every member of the set"""
+        assert isinstance(tag, str)
+        self.db.insert_tag(name=tag, compound=self.id, commit=True)
+
     def get_quotes(
         self,
         min_amount: float | None = None,
