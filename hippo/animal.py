@@ -311,12 +311,24 @@ class HIPPO:
 
             count_directories_tried += 1
 
+            # standard xchem naming
             sdfs = list(path.glob("*[0-9][0-9][0-9][0-9][a-z].sdf"))
 
+            # non-standard xchem naming
             if not sdfs:
-                sdfs = list(path.glob("*.sdf"))
+                sdfs = [
+                    p
+                    for p in path.glob("*.sdf")
+                    if "_ligand" not in p.name
+                ]
 
-            assert len(sdfs) == 1, (path, sdfs)
+            if len(sdfs) == 0:
+                mrich.error("No SDFs in", path)
+                continue
+
+            elif len(sdfs) > 1:
+                mrich.warning("Multiple SDFs", path, sdfs)
+                sdfs = [sdfs[0]]
 
             pdbs = [
                 p
