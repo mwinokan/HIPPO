@@ -411,7 +411,9 @@ class Recipe:
 
             if pick_cheapest and len(comp_options) > 1:
                 if warn_multiple_solutions:
-                    mrich.warning(f"Multiple solutions for compound={comp}")
+                    mrich.warning(
+                        f"Multiple solutions for", comp, "(", len(comp_options), ")"
+                    )
                 if debug:
                     mrich.debug("Picking cheapest...")
                 priced = [r for r in comp_options if r.price]
