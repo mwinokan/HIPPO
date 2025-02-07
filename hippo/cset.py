@@ -827,6 +827,28 @@ class CompoundSet:
         return CompoundSet(self.db, ids)
 
     @property
+    def elab_df(self) -> "pd.DataFrame":
+        """"""
+        from pandas import DataFrame
+
+        cluster_dict = self.db.get_compound_cluster_dict(max_bases=1)
+
+        data = []
+        for scaffold, elabs in cluster_dict.items():
+            scaffold = self.db.get_compound(id=scaffold[0])
+            elabs = CompoundSet(self.db, indices=elabs)
+            data.append(
+                dict(
+                    scaffold_id=scaffold.id,
+                    scaffold_compound=scaffold,
+                    elabs=elabs,
+                    num_elabs=len(elabs),
+                )
+            )
+
+        return DataFrame(data)
+
+    @property
     def id_num_poses_dict(self) -> dict[int, int]:
         """Get a dictionary mapping compound ids to the number of poses"""
 
