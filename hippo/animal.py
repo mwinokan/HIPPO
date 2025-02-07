@@ -763,9 +763,23 @@ class HIPPO:
 
         ###### PREP ######
 
+        # filter out
+
+        n_null_mol = len(df[df["path_to_mol"].isna()])
+        if n_null_mol:
+            df = df[df["path_to_mol"].notna()]
+            mrich.var("#rows skipped due to null path_to_mol", n_null_mol)
+
+        if not len(df):
+            mrich.warning("No rows with valid poses!")
+            return None
+
         # inspirations
-        inspiration_sets = set(tuple(sorted(i)) for i in df["regarded"].to_list())
-        assert len(inspiration_sets) == 1, "Varying inspirations not supported"
+        inspiration_sets = set(tuple(sorted(i)) for i in df["regarded"])
+        if len(inspiration_sets) != 1:
+            mrich.error("Varying inspirations not supported")
+            return df
+
         (inspiration_set,) = inspiration_sets
         inspirations = self.poses[inspiration_set]
         assert len(inspirations) == len(inspiration_set)
@@ -879,25 +893,32 @@ class HIPPO:
 
         ok = df
 
-        if require_intra_geometry_pass:
-            mrich.var(
-                "#poses !intra_geometry_pass", len(df[~df["intra_geometry_pass"]])
-            )
-            ok = ok[ok["intra_geometry_pass"]]
+        try:
+            if require_intra_geometry_pass:
+                mrich.var(
+                    "#poses !intra_geometry_pass",
+                    len(df[df["intra_geometry_pass"] == False]),
+                )
+                ok = ok[ok["intra_geometry_pass"] == True]
 
-        if max_energy_score is not None:
-            mrich.var(
-                f"#poses ∆∆G > {max_energy_score}",
-                len(df[df["∆∆G"] > max_energy_score]),
-            )
-            ok = ok[ok["∆∆G"] <= max_energy_score]
+            if max_energy_score is not None:
+                mrich.var(
+                    f"#poses ∆∆G > {max_energy_score}",
+                    len(df[df["∆∆G"] > max_energy_score]),
+                )
+                ok = ok[ok["∆∆G"] <= max_energy_score]
 
-        if max_distance_score is not None:
-            mrich.var(
-                f"#poses comRMSD > {max_distance_score}",
-                len(df[df["comRMSD"] > max_energy_score]),
-            )
-            ok = ok[ok["comRMSD"] <= max_distance_score]
+            if max_distance_score is not None:
+                mrich.var(
+                    f"#poses comRMSD > {max_distance_score}",
+                    len(df[df["comRMSD"] > max_energy_score]),
+                )
+                ok = ok[ok["comRMSD"] <= max_distance_score]
+
+        except Exception as e:
+            mrich.error("Problem filtering dataframe")
+            mrich.error(e)
+            return df
 
         mrich.var("#acceptable poses", len(ok))
 
@@ -934,12 +955,10 @@ class HIPPO:
             pose_distance_score
         )
         VALUES(?1, ?2, ?3, ?4, ?5, ?6)
-        RETURNING pose_id
         """
 
         n_before = self.num_poses
-        pose_ids = self.db.executemany(sql, payload)
-        pose_ids = [i for i, in pose_ids]
+        self.db.executemany(sql, payload)
         self.db.commit()
         diff = self.num_poses - n_before
 
@@ -947,6 +966,14 @@ class HIPPO:
             mrich.success("Registered", diff, "new poses")
         else:
             mrich.warning("Registered", diff, "new poses")
+
+        # query relevant poses (also previously registered)
+        paths = [t[1] for t in payload]
+        str_ids = str(tuple(paths)).replace(",)", ")")
+        records = self.db.select_where(
+            table="pose", query="pose_id", key=f"pose_path IN {str_ids}", multiple=True
+        )
+        pose_ids = [i for i, in records]
 
         # bulk register inspirations
 
