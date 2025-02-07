@@ -33,6 +33,7 @@ dependencies = [
     "ipywidgets",
     "networkx",
     "openmm",
+    "apsw"
 ]
 [project.urls]
 "Homepage" = "https://hippo.winokan.com"
