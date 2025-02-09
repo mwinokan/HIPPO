@@ -414,7 +414,7 @@ class HIPPO:
 
         from .orm.formatters import path_formatter, dict_formatter  # , str_formatter
         from .protein import Target, Structure
-        from .files import File, guess_file_format
+        from .resources import File, guess_file_format
 
         # format values
         protein_file = path_formatter(protein_file)
@@ -560,7 +560,7 @@ class HIPPO:
         from .compound import Compound
         from .annotation import Placement
         from .pose import Pose
-        from .files import File, guess_file_format
+        from .resources import File, guess_file_format
 
         # sanitise / format
 
