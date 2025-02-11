@@ -1043,7 +1043,7 @@ class HIPPO:
         self.db.executemany(sql, list(payload))
         self.db.commit()
 
-        # bulk register tags / metadata?
+        # bulk register reaction metadata...
 
         return df
 

@@ -33,6 +33,7 @@ class Reaction:
         self._product_id = product
         self._product = None
         self._product_yield = product_yield
+        self._metadata = None
 
     ### PROPERTIES
 
@@ -121,6 +122,13 @@ class Reaction:
     def plain_repr(self) -> str:
         """Unformatted long string representation"""
         return f"{self}: {self.reaction_str} via {self.type}"
+
+    @property
+    def metadata(self) -> "MetaData":
+        """Returns the compound's metadata dict"""
+        if self._metadata is None:
+            self._metadata = self.db.get_metadata(table="reaction", id=self.id)
+        return self._metadata
 
     ### METHODS
 

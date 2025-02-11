@@ -108,6 +108,17 @@ class Database:
 
             self.update_legacy_routes()
 
+        if "reaction_metadata" not in self.column_names("reaction"):
+            if not update_legacy:
+                mrich.error("This is a legacy format database (hippo-db < 0.3.32)")
+                mrich.error("Re-initialise HIPPO object with update_legacy=True to fix")
+                raise LegacyDatabaseError("hippo-db < 0.3.32")
+            else:
+                mrich.warning("This is a legacy format database (hippo-db < 0.3.32)")
+                mrich.warning("Updating legacy reaction table...")
+
+            self.update_legacy_reaction_metadata()
+
     @classmethod
     def copy_from(
         cls,
@@ -425,6 +436,7 @@ class Database:
             reaction_type TEXT,
             reaction_product INTEGER,
             reaction_product_yield REAL,
+            reaction_metadata TEXT,
             FOREIGN KEY (reaction_product) REFERENCES compound(compound_id)
         );
         """
@@ -2123,6 +2135,16 @@ class Database:
         self.execute(sql, dict(component_amount=None, component_type=1))
         self.execute(sql, dict(component_amount=1.0, component_type=2))
         self.execute(sql, dict(component_amount=1.0, component_type=3))
+
+    def update_legacy_reaction_metadata(self) -> None:
+        """Add reaction_metadata column"""
+
+        sql = """
+        ALTER TABLE reaction
+        ADD reaction_metadata TEXT;
+        """
+
+        self.execute(sql)
 
     def prune_duplicate_routes(self) -> None:
 
