@@ -328,17 +328,17 @@ class PoseTable:
         pset._name = name
         return pset
 
-    def get_by_metadata_substring_match(self,
+    def get_by_metadata_substring_match(
+        self,
         substring: str,
     ) -> "PoseSet":
-
         """Get :class:`.PoseSet` of poses with metadata JSON containing substring"""
 
         assert substring
         assert isinstance(substring, str)
 
         pose_ids = self.db.select_where(
-            table="pose", 
+            table="pose",
             query="pose_id",
             key=f"""pose_metadata LIKE '%{substring}%'""",
             multiple=True,
@@ -349,7 +349,7 @@ class PoseTable:
             return None
 
         pose_ids = [i for i, in pose_ids]
-        
+
         name = f"poses with '{substring}' in metadata"
 
         pset = self[pose_ids]
@@ -1806,17 +1806,20 @@ class PoseSet:
                 f.write(",".join(data))
                 f.write("\n")
 
-    def to_syndirella(self, out_key: "str | Path", separate: bool = False) -> "DataFrame":
-
+    def to_syndirella(
+        self, out_key: "str | Path", separate: bool = False
+    ) -> "DataFrame":
         """Create syndirella inputs"""
 
         from pathlib import Path
+
         out_key = Path(out_key)
 
         if separate:
             dfs = []
             from pandas import concat
-            for i,pose in enumerate(self):
+
+            for i, pose in enumerate(self):
                 mrich.h3(f"{i}/{len(self)}: {pose}")
                 this_out_key = out_key / f"P{pose.id}"
                 df = pose.to_syndirella(out_key=this_out_key)

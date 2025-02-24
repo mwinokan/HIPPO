@@ -1485,7 +1485,10 @@ class Pose:
     def to_syndirella(self, out_key: "str | Path") -> "DataFrame":
         """Create syndirella inputs. See :meth:`.PoseSet.to_syndirella`"""
         from .pset import PoseSet
-        return PoseSet(self.db, [self.id]).to_syndirella(out_key=out_key, separate=False)
+
+        return PoseSet(self.db, [self.id]).to_syndirella(
+            out_key=out_key, separate=False
+        )
 
     ### DUNDERS
 
