@@ -668,6 +668,9 @@ class Pose:
         metadata: bool = True,
         duplicate_name: str | bool = False,
         sanitise_null_metadata_values: bool = False,
+        skip_metadata: list[str] | None = None,
+        sanitise_tag_list_separator: str | None = None,
+        sanitise_metadata_list_separator: str | None = ";",
         tags: bool = True,
     ) -> dict:
         """Returns a dictionary representing this Pose. Arguments:
@@ -680,6 +683,8 @@ class Pose:
         :param tags: bool: Include tags? (Default value = True)
 
         """
+
+        skip_metadata = skip_metadata or []
 
         serialisable_fields = [
             "id",
@@ -712,6 +717,8 @@ class Pose:
 
         if tags:
             data["tags"] = self.tags
+            if sanitise_tag_list_separator:
+                data["tags"] = sanitise_tag_list_separator.join(data["tags"])
 
         if inspirations == "fragalysis":
             if not self.inspirations:
@@ -734,12 +741,19 @@ class Pose:
 
                 value = metadict[key]
 
+                if key in skip_metadata:
+                    continue
+
                 if (
                     sanitise_null_metadata_values
                     and isinstance(value, str)
                     and not value
                 ):
                     value = None
+
+                if sanitise_metadata_list_separator:
+                    if isinstance(value, list):
+                        value = sanitise_metadata_list_separator.join(value)
 
                 data[key] = value
 
@@ -1467,6 +1481,14 @@ class Pose:
                 mrich.debug(self, "did not pass flatness checks.")
             return False
         return True
+
+    def to_syndirella(self, out_key: "str | Path") -> "DataFrame":
+        """Create syndirella inputs. See :meth:`.PoseSet.to_syndirella`"""
+        from .pset import PoseSet
+
+        return PoseSet(self.db, [self.id]).to_syndirella(
+            out_key=out_key, separate=False
+        )
 
     ### DUNDERS
 

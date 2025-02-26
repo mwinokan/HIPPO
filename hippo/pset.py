@@ -328,6 +328,35 @@ class PoseTable:
         pset._name = name
         return pset
 
+    def get_by_metadata_substring_match(
+        self,
+        substring: str,
+    ) -> "PoseSet":
+        """Get :class:`.PoseSet` of poses with metadata JSON containing substring"""
+
+        assert substring
+        assert isinstance(substring, str)
+
+        pose_ids = self.db.select_where(
+            table="pose",
+            query="pose_id",
+            key=f"""pose_metadata LIKE '%{substring}%'""",
+            multiple=True,
+        )
+
+        if not pose_ids:
+            mrich.error("No poses with export ")
+            return None
+
+        pose_ids = [i for i, in pose_ids]
+
+        name = f"poses with '{substring}' in metadata"
+
+        pset = self[pose_ids]
+        pset._name = name
+
+        return pset
+
     def draw(
         self,
         max_draw: int = 100,
@@ -1361,6 +1390,7 @@ class PoseSet:
         tags: bool = True,
         extra_cols: dict[str, list] = None,
         name_col: str = "name",
+        **kwargs,
     ):
         """Prepare an SDF for upload to the RHS of Fragalysis.
 
@@ -1467,6 +1497,9 @@ class PoseSet:
             metadata=metadata,
             tags=tags,
             sanitise_null_metadata_values=True,
+            sanitise_tag_list_separator=";",
+            sanitise_metadata_list_separator=";",
+            **kwargs,
         )
 
         drops = ["path", "compound", "target", "ref_pdb", "original SMILES"]
@@ -1773,14 +1806,31 @@ class PoseSet:
                 f.write(",".join(data))
                 f.write("\n")
 
-    def to_syndirella(self, out_key: "str | Path") -> "DataFrame":
+    def to_syndirella(
+        self, out_key: "str | Path", separate: bool = False
+    ) -> "DataFrame":
+        """Create syndirella inputs"""
+
+        from pathlib import Path
+
+        out_key = Path(out_key)
+
+        if separate:
+            dfs = []
+            from pandas import concat
+
+            for i, pose in enumerate(self):
+                mrich.h3(f"{i}/{len(self)}: {pose}")
+                this_out_key = out_key / f"P{pose.id}"
+                df = pose.to_syndirella(out_key=this_out_key)
+                dfs.append(df)
+            return concat(dfs)
 
         import shutil
         from pandas import DataFrame
-        from pathlib import Path
 
-        out_dir = Path(out_key).parent
-        out_key = Path(out_key).name
+        out_dir = out_key.parent
+        out_key = out_key.name
 
         out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -2109,9 +2159,13 @@ class PoseSet:
         other: "PoseSet",
     ) -> "PoseSet":
         """Substract a :class:`.PoseSet` from this set"""
-        assert isinstance(other, PoseSet)
-        ids = set(self.ids) - set(other.ids)
-        return PoseSet(self.db, ids, sort=False)
+        match other:
+            case PoseSet():
+                ids = set(self.ids) - set(other.ids)
+                return PoseSet(self.db, ids, sort=False)
+            case int():
+                # assert other in set(self.ids)
+                return PoseSet(self.db, [i for i in self.ids if i != other], sort=False)
 
     def __call__(
         self,

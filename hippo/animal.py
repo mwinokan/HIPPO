@@ -311,12 +311,20 @@ class HIPPO:
 
             count_directories_tried += 1
 
+            # standard xchem naming
             sdfs = list(path.glob("*[0-9][0-9][0-9][0-9][a-z].sdf"))
 
+            # non-standard xchem naming
             if not sdfs:
-                sdfs = list(path.glob("*.sdf"))
+                sdfs = [p for p in path.glob("*.sdf") if "_ligand" not in p.name]
 
-            assert len(sdfs) == 1, (path, sdfs)
+            if len(sdfs) == 0:
+                mrich.error("No SDFs in", path)
+                continue
+
+            elif len(sdfs) > 1:
+                mrich.warning("Multiple SDFs", path, sdfs)
+                sdfs = [sdfs[0]]
 
             pdbs = [
                 p
@@ -733,6 +741,8 @@ class HIPPO:
         max_energy_score: float | None = 0.0,
         max_distance_score: float | None = 2.0,
         require_intra_geometry_pass: bool = True,
+        reject_flags: list[str] | None = ["one_of_multiple_products"],
+        dry_run: bool = False,
     ) -> "pd.DataFrame":
         """
         Load Syndirella elaboration compounds and poses from a pickled DataFrame
@@ -741,8 +751,11 @@ class HIPPO:
         :param max_energy_score: Filter out poses with `∆∆G` above this value
         :param max_distance_score: Filter out poses with `comRMSD` above this value
         :param require_intra_geometry_pass: Filter out poses with falsy `intra_geometry_pass` values
+        :param reject_flags: Filter out rows flagged with strings from this list
         :returns: annotated DataFrame
         """
+
+        reject_flags = reject_flags or []
 
         from .syndirella import reactions_from_row
 
@@ -765,13 +778,49 @@ class HIPPO:
 
         # filter out
 
+        # flags
+
+        present_flags = set()
+        for step in range(num_steps):
+            step += 1
+
+            # display(df[df[f"{step}_flag"].notna()])
+
+            # print(set(df[df[f"{step}_flag"].notna()][f"{step}_flag"].to_list()))
+
+            for flags in set(df[df[f"{step}_flag"].notna()][f"{step}_flag"].to_list()):
+                for flag in flags:
+                    present_flags.add(flag)
+
+        if present_flags:
+            mrich.warning("Flags in DataFrame:", present_flags)
+
+        for flag in reject_flags:
+            if flag in present_flags:
+                for step in range(num_steps):
+                    step += 1
+                    matches = df[f"{step}_flag"].apply(
+                        lambda x: flag in x if x is not None else False
+                    )
+                    mrich.print(
+                        "Filtering out",
+                        len(df[matches]),
+                        "rows from step",
+                        step,
+                        "due to",
+                        flag,
+                    )
+                    df = df[~matches]
+
+        # poses
+
         n_null_mol = len(df[df["path_to_mol"].isna()])
         if n_null_mol:
             df = df[df["path_to_mol"].notna()]
             mrich.var("#rows skipped due to null path_to_mol", n_null_mol)
 
         if not len(df):
-            mrich.warning("No rows with valid poses!")
+            mrich.warning("No valid rows")
             return None
 
         # inspirations
@@ -802,6 +851,10 @@ class HIPPO:
         elab_df = df[~df["is_scaffold"]]
         mrich.var("#scaffold entries", len(scaffold_df))
         mrich.var("#elab entries", len(elab_df))
+
+        if dry_run:
+            mrich.error("Not registering records (dry_run)")
+            return df
 
         ###### ELABS ######
 
@@ -989,6 +1042,8 @@ class HIPPO:
 
         self.db.executemany(sql, list(payload))
         self.db.commit()
+
+        # bulk register reaction metadata...
 
         return df
 
