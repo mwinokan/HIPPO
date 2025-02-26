@@ -76,6 +76,10 @@ class Feature:
         from molparse.amino import BB_NAMES
 
         for atom_name in self.atom_names.split(","):
+
+            if atom_name.startswith("H"):
+                continue
+
             if atom_name not in BB_NAMES:
                 return True
 
