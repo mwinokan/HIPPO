@@ -836,7 +836,7 @@ class Compound:
 
         return scaffold
 
-    def summary(self, metadata: bool = True, draw: bool = True) -> None:
+    def summary(self, metadata: bool = True, draw: bool = True, tags: bool = True) -> None:
         """
         Print a summary of this compound
 
@@ -861,7 +861,8 @@ class Compound:
         mrich.var("#reactions (product)", self.num_reactions)
         mrich.var("#reactions (reactant)", self.num_reactant)
 
-        mrich.var("tags", self.tags)
+        if tags:
+            mrich.var("tags", self.tags)
 
         poses = self.poses
         mrich.var("#poses", len(poses))
