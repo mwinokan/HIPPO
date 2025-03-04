@@ -429,7 +429,11 @@ class HIPPO:
             )
 
             if load_pose_mols:
-                pose.mol
+                try:
+                    pose.mol
+                except Exception as e:
+                    mrich.error("Could not load molecule", pose)
+                    mrich.error(e)
 
         mrich.var("#directories parsed", count_directories_tried)
         mrich.var("#compounds registered", count_compound_registered)
