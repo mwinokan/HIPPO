@@ -1537,6 +1537,8 @@ class PoseSet:
             "ref_mols": "fragment inspirations",
             "original ID": "original ID",
             "compound inchikey": "compound inchikey",
+            "distance_score": "distance_score",
+            "energy_score": "energy_score",
         }
 
         if extra_cols:
@@ -1842,12 +1844,27 @@ class PoseSet:
         mrich.var("out_key", out_key)
         mrich.var("#poses", len(self))
 
+        pset_inspirations = set()
+
         data = []
-        for pose in mrich.track(self, prefix="Fetching data..."):
+        for pose in mrich.track(self, prefix="preparing inputs..."):
 
             comp = pose.compound
 
             ref = pose.reference
+            inspirations = pose.inspirations
+
+            if not ref:
+                mrich.warning(pose, "has no reference, using self as template")
+                ref = pose
+                assert ref.apo_path, f"Reference {ref} has no apo_path"
+
+            if not inspirations:
+                mrich.warning(pose, "has no inspirations, using self")
+                inspirations = PoseSet(self.db, [pose.id])
+
+            for i in inspirations.ids:
+                pset_inspirations.add(i)
 
             d = dict(
                 smiles=comp.smiles,
@@ -1859,7 +1876,7 @@ class PoseSet:
             mrich.writing(template_dir / ref.apo_path.name)
             shutil.copy(ref.apo_path, template_dir / ref.apo_path.name)
 
-            for i, p in enumerate(pose.inspirations):
+            for i, p in enumerate(inspirations):
                 d[f"hit{i+1}"] = p.name
 
             data.append(d)
@@ -1870,7 +1887,7 @@ class PoseSet:
         mrich.writing(csv_name)
         df.to_csv(csv_name, index=False)
 
-        inspirations = self.inspirations
+        inspirations = PoseSet(self.db, pset_inspirations)
 
         sdf_name = out_dir / f"{out_key}_syndirella_inspiration_hits.sdf"
         inspirations.write_sdf(
