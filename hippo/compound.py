@@ -836,7 +836,9 @@ class Compound:
 
         return scaffold
 
-    def summary(self, metadata: bool = True, draw: bool = True, tags: bool = True) -> None:
+    def summary(
+        self, metadata: bool = True, draw: bool = True, tags: bool = True
+    ) -> None:
         """
         Print a summary of this compound
 
