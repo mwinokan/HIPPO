@@ -415,7 +415,7 @@ class CompoundTable:
                     if isinstance(i, int) or isinstance(i, int64):
                         index = i
                     elif isinstance(i, str):
-                        index = self.db.get_compound_id(name=i)
+                        index = self.db.get_compound_id(inchikey=i)
                     else:
                         raise NotImplementedError
 
