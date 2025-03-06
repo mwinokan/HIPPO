@@ -423,6 +423,8 @@ class PoseTable:
 
         """
 
+        from pandas import Series
+
         match key:
 
             case int():
@@ -444,7 +446,7 @@ class PoseTable:
 
             case key if isinstance(key, list) or isinstance(key, tuple) or isinstance(
                 key, set
-            ):
+            ) or isinstance(key, Series):
 
                 indices = []
                 for i in key:
