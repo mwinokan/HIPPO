@@ -1403,6 +1403,9 @@ def plot_compound_availability(animal, compounds=None, title=None, subtitle=None
                     key=f'quote_supplier IS "{supplier}" AND quote_catalogue IS {cat_str} AND quote_compound IN {compounds.str_ids}',
                 )
 
+                if not count:
+                    continue
+
                 plot_data.append(
                     dict(supplier=supplier, catalogue=catalogue, count=count)
                 )
@@ -1424,6 +1427,60 @@ def plot_compound_availability(animal, compounds=None, title=None, subtitle=None
     )  # ,title_automargin=False, title_yref='container', barmode='group')
 
     return fig
+
+
+# @hippo_graph
+def plot_compound_availability_venn(animal, compounds):
+    """
+
+    :param animal:
+    :param compounds:  (Default value = None)
+    :param title:  (Default value = None)
+    :param subtitle:  (Default value = None)
+
+    """
+
+    from venn import venn
+    from .cset import CompoundTable, CompoundSet
+
+    pairs = animal.db.select(
+        table="quote",
+        query="DISTINCT quote_supplier, quote_catalogue",
+        multiple=True,
+    )
+
+    plot_data = {}
+
+    for supplier, catalogue in pairs:
+
+        if catalogue is None:
+            catalogue = "None"
+            cat_str = "NULL"
+        else:
+            cat_str = f'"{catalogue}"'
+
+        if (supplier, catalogue) not in plot_data:
+            plot_data[(supplier, catalogue)] = set()
+
+        records = animal.db.select_where(
+            table="quote",
+            query="quote_compound",
+            key=f'quote_supplier IS "{supplier}" AND quote_catalogue IS {cat_str} AND quote_compound IN {compounds.str_ids}',
+            multiple=True,
+            none="quiet",
+        )
+
+        if not records:
+            continue
+
+        for (i,) in records:
+            plot_data[(supplier, catalogue)].add(i)
+
+    plot_data = {k: v for k, v in plot_data.items() if v}
+
+    # return plot_data
+
+    return venn(plot_data)
 
 
 @hippo_graph

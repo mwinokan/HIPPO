@@ -2311,6 +2311,14 @@ class HIPPO:
 
         return plot_compound_availability(self, compounds=compounds, **kwargs)
 
+    def plot_compound_availability_venn(
+        self, compounds, **kwargs
+    ) -> "plotly.graph_objects.Figure":
+        """Plot a venn diagram of compound availability by supplier/catalogue, see :func:`hippo.plotting.plot_compound_availability`"""
+        from .plotting import plot_compound_availability_venn
+
+        return plot_compound_availability_venn(self, compounds=compounds, **kwargs)
+
     def plot_compound_price(
         self,
         min_amount,
