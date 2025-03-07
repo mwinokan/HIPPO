@@ -66,17 +66,16 @@ See :doc:`definitions` for more detail.
 
    Getting started <getting_started>
 
-   Structure-based searching <queries>
 
    Adding data <insert_elaborations>
 
-   Loading Syndirella outputs <load_syndirella>
+   Interfacing with Syndirella <syndirella>
    
-   Inserting synthetic pathways <insert_reactions>
+   Running an FFF campaign <fff>
+   
 
    Preparing files for Fragalysis upload <fragalysis>
 
-   Quoting with Pycule <pycule_tutorial>
 
    Windows installation <windows>
 
@@ -90,3 +89,7 @@ See :doc:`definitions` for more detail.
 .. * :ref:`genindex`
 .. * :ref:`modindex`
 .. * :ref:`search`
+
+.. Structure-based searching <queries>
+.. Inserting synthetic pathways <insert_reactions>
+.. Quoting with Pycule <pycule_tutorial>
