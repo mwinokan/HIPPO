@@ -741,43 +741,41 @@ class Recipe:
         return self.reactants.price
 
     @property
-    def num_products(self):
+    def num_products(self) -> int:
+        """Return the number of products"""
         return len(self.products)
 
     @property
     def num_reactions(self):
+        """Return the number of reactions"""
         return len(self.reactions)
 
     @property
     def num_reactants(self):
+        """Return the number of reactants"""
         return len(self.reactants)
 
     @property
     def num_intermediates(self):
+        """Return the number of intermediates"""
         return len(self.intermediates)
 
     @property
-    def hash(self):
+    def hash(self) -> str:
+        """Return the unique hash string"""
         return self._hash
 
     @property
     def score(self):
+        """Return the Recipe score"""
         return self._score
-
-    # @property
-    # def lead_time(self):
-    #   total = 0
-    #   quotes = self.quotes
-    #   if not quotes:
-    #       return None
-    #   return max([q.lead_time for q in quotes])
 
     ### METHODS
 
-    def get_price(self, supplier=None):
-        """
+    def get_price(self, supplier: str | None = None) -> "Price":
+        """get the reactants price. See :meth:`.IngredientSet.get_price`
 
-        :param supplier:  (Default value = None)
+        :param supplier: restrict quotes to this supplier
 
         """
         return self.reactants.get_price(supplier=supplier)
@@ -872,7 +870,7 @@ class Recipe:
                 node_size=sizes,
             )
 
-    def sankey(self, title=None):
+    def sankey(self, title: str | None = None) -> "graph_objects.Figure":
         """draw a plotly Sankey diagram
 
         :param title:  (Default value = None)
@@ -1015,10 +1013,10 @@ class Recipe:
 
         return fig
 
-    def summary(self, price: bool = True):
+    def summary(self, price: bool = True) -> None:
         """Print a summary of this recipe
 
-        :param price: bool:  (Default value = True)
+        :param price: print the price (Default value = True)
 
         """
 
@@ -1060,10 +1058,10 @@ class Recipe:
             for reaction in self.reactions:
                 mrich.var(str(reaction), reaction.reaction_str, reaction.type)
 
-    def get_ingredient(self, id):
+    def get_ingredient(self, id) -> "Ingredient":
         """Get an ingredient by its compound ID
 
-        :param id:
+        :param id: compound ID
 
         """
         matches = [r for r in self.reactants if r.id == id]
@@ -1075,20 +1073,27 @@ class Recipe:
         assert len(matches) == 1
         return matches[0]
 
-    def add_to_all_reactants(self, amount=20):
-        """
+    def add_to_all_reactants(self, amount: float = 20) -> None:
+        """Increment all reactants by this amount
 
-        :param amount:  (Default value = 20)
+        :param amount: amount in ``mg`` (Default value = 20)
 
         """
         self.reactants.df["amount"] += amount
 
-    def write_json(self, file, *, extra: dict | None = None, indent="\t", **kwargs):
+    def write_json(
+        self,
+        file: "str | Path",
+        *,
+        extra: dict | None = None,
+        indent: str = "\t",
+        **kwargs,
+    ) -> None:
         """Serialise this recipe object and write it to disk
 
-        :param file:
-        :param extra:
-        :param indent:  (Default value = '\t')
+        :param file: write to this path
+        :param extra: extra data to serialise
+        :param indent: indentation whitespace (Default value = '\t')
 
         """
         import json
@@ -1126,14 +1131,13 @@ class Recipe:
         - Total Price
         - Lead time
 
-        :param *:
-        :param price: bool:  (Default value = True)
-        :param reactant_supplier: bool:  (Default value = True)
-        :param database: bool:  (Default value = True)
-        :param timestamp: bool:  (Default value = True)
-        :param compound_ids_only: bool:  (Default value = False)
-        :param products: bool:  (Default value = True)
-        :param serialise_price: bool:  (Default value = False)
+        :param price: include the price (Default value = True)
+        :param reactant_supplier: include the supplier (Default value = True)
+        :param database: include the database (Default value = True)
+        :param timestamp: add a timestamp (Default value = True)
+        :param compound_ids_only: ID's only (instead of full :attr:`.IngredientSet.df`) (Default value = False)
+        :param products: include products (Default value = True)
+        :param serialise_price: serialise :class:`.Price` object (Default value = False)
 
         """
 
@@ -1180,7 +1184,8 @@ class Recipe:
 
         return data
 
-    def get_routes(self):
+    def get_routes(self) -> "RouteSet":
+        """Get routes"""
         return self.products.get_routes(permitted_reactions=self.reactions)
 
     def write_CAR_csv(
@@ -1209,8 +1214,8 @@ class Recipe:
         * reaction-recipe-1
         * reaction-groupby-column-1
 
-        :param file:
-        :param return_df:  (Default value = False)
+        :param file: file to write to
+        :param return_df: return the dataframe (Default value = False)
 
         """
 
@@ -1399,7 +1404,9 @@ class Recipe:
 
         return None
 
-    def write_product_csv(self, file: "str | Path", return_df: bool = False):
+    def write_product_csv(
+        self, file: "str | Path", return_df: bool = False
+    ) -> "pd.DataFrame | None":
         """Detailed CSV output including product information for selection and synthesis"""
 
         from pandas import DataFrame
@@ -1502,7 +1509,9 @@ class Recipe:
 
         return None
 
-    def write_chemistry_csv(self, file: "str | Path", return_df: bool = True):
+    def write_chemistry_csv(
+        self, file: "str | Path", return_df: bool = True
+    ) -> "pd.DataFrame | None":
         """Detailed CSV output synthetis information for chemistry types in this set"""
 
         from pandas import DataFrame
@@ -1663,8 +1672,8 @@ class Recipe:
 
         return None
 
-    def copy(self):
-        """ """
+    def copy(self) -> "Recipe":
+        """Copy this recipe"""
         return Recipe(
             self.db,
             products=self.products.copy(),
@@ -1674,27 +1683,15 @@ class Recipe:
             # supplier=self.supplier
         )
 
-    def get_product_fingerprint(self):
-        """Calculate the combined fingerprint of all product poses in this set"""
-
-        poses = self.products.compounds.poses
-
-        null_count = self.db.count_where(
-            table="pose", key=f"pose_id IN {poses.str_ids} AND pose_fingerprint IS NULL"
-        )
-
-        if null_count:
-            mrich.warning(f"{null_count} poses have no fingerprint")
-
-        return poses.fingerprint
-
-    def __flag_modification(self):
+    def __flag_modification(self) -> None:
+        """Flag this recipe as modified"""
         self._product_interactions = None
         self._score = None
         self._product_compounds = None
         self._product_poses = None
 
     def check_integrity(self, debug: bool = False) -> bool:
+        """Verify integrity of this recipe"""
 
         # no duplicate ingredients
 
@@ -1808,7 +1805,8 @@ class Recipe:
 
     ### DUNDERS
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """Unformatted string representation"""
 
         if self.score:
             s = f"(score={self.score:.3f})"
@@ -1881,12 +1879,14 @@ class Route(Recipe):
     ### FACTORIES
 
     @classmethod
-    def from_json(cls, db, path, data=None):
-        """
+    def from_json(
+        cls, db: "Database", path: "str | Path", data: dict = None
+    ) -> "Route":
+        """Load a serialised route from a JSON file
 
-        :param db:
-        :param path:
-        :param data:  (Default value = None)
+        :param db: database to link
+        :param path: path to JSON
+        :param data: serialised data (Default value = None)
 
         """
 
@@ -1928,23 +1928,23 @@ class Route(Recipe):
     ### PROPERTIES
 
     @property
-    def product(self):
-        """ """
+    def product(self) -> "Ingredient":
+        """Product ingredient"""
         return self._products[0]
 
     @property
-    def product_compound(self):
-        """ """
+    def product_compound(self) -> "Compound":
+        """Product compound"""
         return self.product.compound
 
     @property
-    def id(self):
-        """ """
+    def id(self) -> int:
+        """Route ID"""
         return self._id
 
     ### METHODS
 
-    def get_dict(self):
+    def get_dict(self) -> dict:
         """Serialisable dictionary"""
         data = {}
 
@@ -1990,12 +1990,14 @@ class RouteSet:
     ### FACTORIES
 
     @classmethod
-    def from_json(cls, db, path, data=None):
-        """
+    def from_json(
+        cls, db: "Database", path: "str | Path", data: dict = None
+    ) -> "RouteSet":
+        """Load a serialised routeset from a JSON file
 
-        :param db:
-        :param path:
-        :param data:  (Default value = None)
+        :param db: database to link
+        :param path: path to JSON
+        :param data: serialised data (Default value = None)
 
         """
 
@@ -2022,22 +2024,22 @@ class RouteSet:
     ### PROPERTIES
 
     @property
-    def data(self):
-        """ """
+    def data(self) -> "dict[int, Route]":
+        """Get internal data dictionary"""
         return self._data
 
     @property
     def db(self):
-        """ """
+        """Get associated database"""
         return self._db
 
     @property
-    def routes(self):
-        """ """
+    def routes(self) -> "list[Route]":
+        """Get route objects"""
         return self.data.values()
 
     @property
-    def product_ids(self):
+    def product_ids(self) -> list[int]:
         """Get the :class:`.Compound` ID's of the products"""
         ids = self.db.select_where(
             table="route",
@@ -2055,12 +2057,12 @@ class RouteSet:
         return CompoundSet(self.db, self.product_ids)
 
     @property
-    def str_ids(self):
+    def str_ids(self) -> str:
         """Return an SQL formatted tuple string of the :class:`.Route` ID's"""
         return str(tuple(self.ids)).replace(",)", ")")
 
     @property
-    def ids(self):
+    def ids(self) -> list[int]:
         """Return the :class:`.Route` IDs"""
         return self.data.keys()
 
@@ -2103,11 +2105,11 @@ class RouteSet:
 
     ### METHODS
 
-    def copy(self):
-        """ """
+    def copy(self) -> "RouteSet":
+        """Copy this RouteSet"""
         return RouteSet(self.db, self.data.values())
 
-    def set_db_pointers(self, db):
+    def set_db_pointers(self, db: "Database") -> None:
         """
 
         :param db:
@@ -2117,40 +2119,37 @@ class RouteSet:
         for route in self.data.values():
             route._db = db
 
-    def clear_db_pointers(self):
-        """ """
-        self._db = None
-        for route in self.data.values():
-            route._db = None
+    # def clear_db_pointers(self):
+    #     """ """
+    #     self._db = None
+    #     for route in self.data.values():
+    #         route._db = None
 
-    def get_dict(self):
-        """Get serialisable dictionary"""
+    # def get_dict(self):
+    #     """Get serialisable dictionary"""
 
-        data = dict(db=str(self.db), routes={})
+    #     data = dict(db=str(self.db), routes={})
 
-        # populate with routes
-        for route_id, route in self.data.items():
-            data["routes"][route_id] = route.get_dict()
+    #     # populate with routes
+    #     for route_id, route in self.data.items():
+    #         data["routes"][route_id] = route.get_dict()
 
-        return data
+    #     return data
 
-    def pop_id(self):
-        """ """
-
+    def pop_id(self) -> int:
+        """Pop the last route from the set and return it's id"""
         route_id, route = self.data.popitem()
-
         return route_id
 
-    def pop(self):
-        """ """
-
+    def pop(self) -> "Route":
+        """Pop the last route from the set and return it's object"""
         route_id, route = self.data.popitem()
-
         return route
 
     def balanced_pop(
         self, permitted_clusters: set[tuple] | None = None, debug: bool = False
     ) -> "Route":
+        """Pop a route from this set, while maintaining the balance of scaffold clusters populations"""
 
         if not self._data:
             mrich.print("RouteSet depleted")
@@ -2278,7 +2277,8 @@ class RouteSet:
 
     ### DUNDERS
 
-    def __len__(self):
+    def __len__(self) -> int:
+        """Number of routes in this set"""
         return len(self.data)
 
     def __str__(self) -> str:
@@ -2298,14 +2298,7 @@ class RouteSet:
 
 
 class RecipeSet:
-    """
-    RecipeSet class
-
-    :param param1: this is a first param
-    :param param2: this is a second param
-    :returns: this is a description of what is returned
-    :raises keyError: raises an exception
-    """
+    """A set of recipes stored on disk"""
 
     def __init__(self, db, directory, pattern="*.json"):
 
@@ -2349,7 +2342,8 @@ class RecipeSet:
     ### PROPERTIES
 
     @property
-    def db(self):
+    def db(self) -> "Database":
+        """Associated database"""
         return self._db
 
     ### METHODS
@@ -2360,6 +2354,13 @@ class RecipeSet:
         progress: bool = False,
         serialise_price: bool = False,
     ):
+        """Get values of member recipes associated with attribute ``key``
+
+        :param key: attribute to query/calculate
+        :param progress: show a progress bar
+        :param serialise_price: serialise price objects
+
+        """
 
         values = []
         recipes = self._recipes.values()
@@ -2376,6 +2377,7 @@ class RecipeSet:
         return values
 
     def get_df(self, **kwargs) -> "pandas.DataFrame":
+        """Get dataframe of recipe dictionaries. See :meth:`.Recipe.get_dict`"""
 
         data = []
 
@@ -2395,10 +2397,12 @@ class RecipeSet:
 
         return DataFrame(data)
 
-    def items(self):
+    def items(self) -> "list[tuple[str, Recipe]]":
+        """Get data dictionary items"""
         return self._recipes.items()
 
-    def keys(self):
+    def keys(self) -> list[str]:
+        """Get data dictionary keys (recipe hashes)"""
         return self._recipes.keys()
 
     ### DUNDERS
