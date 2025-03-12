@@ -1921,21 +1921,6 @@ class Database:
         """
         self.delete_where(table="tag", key="name", value=tag)
 
-    def delete_poses(self, poses: "PoseSet") -> None:
-        """Delete all database records related to a set of poses"""
-
-        # raise NotImplementedError("Needs more dev")
-
-        str_ids = poses.str_ids
-
-        self.delete_where(table="pose", key=f"pose_id IN {str_ids}")
-        self.delete_where(table="tag", key=f"tag_pose IN {str_ids}")
-        self.delete_where(
-            table="inspiration", key=f"inspiration_derivative IN {str_ids}"
-        )
-        # interactions?
-        # subsites?
-
     def delete_interactions(self) -> None:
         """Delete all calculated interactions and set pose_fingerprint appropriately"""
 
@@ -2147,6 +2132,7 @@ class Database:
         self.execute(sql)
 
     def prune_duplicate_routes(self) -> None:
+        """Remove duplicate routes from the database"""
 
         from collections import Counter
 
@@ -2739,6 +2725,7 @@ class Database:
         return ISETS
 
     def get_compound_id_inspiration_ids_dict(self) -> dict[int, set]:
+        """Get a dictionary mapping :class:`.Compound` ID's to a set of :class:`Pose` ID's for the inspirations for the whole database"""
 
         sql = """
         SELECT compound_id, pose_id, inspiration_original FROM compound

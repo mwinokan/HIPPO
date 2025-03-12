@@ -178,11 +178,13 @@ Interaction
 The :class:`.Interaction` class can be used to store protein-ligand interactions between pharmacophores on the ligand and :class:`.Feature` records.
 
 .. seealso::
+	- :attr:`.HIPPO.interactions`
 	- :attr:`.Pose.interactions`
 	- :meth:`.Pose.calculate_interactions`
 	- :meth:`.Pose.calculate_prolif_interactions`
 	- :class:`.Interaction`
 	- :class:`.InteractionSet`
+	- :class:`.InteractionTable`
 
 Units
 =====

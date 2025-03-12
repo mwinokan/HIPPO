@@ -1453,10 +1453,7 @@ class Pose:
         )
 
     def posebusters(self, debug: bool = False) -> bool:
-        # if debug:
-        #     mrich.debug(self, "posebusters")
-        # from .posebusters import check_mol
-        # return check_mol(self.mol, debug=debug)
+        """Run a posebusters ligand check on this pose's molecule"""
 
         # use syndirella implementation
         from syndirella.slipper import intra_geometry, flatness

@@ -828,7 +828,7 @@ class PoseSet:
 
     @property
     def best_placed_pose_id(self) -> int:
-        """ """
+        """Get the id of the pose with the best distance_score in this subset"""
         query = f"pose_id, MIN(pose_distance_score)"
         query = self.db.select_where(
             table="pose", query=query, key=f"pose_id in {self.str_ids}", multiple=False
@@ -845,7 +845,8 @@ class PoseSet:
         return self._interactions
 
     @property
-    def interaction_overlap_score(self):
+    def interaction_overlap_score(self) -> int:
+        """Count the number of member pose pairs which share at least one but not all interactions"""
 
         sql = f"""
         SELECT DISTINCT interaction_pose, feature_id, interaction_type FROM interaction 
@@ -2075,6 +2076,7 @@ class PoseSet:
     ### PRIVATE
 
     def _delete(self, *, force: bool = False) -> None:
+        """Delete poses in this set"""
 
         if not force:
             mrich.warning("Deleting Poses is risky! Set force=True to continue")

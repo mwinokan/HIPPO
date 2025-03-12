@@ -1932,11 +1932,7 @@ def add_hippo_logo(fig, in_plot=True, position="top right"):
 
 
 def add_punchcard_logo(fig):
-    """
-
-    :param fig:
-
-    """
+    """Add the HIPPO logo to a punchcard figure"""
 
     fig.add_layout_image(
         dict(

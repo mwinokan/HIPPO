@@ -48,29 +48,27 @@ class Recipe:
         *,
         debug: bool = False,
         pick_cheapest: bool = True,
-        permitted_reactions=None,
+        permitted_reactions: "ReactionSet | None" = None,
         quoted_only: bool = False,
         supplier: None | str = None,
-        unavailable_reaction="error",
-        reaction_checking_cache=None,
-        reaction_reactant_cache=None,
-        inner=False,
+        unavailable_reaction: str = "error",
+        reaction_checking_cache: dict[int, bool] = None,
+        reaction_reactant_cache: dict[int, bool] = None,
+        inner: bool = False,
         get_ingredient_quotes: bool = True,
-    ):
-        """
+    ) -> "Recipe | list[Recipe]":
+        """Create a :class:`.Recipe` from a :class:`.Reaction` and its upstream dependencies
 
-        :param reaction:
-        :param amount:  (Default value = 1)
-        :param *:
-        :param debug: bool:  (Default value = False)
-        :param pick_cheapest: bool:  (Default value = True)
-        :param permitted_reactions:  (Default value = None)
-        :param quoted_only: bool:  (Default value = False)
-        :param supplier: None | str:  (Default value = None)
-        :param unavailable_reaction:  (Default value = 'error')
-        :param reaction_checking_cache:  (Default value = None)
-        :param reaction_reactant_cache:  (Default value = None)
-        :param inner:  (Default value = False)
+        :param reaction: reaction to create recipe from
+        :param amount: amount in ``mg`` (Default value = 1)
+        :param debug: bool: increase verbosity for debugging (Default value = False)
+        :param pick_cheapest: bool: choose the cheapest solution (Default value = True)
+        :param permitted_reactions: once consider reactions in this set (Default value = None)
+        :param quoted_only: bool: only allow reactants with quotes (Default value = False)
+        :param supplier: None | str: optionally restrict quotes to only this supplier (Default value = None)
+        :param unavailable_reaction: define the behaviour for when a reaction has unavailable reactants (Default value = 'error')
+        :param inner: used to indicate that this is a recursive call (Default value = False)
+        :param get_ingredient_quotes: get quotes for ingredients in this recipe
 
         """
 
@@ -238,23 +236,23 @@ class Recipe:
     @classmethod
     def from_reactions(
         cls,
-        reactions,
-        amount=1,
+        reactions: "ReactionSet",
+        amount: float = 1,
         pick_cheapest: bool = True,
-        permitted_reactions=None,
-        final_products_only=True,
-        return_products=False,
-        debug=False,
-    ):
-        """
+        permitted_reactions: "ReactionSet | None" = None,
+        final_products_only: bool = True,
+        return_products: bool = False,
+        debug: bool = False,
+    ) -> "Recipe | list[Recipe] | CompoundSet":
+        """Create a :class:`.Recipe` from a :class:`.ReactionSet` and its upstream dependencies
 
-        :param reactions:
-        :param amount:  (Default value = 1)
-        :param pick_cheapest: bool:  (Default value = True)
-        :param permitted_reactions:  (Default value = None)
-        :param final_products_only:  (Default value = True)
-        :param return_products:  (Default value = False)
-        :param debug:  (Default value = False)
+        :param reactions: reactions to create recipe from
+        :param amount: amount in ``mg`` (Default value = 1)
+        :param debug: bool: increase verbosity for debugging (Default value = False)
+        :param pick_cheapest: bool: choose the cheapest solution (Default value = True)
+        :param permitted_reactions: once consider reactions in this set (Default value = None)
+        :param final_products_only: don't get routes to intermediates (Default value = True)
+        :param return_products: return the :class:`.CompoundSet` of products instead (Default value = False)
 
         """
 
@@ -318,7 +316,7 @@ class Recipe:
     @classmethod
     def from_compounds(
         cls,
-        compounds,
+        compounds: "CompoundSet",
         amount: float = 1,
         debug: bool = False,
         pick_cheapest: bool = True,
@@ -329,27 +327,26 @@ class Recipe:
         pick_first: bool = False,
         warn_multiple_solutions: bool = True,
         pick_cheapest_inner_routes: bool = False,
-        unavailable_reaction="error",
-        reaction_checking_cache=None,
-        reaction_reactant_cache=None,
+        unavailable_reaction: str = "error",
+        reaction_checking_cache: dict[int, bool] | None = None,
+        reaction_reactant_cache: dict[int, bool] | None = None,
         **kwargs,
     ):
-        """
+        """Create recipe(s) to synthesis products in the :class:`.CompoundSet`
 
-        :param compounds:
-        :param amount: float:  (Default value = 1)
-        :param debug: bool:  (Default value = False)
-        :param pick_cheapest: bool:  (Default value = True)
-        :param permitted_reactions:  (Default value = None)
-        :param quoted_only: bool:  (Default value = False)
-        :param supplier: None | str:  (Default value = None)
-        :param solve_combinations: bool:  (Default value = True)
-        :param pick_first: bool:  (Default value = False)
-        :param warn_multiple_solutions: bool:  (Default value = True)
-        :param pick_cheapest_inner_routes: bool:  (Default value = False)
-        :param unavailable_reaction:  (Default value = 'error')
-        :param reaction_checking_cache:  (Default value = None)
-        :param reaction_reactant_cache:  (Default value = None)
+        :param compounds: set of compounds to find routes for
+        :param solve_combinations: bool: combinatorially combine all individual routes (Default value = True)
+        :param pick_first: return the first solution without comparison (Default value = False)
+        :param warn_multiple_solutions: warn if a compound has multiple routes (Default value = True)
+        :param pick_cheapest_inner_routes: for each compound choose the cheapest route (Default value = False)
+        :param reaction: reaction to create recipe from
+        :param amount: amount in ``mg`` (Default value = 1)
+        :param debug: bool: increase verbosity for debugging (Default value = False)
+        :param pick_cheapest: bool: choose the cheapest solution (Default value = True)
+        :param permitted_reactions: once consider reactions in this set (Default value = None)
+        :param quoted_only: bool: only allow reactants with quotes (Default value = False)
+        :param supplier: None | str: optionally restrict quotes to only this supplier (Default value = None)
+        :param unavailable_reaction: define the behaviour for when a reaction has unavailable reactants (Default value = 'error')
 
         """
 
@@ -486,13 +483,21 @@ class Recipe:
         return solutions
 
     @classmethod
-    def from_reactants(cls, reactants, amount=1, debug=False, return_products=False):
-        """
+    def from_reactants(
+        cls,
+        reactants: "CompoundSet | IngredientSet",
+        amount: float = 1,
+        debug: bool = False,
+        return_products: bool = False,
+        **kwargs,
+    ) -> "Recipe | CompoundSet":
+        """Find the maximal recipe from a given set of reactants
 
-        :param reactants:
-        :param amount:  (Default value = 1)
-        :param debug:  (Default value = False)
-        :param return_products:  (Default value = False)
+        :param reactants: :class:`.CompoundSet` or :class:`.IngredientSet` for the reactants. Ingredient amounts are ignored
+        :param amount: amount of each product needed (Default value = 1)
+        :param debug: increase verbosity (Default value = False)
+        :param return_products: return products instead of recipe (Default value = False)
+        :param kwargs: passed to :meth:`.Recipe.from_reactions`
 
         """
 
@@ -562,42 +567,30 @@ class Recipe:
             pick_cheapest=False,
             debug=debug,
             return_products=return_products,
+            **kwargs,
         )
 
         return recipe
 
     @classmethod
-    def from_ingredients(cls, db, ingredients):
-        """
-
-        :param db:
-        :param ingredients:
-
-        """
-        raise NotImplementedError
-        self = cls.__new__(cls)
-        self.__init__(...)
-        return self
-
-    @classmethod
     def from_json(
         cls,
-        db,
-        path,
-        debug=True,
-        allow_db_mismatch=False,
-        clear_quotes=False,
-        data=None,
+        db: "Database",
+        path: "str | Path",
+        debug: bool = True,
+        allow_db_mismatch: bool = False,
+        clear_quotes: bool = False,
+        data: dict = None,
         db_mismatch_warning: bool = True,
     ):
-        """
+        """Load a serialised recipe from a JSON file
 
-        :param db:
-        :param path:
-        :param debug:  (Default value = True)
-        :param allow_db_mismatch:  (Default value = False)
-        :param clear_quotes:  (Default value = False)
-        :param data:  (Default value = None)
+        :param db: database to link
+        :param path: path to JSON
+        :param debug: increase verbosity (Default value = True)
+        :param allow_db_mismatch: allow a database mismatch (Default value = False)
+        :param clear_quotes: ignore reactant quotes (Default value = False)
+        :param data: serialised data (Default value = None)
 
         """
 
@@ -665,17 +658,18 @@ class Recipe:
     ### PROPERTIES
 
     @property
-    def db(self):
-        """ """
+    def db(self) -> "Database":
+        """Associated :class:`.Database:"""
         return self._db
 
     @property
-    def products(self):
-        """ """
+    def products(self) -> "IngredientSet":
+        """Product :class:`.IngredientSet`"""
         return self._products
 
     @property
     def product_poses(self) -> "PoseSet":
+        """Product poses"""
         if self._product_poses is None:
             self._product_poses = self.product_compounds.poses
             self._product_poses._name = f"product poses of {self}"
@@ -683,6 +677,7 @@ class Recipe:
 
     @property
     def product_compounds(self) -> "CompoundSet":
+        """Product compounds"""
         if self._product_compounds is None:
             self._product_compounds = self.products.compounds
             self._product_compounds._name = f"products of {self}"
@@ -696,75 +691,53 @@ class Recipe:
         return self._product_interactions
 
     @property
-    def product(self):
-        """ """
+    def product(self) -> "Ingredient":
+        """Return single product (if there's only one)"""
         assert len(self.products) == 1
         return self.products[0]
 
     @products.setter
-    def products(self, a):
-        """
-
-        :param a:
-
-        """
+    def products(self, a: "IngredientSet"):
+        """Set the products"""
         self._products = a
         self.__flag_modification()
 
     @property
     def reactants(self):
-        """ """
+        """Reactant :class:`.IngredientSet`"""
         return self._reactants
 
     @reactants.setter
-    def reactants(self, a):
-        """
-
-        :param a:
-
-        """
+    def reactants(self, a: "IngredientSet"):
+        """Set the reactants"""
         self._reactants = a
         self.__flag_modification()
 
     @property
-    def intermediates(self):
-        """ """
+    def intermediates(self) -> "IngredientSet":
+        """Intermediates :class:`.IngredientSet`"""
         return self._intermediates
 
     @intermediates.setter
-    def intermediates(self, a):
-        """
-
-        :param a:
-
-        """
+    def intermediates(self, a: "IngredientSet"):
+        """Set the intermediates"""
         self._intermediates = a
         self.__flag_modification()
 
     @property
-    def reactions(self):
-        """ """
+    def reactions(self) -> "ReactionSet":
+        """Intermediates :class:`.IngredientSet`"""
         return self._reactions
 
     @reactions.setter
-    def reactions(self, a):
-        """
-
-        :param a:
-
-        """
+    def reactions(self, a: "ReactionSet"):
+        """Set the reactions"""
         self._reactions = a
         self.__flag_modification()
 
     @property
-    def price(self):
-        """ """
-        # total = 0
-        # quotes = self.quotes
-        # if not quotes:
-        #   return None
-        # assert len((currencies := set([q.currency for q in quotes]))) == 1, 'Multiple currencies'
-        # return sum([q.price for q in quotes]), list(currencies)[0]
+    def price(self) -> "Price":
+        """Get the price of the reactants"""
         return self.reactants.price
 
     @property
