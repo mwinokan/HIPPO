@@ -220,7 +220,7 @@ class Compound:
         return self.db.count_where(table="reactant", key="compound", value=self.id)
 
     @property
-    def bases(self):
+    def bases(self) -> "CompoundSet | None":
         """Returns the base compound for this elaboration"""
         if self._bases is None or self._db_changed:
             ids = self.get_base_ids()
