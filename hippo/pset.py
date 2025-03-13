@@ -886,6 +886,97 @@ class PoseSet:
 
         return count
 
+    def get_interaction_clusters(self) -> "dict[int, PoseSet]":
+        """Cluster poses based on shared interactions."""
+
+        import networkx as nx
+        import community as louvain
+        from itertools import combinations
+
+        # get interaction records
+
+        sql = f"""
+        SELECT DISTINCT interaction_pose, feature_residue_name, feature_residue_number, interaction_type FROM interaction 
+        INNER JOIN feature ON interaction_feature = feature_id
+        WHERE interaction_pose IN {self.str_ids}
+        """
+
+        records = self.db.execute(sql).fetchall()
+
+        ISETS = {}
+        for (
+            pose_id,
+            feature_residue_name,
+            feature_residue_number,
+            interaction_type,
+        ) in records:
+            values = ISETS.get(pose_id, set())
+            values.add((interaction_type, feature_residue_name, feature_residue_number))
+            ISETS[pose_id] = values
+
+        pairs = combinations(ISETS.keys(), 2)
+
+        # construct overlap dictionary
+
+        OVERLAPS = {}
+        for id1, id2 in pairs:
+            iset1 = ISETS[id1]
+            iset2 = ISETS[id2]
+            OVERLAPS[(id1, id2)] = len(iset1 & iset2)
+
+        # make the graph
+        G = nx.Graph()
+
+        for (id1, id2), count in OVERLAPS.items():
+            G.add_edge(id1, id2, weight=count)
+
+        # partition the graph
+
+        partition = louvain.best_partition(G, weight="weight")
+
+        # find the clusters
+
+        clusters = {}
+        for node, cluster_id in partition.items():
+            clusters.setdefault(cluster_id, set()).add(node)
+
+        # create the PoseSets
+
+        psets = {
+            i: PoseSet(self.db, ids, name=f"Cluster {i}")
+            for i, ids in enumerate(clusters.values())
+        }
+
+        all_ids = set(sum((pset.ids for pset in psets.values()), []))
+
+        # calculate modal interactions
+
+        for i, cluster in psets.items():
+
+            mrich.var(cluster.name, len(cluster), unit="poses")
+
+            df = cluster.interactions.df
+
+            unique_counts = df.groupby(["type", "residue_name", "residue_number"])[
+                "pose_id"
+            ].nunique()
+
+            max_count = unique_counts.max()
+            max_pairs = unique_counts[unique_counts == max_count]
+
+            for (
+                interaction_type,
+                residue_name,
+                residue_number,
+            ) in max_pairs.index.values:
+                mrich.print(interaction_type, "w/", residue_name, residue_number)
+
+        # unclustered
+        unclustered = set((i for i in self.ids if i not in all_ids))
+        psets[None] = PoseSet(self.db, unclustered, name="Unclustered")
+
+        return psets
+
     @property
     def num_fingerprinted(self) -> int:
         """Count the number of fingerprinted poses in this set"""
