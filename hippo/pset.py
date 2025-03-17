@@ -929,6 +929,24 @@ class PoseSet:
         return -std(counts)
 
     @property
+    def subsite_ids(self) -> set[int]:
+        """Return a list of subsite id's of member poses"""
+
+        sql = f"""
+        SELECT DISTINCT subsite_tag_ref FROM subsite_tag
+        WHERE subsite_tag_pose IN {self.str_ids}
+        """
+
+        subsite_ids = self.db.execute(sql).fetchall()
+
+        if not subsite_ids:
+            return set()
+
+        subsite_ids = set([i for i, in subsite_ids])
+
+        return subsite_ids
+
+    @property
     def avg_energy_score(self) -> float:
         """Average energy score of poses in this set"""
 
@@ -1389,6 +1407,7 @@ class PoseSet:
         ingredients: IngredientSet = None,
         skip_no_reference: bool = True,
         skip_no_inspirations: bool = True,
+        skip_metadata: list[str] | None = None,
         tags: bool = True,
         extra_cols: dict[str, list] = None,
         name_col: str = "name",
@@ -1403,6 +1422,7 @@ class PoseSet:
         :param submitter_email: email of the person submitting the compounds
         :param submitter_institution: institution name of the person submitting the compounds
         :param metadata: include metadata in the output? (Default value = True)
+        :param skipmetadata: exclude metadata keys from output
         :param sort_by: if set will sort the SDF by this column/field (Default value = None)
         :param sort_reverse: reverse the sorting (Default value = False)
         :param generate_pdbs: generate accompanying protein-ligand complex PDBs (Default value = False)
@@ -1493,7 +1513,8 @@ class PoseSet:
 
         pose_df = poses.get_df(
             mol=True,
-            inspirations="fragalysis",
+            inspirations="names",
+            subsites="names",
             duplicate_name="original ID",
             reference="name",
             metadata=metadata,
@@ -1501,6 +1522,7 @@ class PoseSet:
             sanitise_null_metadata_values=True,
             sanitise_tag_list_separator=";",
             sanitise_metadata_list_separator=";",
+            skip_metadata=skip_metadata,
             **kwargs,
         )
 
@@ -1541,6 +1563,7 @@ class PoseSet:
             "compound inchikey": "compound inchikey",
             "distance_score": "distance_score",
             "energy_score": "energy_score",
+            "subsites": "subsites",
         }
 
         if extra_cols:
@@ -1988,18 +2011,20 @@ class PoseSet:
 
             b = Checkbox(description="Name", value=True)
             c = Checkbox(description="Summary", value=False)
-            d = Checkbox(description="2D (Compound)", value=False)
+            h = Checkbox(description="Tags", value=False)
+            i = Checkbox(description="Subsites", value=False)
+            d = Checkbox(description="2D (Comp.)", value=False)
             e = Checkbox(description="2D (Pose)", value=False)
             f = Checkbox(description="3D", value=True)
             g = Checkbox(description="Metadata", value=False)
 
             ui1 = GridBox(
-                [b, c, d],
-                layout=Layout(grid_template_columns="repeat(3, 100px)"),
+                [b, c, d, h],
+                layout=Layout(grid_template_columns="repeat(4, 100px)"),
             )
             ui2 = GridBox(
-                [e, f, g],
-                layout=Layout(grid_template_columns="repeat(3, 100px)"),
+                [e, f, g, i],
+                layout=Layout(grid_template_columns="repeat(4, 100px)"),
             )
             ui = VBox([a, ui1, ui2])
 
@@ -2010,6 +2035,8 @@ class PoseSet:
                 grid=True,
                 draw2d=True,
                 draw=True,
+                tags=True,
+                subsites=True,
                 metadata=True,
             ):
                 pose = self[i]
@@ -2017,7 +2044,11 @@ class PoseSet:
                     print(repr(pose))
 
                 if summary:
-                    pose.summary(metadata=False)
+                    pose.summary(metadata=False, tags=False, subsites=False)
+                if tags:
+                    print(pose.tags)
+                if subsites:
+                    print(pose.subsites)
                 if grid:
                     pose.grid()
                 if draw2d:
@@ -2038,6 +2069,8 @@ class PoseSet:
                     "draw2d": e,
                     "draw": f,
                     "metadata": g,
+                    "tags": h,
+                    "subsites": i,
                 },
             )
 
