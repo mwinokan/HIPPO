@@ -1377,6 +1377,14 @@ class Recipe:
                 self.db, set(reaction.id for reaction in downstream_reactions)
             )
 
+            if not downstream_products:
+                mrich.error("No downstream products for", reactant)
+                continue
+
+            if not downstream_reactions:
+                mrich.error("No downstream reactions for", reactant)
+                continue
+
             def get_scaffold_series():
 
                 bases = downstream_products.bases
@@ -1448,6 +1456,14 @@ class Recipe:
             upstream_reactions = ReactionSet(
                 self.db, set(reaction.id for reaction in upstream_reactions)
             )
+
+            if not upstream_routes:
+                mrich.error("No upstream routes for", product)
+                continue
+
+            if not upstream_reactions:
+                mrich.error("No upstream reactions for", product)
+                continue
 
             def get_scaffold_series():
 
