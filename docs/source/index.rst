@@ -36,47 +36,29 @@ You will also need `chemicalite` which is an extension to SQLite for cheminforma
 
 N.B. Compatibility between rdkit and chemicalite versions is quite strict, and database files created with a certain version pair may not be interoperable with others. 
 
-Core concepts
-=============
+Getting started
+===============
 
-HIPPO uses an sqlite database with several inter-connected tables (see :doc:`db`). In both the database and the python API the following core objects are defined:
+HIPPO uses an sqlite database with several inter-connected tables and Python-class representations thereof, the core concepts are explained in :doc:`definitions`. Once familiar you can try :doc:`getting_started`.
 
-Compound
---------
-
-A :class:`.Compound` represents a ligand/small molecule with stereochemistry removed and no atomic coordinates. I.e. it represents the chemical structure. It's name is always an InChiKey. If a compound is an elaboration it can have a :meth:`.Compound.base` property which is another :class:`.Compound`. :class:`.Compound` objects are target-agnostic and can be linked to any number of catalogue entries (:class:`.Quote`) or synthetic pathways (:class:`.Reaction`). 
-
-Pose
-----
-
-A :class:`.Pose` is a particular conformer of a :class:`.Compound` within a protein environment. A pose will have its own (stereochemical) smiles string, and must have a path to a coordinate file. Poses can have *inspirations* that can be used to trace fragment-derived scaffolds in merges and expansions.
-
-Reaction
---------
-
-A :class:`.Reaction` is a simplified representation of a synthetic pathway to create a product :class:`.Compound`. Reactants (also :class:`.Compound` objects) as well as a reaction type are required.
-
-See :doc:`definitions` for more detail.
 
 .. toctree::
    :maxdepth: 1
-   :caption: Contents:
+   :caption: Documentation Pages
+
+   Home <self>
 
    Definitions, units, and data types <definitions>
 
    Getting started <getting_started>
 
-   Structure-based searching <queries>
-
    Adding data <insert_elaborations>
 
-   Loading Syndirella outputs <load_syndirella>
+   Interfacing with Syndirella <syndirella>
    
-   Inserting synthetic pathways <insert_reactions>
-
+   Running an FFF campaign <fff>
+   
    Preparing files for Fragalysis upload <fragalysis>
-
-   Quoting with Pycule <pycule_tutorial>
 
    Windows installation <windows>
 
@@ -90,3 +72,7 @@ See :doc:`definitions` for more detail.
 .. * :ref:`genindex`
 .. * :ref:`modindex`
 .. * :ref:`search`
+
+.. Structure-based searching <queries>
+.. Inserting synthetic pathways <insert_reactions>
+.. Quoting with Pycule <pycule_tutorial>

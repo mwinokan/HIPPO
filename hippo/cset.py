@@ -828,7 +828,7 @@ class CompoundSet:
 
     @property
     def elab_df(self) -> "pd.DataFrame":
-        """"""
+        """Get a DataFrame summarising the elaborations in this CompoundSet"""
         from pandas import DataFrame
 
         cluster_dict = self.db.get_compound_cluster_dict(max_bases=1)
@@ -1267,7 +1267,12 @@ class CompoundSet:
         self,
         permitted_reactions: "None | ReactionSet" = None,
         debug: bool = True,
-    ):
+    ) -> "RouteSet":
+        """Get a RoutSet to products in this set.
+
+        :param permitted_reactions: optionally restrict reactions to those in this :class:`.ReactionSet`
+
+        """
 
         if "route" not in self.db.table_names:
             mrich.error("route table not in Database")
@@ -2233,7 +2238,7 @@ class IngredientSet:
         quoted_amount: float | None = None,
         debug: bool = False,
     ) -> None:
-        """Add an
+        """Add an :class:`.Ingredient` to this set
 
         :param ingredient: :class:`.Ingredient` to be added, if ``None`` must specify other parameters, (Default value = None)
         :param compound_id: :class:`.Compound` ID (Default value = None)
@@ -2448,7 +2453,8 @@ class IngredientSet:
 
         return self
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: int) -> "Ingredient":
+        """Get a member by it's index"""
         match key:
             case int():
                 series = self.df.loc[key]
@@ -2458,6 +2464,7 @@ class IngredientSet:
                 raise NotImplementedError
 
     def __iter__(self):
+        """Iterate through the ingredients"""
         return iter(self._get_ingredient(s) for i, s in self.df.iterrows())
 
     def __call__(
@@ -2466,6 +2473,7 @@ class IngredientSet:
         compound_id: int | None = None,
         tag: str | None = None,
     ) -> "IngredientSet | Ingredient | CompoundSet":
+        """Get members based on a compound_id or tag"""
 
         if compound_id:
 

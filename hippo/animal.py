@@ -756,6 +756,7 @@ class HIPPO:
         :param max_distance_score: Filter out poses with `comRMSD` above this value
         :param require_intra_geometry_pass: Filter out poses with falsy `intra_geometry_pass` values
         :param reject_flags: Filter out rows flagged with strings from this list
+        :param dry_run: Don't insert new records into the database (for debugging/testing)
         :returns: annotated DataFrame
         """
 

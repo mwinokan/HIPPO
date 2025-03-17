@@ -11,7 +11,8 @@ def generate_header(
     generation_date: str | None = None,
     extras=None,
     metadata: bool = True,
-):
+) -> "Chem.Mol":
+    """Generate a header molecule for Fragalysis RHS upload"""
 
     extras = extras or {}
 
