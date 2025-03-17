@@ -444,9 +444,12 @@ class PoseTable:
                     pose = self.db.get_pose(inchikey=key)
                 return pose
 
-            case key if isinstance(key, list) or isinstance(key, tuple) or isinstance(
-                key, set
-            ) or isinstance(key, Series):
+            case key if (
+                isinstance(key, list)
+                or isinstance(key, tuple)
+                or isinstance(key, set)
+                or isinstance(key, Series)
+            ):
 
                 indices = []
                 for i in key:
