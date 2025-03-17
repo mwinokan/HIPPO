@@ -42,12 +42,12 @@ class RandomRecipeGenerator:
         self._db = db
 
         # JSON I/O set up
-        self._data_path = Path(str(self.db_path).replace(".sqlite", "_rgen.json"))
+        self._data_path = Path(str(self.db_path.name).replace(".sqlite", "_rgen.json"))
         if self.data_path.exists():
             mrich.warning(f"Will overwrite existing rgen data file: {self.data_path}")
 
         # Recipe I/O set up
-        path = Path(str(self.db_path).replace(".sqlite", "_recipes"))
+        path = Path(str(self.db_path.name).replace(".sqlite", "_recipes"))
         mrich.writing(f"{path}/")
         path.mkdir(exist_ok=True)
         self._recipe_dir = path
