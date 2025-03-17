@@ -321,7 +321,7 @@ def plot_interaction_punchcard(
 def plot_interaction_punchcard_by_tags(
     animal,
     tags: dict[str, str] | list[str],
-    permitted_residues: dict[str, list[int]],
+    permitted_residues: dict[str, list[int]] | None = None,
     yaxis_title: str = "Tag",
     subtitle=None,
     opacity=0.7,
