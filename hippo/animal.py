@@ -1170,12 +1170,18 @@ class HIPPO:
         # orig_name_col: str = 'Diamond ID (Molecule Name)',
         price_col: str | None = None,
         fixed_amount: float | None = None,
-        fixed_lead_time: float | None = None,
+        fixed_lead_time: float | None = False,
+        fixed_purity: float | None = False,
         entry_col: str = "Catalog ID",
         catalogue_col: str = "Collection",
+        smiles_col: str = "SMILES",
+        amount_col: str = "Amount, mg",
+        purity_col: str = "Purity, %",
+        lead_time_col: str | None = "Lead time",
         stop_after: None | int = None,
         orig_name_is_hippo_id: bool = False,
         allow_no_catalogue_col: bool = False,
+        delete_unavailable: bool = True,
     ):
         """
         Load an Enamine quote provided as an excel file
@@ -1194,15 +1200,13 @@ class HIPPO:
 
         df = pd.read_excel(path)
 
-        smiles_col = "SMILES"
-        purity_col = "Purity, %"
-        amount_col = "Amount, mg"
-        lead_time_col = "Lead time"
-
         def unexpected_column(key, value) -> str:
             return (
                 f"Unexpected Excel format ({key}='{value}') \n\nfirst row:\n{df.loc[0]}"
             )
+
+        if smiles_col not in df.columns:
+            smiles_col = smiles_col.lower()
 
         assert smiles_col in df.columns, unexpected_column("smiles_col", smiles_col)
 
@@ -1214,12 +1218,14 @@ class HIPPO:
             orig_name_is_hippo_id = False
 
         assert entry_col in df.columns, unexpected_column("entry_col", entry_col)
-        assert purity_col in df.columns, unexpected_column("purity_col", purity_col)
+
+        if fixed_purity is False:
+            assert purity_col in df.columns, unexpected_column("purity_col", purity_col)
 
         if fixed_amount is None:
             assert amount_col in df.columns, unexpected_column("amount_col", amount_col)
 
-        if fixed_lead_time is None:
+        if fixed_lead_time is False and lead_time_col is not None:
             assert lead_time_col in df.columns, unexpected_column(
                 "lead_time_col", lead_time_col
             )
@@ -1273,7 +1279,18 @@ class HIPPO:
             if (catalogue := row[catalogue_col]) in [
                 "No starting material",
                 "Out of stock",
+                "Unavailable",
             ]:
+
+                if delete_unavailable:
+
+                    mrich.warning("Deleting Enamine quotes for", compound)
+
+                    self.db.delete_where(
+                        table="quote",
+                        key=f"quote_supplier = 'Enamine' AND quote_compound = {compound.id}",
+                    )
+
                 continue
 
             if (price := row[price_col]) == 0.0:
@@ -1284,7 +1301,12 @@ class HIPPO:
             else:
                 amount = fixed_amount
 
-            if fixed_lead_time is None:
+            if fixed_purity is False:
+                purity = row[purity_col] / 100
+            else:
+                purity = fixed_purity
+
+            if fixed_lead_time is False:
                 if not isinstance(row[lead_time_col], str):
                     continue
                 if "week" in row[lead_time_col]:
@@ -1300,7 +1322,7 @@ class HIPPO:
                 catalogue=catalogue,
                 entry=row[entry_col],
                 amount=amount,
-                purity=row[purity_col] / 100,
+                purity=purity,
                 lead_time=lead_time,
                 price=price,
                 currency=currency,
@@ -2292,6 +2314,14 @@ class HIPPO:
         return plot_interaction_punchcard(
             self, poses=poses, subtitle=subtitle, opacity=opacity, **kwargs
         )
+
+    def plot_interaction_punchcard_by_tags(
+        self, tags: dict[str, str] | list[str], **kwargs
+    ) -> "plotly.graph_objects.Figure":
+        """Plot an interaction punchcard for a set of poses associated to given tags, see :func:`hippo.plotting.plot_interaction_punchcard_by_tags`"""
+        from .plotting import plot_interaction_punchcard_by_tags
+
+        return plot_interaction_punchcard_by_tags(self, tags=tags, **kwargs)
 
     def plot_residue_interactions(
         self, poses, residue_number, **kwargs
