@@ -1162,7 +1162,12 @@ class Database:
 
         assert currency in ["GBP", "EUR", "USD", None], f"incompatible {currency=}"
 
-        assert supplier in ["MCule", "Enamine", "Stock"], f"incompatible {supplier=}"
+        assert supplier in [
+            "MCule",
+            "Enamine",
+            "Stock",
+            "Molport",
+        ], f"incompatible {supplier=}"
 
         smiles = smiles or ""
 
@@ -1634,7 +1639,7 @@ class Database:
         self,
         *,
         pose_id: int,
-        name: str,
+        name: str | None,
         target: int | None = None,
         subsite_id: int | None = None,
         commit: bool = True,
@@ -1649,7 +1654,9 @@ class Database:
 
         """
 
-        assert isinstance(name, str)
+        if name is not None:
+            assert isinstance(name, str)
+
         assert isinstance(pose_id, int)
 
         if not target:
@@ -2613,6 +2620,15 @@ class Database:
             mrich.var("recipe", recipe)
 
         return recipe
+
+    def get_route_products(self) -> "CompoundSet | None":
+        """Get a :class:`.CompoundSet` of all route products"""
+        from .cset import CompoundSet
+
+        records = self.execute("SELECT DISTINCT route_product FROM route").fetchall()
+        if not records:
+            return None
+        return CompoundSet(self, [i for i, in records])
 
     def get_route_id_product_dict(self) -> dict[int, int]:
         """Get a dictionary mapping route ID's to their product :class:`.Compound`"""
