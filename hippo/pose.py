@@ -530,6 +530,7 @@ class Pose:
             value=self.id,
             multiple=True,
             query="subsite_tag_id, subsite_tag_ref",
+            none='quiet',
         )
 
         if not records:
@@ -727,7 +728,7 @@ class Pose:
 
         if inspirations == "names":
             if not self.inspirations:
-                data["inspirations"] = ""
+                data["inspirations"] = None
             else:
                 data["inspirations"] = ",".join([p.name for p in self.inspirations])
         elif inspirations:
@@ -735,7 +736,7 @@ class Pose:
 
         if subsites == "names":
             if not (sites := self.subsites):
-                data["subsites"] = ""
+                data["subsites"] = None
             else:
                 data["subsites"] = ",".join([p.name for p in sites])
         elif subsites:
