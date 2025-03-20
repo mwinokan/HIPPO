@@ -242,6 +242,7 @@ class Recipe:
         permitted_reactions: "ReactionSet | None" = None,
         final_products_only: bool = True,
         return_products: bool = False,
+        supplier: str | None = None,
         debug: bool = False,
     ) -> "Recipe | list[Recipe] | CompoundSet":
         """Create a :class:`.Recipe` from a :class:`.ReactionSet` and its upstream dependencies
@@ -309,6 +310,7 @@ class Recipe:
             amount=amount,
             permitted_reactions=reactions,
             pick_cheapest=pick_cheapest,
+            supplier=supplier,
         )
 
         return recipe
@@ -489,8 +491,9 @@ class Recipe:
         amount: float = 1,
         debug: bool = False,
         return_products: bool = False,
+        supplier: str | None = None,
         **kwargs,
-    ) -> "Recipe | CompoundSet":
+    ) -> "list[Recipe] | Recipe | CompoundSet":
         """Find the maximal recipe from a given set of reactants
 
         :param reactants: :class:`.CompoundSet` or :class:`.IngredientSet` for the reactants. Ingredient amounts are ignored
@@ -567,6 +570,7 @@ class Recipe:
             pick_cheapest=False,
             debug=debug,
             return_products=return_products,
+            supplier=supplier,
             **kwargs,
         )
 
