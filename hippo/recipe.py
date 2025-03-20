@@ -243,7 +243,9 @@ class Recipe:
         final_products_only: bool = True,
         return_products: bool = False,
         supplier: str | None = None,
+        use_routes: bool = False,
         debug: bool = False,
+        **kwargs,
     ) -> "Recipe | list[Recipe] | CompoundSet":
         """Create a :class:`.Recipe` from a :class:`.ReactionSet` and its upstream dependencies
 
@@ -311,6 +313,8 @@ class Recipe:
             permitted_reactions=reactions,
             pick_cheapest=pick_cheapest,
             supplier=supplier,
+            use_routes=use_routes,
+            **kwargs,
         )
 
         return recipe
@@ -332,6 +336,7 @@ class Recipe:
         unavailable_reaction: str = "error",
         reaction_checking_cache: dict[int, bool] | None = None,
         reaction_reactant_cache: dict[int, bool] | None = None,
+        use_routes: bool = False,
         **kwargs,
     ):
         """Create recipe(s) to synthesis products in the :class:`.CompoundSet`
@@ -359,12 +364,21 @@ class Recipe:
         # if permitted_reactions:
         #   raise NotImplementedError
 
+        db = compounds.db
+
         n_comps = len(compounds)
 
         assert n_comps
 
         if not hasattr(amount, "__iter__"):
             amount = [amount] * n_comps
+
+        if use_routes:
+            route_lookup = db.get_product_id_routes_dict()
+
+            if supplier:
+                raise NotImplementedError
+                # supplier_lookup = db.get_compound_id_suppliers_dict()
 
         options = []
 
@@ -377,36 +391,49 @@ class Recipe:
         ):
 
             comp_options = []
+            
+            if use_routes:
 
-            for reaction in comp.reactions:
-
-                if permitted_reactions and reaction not in permitted_reactions:
+                if comp.id not in route_lookup:
+                    mrich.error("No routes to", comp)
                     continue
 
-                sol = Recipe.from_reaction(
-                    reaction=reaction,
-                    amount=a,
-                    pick_cheapest=pick_cheapest_inner_routes,
-                    debug=debug,
-                    permitted_reactions=permitted_reactions,
-                    quoted_only=quoted_only,
-                    supplier=supplier,
-                    unavailable_reaction=unavailable_reaction,
-                    reaction_checking_cache=reaction_checking_cache,
-                    reaction_reactant_cache=reaction_reactant_cache,
-                    **kwargs,
-                )
+                comp_options = []
+                for route_id in route_lookup[comp.id]:
+                    route = db.get_route(id=route_id)
+                    comp_options.append(route)
 
-                if pick_cheapest_inner_routes:
-                    if sol:
-                        comp_options.append(sol)
-                else:
-                    assert isinstance(sol, list)
-                    comp_options += sol
+            else:
 
-            if not comp_options:
-                mrich.error(f"No solutions for compound={comp} ({comp.reactions.ids=})")
-                continue
+                for reaction in comp.reactions:
+
+                    if permitted_reactions and reaction not in permitted_reactions:
+                        continue
+
+                    sol = Recipe.from_reaction(
+                        reaction=reaction,
+                        amount=a,
+                        pick_cheapest=pick_cheapest_inner_routes,
+                        debug=debug,
+                        permitted_reactions=permitted_reactions,
+                        quoted_only=quoted_only,
+                        supplier=supplier,
+                        unavailable_reaction=unavailable_reaction,
+                        reaction_checking_cache=reaction_checking_cache,
+                        reaction_reactant_cache=reaction_reactant_cache,
+                        **kwargs,
+                    )
+
+                    if pick_cheapest_inner_routes:
+                        if sol:
+                            comp_options.append(sol)
+                    else:
+                        assert isinstance(sol, list)
+                        comp_options += sol
+
+                if not comp_options:
+                    mrich.error(f"No solutions for compound={comp} ({comp.reactions.ids=})")
+                    continue
 
             if pick_cheapest and len(comp_options) > 1:
                 if warn_multiple_solutions:
@@ -492,6 +519,8 @@ class Recipe:
         debug: bool = False,
         return_products: bool = False,
         supplier: str | None = None,
+        pick_cheapest: bool = False,
+        use_routes: bool = False,
         **kwargs,
     ) -> "list[Recipe] | Recipe | CompoundSet":
         """Find the maximal recipe from a given set of reactants
@@ -567,10 +596,10 @@ class Recipe:
             rset,
             amount=amount,
             permitted_reactions=rset,
-            pick_cheapest=False,
             debug=debug,
             return_products=return_products,
             supplier=supplier,
+            use_routes=use_routes,
             **kwargs,
         )
 
