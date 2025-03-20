@@ -2621,6 +2621,21 @@ class Database:
         records = self.execute("SELECT route_id, route_product FROM route").fetchall()
         return {route_id: route_product for route_id, route_product in records}
 
+    def get_product_id_routes_dict(self) -> dict[int, set[int]]:
+        """Get a dictionary mapping route ID's to their product :class:`.Compound`"""
+        records = self.execute("SELECT route_id, route_product FROM route").fetchall()
+
+        lookup = {}
+
+        for route_id, route_product in records:
+
+            if route_product not in lookup:
+                lookup[route_product] = set()
+
+            lookup[route_product].add(route_id)
+
+        return lookup
+
     def get_compound_id_pose_ids_dict(self, cset: "CompoundSet") -> dict[int, set]:
         """Get a dictionary mapping :class:`.Compound` ID's to their associated :class:`.Pose` ID's"""
         records = self.execute(
@@ -2632,6 +2647,20 @@ class Database:
         for comp_id, pose_id in records:
             d[comp_id] = d.get(comp_id, set())
             d[comp_id].add(pose_id)
+        return d
+
+    def get_compound_id_suppliers_dict(self, cset: "CompoundSet") -> dict[int, set[str]]:
+        """Get a dictionary mapping :class:`.Compound` ID's to suppliers which stock it"""
+        records = self.execute(
+            f"SELECT quote_compound, quote_supplier FROM quote WHERE quote_compound IN {cset.str_ids}"
+        ).fetchall()
+
+        d = {}
+
+        for comp_id, quote_supplier in records:
+            d[comp_id] = d.get(comp_id, set())
+            d[comp_id].add(quote_supplier)
+
         return d
 
     def get_compound_inchikey_id_dict(self, inchikeys: list[str]):
