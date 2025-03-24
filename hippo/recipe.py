@@ -391,7 +391,7 @@ class Recipe:
         ):
 
             comp_options = []
-            
+
             if use_routes:
 
                 if comp.id not in route_lookup:
@@ -432,7 +432,9 @@ class Recipe:
                         comp_options += sol
 
                 if not comp_options:
-                    mrich.error(f"No solutions for compound={comp} ({comp.reactions.ids=})")
+                    mrich.error(
+                        f"No solutions for compound={comp} ({comp.reactions.ids=})"
+                    )
                     continue
 
             if pick_cheapest and len(comp_options) > 1:

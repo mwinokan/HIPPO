@@ -406,8 +406,8 @@ class CompoundTable:
                     comp = self.db.get_compound(alias=key)
                 return comp
 
-            case key if isinstance(key, list) or isinstance(key, tuple) or isinstance(
-                key, set
+            case key if (
+                isinstance(key, list) or isinstance(key, tuple) or isinstance(key, set)
             ):
 
                 indices = []

@@ -530,7 +530,7 @@ class Pose:
             value=self.id,
             multiple=True,
             query="subsite_tag_id, subsite_tag_ref",
-            none='quiet',
+            none="quiet",
         )
 
         if not records:

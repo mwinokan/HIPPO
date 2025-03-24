@@ -267,8 +267,8 @@ class ReactionTable:
                 else:
                     return self.db.get_reaction(id=key)
 
-            case key if isinstance(key, list) or isinstance(key, tuple) or isinstance(
-                key, set
+            case key if (
+                isinstance(key, list) or isinstance(key, tuple) or isinstance(key, set)
             ):
                 return ReactionSet(self.db, key)
 
@@ -693,8 +693,8 @@ class ReactionSet:
             case slice():
                 ids = self.ids[key]
                 return ReactionSet(self.db, ids)
-            case key if isinstance(key, list) or isinstance(key, tuple) or isinstance(
-                key, set
+            case key if (
+                isinstance(key, list) or isinstance(key, tuple) or isinstance(key, set)
             ):
                 ids = self.ids[key]
                 return ReactionSet(self.db, ids)
