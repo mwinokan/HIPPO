@@ -2138,6 +2138,17 @@ class Database:
 
         self.execute(sql)
 
+    def update_compound_pattern_bfp_table(self):
+        animal.db.execute(
+            """
+            INSERT INTO compound_pattern_bfp
+            SELECT c.compound_id, c.compound_pattern_bfp FROM compound AS c
+            LEFT JOIN compound_pattern_bfp as fp
+            ON c.compound_id = fp.compound_id
+            WHERE fp.compound_id IS NULL
+        """
+        )
+
     def prune_duplicate_routes(self) -> None:
         """Remove duplicate routes from the database"""
 
@@ -2649,7 +2660,9 @@ class Database:
             d[comp_id].add(pose_id)
         return d
 
-    def get_compound_id_suppliers_dict(self, cset: "CompoundSet") -> dict[int, set[str]]:
+    def get_compound_id_suppliers_dict(
+        self, cset: "CompoundSet"
+    ) -> dict[int, set[str]]:
         """Get a dictionary mapping :class:`.Compound` ID's to suppliers which stock it"""
         records = self.execute(
             f"SELECT quote_compound, quote_supplier FROM quote WHERE quote_compound IN {cset.str_ids}"
