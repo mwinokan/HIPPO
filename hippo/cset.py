@@ -1411,32 +1411,101 @@ class CompoundSet:
 
         """
 
+        from json import loads
+        from rdkit.Chem import Mol
         from pandas import DataFrame
 
         data = []
 
-        for comp in mrich.track(self, prefix="Creating compound dataframe"):
-            d = comp.get_dict(
-                mol=mol,
-                metadata=metadata,
-                count_by_target=count_by_target,
-                poses=poses,
-                num_reactant=num_reactant,
-                num_reactions=num_reactions,
-                bases=bases,
-                elabs=elabs,
-                tags=tags,
-                **kwargs,
-            )
-            data.append(d)
+        if not any(
+            [
+                # poses,
+                count_by_target,
+                num_reactant,
+                num_reactions,
+                # bases,
+                elabs,
+                tags,
+                num_poses,
+                num_routes,
+            ]
+        ):
+
+            sql = f"""
+            SELECT compound_id, compound_inchikey, compound_alias, compound_smiles, mol_to_binary_mol(compound_mol), compound_metadata
+            FROM compound
+            WHERE compound_id IN {self.str_ids}
+            """
+
+            records = self.db.execute(sql)
+
+            for id, inchikey, alias, smiles, mol_bytes, meta_str in records:
+                d = dict(
+                    id=id,
+                    inchikey=inchikey,
+                    alias=alias,
+                    smiles=smiles,
+                )
+
+                if mol:
+                    d["mol"] = Mol(mol_bytes)
+
+                if metadata and meta_str:
+                    d["metadata"] = loads(meta_str)
+
+                data.append(d)
+
+            if bases:
+
+                sql = f"""
+                SELECT scaffold_superstructure, scaffold_base
+                FROM scaffold
+                WHERE scaffold_superstructure IN {self.str_ids}
+                """
+
+                records = self.db.execute(sql)
+
+                lookup = {}
+                for compound_id, base_id in records:
+                    lookup.setdefault(compound_id, set())
+                    if base_id:
+                        lookup[compound_id].add(base_id)
+
+                for d in data:
+                    if d["id"] in lookup:
+                        d["bases"] = lookup[d["id"]]
+
+        else:
+
+            ##### PRE-REFACTOR USING BIG QUERY
+            mrich.warning("Using slower Compound.get_dict() method")
+
+            for comp in mrich.track(self, prefix="Creating compound dataframe"):
+                d = comp.get_dict(
+                    mol=mol,
+                    metadata=metadata,
+                    count_by_target=count_by_target,
+                    # poses=poses,
+                    num_reactant=num_reactant,
+                    num_reactions=num_reactions,
+                    bases=bases,
+                    elabs=elabs,
+                    tags=tags,
+                    **kwargs,
+                )
+                data.append(d)
 
         if num_poses:
-
             lookup = self.id_num_poses_dict
-
             for d in data:
                 comp_id = d["id"]
                 d["num_poses"] = lookup.get(comp_id, 0)
+
+        if poses:
+            lookup = self.db.get_compound_id_pose_ids_dict(self)
+            for d in data:
+                comp_id = d["id"]
+                d["poses"] = lookup.get(comp_id, {})
 
         df = DataFrame(data)
 
