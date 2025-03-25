@@ -346,6 +346,10 @@ class CompoundTable:
         """
         self[self.ids].interactive()
 
+    def plot_tsnee(self, **kwargs) -> "go.Figure":
+        """Plot a tanimoto similarity plot of these compounds"""
+        return self[:].plot_tsnee(**kwargs)
+
     ### DUNDERS
 
     def __call__(
@@ -595,6 +599,19 @@ class CompoundSet:
             multiple=True,
         )
         return [q for q, in result]
+
+    @property
+    def mols(self) -> "list[Chem.Mol]":
+        """Returns the molecules of child compounds"""
+        from rdkit.Chem import Mol
+
+        result = self.db.select_where(
+            query="mol_to_binary_mol(compound_mol)",
+            table="compound",
+            key=f"compound_id in {self.str_ids}",
+            multiple=True,
+        )
+        return [Mol(q) for q, in result]
 
     @property
     def inchikeys(self) -> list[str]:
@@ -1736,6 +1753,12 @@ class CompoundSet:
         mrich.print(f'Tagged {self} w/ "{tag}"')
 
         self.db.commit()
+
+    def plot_tsnee(self, **kwargs) -> "go.Figure":
+        """Plot a tanimoto similarity plot of these compounds"""
+        from .plotting import plot_compound_tsnee
+
+        return plot_compound_tsnee(self, **kwargs)
 
     ### DUNDERS
 
