@@ -2202,6 +2202,50 @@ class Database:
 
         return delete
 
+    def calculate_all_scaffolds(self):
+
+        n_before = self.count("scaffold")
+
+        mrich.var("#compounds", self.count("compound"))
+        mrich.var("#scaffold defs", n_before)
+
+        sql = """
+        SELECT compound_id, compound_mol, compound_pattern_bfp 
+        FROM compound
+        """
+
+        with mrich.loading("Fetching compounds..."):
+            records = self.execute(sql).fetchall()
+
+        sql = """
+            INSERT OR IGNORE INTO scaffold
+            SELECT ?1, c.compound_id 
+            FROM compound AS c, compound_pattern_bfp AS fp
+            WHERE c.compound_id = fp.compound_id
+            AND c.compound_id <> ?1
+            AND mol_is_substruct(c.compound_mol, ?2)
+            AND fp.compound_id MATCH rdtree_subset(?3)
+        """
+
+        with mrich.loading("Calculating scaffolds..."):
+            t1 = time.time()
+            self.executemany(sql, records)
+            mrich.print("Took", f"{time.time() - t1:.1f}", "seconds")
+
+        with mrich.loading("Committing..."):
+            self.commit()
+
+        diff = self.count("scaffold") - n_before
+
+        if diff:
+            mrich.success(
+                "Found", diff, "new substructure-superstructure relationships"
+            )
+        else:
+            mrich.warning(
+                "Found", diff, "new substructure-superstructure relationships"
+            )
+
     ### GETTERS
 
     def get_compound(
