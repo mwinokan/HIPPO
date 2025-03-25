@@ -122,6 +122,15 @@ class PoseTable:
         return set(v for v, in values)
 
     @property
+    def num_fingerprinted(self) -> int:
+        """Count the number of fingerprinted poses"""
+        return self.db.count_where(
+            table="pose",
+            key="fingerprint",
+            value=1,
+        )
+
+    @property
     def id_name_dict(self) -> dict[int, str]:
         """Return a dictionary mapping pose ID's to their name"""
 
