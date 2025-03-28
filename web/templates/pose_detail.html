@@ -29,11 +29,12 @@
                 viewer.addModel(sdfData, "sdf");  // Add SDF model
                 viewer.setBackgroundColor("white", 0.0)
                 viewer.setStyle({}, { stick: {} });  // Stick representation
+                viewer.setStyle({ elem: "C" }, { stick: { color: "white" } });  // recolor carbons
                 viewer.zoomTo();  // Zoom to molecule
                 viewer.render();  // Render the molecule
             })
             .catch(error => console.error("Error loading SDF:", error));
-            
+
     </script>
 
     <table>

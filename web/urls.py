@@ -28,7 +28,8 @@ urlpatterns = [
     # path("targets/", views.TargetListView.as_view(), name="target-list"),
     # path("target/<int:pk>/", views.TargetDetailView.as_view(), name="target-detail"),
 
-    path("pose_sdf/<int:pk>", views.pose_sdf, name="pose_sdf")
+    path("pose_sdf/<int:pk>", views.pose_sdf, name="pose_sdf"),
+    path("pose_compare/<str:pks>", views.pose_compare, name="pose_compare"),
 ]
 
 for model_name, model_views in views.GENERATED_VIEWS.items():

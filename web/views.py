@@ -1,4 +1,4 @@
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, get_list_or_404
 from django.http import HttpResponse
 from django.apps import apps
 from django.db.models.fields.related import ForeignKey
@@ -69,6 +69,14 @@ def pose_sdf(request, pk: int):
 
     return HttpResponse(text, content_type="chemical/x-mdl-sdfile")
 
+def pose_compare(request, pks: str):
+
+    # Split comma-separated pks (e.g., "1,2,3") into a list
+    pk_list = pks.split(",")
+
+    # Fetch poses from the database
+    poses = get_list_or_404(Pose, pk__in=pk_list)
+    return render(request, "pose_compare.html", {"poses": poses, "colors":['orange', 'blue', 'green', 'yellow', 'red']})
 
 ### class based views
 
