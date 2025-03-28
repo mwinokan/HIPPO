@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% load custom_tags %}
+
+{% block content %}
+
+<script src="https://3Dmol.org/build/3Dmol-min.js"></script>     
+<!-- <script src="https://3Dmol.org/build/3Dmol.ui-min.js"></script>      -->
+ 
+
+<div class="card">
+
+    <h2 class="center">{{ object.model_pill_html|default:object|safe }}</h2>
+    <br>
+
+    <div class="monospace">
+        <div id="viewer" style="width: 100%; height: 400px; position: relative;"></div>
+    </div>
+
+    <br>
+
+    <script>
+        let sdfUrl = "{% url 'pose_sdf' object.pk %}";  // Fetch SDF
+
+        fetch(sdfUrl)
+            .then(response => response.text())
+            .then(sdfData => {
+                let viewer = $3Dmol.createViewer("viewer");
+                viewer.addModel(sdfData, "sdf");  // Add SDF model
+                viewer.setBackgroundColor("white", 0.0)
+                viewer.setStyle({}, { stick: {} });  // Stick representation
+                viewer.zoomTo();  // Zoom to molecule
+                viewer.render();  // Render the molecule
+            })
+            .catch(error => console.error("Error loading SDF:", error));
+            
+    </script>
+
+    <table>
+        <tbody>
+
+            <!-- TABLE OF FIELDS -->
+
+            {% for field_name, value, render_dict in fields %}
+
+                {% if render_dict.type == "FieldRenderType.TABLE" %}
+                    <tr>
+                        <td style="font-weight:bold;">{{ field_name.capitalize }}</td>
+
+                    {% if render_dict.content == "ContentRenderType.TEXT_NORMAL" %}
+
+                        <td>{{ value }}</td>
+                    
+                    {% elif render_dict.content == "ContentRenderType.TEXT_MONOSPACE" %}
+
+                        <td><span class="monospace">{{ value }}</span></td>
+                    
+                    {% elif render_dict.content == "ContentRenderType.INSTANCE_PILL" %}
+
+                        <td><a href="{{ value.get_absolute_url }}">{{ value.model_pill_html|default:value|safe }}</a></td>
+
+                    {% elif render_dict.content == "ContentRenderType.MOL_2D_SVG" %}
+
+                        <td>{{ object.get_mol_svg_text|safe }}</td>
+
+                    {% else %}
+
+                        <td>UNSUPPORTED CONTENT TYPE {{render_dict.content}}</td>
+
+                    {% endif %}
+
+                    </tr>
+
+                {% endif %}
+
+            {% endfor %}
+        </tbody>
+    </table>
+
+</div>
+    
+<!-- CARDS/TOGGLES -->
+
+{% for field_name, values, render_dict in fields %}
+
+    <!-- CARD -->
+
+    {% if render_dict.type|endswith:"CARD" %}
+        
+    <div class="card">
+        
+        {% if render_dict.type|startswith:"FieldRenderType.TOGGLE" %}
+
+            <div class="h2-checkbox-container">
+                <h2 class="title">{{ field_name }} ({{ values|length }})</h2>
+                <label class="switch">
+                    <input type="checkbox" id="{{ field_name }}_toggle_checkbox">
+                    <span class="slider round"></span>
+                </label>
+            </div>
+
+            <div id="{{ field_name }}_toggle_div" style="display:none;">
+
+        {% else %}
+
+            <h2>{{ field_name }} ({{ values|length }})</h2>
+
+        {% endif %}
+        
+        {% for member in values %}
+
+            {% if render_dict.content == "ContentRenderType.INSTANCE_PILL" %}
+            
+                <a href="{{ member.get_absolute_url }}">{{ member.model_pill_html|default:member|safe }}</a>
+
+            {% elif render_dict.content == "ContentRenderType.DICT_TABLE" %}
+
+                <table class="bordered">
+
+                {% for key,value in values.items %}
+
+                    <tr>
+                        <th>key</th>
+                        <td>value</td>
+                    </tr>
+
+                {% endfor %}
+
+                </table>
+
+            {% else %}
+
+                <p>UNSUPPORTED CONTENT TYPE {{ field_name }} {{render_dict.content}}</p>
+
+            {% endif %}
+        
+        {% endfor %}
+        
+        {% if render_dict.type|startswith:"FieldRenderType.TOGGLE" %}
+
+            <script type="text/javascript">
+                document.getElementById('{{ field_name }}_toggle_checkbox').addEventListener('change', function() {
+                    const toggleDiv = document.getElementById('{{ field_name }}_toggle_div');
+                    if (this.checked) {
+                        toggleDiv.style.display = 'block'; // Show the div
+                    } else {
+                        toggleDiv.style.display = 'none'; // Hide the div
+                    }
+                });
+            </script>
+
+            </div>
+
+        {% endif %}
+        
+    </div>
+
+    {% endif %}
+
+{% endfor %}
+
+<button><a href="{% url model_name|add:'_list' %}">Back to List</a></button>
+<button><a href="{{ object.get_admin_url }}">Edit</a></button>
+
+{% endblock %}
