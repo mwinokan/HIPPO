@@ -7,6 +7,8 @@ class Pose(PoseModel):
     _objects = PoseSet.as_manager()
     _parent_module = "pose"
 
+    _custom_detail_view = True
+
     def get_mol_svg_text(self, width=300, height=200):
 
         import re

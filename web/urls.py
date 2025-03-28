@@ -27,18 +27,25 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     # path("targets/", views.TargetListView.as_view(), name="target-list"),
     # path("target/<int:pk>/", views.TargetDetailView.as_view(), name="target-detail"),
+
+    path("pose_sdf/<int:pk>", views.pose_sdf, name="pose_sdf")
 ]
 
 for model_name, model_views in views.GENERATED_VIEWS.items():
-    urlpatterns += [
-        path(
+
+    list_view = model_views.get("list_view", None)
+
+    if list_view:
+        urlpatterns.append(path(
             f"{model_name}/",
             model_views["list_view"].as_view(),
-            name=f"{model_name}_list",
-        ),
-        path(
-            f"{model_name}/<int:pk>/",
+            name=f"{model_name}_list"))
+
+    detail_view = model_views.get("detail_view", None)
+
+    if detail_view:
+        urlpatterns.append(path(
+            f"{model_name}/<str:value>/",
             model_views["detail_view"].as_view(),
             name=f"{model_name}_detail",
-        ),
-    ]
+        ))

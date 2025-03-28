@@ -20,6 +20,8 @@ class AbstractModel(models.Model):
 
     _shorthand = None
     _name_field = None
+    
+    _custom_detail_view = False
 
     _field_render_types = {
         # "pill": dict(type=FieldRenderType.HIDDEN, content=ContentRenderType.INSTANCE_PILL),
