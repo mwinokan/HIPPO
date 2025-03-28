@@ -177,64 +177,32 @@ def parse_observation_longcode(longcode: str) -> dict[str]:
 
     import re
 
-    dashx_split = longcode.split("-x")
+    match = re.search(
+        r"(.*)_([A-z]_[0-9]*_[0-9])_(.*)\+([A-z]\+[0-9]*\+[0-9])_.LIG", longcode
+    )
 
-    match len(dashx_split):
-        case 3:
+    if not match:
+        raise UnsupportedFragalysisLongcodeError(longcode)
 
-            target = dashx_split[0]
+    cryst_str, lig_str, _, _ = match.groups()
 
-            data = dashx_split[1].removesuffix(target).split("_")
-
-            data = [d for d in data if d]
-
-        case 2:
-
-            if not re.match(r"[^_]*_[A-Z]_[0-9]{3,4}_[0-9]{1,2}_.*", dashx_split[0]):
-                if len(dashx_split[0]) > len(dashx_split[1]):
-                    raise UnsupportedFragalysisLongcodeError(dashx_split)
-
-                else:
-                    data = dashx_split[1].split("_")[:4]
-                    target = dashx_split[0]
-
-            else:
-                data = dashx_split[0].split("_")[:4]
-                target = None
-
-        case 1:
-
-            if not re.match(
-                r"[^_]*_[A-Z]_[0-9]{3,4}_[0-9]{1,2}_[^_+]*\+[A-Z]\+[0-9]{3,4}\+[0-9]{1,2}",
-                dashx_split[0],
-            ):
-                raise UnsupportedFragalysisLongcodeError(dashx_split)
-
-            data = dashx_split[0].split("_")[:4]
-            target = None
-
-        case _:
-            mrich.var("dashx_split", dashx_split)
-            raise UnsupportedFragalysisLongcodeError(dashx_split)
-
-    match len(data):
-        case 4:
-            crystal, chain, residue_number, version = data
-        case 3:
-            crystal, chain, residue_number = data
-            version = None
-        case _:
-            raise UnsupportedFragalysisLongcodeError(data)
+    chain, residue_number, version = lig_str.split("_")
 
     residue_number = int(residue_number)
+    version = int(version)
 
-    if len(chain) != 1:
-        raise ValueError(f"{chain=}")
+    if match := re.search(r"(.*)-(\w[0-9]{4})", cryst_str):
 
-    version = int(version) if version else None
+        target_name = match.group(0)
+        crystal = match.group(1)
+
+    else:
+
+        target_name = None
+        crystal = cryst_str
 
     return dict(
-        target=target,
+        target=target_name,
         crystal=crystal,
         chain=chain,
         residue_number=residue_number,
