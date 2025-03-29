@@ -1,5 +1,6 @@
 from .tag import Tag
 from .tag_type import TagType
+
 # from .inspiration import Inspiration
 # from .inspiration_score import InspirationScore
 # from .inspiration_score_type import InspirationScoreType
@@ -9,6 +10,7 @@ from .placement import Placement
 
 from .tag_table import TagTable
 from .tag_type_table import TagTypeTable
+
 # from .inspiration_table import InspirationTable
 # from .inspiration_score_table import InspirationScoreTable
 # from .inspiration_score_type_table import InspirationScoreTypeTable

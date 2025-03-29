@@ -21,6 +21,7 @@ def endswith(text, ends):
 def get(obj, attr):
     return getattr(obj, attr)
 
+
 @register.filter("index_by")
 def index_by(value, arg):
     try:

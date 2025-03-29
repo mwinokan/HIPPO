@@ -31,6 +31,7 @@
     <script>
 
     let viewer = $3Dmol.createViewer("viewer", {controlPanel: true});
+    viewer.setBackgroundColor("a7cfee", 0.0);
 
     let sdfUrls = [{% for pose in poses %} "{% url 'pose_sdf' pose.id %}", {% endfor %}];
     let fetchPromises = [];  // Store promises
@@ -57,16 +58,10 @@
 
     // Ensure all models are loaded before rendering
     Promise.all(fetchPromises).then(() => {
-        viewer.setBackgroundColor("white", 0.0);
         viewer.zoomTo();  // Zoom to molecules
         viewer.render();  // Render AFTER all molecules load
     });
     
-    viewer.setBackgroundColor("white", 0.0);
-    // viewer.setStyle({}, { stick: {} });  // Stick representation
-    viewer.zoomTo();  // Zoom to molecule
-    viewer.render();  // Render the molecule
-
     </script>
 
     <br>

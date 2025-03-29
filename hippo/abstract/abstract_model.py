@@ -20,19 +20,25 @@ class AbstractModel(models.Model):
 
     _shorthand = None
     _name_field = None
-    
+
     _custom_detail_view = False
 
     _field_render_types = {
         # "pill": dict(type=FieldRenderType.HIDDEN, content=ContentRenderType.INSTANCE_PILL),
         "smiles": dict(
-            type=FieldRenderType.TABLE, content=ContentRenderType.TEXT_MONOSPACE, copyable=True,
+            type=FieldRenderType.TABLE,
+            content=ContentRenderType.TEXT_MONOSPACE,
+            copyable=True,
         ),
         "alias": dict(
-            type=FieldRenderType.TABLE, content=ContentRenderType.TEXT_MONOSPACE, copyable=True,
+            type=FieldRenderType.TABLE,
+            content=ContentRenderType.TEXT_MONOSPACE,
+            copyable=True,
         ),
         "inchikey": dict(
-            type=FieldRenderType.TABLE, content=ContentRenderType.TEXT_MONOSPACE, copyable=True,
+            type=FieldRenderType.TABLE,
+            content=ContentRenderType.TEXT_MONOSPACE,
+            copyable=True,
         ),
         "mol": dict(type=FieldRenderType.TABLE, content=ContentRenderType.MOL_2D_SVG),
         "metadata": dict(
@@ -237,7 +243,7 @@ class AbstractModel(models.Model):
 
         else:
             data = DEFAULTS.get(str(type(field)), None)
-            
+
             if debug:
                 mrich.debug("default", field.name, type(field), data)
 

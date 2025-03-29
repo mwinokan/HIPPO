@@ -1,6 +1,7 @@
 from .protein import Target, Structure
-from .compound import Compound #, CompoundScore, CompoundScoreType
-from .pose import Pose #, PoseScore, PoseScoreType
+from .compound import Compound  # , CompoundScore, CompoundScoreType
+from .pose import Pose  # , PoseScore, PoseScoreType
+
 # from .quoting import Quote, Supplier
 from .annotation import (
     Tag,
@@ -12,9 +13,11 @@ from .annotation import (
     # Observation,
     Placement,
 )
+
 # from .interactions import Interaction, Feature
 # from .chemistry import Solvent, Reaction, Reactant, Product
-from .resources import File #, Link
+from .resources import File  # , Link
+
 # from .projects import Campaign, Iteration
 
 MODELS = [

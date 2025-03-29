@@ -230,12 +230,21 @@ class PoseModel(AbstractModel):
     _field_render_types.update(
         {
             "origin": dict(
-            type=FieldRenderType.TABLE, content=ContentRenderType.TEXT_MONOSPACE, copyable=False,),
-            "_structures": dict(type=FieldRenderType.TABLE, content=ContentRenderType.INSTANCE_PILL, zero_index=True),
-            "_placements": dict(type=FieldRenderType.TABLE, content=ContentRenderType.INSTANCE_PILL, zero_index=True),
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.TEXT_MONOSPACE,
+                copyable=False,
+            ),
+            "_structures": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.INSTANCE_PILL,
+                zero_index=True,
+            ),
+            "_placements": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.INSTANCE_PILL,
+                zero_index=True,
+            ),
         }
-
-
     )
 
 
