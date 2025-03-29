@@ -7,9 +7,12 @@
 <div class="card">
 
     <h2 class="center">{{ object.model_pill_html|default:object|safe }}</h1>
+    
+    {% block pretable %}{% endblock %}
+
     <br>
 
-    <table>
+    <table class="responsive-text">
         <tbody>
 
             <!-- TABLE OF FIELDS -->
@@ -26,7 +29,12 @@
                     
                     {% elif render_dict.content == "ContentRenderType.TEXT_MONOSPACE" %}
 
-                        <td><span class="monospace">{{ value }}</span></td>
+                        <td>
+                            <span id="{{ field_name |add:'_text' }}" class="monospace">{{ value }}</span>
+                            {% if render_dict.copyable %}
+                                <button onclick="copyToClipboard('{{ field_name |add:'_text' }}')"><i class="fa fa-copy"></i></button>
+                            {% endif %}
+                        </td>
                     
                     {% elif render_dict.content == "ContentRenderType.INSTANCE_PILL" %}
 
@@ -34,7 +42,11 @@
 
                     {% elif render_dict.content == "ContentRenderType.MOL_2D_SVG" %}
 
-                        <td>{{ object.get_mol_svg_text|safe }}</td>
+                        <td>
+                            <div class="svg-container">
+                                {{ object.get_mol_svg_text|safe }}                                
+                            </div>
+                        </td>
 
                     {% else %}
 
@@ -49,6 +61,8 @@
             {% endfor %}
         </tbody>
     </table>
+
+    {% block posttable %}{% endblock %}
 
 </div>
     

@@ -14,15 +14,17 @@
 
     {% for pose in poses %}
         
-        <div class="model-pill" style="background:{{ colors|index_by:forloop.counter0 }};color:white;">
-            {{ pose }}
-        </div>
+        <a href="{% url 'pose_detail' pose.pk %}">
+            <div class="model-pill" style="background:{{ colors|index_by:forloop.counter0 }};color:white;">
+                {{ pose }}
+            </div>
+        </a>
 
     {% endfor %}
 
     <br>
 
-    <div class="monospace">
+    <div class="monospace" style="padding:0;">
         <div id="viewer" style="width: 100%; height: 400px; position: relative;"></div>
     </div>
     

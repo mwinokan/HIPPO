@@ -74,14 +74,32 @@ main {
     padding-botoom: 2rem;
 }
 
-.card {
-    margin: 1rem;
-    background-color: var(--color-white-overlay);
-    border-radius: 32px;
-/*    background-color: var(--color-accent);*/
-/*    opacity: 10%;*/
-    padding: 1rem 1rem;
-/*    padding: 2rem;*/
+@media screen and (min-width: 601px) {
+    .card {
+        margin: 1rem;
+        background-color: var(--color-white-overlay);
+        border-radius: 32px;
+    /*    background-color: var(--color-accent);*/
+    /*    opacity: 10%;*/
+        padding: 1rem 1rem;
+    /*    padding: 2rem;*/
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .card {
+/*        margin: 3rem;*/
+        margin-left: 0rem;
+        margin-right: 0rem;
+        margin-top: 1rem;
+        margin-bottom: 1rem;
+        background-color: var(--color-white-overlay);
+        border-radius: 32px;
+    /*    background-color: var(--color-accent);*/
+    /*    opacity: 10%;*/
+        padding: 1rem 1rem;
+    /*    padding: 2rem;*/
+    }
 }
 
 .center {
@@ -102,6 +120,8 @@ table {
     border-collapse:collapse;
     border-spacing:0;
     border:none;
+/*    padding:none;*/
+/*    margin:none;*/
     width:100%;
     display:table;
 }
@@ -161,13 +181,23 @@ table.bordered {
     background-color: var(--color-tertiary);
 }*/
 
+@media screen and (min-width: 601px) {
 th, td {
     padding:8px 32px;
     display:table-cell;
     text-align:left;
     vertical-align:middle;
     background: none;
-}
+}}
+
+@media screen and (max-width: 600px) {
+th, td {
+    padding:0px 4px;
+    display:table-cell;
+    text-align:left;
+    vertical-align:middle;
+    background: none;
+}}
 
 tr {
     width: 100%;
@@ -266,4 +296,24 @@ h2,h3,h4,h5,h6 {
 
 .checkbox {
     transform: scale(1); /* Adjust size if necessary */
+}
+
+@media screen and (min-width: 601px) { .responsive-text { font-size: 16px;  } }
+@media screen and (max-width: 600px) { .responsive-text { font-size: 12px;  } }
+@media screen and (max-width: 600px) { .hide-if-narrow { display: none !important; } }
+
+/*.mol-svg {
+    width:100%;
+    max-width: 400px;
+}*/
+
+.svg-container {
+  width: 100%; /* Adjust as needed */
+  max-width: 300px; /* Limits the SVG from growing beyond this */
+}
+
+svg {
+  width: 100%;
+  height: auto; /* Maintains aspect ratio */
+  max-width: 300px; /* Ensures it doesn't exceed this width */
 }

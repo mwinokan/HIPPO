@@ -106,23 +106,31 @@ class BaseDetailView(DetailView):
 
                     related = getattr(self.object, field_name)
 
-                    field_name = field_name.removeprefix("_")  # .capitalize()
+                    field_name = field_name#.removeprefix("_")  # .capitalize()
                     value = related
 
                 else:
 
                     members = getattr(self.object, field.name).all()
 
-                    field_name = field_name.removeprefix("_").capitalize()
+                    field_name = field_name#.removeprefix("_") .capitalize()
                     value = members
 
                 if value is None:
                     continue
 
+                if render_dict.get("zero_index", False):
+                    value = members[0]
+
                 elif hasattr(value, "__len__") and len(value) == 0:
                     continue
 
                 fields.append((field_name, value, render_dict))
+
+            fields = sorted(fields, key=lambda x: x[0].count("_"))
+            fields = [(x[0].removeprefix("_"), x[1], x[2]) for x in fields]
+
+            mrich.print(fields)
 
             context["fields"] = fields
 

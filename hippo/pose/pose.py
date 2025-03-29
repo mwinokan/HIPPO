@@ -24,5 +24,6 @@ class Pose(PoseModel):
 
         # transparent background
         value = re.sub(r"<rect style='opacity:1.0;fill:#FFFFFF.*> <\/rect>", "", value)
+        value = re.sub(r"<\?xml version='1\.0' encoding='iso-8859-1'\?>", "", value)
 
         return value

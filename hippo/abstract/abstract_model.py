@@ -26,10 +26,13 @@ class AbstractModel(models.Model):
     _field_render_types = {
         # "pill": dict(type=FieldRenderType.HIDDEN, content=ContentRenderType.INSTANCE_PILL),
         "smiles": dict(
-            type=FieldRenderType.TABLE, content=ContentRenderType.TEXT_MONOSPACE
+            type=FieldRenderType.TABLE, content=ContentRenderType.TEXT_MONOSPACE, copyable=True,
+        ),
+        "alias": dict(
+            type=FieldRenderType.TABLE, content=ContentRenderType.TEXT_MONOSPACE, copyable=True,
         ),
         "inchikey": dict(
-            type=FieldRenderType.TABLE, content=ContentRenderType.TEXT_MONOSPACE
+            type=FieldRenderType.TABLE, content=ContentRenderType.TEXT_MONOSPACE, copyable=True,
         ),
         "mol": dict(type=FieldRenderType.TABLE, content=ContentRenderType.MOL_2D_SVG),
         "metadata": dict(
@@ -159,11 +162,12 @@ class AbstractModel(models.Model):
 
     @property
     def model_pill_html(self):
-        return f"""
-        <div class="model-pill" 
-        style="background:var(--color-{self.__name__.lower()}, var(--color-{self._parent_module}));
-        color:var(--text-color-{self.__name__.lower()}, var(--text-color-{self._parent_module}));">
-        {self}</div>"""
+        return f"""<div class="model-pill" style="
+        background:var(--color-{self.__name__.lower()}, 
+                   var(--color-{self._parent_module}));
+        color:var(--text-color-{self.__name__.lower()}, 
+              var(--text-color-{self._parent_module}));
+        ">{self}</div>"""
 
     # @property
     # def wrapped_field_names(self):
@@ -223,13 +227,19 @@ class AbstractModel(models.Model):
         self.full_clean()
         self.save()
 
-    def get_field_render_type(self, field):
+    def get_field_render_type(self, field, debug: bool = False):
 
         if field.name in self._field_render_types:
             data = self._field_render_types[field.name]
 
+            if debug:
+                mrich.debug("custom", field.name, type(field), data)
+
         else:
             data = DEFAULTS.get(str(type(field)), None)
+            
+            if debug:
+                mrich.debug("default", field.name, type(field), data)
 
         if not data:
             data = {}
