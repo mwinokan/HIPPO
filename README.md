@@ -5,7 +5,7 @@ HIPPO
 
 > 🦛 Hit Interaction Profiling for Procurement Optimisation
 
-HIPPO is still in alpha development and is not recommended for public use.
+HIPPO is still in beta development and feedback is appreciated.
 
 ![GitHub Tag](https://img.shields.io/github/v/tag/mwinokan/hippo?include_prereleases&label=PyPI&link=https%3A%2F%2Fpypi.org%2Fproject%2Fhippo-db%2F)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/mwinokan/HIPPO/python-publish.yml?label=publish&link=https%3A%2F%2Fgithub.com%2Fmwinokan%2FHIPPO%2Factions%2Fworkflows%2Fpython-publish.yml)
