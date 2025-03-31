@@ -81,11 +81,24 @@ def pose_compare(request, pks: str):
     pk_list = pks.split(",")
 
     # Fetch poses from the database
-    poses = get_list_or_404(Pose, pk__in=pk_list)
+
+    poses = Pose.filter(pk__in=pk_list)
+
+    # poses = get_list_or_404(Pose, pk__in=pk_list)
+
+    context = {
+        "poses": poses,
+        "colors": ["orange", "blue", "green", "yellow", "red"],
+        "num_poses": len(poses),
+        "last_index": len(poses) - 1,
+    }
+
+    context["mocassin"] = poses.score_set(method="mocassin")
+
     return render(
         request,
         "pose_compare.html",
-        {"poses": poses, "colors": ["orange", "blue", "green", "yellow", "red"]},
+        context,
     )
 
 

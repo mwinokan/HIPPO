@@ -7,22 +7,17 @@
 <script src="https://3Dmol.org/build/3Dmol-min.js"></script>     
 <script src="https://3Dmol.org/build/3Dmol.ui-min.js"></script>     
  
-
 <div class="card">
 
     <h2 class="center">Pose Comparison</h2>
 
-    {% for pose in poses %}
-        
-        <a href="{% url 'pose_detail' pose.pk %}">
-            <div class="model-pill" style="background:{{ colors|index_by:forloop.counter0 }};color:white;">
-                {{ pose }}
-            </div>
-        </a>
+    <div class="center" style="padding-bottom:1rem;">
+        {% for pose in poses %}
+            
+            <a href="{% url 'pose_detail' pose.pk %}"><div class="model-pill" style="background:{{ colors|index_by:forloop.counter0 }};color:white;">{{ pose }}</div></a>
 
-    {% endfor %}
-
-    <br>
+        {% endfor %}
+    </div>
 
     <div class="monospace" style="padding:0;">
         <div id="viewer" style="width: 100%; height: 400px; position: relative;"></div>
@@ -53,7 +48,6 @@
         
         fetchPromises.push(fetchPromise);
 
-        
     });
 
     // Ensure all models are loaded before rendering
@@ -65,6 +59,40 @@
     </script>
 
     <br>
+
+    <h2>MoCASSIn Score</h2>
+
+    <table>
+        <tbody>
+            <tr>
+                <td>References</td>
+                <td>
+                    {% for pose in poses %}
+                        {% if forloop.counter0 != last_index %}
+                            {{ pose }}
+                        {% endif %}
+                    {% endfor %}
+                </td>
+            </tr>
+            <tr>
+                <td>Query</td>
+                <td>{{ poses|index_by:last_index }} </td>
+            </tr>
+
+            <tr>
+                <td>Combined</td>
+                <td>{{ mocassin.combined|mul:100|floatformat:2 }}%</td>
+            </tr>
+            <tr>
+                <td>Shape</td>
+                <td>{{ mocassin.shape|mul:100|floatformat:2 }}%</td>
+            </tr>
+            <tr>
+                <td>Feature</td>
+                <td>{{ mocassin.feature|mul:100|floatformat:2 }}%</td>
+            </tr>
+        </tbody>
+    </table>
 
 <button><a href="{% url 'pose_list' %}">Back to List</a></button>
 
