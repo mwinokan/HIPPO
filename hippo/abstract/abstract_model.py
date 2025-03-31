@@ -279,7 +279,7 @@ class AbstractModel(models.Model):
     #         super().__setattr__("_auto_save", True)
 
     def get_admin_url(self):
-        return reverse(f"admin:hippo_{self.__name__.lower()}_change", args=[(self.id)])
+        return reverse(f"admin:hippo_{self.__name__.lower()}_change", args=[self.id])
 
     ### DUNDERS
 
