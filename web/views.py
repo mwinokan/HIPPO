@@ -99,6 +99,8 @@ from django.apps import apps
 
 class BaseDetailView(DetailView):
 
+    _uri_param_str = "<int:pk>"
+
     def get_context_data(self, **kwargs):
 
         context = super().get_context_data(**kwargs)
@@ -132,7 +134,11 @@ class BaseDetailView(DetailView):
                 continue
 
             if render_dict.get("zero_index", False):
-                value = members[0]
+
+                if members:
+                    value = members[0]
+                else:
+                    continue
 
             elif hasattr(value, "__len__") and len(value) == 0:
                 continue
@@ -141,8 +147,6 @@ class BaseDetailView(DetailView):
 
         fields = sorted(fields, key=lambda x: x[0].count("_"))
         fields = [(x[0].removeprefix("_"), x[1], x[2]) for x in fields]
-
-        mrich.print(fields)
 
         context["fields"] = fields
 
@@ -235,6 +239,8 @@ class PoseDetailView(BaseDetailView):
     model = Pose
     template_name = f"pose_detail.html"
     context_object_name = f"pose_detail"
+
+    _uri_param_str = "<str:value>"
 
     def get_object(self):
 

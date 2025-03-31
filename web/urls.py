@@ -21,12 +21,10 @@ from . import views
 
 urlpatterns = [
     # index
-    # path("", include("hippo.urls")),
     path("", views.index, name="index"),
     # admin
     path("admin/", admin.site.urls),
-    # path("targets/", views.TargetListView.as_view(), name="target-list"),
-    # path("target/<int:pk>/", views.TargetDetailView.as_view(), name="target-detail"),
+    # custom views
     path("pose_sdf/<int:pk>/", views.pose_sdf, name="pose_sdf"),
     path("pose_compare/<str:pks>/", views.pose_compare, name="pose_compare"),
 ]
@@ -47,10 +45,16 @@ for model_name, model_views in views.GENERATED_VIEWS.items():
     detail_view = model_views.get("detail_view", None)
 
     if detail_view:
+
+        uri_params = detail_view._uri_param_str
+        uri = f"{model_name}/{uri_params}/"
+
+        detail_view = detail_view.as_view()
+
         urlpatterns.append(
             path(
-                f"{model_name}/<str:value>/",
-                model_views["detail_view"].as_view(),
+                uri,
+                detail_view,
                 name=f"{model_name}_detail",
             )
         )
