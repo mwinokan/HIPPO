@@ -20,3 +20,11 @@ def endswith(text, ends):
 @register.filter("get")
 def get(obj, attr):
     return getattr(obj, attr)
+
+
+@register.filter("index_by")
+def index_by(value, arg):
+    try:
+        return value[arg]
+    except IndexError:
+        return None

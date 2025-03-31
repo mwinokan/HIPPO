@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% load custom_tags %}
+
+{% block content %}
+
+<script src="https://3Dmol.org/build/3Dmol-min.js"></script>     
+<script src="https://3Dmol.org/build/3Dmol.ui-min.js"></script>     
+ 
+
+<div class="card">
+
+    <h2 class="center">Pose Comparison</h2>
+
+    {% for pose in poses %}
+        
+        <a href="{% url 'pose_detail' pose.pk %}">
+            <div class="model-pill" style="background:{{ colors|index_by:forloop.counter0 }};color:white;">
+                {{ pose }}
+            </div>
+        </a>
+
+    {% endfor %}
+
+    <br>
+
+    <div class="monospace" style="padding:0;">
+        <div id="viewer" style="width: 100%; height: 400px; position: relative;"></div>
+    </div>
+    
+    <script>
+
+    let viewer = $3Dmol.createViewer("viewer", {controlPanel: true});
+    viewer.setBackgroundColor("a7cfee", 0.0);
+
+    let sdfUrls = [{% for pose in poses %} "{% url 'pose_sdf' pose.id %}", {% endfor %}];
+    let fetchPromises = [];  // Store promises
+
+    let colorList = ['orange', 'blue', 'green', 'yellow', 'red'];
+
+    sdfUrls.forEach((url, index) => {
+
+        let color = colorList[index % colorList.length];
+
+        let fetchPromise = fetch(url)
+            .then(response => response.text())
+            .then(sdfData => {
+                viewer.addModel(sdfData, "sdf");  // Add each molecule
+                viewer.setStyle({model: -1}, { stick: {} });  // Stick representation
+                viewer.setStyle({model: -1, elem: "C"}, { stick: { color: color} });  // Stick representation
+            })
+            .catch(error => console.error("Error loading SDF:", error));
+        
+        fetchPromises.push(fetchPromise);
+
+        
+    });
+
+    // Ensure all models are loaded before rendering
+    Promise.all(fetchPromises).then(() => {
+        viewer.zoomTo();  // Zoom to molecules
+        viewer.render();  // Render AFTER all molecules load
+    });
+    
+    </script>
+
+    <br>
+
+<button><a href="{% url 'pose_list' %}">Back to List</a></button>
+
+{% endblock %}

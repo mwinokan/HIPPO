@@ -1,0 +1,31 @@
+{% extends "model_detail.html" %}
+
+{% load custom_tags %}
+
+{% block pretable %} 
+
+<br>
+
+<div class="monospace" style="padding:0;">
+    <div id="viewer" style="width: 100%; height: 400px; position: relative;"></div>
+</div>
+
+<script>
+    let sdfUrl = "{% url 'pose_sdf' object.pk %}";  // Fetch SDF
+
+    fetch(sdfUrl)
+        .then(response => response.text())
+        .then(sdfData => {
+            let viewer = $3Dmol.createViewer("viewer");
+            viewer.addModel(sdfData, "sdf");  // Add SDF model
+            viewer.setBackgroundColor("a7cfee", 0.0)
+            viewer.setStyle({}, { stick: {} });  // Stick representation
+            viewer.setStyle({ elem: "C" }, { stick: { color: "white" } });  // recolor carbons
+            viewer.zoomTo();  // Zoom to molecule
+            viewer.render();  // Render the molecule
+        })
+        .catch(error => console.error("Error loading SDF:", error));
+
+</script>
+
+{% endblock %}

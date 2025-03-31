@@ -105,24 +105,24 @@ class CompoundModel(AbstractModel):
         db_persist=True,
     )
 
-    _suppliers = models.ManyToManyField(
-        "Supplier",
-        through="Quote",
-        through_fields=("compound", "supplier"),
-        related_name="_compounds",
-    )
+    # _suppliers = models.ManyToManyField(
+    #     "Supplier",
+    #     through="Quote",
+    #     through_fields=("compound", "supplier"),
+    #     related_name="_compounds",
+    # )
 
     _scaffolds = models.ManyToManyField(
         "Compound", related_name="_elaborations", blank=True
     )
     _tags = models.ManyToManyField("Tag", related_name="_compounds", blank=True)
 
-    _score_types = models.ManyToManyField(
-        "CompoundScoreType",
-        through="CompoundScore",
-        through_fields=("compound", "score_type"),
-        related_name="_compounds",
-    )
+    # _score_types = models.ManyToManyField(
+    #     "CompoundScoreType",
+    #     through="CompoundScore",
+    #     through_fields=("compound", "score_type"),
+    #     related_name="_compounds",
+    # )
 
     _shorthand = "C"
     _name_field = "alias"
@@ -139,28 +139,28 @@ class CompoundModel(AbstractModel):
     # _list_view_fields += [ "" ]
 
 
-class CompoundScoreTypeModel(AbstractModel):
-    class Meta:
-        abstract = True
+# class CompoundScoreTypeModel(AbstractModel):
+#     class Meta:
+#         abstract = True
 
-    name = models.CharField(max_length=30)
-    method = models.CharField(max_length=30)
-    unit = models.CharField(max_length=30)
-    description = models.CharField(max_length=120)
+#     name = models.CharField(max_length=30)
+#     method = models.CharField(max_length=30)
+#     unit = models.CharField(max_length=30)
+#     description = models.CharField(max_length=120)
 
 
-class CompoundScoreModel(AbstractModel):
-    class Meta:
-        abstract = True
+# class CompoundScoreModel(AbstractModel):
+#     class Meta:
+#         abstract = True
 
-    compound = models.ForeignKey(
-        "Compound", on_delete=models.CASCADE, related_name="_scores"
-    )
-    score_type = models.ForeignKey(
-        "CompoundScoreType", on_delete=models.CASCADE, related_name="_values"
-    )
+#     compound = models.ForeignKey(
+#         "Compound", on_delete=models.CASCADE, related_name="_scores"
+#     )
+#     score_type = models.ForeignKey(
+#         "CompoundScoreType", on_delete=models.CASCADE, related_name="_values"
+#     )
 
-    value = models.FloatField()
+#     value = models.FloatField()
 
 
 ### LIGAND (3D)
@@ -208,262 +208,283 @@ class PoseModel(AbstractModel):
         max_length=10, choices=[(k, v) for k, v in POSE_ORIGINS.items()]
     )
 
-    _score_types = models.ManyToManyField(
-        "PoseScoreType",
-        through="PoseScore",
-        through_fields=("pose", "score_type"),
-        related_name="_poses",
-    )
+    # _score_types = models.ManyToManyField(
+    #     "PoseScoreType",
+    #     through="PoseScore",
+    #     through_fields=("pose", "score_type"),
+    #     related_name="_poses",
+    # )
 
-    _inspirations = models.ManyToManyField(
-        "Pose",
-        through="Inspiration",
-        through_fields=("original", "derivative"),
-        related_name="_derivatives",
-    )
+    # _inspirations = models.ManyToManyField(
+    #     "Pose",
+    #     through="Inspiration",
+    #     through_fields=("original", "derivative"),
+    #     related_name="_derivatives",
+    # )
     _tags = models.ManyToManyField("Tag", related_name="_poses")
 
     _shorthand = "P"
     _name_field = "alias"
 
-
-class PoseScoreTypeModel(AbstractModel):
-    class Meta:
-        abstract = True
-
-    name = models.CharField(max_length=30)
-    method = models.CharField(max_length=30)
-    unit = models.CharField(max_length=30)
-    description = models.CharField(max_length=120)
-
-
-class PoseScoreModel(AbstractModel):
-
-    class Meta:
-        abstract = True
-
-    pose = models.ForeignKey("Pose", on_delete=models.CASCADE, related_name="_scores")
-    score_type = models.ForeignKey(
-        "PoseScoreType", on_delete=models.CASCADE, related_name="_values"
+    _field_render_types = AbstractModel._field_render_types.copy()
+    _field_render_types.update(
+        {
+            "origin": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.TEXT_MONOSPACE,
+                copyable=False,
+            ),
+            "_structures": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.INSTANCE_PILL,
+                zero_index=True,
+            ),
+            "_placements": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.INSTANCE_PILL,
+                zero_index=True,
+            ),
+        }
     )
 
-    value = models.FloatField()
+
+# class PoseScoreTypeModel(AbstractModel):
+#     class Meta:
+#         abstract = True
+
+#     name = models.CharField(max_length=30)
+#     method = models.CharField(max_length=30)
+#     unit = models.CharField(max_length=30)
+#     description = models.CharField(max_length=120)
+
+
+# class PoseScoreModel(AbstractModel):
+
+#     class Meta:
+#         abstract = True
+
+#     pose = models.ForeignKey("Pose", on_delete=models.CASCADE, related_name="_scores")
+#     score_type = models.ForeignKey(
+#         "PoseScoreType", on_delete=models.CASCADE, related_name="_values"
+#     )
+
+#     value = models.FloatField()
 
 
 ### INTERACTIONS
 
 
-class FeatureModel(AbstractModel):
+# class FeatureModel(AbstractModel):
 
-    class Meta:
-        app_label = "hippo"
-        abstract = True
-        unique_together = (
-            "family",
-            "target",
-            "chain_name",
-            "residue_name",
-            "residue_number",
-            "atom_names",
-        )
+#     class Meta:
+#         app_label = "hippo"
+#         abstract = True
+#         unique_together = (
+#             "family",
+#             "target",
+#             "chain_name",
+#             "residue_name",
+#             "residue_number",
+#             "atom_names",
+#         )
 
-    family = models.CharField(max_length=30, choices={f: f for f in FEATURE_FAMILIES})
+#     family = models.CharField(max_length=30, choices={f: f for f in FEATURE_FAMILIES})
 
-    target = models.ForeignKey(
-        "Target",
-        on_delete=models.CASCADE,
-        related_name="_features",
-    )
+#     target = models.ForeignKey(
+#         "Target",
+#         on_delete=models.CASCADE,
+#         related_name="_features",
+#     )
 
-    chain_name = models.CharField(max_length=5)
-    residue_name = models.CharField(max_length=10)
-    residue_number = models.SmallIntegerField()
-    atom_names = models.JSONField(default=dict)  # TODO: Validate as list
+#     chain_name = models.CharField(max_length=5)
+#     residue_name = models.CharField(max_length=10)
+#     residue_number = models.SmallIntegerField()
+#     atom_names = models.JSONField(default=dict)  # TODO: Validate as list
 
-    _shorthand = "F"
-    _name_field = "family"
+#     _shorthand = "F"
+#     _name_field = "family"
 
 
-class InteractionModel(AbstractModel):
-    class Meta:
-        app_label = "hippo"
-        abstract = True
-        unique_together = ("feature", "pose", "type", "family")
+# class InteractionModel(AbstractModel):
+#     class Meta:
+#         app_label = "hippo"
+#         abstract = True
+#         unique_together = ("feature", "pose", "type", "family")
 
-    family = models.CharField(max_length=30, choices={f: f for f in FEATURE_FAMILIES})
-    type = models.CharField(
-        max_length=30, choices={f: f for f in INTERACTION_TYPES.values()}
-    )
+#     family = models.CharField(max_length=30, choices={f: f for f in FEATURE_FAMILIES})
+#     type = models.CharField(
+#         max_length=30, choices={f: f for f in INTERACTION_TYPES.values()}
+#     )
 
-    pose = models.ForeignKey(
-        "Pose", on_delete=models.CASCADE, related_name="_interactions"
-    )
+#     pose = models.ForeignKey(
+#         "Pose", on_delete=models.CASCADE, related_name="_interactions"
+#     )
 
-    structure = models.ForeignKey(
-        "Structure", on_delete=models.CASCADE, related_name="_interactions"
-    )
+#     structure = models.ForeignKey(
+#         "Structure", on_delete=models.CASCADE, related_name="_interactions"
+#     )
 
-    feature = models.ForeignKey(
-        "Feature", on_delete=models.RESTRICT, related_name="_interactions"
-    )
+#     feature = models.ForeignKey(
+#         "Feature", on_delete=models.RESTRICT, related_name="_interactions"
+#     )
 
-    atom_ids = models.JSONField(default=dict, validators=[validate_list_of_integers])
-    prot_coord = models.JSONField(default=dict, validators=[validate_coord])
-    lig_coord = models.JSONField(default=dict, validators=[validate_coord])
-    distance = models.FloatField(validators=[MinValueValidator(0.0)])
-    angle = models.FloatField(
-        blank=True,
-        null=True,
-        validators=[MinValueValidator(0.0), MaxValueValidator(360)],
-    )
-    energy = models.FloatField(blank=True, null=True)
+#     atom_ids = models.JSONField(default=dict, validators=[validate_list_of_integers])
+#     prot_coord = models.JSONField(default=dict, validators=[validate_coord])
+#     lig_coord = models.JSONField(default=dict, validators=[validate_coord])
+#     distance = models.FloatField(validators=[MinValueValidator(0.0)])
+#     angle = models.FloatField(
+#         blank=True,
+#         null=True,
+#         validators=[MinValueValidator(0.0), MaxValueValidator(360)],
+#     )
+#     energy = models.FloatField(blank=True, null=True)
 
-    _shorthand = "I"
-    _name_field = "type"
+#     _shorthand = "I"
+#     _name_field = "type"
 
 
 ### PROCUREMENT
 
 
-class QuoteModel(AbstractModel):
-    class Meta:
-        app_label = "hippo"
-        abstract = True
-        unique_together = ("amount", "supplier", "catalogue", "entry")
+# class QuoteModel(AbstractModel):
+#     class Meta:
+#         app_label = "hippo"
+#         abstract = True
+#         unique_together = ("amount", "supplier", "catalogue", "entry")
 
-    amount = models.FloatField(validators=[MinValueValidator(0.0)])
-    catalogue = models.CharField(max_length=60, blank=True)
-    entry = models.CharField(max_length=60, blank=True)
-    lead_time = models.FloatField(
-        validators=[MinValueValidator(0.0)], blank=True, null=True
-    )
-    price = models.DecimalField(
-        validators=[MinValueValidator(0.0)],
-        blank=True,
-        null=True,
-        max_digits=8,
-        decimal_places=2,
-    )
-    currency = models.CharField(max_length=3, blank=True, choices=CURRENCIES)
-    date = models.DateField(default=date.today)
+#     amount = models.FloatField(validators=[MinValueValidator(0.0)])
+#     catalogue = models.CharField(max_length=60, blank=True)
+#     entry = models.CharField(max_length=60, blank=True)
+#     lead_time = models.FloatField(
+#         validators=[MinValueValidator(0.0)], blank=True, null=True
+#     )
+#     price = models.DecimalField(
+#         validators=[MinValueValidator(0.0)],
+#         blank=True,
+#         null=True,
+#         max_digits=8,
+#         decimal_places=2,
+#     )
+#     currency = models.CharField(max_length=3, blank=True, choices=CURRENCIES)
+#     date = models.DateField(default=date.today)
 
-    compound = models.ForeignKey(
-        "Compound", on_delete=models.RESTRICT, related_name="_quotes"
-    )
+#     compound = models.ForeignKey(
+#         "Compound", on_delete=models.RESTRICT, related_name="_quotes"
+#     )
 
-    supplier = models.ForeignKey(
-        "Supplier", on_delete=models.RESTRICT, related_name="_quotes"
-    )
+#     supplier = models.ForeignKey(
+#         "Supplier", on_delete=models.RESTRICT, related_name="_quotes"
+#     )
 
-    purity = models.FloatField(
-        blank=True,
-        null=True,
-        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
-    )
+#     purity = models.FloatField(
+#         blank=True,
+#         null=True,
+#         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
+#     )
 
-    _shorthand = "Q"
+#     _shorthand = "Q"
 
 
-class SupplierModel(AbstractModel):
-    class Meta:
-        app_label = "hippo"
-        abstract = True
+# class SupplierModel(AbstractModel):
+#     class Meta:
+#         app_label = "hippo"
+#         abstract = True
 
-    name = models.CharField(max_length=30, unique=True)
+#     name = models.CharField(max_length=30, unique=True)
 
-    _name_field = "name"
+#     _name_field = "name"
 
 
 ### CHEMISTRY
 
 
-class ReactionModel(AbstractModel):
-    class Meta:
-        app_label = "hippo"
-        abstract = True
+# class ReactionModel(AbstractModel):
+#     class Meta:
+#         app_label = "hippo"
+#         abstract = True
 
-    type = models.CharField(max_length=60, blank=False)
+#     type = models.CharField(max_length=60, blank=False)
 
-    _product_compounds = models.ManyToManyField(
-        "Compound",
-        through="Product",
-        through_fields=("reaction", "compound"),
-        related_name="_product_reactions",
-    )
+#     _product_compounds = models.ManyToManyField(
+#         "Compound",
+#         through="Product",
+#         through_fields=("reaction", "compound"),
+#         related_name="_product_reactions",
+#     )
 
-    yield_fraction = models.FloatField(
-        default=1.0, validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
-    )
+#     yield_fraction = models.FloatField(
+#         default=1.0, validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
+#     )
 
-    _reactant_compounds = models.ManyToManyField(
-        "Compound",
-        through="Reactant",
-        through_fields=("reaction", "compound"),
-        related_name="_reactant_reactions",
-    )
+#     _reactant_compounds = models.ManyToManyField(
+#         "Compound",
+#         through="Reactant",
+#         through_fields=("reaction", "compound"),
+#         related_name="_reactant_reactions",
+#     )
 
-    _shorthand = "R"
-    _name_field = "type"
-
-
-class ProductModel(AbstractModel):
-    class Meta:
-        app_label = "hippo"
-        abstract = True
-        unique_together = ("reaction", "compound")
-
-    amount = models.FloatField(default=1.0, validators=[MinValueValidator(0.0)])
-
-    reaction = models.ForeignKey(
-        "Reaction",
-        on_delete=models.CASCADE,
-        related_name="_products",
-    )
-
-    compound = models.ForeignKey(
-        "Compound", on_delete=models.RESTRICT, related_name="_reaction_products"
-    )
-
-    solvent = models.ForeignKey(
-        "Solvent",
-        null=True,
-        blank=True,
-        on_delete=models.RESTRICT,
-        related_name="_products",
-    )
+#     _shorthand = "R"
+#     _name_field = "type"
 
 
-class ReactantModel(AbstractModel):
-    class Meta:
-        app_label = "hippo"
-        abstract = True
-        unique_together = ("reaction", "compound")
+# class ProductModel(AbstractModel):
+#     class Meta:
+#         app_label = "hippo"
+#         abstract = True
+#         unique_together = ("reaction", "compound")
 
-    amount = models.FloatField(default=1.0, validators=[MinValueValidator(0.0)])
-    reaction = models.ForeignKey(
-        "Reaction", on_delete=models.CASCADE, related_name="_reactants"
-    )
-    compound = models.ForeignKey(
-        "Compound", on_delete=models.RESTRICT, related_name="_reaction_reactants"
-    )
+#     amount = models.FloatField(default=1.0, validators=[MinValueValidator(0.0)])
 
-    solvent = models.ForeignKey(
-        "Solvent",
-        null=True,
-        blank=True,
-        on_delete=models.RESTRICT,
-        related_name="_reactants",
-    )
+#     reaction = models.ForeignKey(
+#         "Reaction",
+#         on_delete=models.CASCADE,
+#         related_name="_products",
+#     )
+
+#     compound = models.ForeignKey(
+#         "Compound", on_delete=models.RESTRICT, related_name="_reaction_products"
+#     )
+
+#     solvent = models.ForeignKey(
+#         "Solvent",
+#         null=True,
+#         blank=True,
+#         on_delete=models.RESTRICT,
+#         related_name="_products",
+#     )
 
 
-class SolventModel(AbstractModel):
-    class Meta:
-        app_label = "hippo"
-        abstract = True
+# class ReactantModel(AbstractModel):
+#     class Meta:
+#         app_label = "hippo"
+#         abstract = True
+#         unique_together = ("reaction", "compound")
 
-    name = models.CharField(max_length=30, unique=True)
+#     amount = models.FloatField(default=1.0, validators=[MinValueValidator(0.0)])
+#     reaction = models.ForeignKey(
+#         "Reaction", on_delete=models.CASCADE, related_name="_reactants"
+#     )
+#     compound = models.ForeignKey(
+#         "Compound", on_delete=models.RESTRICT, related_name="_reaction_reactants"
+#     )
 
-    _name_field = "name"
+#     solvent = models.ForeignKey(
+#         "Solvent",
+#         null=True,
+#         blank=True,
+#         on_delete=models.RESTRICT,
+#         related_name="_reactants",
+#     )
+
+
+# class SolventModel(AbstractModel):
+#     class Meta:
+#         app_label = "hippo"
+#         abstract = True
+
+#     name = models.CharField(max_length=30, unique=True)
+
+#     _name_field = "name"
 
 
 ### ANNOTATION
@@ -494,87 +515,87 @@ class TagTypeModel(AbstractModel):
     _name_field = "name"
 
 
-class InspirationModel(AbstractModel):
-    class Meta:
-        abstract = True
+# class InspirationModel(AbstractModel):
+#     class Meta:
+#         abstract = True
 
-    original = models.ForeignKey("Pose", on_delete=models.CASCADE, related_name="+")
+#     original = models.ForeignKey("Pose", on_delete=models.CASCADE, related_name="+")
 
-    derivative = models.ForeignKey("Pose", on_delete=models.CASCADE, related_name="+")
+#     derivative = models.ForeignKey("Pose", on_delete=models.CASCADE, related_name="+")
 
-    _score_types = models.ManyToManyField(
-        "InspirationScoreType",
-        through="InspirationScore",
-        through_fields=("inspiration", "score_type"),
-        related_name="_inspirations",
-    )
-
-
-class InspirationScoreTypeModel(AbstractModel):
-    class Meta:
-        abstract = True
-
-    name = models.CharField(max_length=30)
-    method = models.CharField(max_length=30)
-    unit = models.CharField(max_length=30)
-    description = models.CharField(max_length=120)
+#     _score_types = models.ManyToManyField(
+#         "InspirationScoreType",
+#         through="InspirationScore",
+#         through_fields=("inspiration", "score_type"),
+#         related_name="_inspirations",
+#     )
 
 
-class InspirationScoreModel(AbstractModel):
-    class Meta:
-        abstract = True
+# class InspirationScoreTypeModel(AbstractModel):
+#     class Meta:
+#         abstract = True
 
-    inspiration = models.ForeignKey(
-        "Inspiration", on_delete=models.CASCADE, related_name="_scores"
-    )
-    score_type = models.ForeignKey(
-        "InspirationScoreType", on_delete=models.CASCADE, related_name="_values"
-    )
-
-    value = models.FloatField()
+#     name = models.CharField(max_length=30)
+#     method = models.CharField(max_length=30)
+#     unit = models.CharField(max_length=30)
+#     description = models.CharField(max_length=120)
 
 
-class SubsiteModel(AbstractModel):
-    class Meta:
-        app_label = "hippo"
-        abstract = True
-        unique_together = ("target", "name")
+# class InspirationScoreModel(AbstractModel):
+#     class Meta:
+#         abstract = True
 
-    target = models.ForeignKey(
-        "Target", on_delete=models.CASCADE, related_name="_subsites"
-    )
-    name = models.CharField(max_length=30)
-    description = models.CharField(max_length=120, blank=True, null=True)
-    metadata = models.JSONField(default=dict, blank=True)
+#     inspiration = models.ForeignKey(
+#         "Inspiration", on_delete=models.CASCADE, related_name="_scores"
+#     )
+#     score_type = models.ForeignKey(
+#         "InspirationScoreType", on_delete=models.CASCADE, related_name="_values"
+#     )
 
-    # _poses M2M field defined on
-
-    _poses = models.ManyToManyField(
-        "Pose",
-        through="Observation",
-        through_fields=("subsite", "pose"),
-        related_name="_subsites",
-    )
-
-    _name_field = "name"
+#     value = models.FloatField()
 
 
-class ObservationModel(AbstractModel):
-    class Meta:
-        app_label = "hippo"
-        abstract = True
-        unique_together = ("subsite", "pose")
+# class SubsiteModel(AbstractModel):
+#     class Meta:
+#         app_label = "hippo"
+#         abstract = True
+#         unique_together = ("target", "name")
 
-    subsite = models.ForeignKey(
-        "Subsite", on_delete=models.RESTRICT, related_name="_observations"
-    )
-    pose = models.ForeignKey(
-        "Pose", on_delete=models.CASCADE, related_name="_observations"
-    )
-    atom_ids = models.JSONField(default=dict)  # TODO: validation
-    metadata = models.JSONField(default=dict, blank=True)
+#     target = models.ForeignKey(
+#         "Target", on_delete=models.CASCADE, related_name="_subsites"
+#     )
+#     name = models.CharField(max_length=30)
+#     description = models.CharField(max_length=120, blank=True, null=True)
+#     metadata = models.JSONField(default=dict, blank=True)
 
-    _shorthand = "O"
+#     # _poses M2M field defined on
+
+#     _poses = models.ManyToManyField(
+#         "Pose",
+#         through="Observation",
+#         through_fields=("subsite", "pose"),
+#         related_name="_subsites",
+#     )
+
+#     _name_field = "name"
+
+
+# class ObservationModel(AbstractModel):
+#     class Meta:
+#         app_label = "hippo"
+#         abstract = True
+#         unique_together = ("subsite", "pose")
+
+#     subsite = models.ForeignKey(
+#         "Subsite", on_delete=models.RESTRICT, related_name="_observations"
+#     )
+#     pose = models.ForeignKey(
+#         "Pose", on_delete=models.CASCADE, related_name="_observations"
+#     )
+#     atom_ids = models.JSONField(default=dict)  # TODO: validation
+#     metadata = models.JSONField(default=dict, blank=True)
+
+#     _shorthand = "O"
 
 
 class PlacementModel(AbstractModel):
@@ -654,217 +675,217 @@ class FileModel(AbstractModel):
     _name_field = "name"
 
 
-class LinkModel(AbstractModel):
-    class Meta:
-        abstract = True
+# class LinkModel(AbstractModel):
+#     class Meta:
+#         abstract = True
 
-    url = models.CharField(max_length=300)
-    description = models.CharField(max_length=300)
+#     url = models.CharField(max_length=300)
+#     description = models.CharField(max_length=300)
 
-    _iterations = models.ManyToManyField("Iteration", related_name="_links", blank=True)
-    _poses = models.ManyToManyField("Pose", related_name="_links", blank=True)
-    _targets = models.ManyToManyField("Target", related_name="_links", blank=True)
-    _campaigns = models.ManyToManyField("Campaign", related_name="_links", blank=True)
-    _subsites = models.ManyToManyField("Subsite", related_name="_links", blank=True)
-    _structures = models.ManyToManyField("Structure", related_name="_links", blank=True)
-    _files = models.ManyToManyField("File", related_name="_links", blank=True)
-    _tags = models.ManyToManyField("Tag", related_name="_links", blank=True)
-    _posescoretypes = models.ManyToManyField(
-        "PoseScoreType", related_name="_links", blank=True
-    )
-    _compounds = models.ManyToManyField("Compound", related_name="_links", blank=True)
-    _suppliers = models.ManyToManyField("Supplier", related_name="_links", blank=True)
-    _quotes = models.ManyToManyField("Quote", related_name="_links", blank=True)
+#     _iterations = models.ManyToManyField("Iteration", related_name="_links", blank=True)
+#     _poses = models.ManyToManyField("Pose", related_name="_links", blank=True)
+#     _targets = models.ManyToManyField("Target", related_name="_links", blank=True)
+#     _campaigns = models.ManyToManyField("Campaign", related_name="_links", blank=True)
+#     _subsites = models.ManyToManyField("Subsite", related_name="_links", blank=True)
+#     _structures = models.ManyToManyField("Structure", related_name="_links", blank=True)
+#     _files = models.ManyToManyField("File", related_name="_links", blank=True)
+#     _tags = models.ManyToManyField("Tag", related_name="_links", blank=True)
+#     _posescoretypes = models.ManyToManyField(
+#         "PoseScoreType", related_name="_links", blank=True
+#     )
+#     _compounds = models.ManyToManyField("Compound", related_name="_links", blank=True)
+#     _suppliers = models.ManyToManyField("Supplier", related_name="_links", blank=True)
+#     _quotes = models.ManyToManyField("Quote", related_name="_links", blank=True)
 
 
 ### PROJECT MANAGEMENT
 
 
-class CampaignModel(AbstractModel):
+# class CampaignModel(AbstractModel):
 
-    class Meta:
-        abstract = True
+#     class Meta:
+#         abstract = True
 
-    name = models.CharField(max_length=30, unique=True)
-    _targets = models.ManyToManyField("Target", related_name="_campaigns", blank=False)
+#     name = models.CharField(max_length=30, unique=True)
+#     _targets = models.ManyToManyField("Target", related_name="_campaigns", blank=False)
 
-    _name_field = "name"
+#     _name_field = "name"
 
 
-class IterationModel(AbstractModel):
+# class IterationModel(AbstractModel):
 
-    class Meta:
-        abstract = True
+#     class Meta:
+#         abstract = True
 
-    ITERATION_STATUS = [
-        ("P", "PENDING"),
-        ("D", "DESIGN"),
-        ("M", "MAKE"),
-        ("T", "TEST"),
-        ("A", "ANALYSE"),
-        ("F", "FINISHED"),
-        ("C", "CANCELLED"),
-    ]
+#     ITERATION_STATUS = [
+#         ("P", "PENDING"),
+#         ("D", "DESIGN"),
+#         ("M", "MAKE"),
+#         ("T", "TEST"),
+#         ("A", "ANALYSE"),
+#         ("F", "FINISHED"),
+#         ("C", "CANCELLED"),
+#     ]
 
-    number = models.PositiveSmallIntegerField(validators=[MinValueValidator(1)])
+#     number = models.PositiveSmallIntegerField(validators=[MinValueValidator(1)])
 
-    campaign = models.ForeignKey(
-        "Campaign",
-        on_delete=models.CASCADE,
-        related_name="_iterations",
-    )
+#     campaign = models.ForeignKey(
+#         "Campaign",
+#         on_delete=models.CASCADE,
+#         related_name="_iterations",
+#     )
 
-    status = models.CharField(max_length=1, choices=ITERATION_STATUS)
+#     status = models.CharField(max_length=1, choices=ITERATION_STATUS)
 
-    _name_field = "long_name"
+#     _name_field = "long_name"
 
 
 ### RECIPES
 
 
-class Route(AbstractModel):
+# class Route(AbstractModel):
 
-    _reactions = models.ManyToManyField(
-        "Reaction",
-        through="RouteStep",
-        through_fields=("route", "reaction"),
-        related_name="_structures",
-    )
-
-
-class RouteStep(AbstractModel):
-
-    route = models.ForeignKey("Route", on_delete=models.CASCADE, related_name="_steps")
-    reaction = models.ForeignKey(
-        "Reaction", on_delete=models.RESTRICT, related_name="_steps"
-    )
-
-    number = models.PositiveSmallIntegerField()
-
-    multiplier = models.FloatField(default=1.0)
-
-    is_root = models.BooleanField()
-    is_leaf = models.BooleanField()
+#     _reactions = models.ManyToManyField(
+#         "Reaction",
+#         through="RouteStep",
+#         through_fields=("route", "reaction"),
+#         related_name="_structures",
+#     )
 
 
-class RandomRecipeGenerator(AbstractModel):
+# class RouteStep(AbstractModel):
 
-    _suppliers = models.ManyToManyField(
-        "Supplier",
-        # through="RecipeComponent",
-        # through_fields=("recipe", "route"),
-        related_name="+",
-    )
+#     route = models.ForeignKey("Route", on_delete=models.CASCADE, related_name="_steps")
+#     reaction = models.ForeignKey(
+#         "Reaction", on_delete=models.RESTRICT, related_name="_steps"
+#     )
 
-    budget = models.DecimalField(
-        validators=[MinValueValidator(0.0)],
-        blank=True,
-        null=True,
-        max_digits=8,
-        decimal_places=2,
-    )
-    currency = models.CharField(max_length=3, blank=True, choices=CURRENCIES)
+#     number = models.PositiveSmallIntegerField()
 
-    origin = models.ForeignKey(
-        "Recipe", on_delete=models.RESTRICT, related_name="_generators"
-    )
+#     multiplier = models.FloatField(default=1.0)
+
+#     is_root = models.BooleanField()
+#     is_leaf = models.BooleanField()
 
 
-class Recipe(AbstractModel):
+# class RandomRecipeGenerator(AbstractModel):
 
-    generator = models.ForeignKey(
-        "RandomRecipeGenerator", on_delete=models.RESTRICT, related_name="_recipes"
-    )
+#     _suppliers = models.ManyToManyField(
+#         "Supplier",
+#         # through="RecipeComponent",
+#         # through_fields=("recipe", "route"),
+#         related_name="+",
+#     )
 
-    _routes = models.ManyToManyField(
-        "Route",
-        through="RecipeComponent",
-        through_fields=("recipe", "route"),
-        related_name="_recipes",
-    )
+#     budget = models.DecimalField(
+#         validators=[MinValueValidator(0.0)],
+#         blank=True,
+#         null=True,
+#         max_digits=8,
+#         decimal_places=2,
+#     )
+#     currency = models.CharField(max_length=3, blank=True, choices=CURRENCIES)
+
+#     origin = models.ForeignKey(
+#         "Recipe", on_delete=models.RESTRICT, related_name="_generators"
+#     )
 
 
-class RecipeComponent(AbstractModel):
+# class Recipe(AbstractModel):
 
-    recipe = models.ForeignKey(
-        "Recipe", on_delete=models.CASCADE, related_name="_recipe_components"
-    )
-    route = models.ForeignKey(
-        "Route", on_delete=models.RESTRICT, related_name="_recipe_components"
-    )
+#     generator = models.ForeignKey(
+#         "RandomRecipeGenerator", on_delete=models.RESTRICT, related_name="_recipes"
+#     )
 
-    multiplier = models.FloatField(default=1.0)
+#     _routes = models.ManyToManyField(
+#         "Route",
+#         through="RecipeComponent",
+#         through_fields=("recipe", "route"),
+#         related_name="_recipes",
+#     )
+
+
+# class RecipeComponent(AbstractModel):
+
+#     recipe = models.ForeignKey(
+#         "Recipe", on_delete=models.CASCADE, related_name="_recipe_components"
+#     )
+#     route = models.ForeignKey(
+#         "Route", on_delete=models.RESTRICT, related_name="_recipe_components"
+#     )
+
+#     multiplier = models.FloatField(default=1.0)
 
 
 ### SCORING
 
 
-class RecipeScore(AbstractModel):
+# class RecipeScore(AbstractModel):
 
-    recipe = models.ForeignKey(
-        "Recipe", on_delete=models.CASCADE, related_name="_scores"
-    )
-    scorer = models.ForeignKey(
-        "RecipeScorer", on_delete=models.RESTRICT, related_name="_scores"
-    )
+#     recipe = models.ForeignKey(
+#         "Recipe", on_delete=models.CASCADE, related_name="_scores"
+#     )
+#     scorer = models.ForeignKey(
+#         "RecipeScorer", on_delete=models.RESTRICT, related_name="_scores"
+#     )
 
-    score = models.FloatField(
-        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
-    )
-
-
-class RecipeScorer(AbstractModel):
-
-    _recipes = models.ManyToManyField(
-        "Recipe",
-        through="RecipeScore",
-        through_fields=("scorer", "recipe"),
-        related_name="_scorers",
-    )
-
-    _attributes = models.ManyToManyField(
-        "ScoringAttribute",
-        through="ScoringAttributeWeight",
-        through_fields=("scorer", "attribute"),
-        related_name="_scorers",
-    )
+#     score = models.FloatField(
+#         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
+#     )
 
 
-class ScoringAttribute(AbstractModel):
+# class RecipeScorer(AbstractModel):
 
-    name = models.CharField(max_length=30, unique=True)
+#     _recipes = models.ManyToManyField(
+#         "Recipe",
+#         through="RecipeScore",
+#         through_fields=("scorer", "recipe"),
+#         related_name="_scorers",
+#     )
 
-    attribute = models.CharField(max_length=90)
-
-    _recipes = models.ManyToManyField(
-        "Recipe",
-        through="AttributeValue",
-        through_fields=("attribute", "recipe"),
-        related_name="+",
-    )
-
-
-class AttributeValue(AbstractModel):
-
-    attribute = models.ForeignKey(
-        "ScoringAttribute", on_delete=models.RESTRICT, related_name="_values"
-    )
-    recipe = models.ForeignKey("Recipe", on_delete=models.CASCADE, related_name="+")
-
-    value = models.FloatField()
+#     _attributes = models.ManyToManyField(
+#         "ScoringAttribute",
+#         through="ScoringAttributeWeight",
+#         through_fields=("scorer", "attribute"),
+#         related_name="_scorers",
+#     )
 
 
-class ScoringAttributeWeight(AbstractModel):
+# class ScoringAttribute(AbstractModel):
 
-    attribute = models.ForeignKey(
-        "ScoringAttribute", on_delete=models.CASCADE, related_name="+"
-    )
-    scorer = models.ForeignKey(
-        "RecipeScorer", on_delete=models.RESTRICT, related_name="_attribute_weights"
-    )
+#     name = models.CharField(max_length=30, unique=True)
 
-    is_inversed = models.BooleanField()
+#     attribute = models.CharField(max_length=90)
 
-    weight = models.FloatField(
-        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
-    )
+#     _recipes = models.ManyToManyField(
+#         "Recipe",
+#         through="AttributeValue",
+#         through_fields=("attribute", "recipe"),
+#         related_name="+",
+#     )
+
+
+# class AttributeValue(AbstractModel):
+
+#     attribute = models.ForeignKey(
+#         "ScoringAttribute", on_delete=models.RESTRICT, related_name="_values"
+#     )
+#     recipe = models.ForeignKey("Recipe", on_delete=models.CASCADE, related_name="+")
+
+#     value = models.FloatField()
+
+
+# class ScoringAttributeWeight(AbstractModel):
+
+#     attribute = models.ForeignKey(
+#         "ScoringAttribute", on_delete=models.CASCADE, related_name="+"
+#     )
+#     scorer = models.ForeignKey(
+#         "RecipeScorer", on_delete=models.RESTRICT, related_name="_attribute_weights"
+#     )
+
+#     is_inversed = models.BooleanField()
+
+#     weight = models.FloatField(
+#         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
+#     )

@@ -8,10 +8,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}HIPPO{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <script src="https://3Dmol.org/build/3Dmol-min.js"></script>     
 </head>
 <body>
-    <header>
-        <h1>HIPPO</h1>
+    <header style="padding-top:1em; padding-bottom:0em">
+        <img src="{% static 'media/hippo_logo_tightcrop.png' %}" style="max-width: 200px; width: 50%; min-width: 100px;">
     </header>
     <main>
         {% block content %}{% endblock %}
@@ -23,5 +25,41 @@
             <a href="mailto:max.winokan@diamond.ac.uk">max.winokan@diamond.ac.uk</a>
         </p>
     </footer>
+
+    <div id="copyNotification" style="display: none; background-color: #4CAF50; color: white; padding: 10px; border-radius: 5px; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); font-size: 16px; z-index: 1000;">
+        Copied to clipboard!
+    </div>
+
+    <script>
+        function copyToClipboard(elementId) {
+            const element = document.getElementById(elementId);
+            let text = "";
+
+            if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
+                text = element.value;
+            } else {
+                text = element.innerText;
+            }
+
+            navigator.clipboard.writeText(text).then(() => {
+                // alert("Copied to clipboard!");
+                showNotification("Copied to clipboard!");
+            }).catch(err => {
+                showNotification("Failed to copy to clipboard!");
+                // console.error("Failed to copy:", err);
+            });
+        }
+
+        function showNotification(message) {
+            const notification = document.getElementById("copyNotification");
+            notification.innerText = message;
+            notification.style.display = "block";
+            
+            // Hide notification after 3 seconds
+            setTimeout(() => {
+                notification.style.display = "none";
+            }, 3000);
+        }
+    </script>
 </body>
 </html>
