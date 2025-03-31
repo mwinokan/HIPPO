@@ -50,6 +50,3 @@ class Command(BaseCommand):
             mol = row["ROMol"]
 
             register_pose(mol=mol)
-
-            # if i > 1:
-            #     break
