@@ -41,6 +41,7 @@ class AbstractModel(models.Model):
             copyable=True,
         ),
         "mol": dict(type=FieldRenderType.TABLE, content=ContentRenderType.MOL_2D_SVG),
+        "pdbblock": dict(type=FieldRenderType.HIDDEN),
         "metadata": dict(
             type=FieldRenderType.TOGGLE_CARD, content=ContentRenderType.DICT_TABLE
         ),
