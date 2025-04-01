@@ -11,7 +11,7 @@ from hippo.io.register import register_pose
 
 
 class Command(BaseCommand):
-    help = "Runs makemigrations, migrate, and createsuperuser in sequence."
+    help = "Loads poses from an SDF"
 
     def add_arguments(self, parser):
         parser.add_argument("file", type=str)
