@@ -32,7 +32,7 @@
                         <td>
                             <span id="{{ field_name |add:'_text' }}" class="monospace">{{ value }}</span>
                             {% if render_dict.copyable %}
-                                <button onclick="copyToClipboard('{{ field_name |add:'_text' }}')"><i class="fa fa-copy"></i></button>
+                                <button onclick="copyToClipboard('{{ field_name |add:'_text' }}')"><i class="fa fa-copy" style="cursor:copy;"></i></button>
                             {% endif %}
                         </td>
                     

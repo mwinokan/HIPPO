@@ -7,31 +7,6 @@
 
 <div class="card">
 
-    <h2 class="center">FFF Campaigns</h2>
-
-    <table>
-        <thead>
-            <tr>
-                <th>Iteration</th>
-                <th>Targets</th>
-                <th class="center">Status</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for iteration in iteration_content %}
-                <tr>
-                    <td>{{ iteration.name }}</td>
-                    <td>{{ iteration.targets }}</td>
-                    <td class="center"><span class="span-pill" style="background:var({{ iteration.bg_style }});color:var({{ iteration.fg_style }});">{{ iteration.status }}</span></td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
-</div>
-
-<div class="card">
-
     <h2 class="center">Database Statistics</h2>
 
     <table>
@@ -44,7 +19,12 @@
         <tbody>
             {% for stat in model_stats %}
                 <tr>
-                    <td>{{ stat.model_name }}</td>
+                    <td>
+                        <a href="{% url stat.model_name.lower|add:'_list' %}">
+                            {{ stat.model_name }}
+                        </a>
+                    </td>
+                    
                     <td class="right">{{ stat.model_count }}</td>
                 </tr>
             {% endfor %}

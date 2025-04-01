@@ -13,7 +13,17 @@
 </head>
 <body>
     <header style="padding-top:1em; padding-bottom:0em">
-        <img src="{% static 'media/hippo_logo_tightcrop.png' %}" style="max-width: 200px; width: 50%; min-width: 100px;">
+        <a href="{% url 'index' %}">
+            <img src="{% static 'media/hippo_logo_tightcrop.png' %}" style="max-width: 200px; width: 50%; min-width: 100px;">
+        </a>
+
+        <br>
+
+        <a href="{% url 'index' %}">
+            <button>Home</button>
+        </a>
+
+
     </header>
     <main>
         {% block content %}{% endblock %}

@@ -149,6 +149,21 @@ button {
     border-radius: 32px;
     font-size: 100%;
     margin: 1rem;
+    cursor: pointer;
+}
+
+.btn {
+    color: var(--color-white);
+    border: none;
+    background-color: var(--color-white-overlay);
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+    border-radius: 32px;
+    font-size: 100%;
+    margin: 1rem;
+/*    cursor: pointer;*/
 }
 
 a {

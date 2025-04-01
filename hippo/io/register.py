@@ -1,13 +1,38 @@
 import mrich
-from hippo.custom_models import *
+from pathlib import Path
+import molparse as mp
 
 from rdkit import Chem
 from rdkit.Chem.inchi import MolToInchiKey
 
-from pathlib import Path
+from hippo.custom_models import *
 from hippo.tools import inchikey_from_smiles, sanitise_smiles
 from hippo.orm.formatters import path_formatter, dict_formatter
 from hippo.resources import guess_file_format
+
+
+def register_target(
+    *,
+    name: str,
+    metadata: str | dict | None = None,
+    debug: bool = False,
+) -> "Target":
+
+    # convert metadata
+    metadata = dict_formatter(metadata)
+
+    instance, created = Target.get_or_create(name=name, metadata=metadata)
+
+    if created:
+        instance.clean_and_save()
+
+        if debug:
+            mrich.debug("Created", instance)
+
+    elif debug:
+        mrich.debug("Retrieved", instance)
+
+    return instance
 
 
 def register_compound(
@@ -282,3 +307,233 @@ def register_pose(
         pose.files.add(file)
 
     return pose
+
+
+def register_structure(
+    *,
+    protein_file: "str | Path",
+    target: "Target | int",
+    # is_experimental: bool | None,
+    alias: str | None = None,
+    pdbblock: str | None = None,
+    resolution: float | None = None,
+    metadata: str | dict | None = None,
+    origin: str = "COMPUTED",
+    debug: bool = False,
+) -> "Structure":
+
+    # format values
+    protein_file = path_formatter(protein_file)
+    metadata = dict_formatter(metadata)
+
+    # get related
+    if isinstance(target, int):
+        target = Target.get(id=target)
+
+    assert origin in Structure.STRUCTURE_ORIGINS
+
+    instance, created = Structure.get_or_create(
+        # protein_file=protein_file,
+        # is_experimental=is_experimental,
+        alias=alias,
+        pdbblock=pdbblock,
+        resolution=resolution,
+        metadata=metadata,
+        target=target,
+        origin=origin,
+    )
+
+    if created:
+        instance.clean_and_save()
+
+        if debug:
+            mrich.debug("Created", instance)
+
+    elif debug:
+        mrich.debug("Retrieved", instance)
+
+    file, file_created = File.get_or_create(
+        path=protein_file,
+        purpose="INPUT",
+        content_type="PROTEIN",
+        format_type=guess_file_format(protein_file),
+    )
+
+    if created:
+        instance.files.add(file)
+
+    return instance
+
+
+def register_placement(
+    *,
+    # path: "str | Path",
+    structure: "Structure | int",
+    compound: "Compound | int",
+    pose: "Pose | int",
+    origin: str = "COMPUTED",
+    method: str = "",
+    # is_experimental: bool | None,
+    # alias: str | None = None,
+    # pdbblock: str | None = None,
+    # resolution: float | None = None,
+    metadata: str | dict | None = None,
+    debug: bool = False,
+) -> "Placement":
+
+    # format values
+    metadata = dict_formatter(metadata)
+
+    # get related
+    if isinstance(structure, int):
+        structure = Structure.get(id=structure)
+    if isinstance(compound, int):
+        compound = Compound.get(id=compound)
+    if isinstance(pose, int):
+        pose = Pose.get(id=pose)
+
+    instance, created = Placement.get_or_create(
+        # path=path,
+        # is_experimental=is_experimental,
+        # alias=alias,
+        # pdbblock=pdbblock,
+        # resolution=resolution,
+        metadata=metadata,
+        method=method,
+        pose=pose,
+        structure=structure,
+        compound=compound,
+        # target=target,
+    )
+
+    if created:
+        instance.clean_and_save()
+
+        if debug:
+            mrich.debug("Created", instance)
+
+    elif debug:
+        mrich.debug("Retrieved", instance)
+
+    return instance
+
+
+def register_fragalysis_target(
+    target_name: str,
+    target_access_string: str | None = None,
+    download_directory: "str | Path | None" = None,
+    metadata_csv: "str | Path | None" = None,
+    aligned_dir: "str | Path | None" = None,
+    stack: str = "production",
+    token: str | None = None,
+):
+
+    import pandas as pd
+    from rdkit.Chem import PandasTools
+    from .fragalysis import download_target, POSE_META_TAG_FIELDS
+
+    if target_access_string:
+
+        from django.conf import settings
+
+        assert download_directory, "download_directory required"
+
+        download_directory = Path(download_directory)
+
+        if not download_directory.exists():
+            download_directory.mkdir()
+
+        target_dir = download_target(
+            target_name=target_name,
+            target_access_string=target_access_string,
+            destination=download_directory,
+            stack=stack,
+            token=token,
+        )
+
+        if not target_dir:
+            raise ValueError(
+                "No target, is Fragalysis available and are permissions correct?"
+            )
+
+        metadata_csv = target_dir / "metadata.csv"
+        aligned_dir = target_dir / "aligned_files"
+
+    else:
+
+        assert (
+            metadata_csv
+        ), "metadata.csv must be provided if no target_access_string is given"
+        assert (
+            aligned_dir
+        ), "aligned_dir must be provided if no target_access_string is given"
+        metadata_csv = Path(metadata_csv)
+        aligned_dir = Path(aligned_dir)
+
+    assert metadata_csv.exists()
+    assert aligned_dir.exists()
+
+    meta_df = pd.read_csv(metadata_csv)
+
+    target = register_target(name=target_name)
+
+    shortcodes = set(meta_df["Code"].values)
+
+    poses = []
+
+    subdirs = list(aligned_dir.iterdir())
+
+    for subdir in mrich.track(subdirs):
+
+        if subdir.name not in shortcodes:
+            mrich.debug("Skipping", subdir)
+
+        alias = subdir.name
+
+        meta = meta_df[meta_df["Code"] == alias].iloc[0].to_dict()
+
+        # files = list(subdir.iterdir())
+
+        combi_sdf = subdir / f"{alias}.sdf"
+        complex_pdb = subdir / f"{alias}.pdb"
+        apo_pdb = subdir / f"{alias}_apo-desolv.pdb"
+
+        mol_df = PandasTools.LoadSDF(
+            str(combi_sdf),
+            molColName="ROMol",
+            idName="ID",
+            strictParsing=True,
+        )
+
+        assert len(mol_df) == 1, "Combi-soaks not yet supported"
+
+        mol = mol_df.ROMol[0]
+
+        pose = register_pose(
+            smiles=meta["Smiles"],
+            mol=mol,
+            complex_file=complex_pdb,
+            protein_file=apo_pdb,
+            mol_file=combi_sdf,
+            alias=alias,
+            origin="EXPERIMENT",
+            is_fingerprinted=False,
+            metadata=None,
+            target=target,
+            compound_alias=meta["Compound code"],
+            structure_origin="EXPERIMENT",
+        )
+
+        def add_tag(key, type):
+            tagtype, _ = TagType.get_or_create(name=type)
+            tag, created = Tag.get_or_create(name=meta[key], type=tagtype)
+            if created:
+                tag.clean_and_save()
+            pose.tags.add(tag)
+
+        for key, type in POSE_META_TAG_FIELDS.items():
+            add_tag(key, type)
+
+        poses.append(pose)
+
+    mrich.success("Loaded", len(poses), "poses for target:", target)

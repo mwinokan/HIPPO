@@ -1,4 +1,5 @@
 import mrich
+from mrich import print
 
 POSE_META_TAG_FIELDS = {
     "Long code": "Observation long code (Fragalysis)",
@@ -68,6 +69,7 @@ def download_target(
     stack: str = "production",
     unzip: bool = True,
     overwrite: bool = False,
+    token: str | None = None,
 ) -> "Path":
     """Download a target from Fragalysis
 
@@ -84,6 +86,7 @@ def download_target(
     import requests
     from pathlib import Path
     import urllib.request
+    from urllib.parse import urljoin  # , urlsplit
 
     destination = Path(destination)
 
@@ -112,22 +115,77 @@ def download_target(
         "trans_matrix_info": False,
     }
 
-    mrich.print("Requesting download...")
+    USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    LOGIN_URL = "/accounts/login/"
+    DOWNLOAD_URL = "/api/download_structures/"
+    LANDING_PAGE_URL = "/viewer/react/landing/"
 
-    url = root + "/api/download_structures/"
+    download_api_url = urljoin(root, DOWNLOAD_URL)
+    landing_page_url = urljoin(root, LANDING_PAGE_URL)
 
-    mrich.var("url", url)
+    with requests.Session() as session:
+        session.headers.update(
+            {
+                "User-Agent": USER_AGENT,
+                "Referer": landing_page_url,
+                "Referrer-policy": "same-origin",
+            }
+        )
 
-    response = requests.post(url, json=payload)
+        print("Getting Fragalysis landing page")
+        session.get(landing_page_url)  # sets csrftoken
 
-    if response.status_code == 200:
-        mrich.print("Download is ready.")
-    else:
-        mrich.error(f"Download request failed: {response.status_code=}")
-        mrich.error(response.text)
-        return None
+        # set manually if still missing
+        csrftoken = session.cookies.get("csrftoken", None)
+        if csrftoken:
+            session.headers.update(
+                {
+                    "X-CSRFToken": csrftoken,
+                    "User-Agent": USER_AGENT,
+                }
+            )
 
-    file_url = urllib.request.pathname2url(response.json()["file_url"])
+        if token:
+            session.cookies.update(
+                {
+                    "sessionid": token,
+                }
+            )
+
+        # this will initiate zipfile creation process. Response is
+        # returned when the file is ready (this is not an async
+        # operation on the server, may take some time)
+        print("Initiating creation of download")
+        start_download_process_response = session.post(
+            download_api_url,
+            data=payload,
+        )
+        print(start_download_process_response)
+        # successful response contains the file_url, something like this
+        # {'file_url': '/code/media/downloads/c1b21660-b2ff-4e82-b928-e6f2d19582c7/A71EV2A.zip'}
+
+        if start_download_process_response.ok:
+            file_url_response = start_download_process_response.json()
+            print(start_download_process_response.json())
+
+            file_url = file_url_response["file_url"]
+            print("Downloading file:", file_url)
+
+            local_filename = destination / Path(file_url).name
+            with session.get(
+                download_api_url,
+                params=file_url_response,
+                stream=True,
+            ) as r:
+                r.raise_for_status()
+                with open(local_filename, "wb") as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        f.write(chunk)
+
+                print("Downloaded complete")
+
+        else:
+            mrich.error("Download Failed")
 
     zip_path = destination / Path(file_url).name
 
