@@ -2139,7 +2139,7 @@ class Database:
         self.execute(sql)
 
     def update_compound_pattern_bfp_table(self):
-        self.db.execute(
+        self.execute(
             """
             INSERT INTO compound_pattern_bfp
             SELECT c.compound_id, c.compound_pattern_bfp FROM compound AS c
