@@ -1644,8 +1644,7 @@ class HIPPO:
         self.db.executemany(sql, values)
         self.db.commit()
 
-        with mrich.loading("Updating compound pattern BFP table"):
-            self.db.update_compound_pattern_bfp_table()
+        self.db.update_compound_pattern_bfp_table()
 
         diff = self.num_compounds - n_before
 
