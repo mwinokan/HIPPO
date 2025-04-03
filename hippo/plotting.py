@@ -321,7 +321,7 @@ def plot_interaction_punchcard(
 def plot_interaction_punchcard_by_tags(
     animal,
     tags: dict[str, str] | list[str],
-    permitted_residues: dict[str, list[int]],
+    permitted_residues: dict[str, list[int]] | None = None,
     yaxis_title: str = "Tag",
     subtitle=None,
     opacity=0.7,
@@ -1766,19 +1766,24 @@ def plot_compound_tsnee(
     from sklearn.decomposition import PCA
     import numpy as np
 
-    df = compounds.get_df(mol=True, bases=True)
+    mrich.var("#compounds", len(compounds))
 
-    df["FP"] = df["mol"].map(get_cfps)
+    with mrich.loading("Getting Compound DataFrame"):
+        df = compounds.get_df(mol=True, bases=True)
+
+    with mrich.loading("Getting Compound fingerprints"):
+        df["FP"] = df["mol"].map(get_cfps)
 
     def get_cluster(row):
 
         bases = row["bases"]
 
-        if bases is None:
+        if not bases:
             return row["id"]
 
         if len(bases) == 1:
-            return bases[0]
+            return list(bases)[0]
+
         return tuple(bases)
 
     def get_type(row):
@@ -1788,13 +1793,15 @@ def plot_compound_tsnee(
 
         return "elaboration"
 
-    df["cluster"] = df.apply(get_cluster, axis=1)
-    df["type"] = df.apply(get_type, axis=1)
+    with mrich.loading("Adding columns"):
+        df["cluster"] = df.apply(get_cluster, axis=1)
+        df["type"] = df.apply(get_type, axis=1)
 
     X = np.array([x.fp for x in df["FP"]])
 
-    pca = PCA(n_components=2, random_state=0)
-    pca_fit = pca.fit_transform(X)
+    with mrich.loading("Computing PCA"):
+        pca = PCA(n_components=2, random_state=0)
+        pca_fit = pca.fit_transform(X)
 
     df["PC1"] = pca_fit.T[0]
     df["PC2"] = pca_fit.T[1]
@@ -1811,19 +1818,23 @@ def plot_compound_tsnee(
         "type",
     ]
 
+    df["bases"] = df["bases"].astype(str)
     df["cluster"] = df["cluster"].astype(str)
+
+    # return df
 
     # mrich.debug(df.columns)
 
-    fig = px.scatter(
-        df,
-        x="PC1",
-        y="PC2",
-        hover_data=hover_data,
-        color="cluster",
-        symbol="type",
-        **kwargs,
-    )
+    with mrich.loading("Creating figure"):
+        fig = px.scatter(
+            df,
+            x="PC1",
+            y="PC2",
+            hover_data=hover_data,
+            color="cluster",
+            symbol="type",
+            **kwargs,
+        )
 
     subtitle = subtitle or f"#compounds={len(compounds)}"
 
@@ -1932,11 +1943,7 @@ def add_hippo_logo(fig, in_plot=True, position="top right"):
 
 
 def add_punchcard_logo(fig):
-    """
-
-    :param fig:
-
-    """
+    """Add the HIPPO logo to a punchcard figure"""
 
     fig.add_layout_image(
         dict(

@@ -1162,7 +1162,12 @@ class Database:
 
         assert currency in ["GBP", "EUR", "USD", None], f"incompatible {currency=}"
 
-        assert supplier in ["MCule", "Enamine", "Stock"], f"incompatible {supplier=}"
+        assert supplier in [
+            "MCule",
+            "Enamine",
+            "Stock",
+            "Molport",
+        ], f"incompatible {supplier=}"
 
         smiles = smiles or ""
 
@@ -1634,7 +1639,7 @@ class Database:
         self,
         *,
         pose_id: int,
-        name: str,
+        name: str | None,
         target: int | None = None,
         subsite_id: int | None = None,
         commit: bool = True,
@@ -1649,7 +1654,9 @@ class Database:
 
         """
 
-        assert isinstance(name, str)
+        if name is not None:
+            assert isinstance(name, str)
+
         assert isinstance(pose_id, int)
 
         if not target:
@@ -1921,21 +1928,6 @@ class Database:
         """
         self.delete_where(table="tag", key="name", value=tag)
 
-    def delete_poses(self, poses: "PoseSet") -> None:
-        """Delete all database records related to a set of poses"""
-
-        # raise NotImplementedError("Needs more dev")
-
-        str_ids = poses.str_ids
-
-        self.delete_where(table="pose", key=f"pose_id IN {str_ids}")
-        self.delete_where(table="tag", key=f"tag_pose IN {str_ids}")
-        self.delete_where(
-            table="inspiration", key=f"inspiration_derivative IN {str_ids}"
-        )
-        # interactions?
-        # subsites?
-
     def delete_interactions(self) -> None:
         """Delete all calculated interactions and set pose_fingerprint appropriately"""
 
@@ -2146,7 +2138,19 @@ class Database:
 
         self.execute(sql)
 
+    def update_compound_pattern_bfp_table(self):
+        self.execute(
+            """
+            INSERT INTO compound_pattern_bfp
+            SELECT c.compound_id, c.compound_pattern_bfp FROM compound AS c
+            LEFT JOIN compound_pattern_bfp as fp
+            ON c.compound_id = fp.compound_id
+            WHERE fp.compound_id IS NULL
+        """
+        )
+
     def prune_duplicate_routes(self) -> None:
+        """Remove duplicate routes from the database"""
 
         from collections import Counter
 
@@ -2197,6 +2201,50 @@ class Database:
         mrich.success("Deleted", len(delete), "duplicate routes")
 
         return delete
+
+    def calculate_all_scaffolds(self):
+
+        n_before = self.count("scaffold")
+
+        mrich.var("#compounds", self.count("compound"))
+        mrich.var("#scaffold defs", n_before)
+
+        sql = """
+        SELECT compound_id, compound_mol, compound_pattern_bfp 
+        FROM compound
+        """
+
+        with mrich.loading("Fetching compounds..."):
+            records = self.execute(sql).fetchall()
+
+        sql = """
+            INSERT OR IGNORE INTO scaffold
+            SELECT ?1, c.compound_id 
+            FROM compound AS c, compound_pattern_bfp AS fp
+            WHERE c.compound_id = fp.compound_id
+            AND c.compound_id <> ?1
+            AND mol_is_substruct(c.compound_mol, ?2)
+            AND fp.compound_id MATCH rdtree_subset(?3)
+        """
+
+        with mrich.loading("Calculating scaffolds..."):
+            t1 = time.time()
+            self.executemany(sql, records)
+            mrich.print("Took", f"{time.time() - t1:.1f}", "seconds")
+
+        with mrich.loading("Committing..."):
+            self.commit()
+
+        diff = self.count("scaffold") - n_before
+
+        if diff:
+            mrich.success(
+                "Found", diff, "new substructure-superstructure relationships"
+            )
+        else:
+            mrich.warning(
+                "Found", diff, "new substructure-superstructure relationships"
+            )
 
     ### GETTERS
 
@@ -2614,10 +2662,34 @@ class Database:
 
         return recipe
 
+    def get_route_products(self) -> "CompoundSet | None":
+        """Get a :class:`.CompoundSet` of all route products"""
+        from .cset import CompoundSet
+
+        records = self.execute("SELECT DISTINCT route_product FROM route").fetchall()
+        if not records:
+            return None
+        return CompoundSet(self, [i for i, in records])
+
     def get_route_id_product_dict(self) -> dict[int, int]:
         """Get a dictionary mapping route ID's to their product :class:`.Compound`"""
         records = self.execute("SELECT route_id, route_product FROM route").fetchall()
         return {route_id: route_product for route_id, route_product in records}
+
+    def get_product_id_routes_dict(self) -> dict[int, set[int]]:
+        """Get a dictionary mapping route ID's to their product :class:`.Compound`"""
+        records = self.execute("SELECT route_id, route_product FROM route").fetchall()
+
+        lookup = {}
+
+        for route_id, route_product in records:
+
+            if route_product not in lookup:
+                lookup[route_product] = set()
+
+            lookup[route_product].add(route_id)
+
+        return lookup
 
     def get_compound_id_pose_ids_dict(self, cset: "CompoundSet") -> dict[int, set]:
         """Get a dictionary mapping :class:`.Compound` ID's to their associated :class:`.Pose` ID's"""
@@ -2630,6 +2702,22 @@ class Database:
         for comp_id, pose_id in records:
             d[comp_id] = d.get(comp_id, set())
             d[comp_id].add(pose_id)
+        return d
+
+    def get_compound_id_suppliers_dict(
+        self, cset: "CompoundSet"
+    ) -> dict[int, set[str]]:
+        """Get a dictionary mapping :class:`.Compound` ID's to suppliers which stock it"""
+        records = self.execute(
+            f"SELECT quote_compound, quote_supplier FROM quote WHERE quote_compound IN {cset.str_ids}"
+        ).fetchall()
+
+        d = {}
+
+        for comp_id, quote_supplier in records:
+            d[comp_id] = d.get(comp_id, set())
+            d[comp_id].add(quote_supplier)
+
         return d
 
     def get_compound_inchikey_id_dict(self, inchikeys: list[str]):
@@ -2739,6 +2827,7 @@ class Database:
         return ISETS
 
     def get_compound_id_inspiration_ids_dict(self) -> dict[int, set]:
+        """Get a dictionary mapping :class:`.Compound` ID's to a set of :class:`Pose` ID's for the inspirations for the whole database"""
 
         sql = """
         SELECT compound_id, pose_id, inspiration_original FROM compound

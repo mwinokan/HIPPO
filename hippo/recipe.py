@@ -48,29 +48,27 @@ class Recipe:
         *,
         debug: bool = False,
         pick_cheapest: bool = True,
-        permitted_reactions=None,
+        permitted_reactions: "ReactionSet | None" = None,
         quoted_only: bool = False,
         supplier: None | str = None,
-        unavailable_reaction="error",
-        reaction_checking_cache=None,
-        reaction_reactant_cache=None,
-        inner=False,
+        unavailable_reaction: str = "error",
+        reaction_checking_cache: dict[int, bool] = None,
+        reaction_reactant_cache: dict[int, bool] = None,
+        inner: bool = False,
         get_ingredient_quotes: bool = True,
-    ):
-        """
+    ) -> "Recipe | list[Recipe]":
+        """Create a :class:`.Recipe` from a :class:`.Reaction` and its upstream dependencies
 
-        :param reaction:
-        :param amount:  (Default value = 1)
-        :param *:
-        :param debug: bool:  (Default value = False)
-        :param pick_cheapest: bool:  (Default value = True)
-        :param permitted_reactions:  (Default value = None)
-        :param quoted_only: bool:  (Default value = False)
-        :param supplier: None | str:  (Default value = None)
-        :param unavailable_reaction:  (Default value = 'error')
-        :param reaction_checking_cache:  (Default value = None)
-        :param reaction_reactant_cache:  (Default value = None)
-        :param inner:  (Default value = False)
+        :param reaction: reaction to create recipe from
+        :param amount: amount in ``mg`` (Default value = 1)
+        :param debug: bool: increase verbosity for debugging (Default value = False)
+        :param pick_cheapest: bool: choose the cheapest solution (Default value = True)
+        :param permitted_reactions: once consider reactions in this set (Default value = None)
+        :param quoted_only: bool: only allow reactants with quotes (Default value = False)
+        :param supplier: None | str: optionally restrict quotes to only this supplier (Default value = None)
+        :param unavailable_reaction: define the behaviour for when a reaction has unavailable reactants (Default value = 'error')
+        :param inner: used to indicate that this is a recursive call (Default value = False)
+        :param get_ingredient_quotes: get quotes for ingredients in this recipe
 
         """
 
@@ -238,23 +236,26 @@ class Recipe:
     @classmethod
     def from_reactions(
         cls,
-        reactions,
-        amount=1,
+        reactions: "ReactionSet",
+        amount: float = 1,
         pick_cheapest: bool = True,
-        permitted_reactions=None,
-        final_products_only=True,
-        return_products=False,
-        debug=False,
-    ):
-        """
+        permitted_reactions: "ReactionSet | None" = None,
+        final_products_only: bool = True,
+        return_products: bool = False,
+        supplier: str | None = None,
+        use_routes: bool = False,
+        debug: bool = False,
+        **kwargs,
+    ) -> "Recipe | list[Recipe] | CompoundSet":
+        """Create a :class:`.Recipe` from a :class:`.ReactionSet` and its upstream dependencies
 
-        :param reactions:
-        :param amount:  (Default value = 1)
-        :param pick_cheapest: bool:  (Default value = True)
-        :param permitted_reactions:  (Default value = None)
-        :param final_products_only:  (Default value = True)
-        :param return_products:  (Default value = False)
-        :param debug:  (Default value = False)
+        :param reactions: reactions to create recipe from
+        :param amount: amount in ``mg`` (Default value = 1)
+        :param debug: bool: increase verbosity for debugging (Default value = False)
+        :param pick_cheapest: bool: choose the cheapest solution (Default value = True)
+        :param permitted_reactions: once consider reactions in this set (Default value = None)
+        :param final_products_only: don't get routes to intermediates (Default value = True)
+        :param return_products: return the :class:`.CompoundSet` of products instead (Default value = False)
 
         """
 
@@ -311,6 +312,9 @@ class Recipe:
             amount=amount,
             permitted_reactions=reactions,
             pick_cheapest=pick_cheapest,
+            supplier=supplier,
+            use_routes=use_routes,
+            **kwargs,
         )
 
         return recipe
@@ -318,7 +322,7 @@ class Recipe:
     @classmethod
     def from_compounds(
         cls,
-        compounds,
+        compounds: "CompoundSet",
         amount: float = 1,
         debug: bool = False,
         pick_cheapest: bool = True,
@@ -329,27 +333,27 @@ class Recipe:
         pick_first: bool = False,
         warn_multiple_solutions: bool = True,
         pick_cheapest_inner_routes: bool = False,
-        unavailable_reaction="error",
-        reaction_checking_cache=None,
-        reaction_reactant_cache=None,
+        unavailable_reaction: str = "error",
+        reaction_checking_cache: dict[int, bool] | None = None,
+        reaction_reactant_cache: dict[int, bool] | None = None,
+        use_routes: bool = False,
         **kwargs,
     ):
-        """
+        """Create recipe(s) to synthesis products in the :class:`.CompoundSet`
 
-        :param compounds:
-        :param amount: float:  (Default value = 1)
-        :param debug: bool:  (Default value = False)
-        :param pick_cheapest: bool:  (Default value = True)
-        :param permitted_reactions:  (Default value = None)
-        :param quoted_only: bool:  (Default value = False)
-        :param supplier: None | str:  (Default value = None)
-        :param solve_combinations: bool:  (Default value = True)
-        :param pick_first: bool:  (Default value = False)
-        :param warn_multiple_solutions: bool:  (Default value = True)
-        :param pick_cheapest_inner_routes: bool:  (Default value = False)
-        :param unavailable_reaction:  (Default value = 'error')
-        :param reaction_checking_cache:  (Default value = None)
-        :param reaction_reactant_cache:  (Default value = None)
+        :param compounds: set of compounds to find routes for
+        :param solve_combinations: bool: combinatorially combine all individual routes (Default value = True)
+        :param pick_first: return the first solution without comparison (Default value = False)
+        :param warn_multiple_solutions: warn if a compound has multiple routes (Default value = True)
+        :param pick_cheapest_inner_routes: for each compound choose the cheapest route (Default value = False)
+        :param reaction: reaction to create recipe from
+        :param amount: amount in ``mg`` (Default value = 1)
+        :param debug: bool: increase verbosity for debugging (Default value = False)
+        :param pick_cheapest: bool: choose the cheapest solution (Default value = True)
+        :param permitted_reactions: once consider reactions in this set (Default value = None)
+        :param quoted_only: bool: only allow reactants with quotes (Default value = False)
+        :param supplier: None | str: optionally restrict quotes to only this supplier (Default value = None)
+        :param unavailable_reaction: define the behaviour for when a reaction has unavailable reactants (Default value = 'error')
 
         """
 
@@ -360,12 +364,21 @@ class Recipe:
         # if permitted_reactions:
         #   raise NotImplementedError
 
+        db = compounds.db
+
         n_comps = len(compounds)
 
         assert n_comps
 
         if not hasattr(amount, "__iter__"):
             amount = [amount] * n_comps
+
+        if use_routes:
+            route_lookup = db.get_product_id_routes_dict()
+
+            if supplier:
+                raise NotImplementedError
+                # supplier_lookup = db.get_compound_id_suppliers_dict()
 
         options = []
 
@@ -379,35 +392,50 @@ class Recipe:
 
             comp_options = []
 
-            for reaction in comp.reactions:
+            if use_routes:
 
-                if permitted_reactions and reaction not in permitted_reactions:
+                if comp.id not in route_lookup:
+                    mrich.error("No routes to", comp)
                     continue
 
-                sol = Recipe.from_reaction(
-                    reaction=reaction,
-                    amount=a,
-                    pick_cheapest=pick_cheapest_inner_routes,
-                    debug=debug,
-                    permitted_reactions=permitted_reactions,
-                    quoted_only=quoted_only,
-                    supplier=supplier,
-                    unavailable_reaction=unavailable_reaction,
-                    reaction_checking_cache=reaction_checking_cache,
-                    reaction_reactant_cache=reaction_reactant_cache,
-                    **kwargs,
-                )
+                comp_options = []
+                for route_id in route_lookup[comp.id]:
+                    route = db.get_route(id=route_id)
+                    comp_options.append(route)
 
-                if pick_cheapest_inner_routes:
-                    if sol:
-                        comp_options.append(sol)
-                else:
-                    assert isinstance(sol, list)
-                    comp_options += sol
+            else:
 
-            if not comp_options:
-                mrich.error(f"No solutions for compound={comp} ({comp.reactions.ids=})")
-                continue
+                for reaction in comp.reactions:
+
+                    if permitted_reactions and reaction not in permitted_reactions:
+                        continue
+
+                    sol = Recipe.from_reaction(
+                        reaction=reaction,
+                        amount=a,
+                        pick_cheapest=pick_cheapest_inner_routes,
+                        debug=debug,
+                        permitted_reactions=permitted_reactions,
+                        quoted_only=quoted_only,
+                        supplier=supplier,
+                        unavailable_reaction=unavailable_reaction,
+                        reaction_checking_cache=reaction_checking_cache,
+                        reaction_reactant_cache=reaction_reactant_cache,
+                        **kwargs,
+                    )
+
+                    if pick_cheapest_inner_routes:
+                        if sol:
+                            comp_options.append(sol)
+                    else:
+                        assert isinstance(sol, list)
+                        comp_options += sol
+
+                if not comp_options:
+                    mrich.error(
+                        f"No solutions for compound={comp} ({comp.reactions.ids=})"
+                    )
+                    continue
 
             if pick_cheapest and len(comp_options) > 1:
                 if warn_multiple_solutions:
@@ -486,13 +514,24 @@ class Recipe:
         return solutions
 
     @classmethod
-    def from_reactants(cls, reactants, amount=1, debug=False, return_products=False):
-        """
+    def from_reactants(
+        cls,
+        reactants: "CompoundSet | IngredientSet",
+        amount: float = 1,
+        debug: bool = False,
+        return_products: bool = False,
+        supplier: str | None = None,
+        pick_cheapest: bool = False,
+        use_routes: bool = False,
+        **kwargs,
+    ) -> "list[Recipe] | Recipe | CompoundSet":
+        """Find the maximal recipe from a given set of reactants
 
-        :param reactants:
-        :param amount:  (Default value = 1)
-        :param debug:  (Default value = False)
-        :param return_products:  (Default value = False)
+        :param reactants: :class:`.CompoundSet` or :class:`.IngredientSet` for the reactants. Ingredient amounts are ignored
+        :param amount: amount of each product needed (Default value = 1)
+        :param debug: increase verbosity (Default value = False)
+        :param return_products: return products instead of recipe (Default value = False)
+        :param kwargs: passed to :meth:`.Recipe.from_reactions`
 
         """
 
@@ -559,45 +598,34 @@ class Recipe:
             rset,
             amount=amount,
             permitted_reactions=rset,
-            pick_cheapest=False,
             debug=debug,
             return_products=return_products,
+            supplier=supplier,
+            use_routes=use_routes,
+            **kwargs,
         )
 
         return recipe
 
     @classmethod
-    def from_ingredients(cls, db, ingredients):
-        """
-
-        :param db:
-        :param ingredients:
-
-        """
-        raise NotImplementedError
-        self = cls.__new__(cls)
-        self.__init__(...)
-        return self
-
-    @classmethod
     def from_json(
         cls,
-        db,
-        path,
-        debug=True,
-        allow_db_mismatch=False,
-        clear_quotes=False,
-        data=None,
+        db: "Database",
+        path: "str | Path",
+        debug: bool = True,
+        allow_db_mismatch: bool = False,
+        clear_quotes: bool = False,
+        data: dict = None,
         db_mismatch_warning: bool = True,
     ):
-        """
+        """Load a serialised recipe from a JSON file
 
-        :param db:
-        :param path:
-        :param debug:  (Default value = True)
-        :param allow_db_mismatch:  (Default value = False)
-        :param clear_quotes:  (Default value = False)
-        :param data:  (Default value = None)
+        :param db: database to link
+        :param path: path to JSON
+        :param debug: increase verbosity (Default value = True)
+        :param allow_db_mismatch: allow a database mismatch (Default value = False)
+        :param clear_quotes: ignore reactant quotes (Default value = False)
+        :param data: serialised data (Default value = None)
 
         """
 
@@ -665,17 +693,18 @@ class Recipe:
     ### PROPERTIES
 
     @property
-    def db(self):
-        """ """
+    def db(self) -> "Database":
+        """Associated :class:`.Database:"""
         return self._db
 
     @property
-    def products(self):
-        """ """
+    def products(self) -> "IngredientSet":
+        """Product :class:`.IngredientSet`"""
         return self._products
 
     @property
     def product_poses(self) -> "PoseSet":
+        """Product poses"""
         if self._product_poses is None:
             self._product_poses = self.product_compounds.poses
             self._product_poses._name = f"product poses of {self}"
@@ -683,6 +712,7 @@ class Recipe:
 
     @property
     def product_compounds(self) -> "CompoundSet":
+        """Product compounds"""
         if self._product_compounds is None:
             self._product_compounds = self.products.compounds
             self._product_compounds._name = f"products of {self}"
@@ -696,115 +726,91 @@ class Recipe:
         return self._product_interactions
 
     @property
-    def product(self):
-        """ """
+    def product(self) -> "Ingredient":
+        """Return single product (if there's only one)"""
         assert len(self.products) == 1
         return self.products[0]
 
     @products.setter
-    def products(self, a):
-        """
-
-        :param a:
-
-        """
+    def products(self, a: "IngredientSet"):
+        """Set the products"""
         self._products = a
         self.__flag_modification()
 
     @property
     def reactants(self):
-        """ """
+        """Reactant :class:`.IngredientSet`"""
         return self._reactants
 
     @reactants.setter
-    def reactants(self, a):
-        """
-
-        :param a:
-
-        """
+    def reactants(self, a: "IngredientSet"):
+        """Set the reactants"""
         self._reactants = a
         self.__flag_modification()
 
     @property
-    def intermediates(self):
-        """ """
+    def intermediates(self) -> "IngredientSet":
+        """Intermediates :class:`.IngredientSet`"""
         return self._intermediates
 
     @intermediates.setter
-    def intermediates(self, a):
-        """
-
-        :param a:
-
-        """
+    def intermediates(self, a: "IngredientSet"):
+        """Set the intermediates"""
         self._intermediates = a
         self.__flag_modification()
 
     @property
-    def reactions(self):
-        """ """
+    def reactions(self) -> "ReactionSet":
+        """Intermediates :class:`.IngredientSet`"""
         return self._reactions
 
     @reactions.setter
-    def reactions(self, a):
-        """
-
-        :param a:
-
-        """
+    def reactions(self, a: "ReactionSet"):
+        """Set the reactions"""
         self._reactions = a
         self.__flag_modification()
 
     @property
-    def price(self):
-        """ """
-        # total = 0
-        # quotes = self.quotes
-        # if not quotes:
-        #   return None
-        # assert len((currencies := set([q.currency for q in quotes]))) == 1, 'Multiple currencies'
-        # return sum([q.price for q in quotes]), list(currencies)[0]
+    def price(self) -> "Price":
+        """Get the price of the reactants"""
         return self.reactants.price
 
     @property
-    def num_products(self):
+    def num_products(self) -> int:
+        """Return the number of products"""
         return len(self.products)
 
     @property
     def num_reactions(self):
+        """Return the number of reactions"""
         return len(self.reactions)
 
     @property
     def num_reactants(self):
+        """Return the number of reactants"""
         return len(self.reactants)
 
     @property
     def num_intermediates(self):
+        """Return the number of intermediates"""
         return len(self.intermediates)
 
     @property
-    def hash(self):
+    def hash(self) -> str:
+        """Return the unique hash string"""
         return self._hash
 
     @property
     def score(self):
+        """Return the Recipe score"""
         return self._score
-
-    # @property
-    # def lead_time(self):
-    #   total = 0
-    #   quotes = self.quotes
-    #   if not quotes:
-    #       return None
-    #   return max([q.lead_time for q in quotes])
 
     ### METHODS
 
-    def get_price(self, supplier=None):
-        """
+    def get_price(self, supplier: str | None = None) -> "Price":
+        """get the reactants price. See :meth:`.IngredientSet.get_price`
 
-        :param supplier:  (Default value = None)
+        :param supplier: restrict quotes to this supplier
 
         """
         return self.reactants.get_price(supplier=supplier)
@@ -899,7 +905,7 @@ class Recipe:
                 node_size=sizes,
             )
 
-    def sankey(self, title=None):
+    def sankey(self, title: str | None = None) -> "graph_objects.Figure":
         """draw a plotly Sankey diagram
 
         :param title:  (Default value = None)
@@ -1042,10 +1048,10 @@ class Recipe:
 
         return fig
 
-    def summary(self, price: bool = True):
+    def summary(self, price: bool = True) -> None:
         """Print a summary of this recipe
 
-        :param price: bool:  (Default value = True)
+        :param price: print the price (Default value = True)
 
         """
 
@@ -1087,10 +1093,10 @@ class Recipe:
             for reaction in self.reactions:
                 mrich.var(str(reaction), reaction.reaction_str, reaction.type)
 
-    def get_ingredient(self, id):
+    def get_ingredient(self, id) -> "Ingredient":
         """Get an ingredient by its compound ID
 
-        :param id:
+        :param id: compound ID
 
         """
         matches = [r for r in self.reactants if r.id == id]
@@ -1102,20 +1108,27 @@ class Recipe:
         assert len(matches) == 1
         return matches[0]
 
-    def add_to_all_reactants(self, amount=20):
-        """
+    def add_to_all_reactants(self, amount: float = 20) -> None:
+        """Increment all reactants by this amount
 
-        :param amount:  (Default value = 20)
+        :param amount: amount in ``mg`` (Default value = 20)
 
         """
         self.reactants.df["amount"] += amount
 
-    def write_json(self, file, *, extra: dict | None = None, indent="\t", **kwargs):
+    def write_json(
+        self,
+        file: "str | Path",
+        *,
+        extra: dict | None = None,
+        indent: str = "\t",
+        **kwargs,
+    ) -> None:
         """Serialise this recipe object and write it to disk
 
-        :param file:
-        :param extra:
-        :param indent:  (Default value = '\t')
+        :param file: write to this path
+        :param extra: extra data to serialise
+        :param indent: indentation whitespace (Default value = '\t')
 
         """
         import json
@@ -1153,14 +1166,13 @@ class Recipe:
         - Total Price
         - Lead time
 
-        :param *:
-        :param price: bool:  (Default value = True)
-        :param reactant_supplier: bool:  (Default value = True)
-        :param database: bool:  (Default value = True)
-        :param timestamp: bool:  (Default value = True)
-        :param compound_ids_only: bool:  (Default value = False)
-        :param products: bool:  (Default value = True)
-        :param serialise_price: bool:  (Default value = False)
+        :param price: include the price (Default value = True)
+        :param reactant_supplier: include the supplier (Default value = True)
+        :param database: include the database (Default value = True)
+        :param timestamp: add a timestamp (Default value = True)
+        :param compound_ids_only: ID's only (instead of full :attr:`.IngredientSet.df`) (Default value = False)
+        :param products: include products (Default value = True)
+        :param serialise_price: serialise :class:`.Price` object (Default value = False)
 
         """
 
@@ -1207,7 +1219,8 @@ class Recipe:
 
         return data
 
-    def get_routes(self):
+    def get_routes(self) -> "RouteSet":
+        """Get routes"""
         return self.products.get_routes(permitted_reactions=self.reactions)
 
     def write_CAR_csv(
@@ -1236,8 +1249,8 @@ class Recipe:
         * reaction-recipe-1
         * reaction-groupby-column-1
 
-        :param file:
-        :param return_df:  (Default value = False)
+        :param file: file to write to
+        :param return_df: return the dataframe (Default value = False)
 
         """
 
@@ -1399,6 +1412,14 @@ class Recipe:
                 self.db, set(reaction.id for reaction in downstream_reactions)
             )
 
+            if not downstream_products:
+                mrich.error("No downstream products for", reactant)
+                continue
+
+            if not downstream_reactions:
+                mrich.error("No downstream reactions for", reactant)
+                continue
+
             def get_scaffold_series():
 
                 bases = downstream_products.bases
@@ -1426,7 +1447,9 @@ class Recipe:
 
         return None
 
-    def write_product_csv(self, file: "str | Path", return_df: bool = False):
+    def write_product_csv(
+        self, file: "str | Path", return_df: bool = False
+    ) -> "pd.DataFrame | None":
         """Detailed CSV output including product information for selection and synthesis"""
 
         from pandas import DataFrame
@@ -1468,6 +1491,14 @@ class Recipe:
             upstream_reactions = ReactionSet(
                 self.db, set(reaction.id for reaction in upstream_reactions)
             )
+
+            if not upstream_routes:
+                mrich.error("No upstream routes for", product)
+                continue
+
+            if not upstream_reactions:
+                mrich.error("No upstream reactions for", product)
+                continue
 
             def get_scaffold_series():
 
@@ -1529,7 +1560,9 @@ class Recipe:
 
         return None
 
-    def write_chemistry_csv(self, file: "str | Path", return_df: bool = True):
+    def write_chemistry_csv(
+        self, file: "str | Path", return_df: bool = True
+    ) -> "pd.DataFrame | None":
         """Detailed CSV output synthetis information for chemistry types in this set"""
 
         from pandas import DataFrame
@@ -1690,8 +1723,8 @@ class Recipe:
 
         return None
 
-    def copy(self):
-        """ """
+    def copy(self) -> "Recipe":
+        """Copy this recipe"""
         return Recipe(
             self.db,
             products=self.products.copy(),
@@ -1701,27 +1734,15 @@ class Recipe:
             # supplier=self.supplier
         )
 
-    def get_product_fingerprint(self):
-        """Calculate the combined fingerprint of all product poses in this set"""
-
-        poses = self.products.compounds.poses
-
-        null_count = self.db.count_where(
-            table="pose", key=f"pose_id IN {poses.str_ids} AND pose_fingerprint IS NULL"
-        )
-
-        if null_count:
-            mrich.warning(f"{null_count} poses have no fingerprint")
-
-        return poses.fingerprint
-
-    def __flag_modification(self):
+    def __flag_modification(self) -> None:
+        """Flag this recipe as modified"""
         self._product_interactions = None
         self._score = None
         self._product_compounds = None
         self._product_poses = None
 
     def check_integrity(self, debug: bool = False) -> bool:
+        """Verify integrity of this recipe"""
 
         # no duplicate ingredients
 
@@ -1835,7 +1856,8 @@ class Recipe:
 
     ### DUNDERS
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """Unformatted string representation"""
 
         if self.score:
             s = f"(score={self.score:.3f})"
@@ -1908,12 +1930,14 @@ class Route(Recipe):
     ### FACTORIES
 
     @classmethod
-    def from_json(cls, db, path, data=None):
-        """
+    def from_json(
+        cls, db: "Database", path: "str | Path", data: dict = None
+    ) -> "Route":
+        """Load a serialised route from a JSON file
 
-        :param db:
-        :param path:
-        :param data:  (Default value = None)
+        :param db: database to link
+        :param path: path to JSON
+        :param data: serialised data (Default value = None)
 
         """
 
@@ -1955,23 +1979,23 @@ class Route(Recipe):
     ### PROPERTIES
 
     @property
-    def product(self):
-        """ """
+    def product(self) -> "Ingredient":
+        """Product ingredient"""
         return self._products[0]
 
     @property
-    def product_compound(self):
-        """ """
+    def product_compound(self) -> "Compound":
+        """Product compound"""
         return self.product.compound
 
     @property
-    def id(self):
-        """ """
+    def id(self) -> int:
+        """Route ID"""
         return self._id
 
     ### METHODS
 
-    def get_dict(self):
+    def get_dict(self) -> dict:
         """Serialisable dictionary"""
         data = {}
 
@@ -2017,12 +2041,14 @@ class RouteSet:
     ### FACTORIES
 
     @classmethod
-    def from_json(cls, db, path, data=None):
-        """
+    def from_json(
+        cls, db: "Database", path: "str | Path", data: dict = None
+    ) -> "RouteSet":
+        """Load a serialised routeset from a JSON file
 
-        :param db:
-        :param path:
-        :param data:  (Default value = None)
+        :param db: database to link
+        :param path: path to JSON
+        :param data: serialised data (Default value = None)
 
         """
 
@@ -2049,22 +2075,22 @@ class RouteSet:
     ### PROPERTIES
 
     @property
-    def data(self):
-        """ """
+    def data(self) -> "dict[int, Route]":
+        """Get internal data dictionary"""
         return self._data
 
     @property
     def db(self):
-        """ """
+        """Get associated database"""
         return self._db
 
     @property
-    def routes(self):
-        """ """
+    def routes(self) -> "list[Route]":
+        """Get route objects"""
         return self.data.values()
 
     @property
-    def product_ids(self):
+    def product_ids(self) -> list[int]:
         """Get the :class:`.Compound` ID's of the products"""
         ids = self.db.select_where(
             table="route",
@@ -2082,12 +2108,12 @@ class RouteSet:
         return CompoundSet(self.db, self.product_ids)
 
     @property
-    def str_ids(self):
+    def str_ids(self) -> str:
         """Return an SQL formatted tuple string of the :class:`.Route` ID's"""
         return str(tuple(self.ids)).replace(",)", ")")
 
     @property
-    def ids(self):
+    def ids(self) -> list[int]:
         """Return the :class:`.Route` IDs"""
         return self.data.keys()
 
@@ -2130,11 +2156,11 @@ class RouteSet:
 
     ### METHODS
 
-    def copy(self):
-        """ """
+    def copy(self) -> "RouteSet":
+        """Copy this RouteSet"""
         return RouteSet(self.db, self.data.values())
 
-    def set_db_pointers(self, db):
+    def set_db_pointers(self, db: "Database") -> None:
         """
 
         :param db:
@@ -2144,40 +2170,37 @@ class RouteSet:
         for route in self.data.values():
             route._db = db
 
-    def clear_db_pointers(self):
-        """ """
-        self._db = None
-        for route in self.data.values():
-            route._db = None
+    # def clear_db_pointers(self):
+    #     """ """
+    #     self._db = None
+    #     for route in self.data.values():
+    #         route._db = None
 
-    def get_dict(self):
-        """Get serialisable dictionary"""
+    # def get_dict(self):
+    #     """Get serialisable dictionary"""
 
-        data = dict(db=str(self.db), routes={})
+    #     data = dict(db=str(self.db), routes={})
 
-        # populate with routes
-        for route_id, route in self.data.items():
-            data["routes"][route_id] = route.get_dict()
+    #     # populate with routes
+    #     for route_id, route in self.data.items():
+    #         data["routes"][route_id] = route.get_dict()
 
-        return data
+    #     return data
 
-    def pop_id(self):
-        """ """
-
+    def pop_id(self) -> int:
+        """Pop the last route from the set and return it's id"""
         route_id, route = self.data.popitem()
-
         return route_id
 
-    def pop(self):
-        """ """
-
+    def pop(self) -> "Route":
+        """Pop the last route from the set and return it's object"""
         route_id, route = self.data.popitem()
-
         return route
 
     def balanced_pop(
         self, permitted_clusters: set[tuple] | None = None, debug: bool = False
     ) -> "Route":
+        """Pop a route from this set, while maintaining the balance of scaffold clusters populations"""
 
         if not self._data:
             mrich.print("RouteSet depleted")
@@ -2305,7 +2328,8 @@ class RouteSet:
 
     ### DUNDERS
 
-    def __len__(self):
+    def __len__(self) -> int:
+        """Number of routes in this set"""
         return len(self.data)
 
     def __str__(self) -> str:
@@ -2325,14 +2349,7 @@ class RouteSet:
 
 
 class RecipeSet:
-    """
-    RecipeSet class
-
-    :param param1: this is a first param
-    :param param2: this is a second param
-    :returns: this is a description of what is returned
-    :raises keyError: raises an exception
-    """
+    """A set of recipes stored on disk"""
 
     def __init__(self, db, directory, pattern="*.json"):
 
@@ -2376,7 +2393,8 @@ class RecipeSet:
     ### PROPERTIES
 
     @property
-    def db(self):
+    def db(self) -> "Database":
+        """Associated database"""
         return self._db
 
     ### METHODS
@@ -2387,6 +2405,13 @@ class RecipeSet:
         progress: bool = False,
         serialise_price: bool = False,
     ):
+        """Get values of member recipes associated with attribute ``key``
+
+        :param key: attribute to query/calculate
+        :param progress: show a progress bar
+        :param serialise_price: serialise price objects
+
+        """
 
         values = []
         recipes = self._recipes.values()
@@ -2403,6 +2428,7 @@ class RecipeSet:
         return values
 
     def get_df(self, **kwargs) -> "pandas.DataFrame":
+        """Get dataframe of recipe dictionaries. See :meth:`.Recipe.get_dict`"""
 
         data = []
 
@@ -2422,10 +2448,12 @@ class RecipeSet:
 
         return DataFrame(data)
 
-    def items(self):
+    def items(self) -> "list[tuple[str, Recipe]]":
+        """Get data dictionary items"""
         return self._recipes.items()
 
-    def keys(self):
+    def keys(self) -> list[str]:
+        """Get data dictionary keys (recipe hashes)"""
         return self._recipes.keys()
 
     ### DUNDERS

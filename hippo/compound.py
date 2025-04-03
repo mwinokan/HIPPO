@@ -220,7 +220,7 @@ class Compound:
         return self.db.count_where(table="reactant", key="compound", value=self.id)
 
     @property
-    def bases(self):
+    def bases(self) -> "CompoundSet | None":
         """Returns the base compound for this elaboration"""
         if self._bases is None or self._db_changed:
             ids = self.get_base_ids()
@@ -805,6 +805,51 @@ class Compound:
 
         else:
             display(self.mol)
+
+    def draw_elabs(self):
+
+        from molparse.rdkit import draw_highlighted_mol
+        from rdkit.Chem import rdRGroupDecomposition, MolFromSmarts
+
+        elabs = self.elabs
+
+        display(self)
+        display(elabs)
+
+        if not elabs:
+            mrich.error(self, "has no elaborations")
+            return self.draw()
+
+        # set RGD params
+        params = rdRGroupDecomposition.RGroupDecompositionParameters()
+        params.removeAllHydrogenRGroups = False
+        params.removeAllHydrogenRGroupsAndLabels = True
+        params.removeHydrogensPostMatch = True
+
+        # do the RGD
+        rgd = rdRGroupDecomposition.RGroupDecomposition(
+            MolFromSmarts(self.smiles), params
+        )
+        for mol in elabs.mols:
+            rgd.Add(mol)
+        rgd.Process()
+
+        # Get the R-group decomposition results
+        rgroup_table = rgd.GetRGroupsAsColumns()
+
+        # get the core and its attachment points
+        core = rgroup_table["Core"][0]
+        attachment_points = set()
+        for rgroup in rgroup_table["Core"]:
+            for atom in rgroup.GetAtoms():
+                if atom.GetAtomicNum() == 0:  # Dummy atom (R-group attachment point)
+                    attachment_points.add(atom.GetIdx())
+
+        # display the annotated core
+        drawing = draw_highlighted_mol(
+            core, [(i, (0.5, 1, 0.5)) for i in attachment_points]
+        )
+        display(drawing)
 
     def classify(
         self,

@@ -8,7 +8,14 @@ INTERACTION_TYPES = list(INTERACTION_TYPES.values()) + ["VdWContact"]
 FEATURE_FAMILIES = list(FEATURE_FAMILIES) + ["VdWSphere"]
 
 
-def guess_feature_families(interaction_type, prot_atom_names, lig_atom_ids):
+def guess_feature_families(
+    interaction_type: str, prot_atom_names: list[str], lig_atom_ids: list[int]
+) -> tuple[str, str, str]:
+    """Guess feature families from atom names
+
+    :param interaction_type: interaction type
+
+    """
 
     match interaction_type:
         case "VdWContact":

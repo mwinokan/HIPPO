@@ -530,7 +530,11 @@ class Pose:
             value=self.id,
             multiple=True,
             query="subsite_tag_id, subsite_tag_ref",
+            none="quiet",
         )
+
+        if not records:
+            return None
 
         subsite_tags = []
         for record in records:
@@ -664,6 +668,7 @@ class Pose:
         self,
         mol: bool = False,
         inspirations: bool | str = True,
+        subsites: bool | str = True,
         reference: bool | str = True,
         metadata: bool = True,
         duplicate_name: str | bool = False,
@@ -676,7 +681,8 @@ class Pose:
         """Returns a dictionary representing this Pose. Arguments:
 
         :param mol: Include a ``rdkit.Chem.Mol`` in the output?  (Default value = False)
-        :param inspirations: Include inspirations? ``[True, False, 'fragalysis']`` Specify ``fragalysis`` to format as a comma-separated string (Default value = True)
+        :param inspirations: Include inspirations? ``[True, False, 'names']`` Specify ``names`` to format as a comma-separated string (Default value = True)
+        :param subsites: Include subsites? ``[True, False, 'names']`` Specify ``names`` to format as a comma-separated string (Default value = True)
         :param reference: Include reference? ``[True, False, 'name']`` Specify ``name`` to include the :class:`.Pose` name rather than it's ID (Default value = True)
         :param metadata: Include metadata? (Default value = True)
         :param duplicate_name: Specify the name of a new column duplicating the pose name column  (Default value = False)
@@ -720,13 +726,21 @@ class Pose:
             if sanitise_tag_list_separator:
                 data["tags"] = sanitise_tag_list_separator.join(data["tags"])
 
-        if inspirations == "fragalysis":
+        if inspirations == "names":
             if not self.inspirations:
-                data["inspirations"] = ""
+                data["inspirations"] = None
             else:
                 data["inspirations"] = ",".join([p.name for p in self.inspirations])
         elif inspirations:
             data["inspirations"] = self.inspirations
+
+        if subsites == "names":
+            if not (sites := self.subsites):
+                data["subsites"] = None
+            else:
+                data["subsites"] = ",".join([p.name for p in sites])
+        elif subsites:
+            data["subsites"] = self.subsites
 
         if reference == "name":
             if not self.reference:
@@ -751,9 +765,24 @@ class Pose:
                 ):
                     value = None
 
-                if sanitise_metadata_list_separator:
-                    if isinstance(value, list):
-                        value = sanitise_metadata_list_separator.join(value)
+                elif sanitise_metadata_list_separator and isinstance(value, list):
+
+                    new_values = []
+
+                    for v in value:
+                        if (
+                            sanitise_null_metadata_values
+                            and isinstance(v, str)
+                            and not v
+                        ):
+                            v = None
+
+                        else:
+                            v = str(v)
+
+                        new_values.append(v)
+
+                    value = sanitise_metadata_list_separator.join(new_values)
 
                 data[key] = value
 
@@ -1372,7 +1401,9 @@ class Pose:
 
         display(draw_grid(mols, labels=labels))
 
-    def summary(self, metadata: bool = True) -> None:
+    def summary(
+        self, metadata: bool = True, tags: bool = True, subsite: bool = True
+    ) -> None:
         """Print a summary of this pose
 
         :param metadata: include metadata (Default value = True)
@@ -1389,7 +1420,10 @@ class Pose:
         mrich.var("path", self.path)
         mrich.var("target", self.target)
         mrich.var("reference", self.reference)
-        mrich.var("tags", self.tags)
+        if tags:
+            mrich.var("tags", self.tags)
+        if subsites:
+            mrich.var("subsites", self.subsites)
         mrich.var("num_heavy_atoms", self.num_heavy_atoms)
         mrich.var("distance_score", self.distance_score)
         mrich.var("energy_score", self.energy_score)
@@ -1453,10 +1487,7 @@ class Pose:
         )
 
     def posebusters(self, debug: bool = False) -> bool:
-        # if debug:
-        #     mrich.debug(self, "posebusters")
-        # from .posebusters import check_mol
-        # return check_mol(self.mol, debug=debug)
+        """Run a posebusters ligand check on this pose's molecule"""
 
         # use syndirella implementation
         from syndirella.slipper import intra_geometry, flatness

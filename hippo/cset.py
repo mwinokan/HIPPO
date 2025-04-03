@@ -346,6 +346,10 @@ class CompoundTable:
         """
         self[self.ids].interactive()
 
+    def plot_tsnee(self, **kwargs) -> "go.Figure":
+        """Plot a tanimoto similarity plot of these compounds"""
+        return self[:].plot_tsnee(**kwargs)
+
     ### DUNDERS
 
     def __call__(
@@ -406,8 +410,8 @@ class CompoundTable:
                     comp = self.db.get_compound(alias=key)
                 return comp
 
-            case key if isinstance(key, list) or isinstance(key, tuple) or isinstance(
-                key, set
+            case key if (
+                isinstance(key, list) or isinstance(key, tuple) or isinstance(key, set)
             ):
 
                 indices = []
@@ -595,6 +599,19 @@ class CompoundSet:
             multiple=True,
         )
         return [q for q, in result]
+
+    @property
+    def mols(self) -> "list[Chem.Mol]":
+        """Returns the molecules of child compounds"""
+        from rdkit.Chem import Mol
+
+        result = self.db.select_where(
+            query="mol_to_binary_mol(compound_mol)",
+            table="compound",
+            key=f"compound_id in {self.str_ids}",
+            multiple=True,
+        )
+        return [Mol(q) for q, in result]
 
     @property
     def inchikeys(self) -> list[str]:
@@ -828,7 +845,7 @@ class CompoundSet:
 
     @property
     def elab_df(self) -> "pd.DataFrame":
-        """"""
+        """Get a DataFrame summarising the elaborations in this CompoundSet"""
         from pandas import DataFrame
 
         cluster_dict = self.db.get_compound_cluster_dict(max_bases=1)
@@ -1267,7 +1284,12 @@ class CompoundSet:
         self,
         permitted_reactions: "None | ReactionSet" = None,
         debug: bool = True,
-    ):
+    ) -> "RouteSet":
+        """Get a RoutSet to products in this set.
+
+        :param permitted_reactions: optionally restrict reactions to those in this :class:`.ReactionSet`
+
+        """
 
         if "route" not in self.db.table_names:
             mrich.error("route table not in Database")
@@ -1389,32 +1411,101 @@ class CompoundSet:
 
         """
 
+        from json import loads
+        from rdkit.Chem import Mol
         from pandas import DataFrame
 
         data = []
 
-        for comp in mrich.track(self, prefix="Creating compound dataframe"):
-            d = comp.get_dict(
-                mol=mol,
-                metadata=metadata,
-                count_by_target=count_by_target,
-                poses=poses,
-                num_reactant=num_reactant,
-                num_reactions=num_reactions,
-                bases=bases,
-                elabs=elabs,
-                tags=tags,
-                **kwargs,
-            )
-            data.append(d)
+        if not any(
+            [
+                # poses,
+                count_by_target,
+                num_reactant,
+                num_reactions,
+                # bases,
+                elabs,
+                tags,
+                num_poses,
+                num_routes,
+            ]
+        ):
+
+            sql = f"""
+            SELECT compound_id, compound_inchikey, compound_alias, compound_smiles, mol_to_binary_mol(compound_mol), compound_metadata
+            FROM compound
+            WHERE compound_id IN {self.str_ids}
+            """
+
+            records = self.db.execute(sql)
+
+            for id, inchikey, alias, smiles, mol_bytes, meta_str in records:
+                d = dict(
+                    id=id,
+                    inchikey=inchikey,
+                    alias=alias,
+                    smiles=smiles,
+                )
+
+                if mol:
+                    d["mol"] = Mol(mol_bytes)
+
+                if metadata and meta_str:
+                    d["metadata"] = loads(meta_str)
+
+                data.append(d)
+
+            if bases:
+
+                sql = f"""
+                SELECT scaffold_superstructure, scaffold_base
+                FROM scaffold
+                WHERE scaffold_superstructure IN {self.str_ids}
+                """
+
+                records = self.db.execute(sql)
+
+                lookup = {}
+                for compound_id, base_id in records:
+                    lookup.setdefault(compound_id, set())
+                    if base_id:
+                        lookup[compound_id].add(base_id)
+
+                for d in data:
+                    if d["id"] in lookup:
+                        d["bases"] = lookup[d["id"]]
+
+        else:
+
+            ##### PRE-REFACTOR USING BIG QUERY
+            mrich.warning("Using slower Compound.get_dict() method")
+
+            for comp in mrich.track(self, prefix="Creating compound dataframe"):
+                d = comp.get_dict(
+                    mol=mol,
+                    metadata=metadata,
+                    count_by_target=count_by_target,
+                    # poses=poses,
+                    num_reactant=num_reactant,
+                    num_reactions=num_reactions,
+                    bases=bases,
+                    elabs=elabs,
+                    tags=tags,
+                    **kwargs,
+                )
+                data.append(d)
 
         if num_poses:
-
             lookup = self.id_num_poses_dict
-
             for d in data:
                 comp_id = d["id"]
                 d["num_poses"] = lookup.get(comp_id, 0)
+
+        if poses:
+            lookup = self.db.get_compound_id_pose_ids_dict(self)
+            for d in data:
+                comp_id = d["id"]
+                d["poses"] = lookup.get(comp_id, {})
 
         df = DataFrame(data)
 
@@ -1731,6 +1822,12 @@ class CompoundSet:
         mrich.print(f'Tagged {self} w/ "{tag}"')
 
         self.db.commit()
+
+    def plot_tsnee(self, **kwargs) -> "go.Figure":
+        """Plot a tanimoto similarity plot of these compounds"""
+        from .plotting import plot_compound_tsnee
+
+        return plot_compound_tsnee(self, **kwargs)
 
     ### DUNDERS
 
@@ -2233,7 +2330,7 @@ class IngredientSet:
         quoted_amount: float | None = None,
         debug: bool = False,
     ) -> None:
-        """Add an
+        """Add an :class:`.Ingredient` to this set
 
         :param ingredient: :class:`.Ingredient` to be added, if ``None`` must specify other parameters, (Default value = None)
         :param compound_id: :class:`.Compound` ID (Default value = None)
@@ -2448,7 +2545,8 @@ class IngredientSet:
 
         return self
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: int) -> "Ingredient":
+        """Get a member by it's index"""
         match key:
             case int():
                 series = self.df.loc[key]
@@ -2458,6 +2556,7 @@ class IngredientSet:
                 raise NotImplementedError
 
     def __iter__(self):
+        """Iterate through the ingredients"""
         return iter(self._get_ingredient(s) for i, s in self.df.iterrows())
 
     def __call__(
@@ -2466,6 +2565,7 @@ class IngredientSet:
         compound_id: int | None = None,
         tag: str | None = None,
     ) -> "IngredientSet | Ingredient | CompoundSet":
+        """Get members based on a compound_id or tag"""
 
         if compound_id:
 
