@@ -1,10 +1,13 @@
-from django.shortcuts import render, get_object_or_404, get_list_or_404
+from django.shortcuts import render, get_object_or_404, get_list_or_404, redirect
 from django.http import HttpResponse
 from django.apps import apps
 from django.db.models.fields.related import ForeignKey
 
 # from .rendertypes import ContentRenderType
-from hippo.custom_models import Pose
+from hippo.custom_models import Pose, PoseSet, PoseSetMember
+import plotly.graph_objects as go
+import plotly.io as pio
+
 
 import mrich
 
@@ -98,6 +101,30 @@ def pose_compare(request, pks: str):
     return render(
         request,
         "pose_compare.html",
+        context,
+    )
+
+
+def pose_compare_3d(request, pks: str):
+
+    pk_list = pks.split(",")
+
+    poses = Pose.filter(pk__in=pk_list)
+
+    if inspirations := request.GET.get("inspirations"):
+        assert len(poses) == 1
+
+        pose = poses[0]
+
+        poses = [i for i in pose.inspirations] + [pose]
+
+    context = {
+        "poses": poses,
+    }
+
+    return render(
+        request,
+        "pose_compare_3d.html",
         context,
     )
 
@@ -251,7 +278,7 @@ for model in app_models:
 class PoseDetailView(BaseDetailView):
     model = Pose
     template_name = f"pose_detail.html"
-    context_object_name = f"pose_detail"
+    context_object_name = f"pose"
 
     _uri_param_str = "<str:value>"
 
@@ -267,4 +294,57 @@ class PoseDetailView(BaseDetailView):
         return get_object_or_404(Pose, alias=value)
 
 
+class PoseSetDetailView(BaseDetailView):
+    model = PoseSet
+    template_name = f"poseset_detail.html"
+    context_object_name = f"poseset"
+
+    _uri_param_str = "<int:pk>"
+
+    def get_context_data(self, *args, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        fig = self.object.generate_tsnee_fig()
+        fig = pio.to_json(fig)
+        context["fig"] = fig
+
+        return context
+
+    def post(self, request, *args, **kwargs):
+        # Get the instance you are viewing (retrieved based on pk in URL)
+        obj = self.get_object()
+
+        # Here, you can get the data from the POST request (e.g., from a form)
+        new_review = request.POST.get("review", None)
+
+        assert new_review
+
+        pose_id = request.POST.get("pose", None)
+
+        assert pose_id
+
+        member = PoseSetMember.objects.get(parent_id=obj.id, pose_id=pose_id)
+
+        assert member
+
+        member.review = new_review
+
+        member.save()
+
+        # Redirect to a success URL or reload the detail view with the updated data
+        return redirect("poseset_detail", pk=obj.pk)
+
+    # def get_object(self):
+
+    #     value = self.kwargs.get("value")
+
+    #     # Check if lookup_value is an integer (PK lookup)
+    #     if value.isdigit():
+    #         return get_object_or_404(PoseSet, pk=int(value))
+
+    #     # Otherwise, assume it's a custom field (e.g., 'pose_code')
+    #     return get_object_or_404(PoseSet, alias=value)
+
+
 GENERATED_VIEWS["pose"]["detail_view"] = PoseDetailView
+GENERATED_VIEWS["poseset"]["detail_view"] = PoseSetDetailView

@@ -138,7 +138,21 @@ table {
     border-radius: 32px;
 }
 
-button {
+/*button {
+    color: var(--color-white);
+    border: none;
+    background-color: var(--color-white-overlay);
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+    border-radius: 32px;
+    font-size: 100%;
+    margin: 1rem;
+    cursor: pointer;
+}*/
+
+.btn {
     color: var(--color-white);
     border: none;
     background-color: var(--color-white-overlay);
@@ -152,23 +166,9 @@ button {
     cursor: pointer;
 }
 
-.btn {
-    color: var(--color-white);
-    border: none;
-    background-color: var(--color-white-overlay);
-    padding-left: 16px;
-    padding-right: 16px;
-    padding-top: 4px;
-    padding-bottom: 4px;
-    border-radius: 32px;
-    font-size: 100%;
-    margin: 1rem;
-/*    cursor: pointer;*/
-}
-
-a {
+/*a {
     color: var(--color-secondary);
-}
+}*/
 
 .model-pill {
     padding-left: 16px;
@@ -323,12 +323,12 @@ h2,h3,h4,h5,h6 {
 }*/
 
 .svg-container {
-  width: 100%; /* Adjust as needed */
-  max-width: 300px; /* Limits the SVG from growing beyond this */
+  width: 100%;
+  max-width: 300px;
 }
 
-svg {
+/*svg {
   width: 100%;
-  height: auto; /* Maintains aspect ratio */
-  max-width: 300px; /* Ensures it doesn't exceed this width */
-}
+  height: auto;
+  max-width: 300px;
+}*/

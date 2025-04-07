@@ -54,15 +54,25 @@ def register_compound(
     instance, created = Compound.get_or_create(
         smiles=smiles,
         inchikey=inchikey,
-        alias=alias,
-        metadata=metadata,
     )
 
-    if created:
+    updated = False
+
+    if instance.alias != alias:
+        instance.alias = alias
+        updated = True
+
+    if instance.metadata != metadata:
+        instance.metadata = metadata
+        updated = True
+
+    if created or updated:
         instance.clean_and_save()
 
-        if debug:
+        if debug and created:
             mrich.debug("Created", instance)
+        elif debug and updated:
+            mrich.debug("Updated", instance)
 
     elif debug:
         mrich.debug("Retrieved", instance)

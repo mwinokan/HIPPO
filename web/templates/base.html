@@ -10,6 +10,8 @@
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <script src="https://3Dmol.org/build/3Dmol-min.js"></script>     
+    <script src="https://cdn.plot.ly/plotly-3.0.1.min.js" charset="utf-8"></script>
+    <!-- <script src="https://cdn.plot.ly/plotly-latest.min.js"></script> -->
 </head>
 <body>
     <header style="padding-top:1em; padding-bottom:0em">
@@ -20,7 +22,7 @@
         <br>
 
         <a href="{% url 'index' %}">
-            <button>Home</button>
+            <button class="btn">Home</button>
         </a>
 
 

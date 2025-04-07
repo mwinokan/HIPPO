@@ -7,3 +7,6 @@ from .pose_table import PoseTable
 
 # from .pose_score_table import PoseScoreTable
 # from .pose_score_type_table import PoseScoreTypeTable
+
+from .pose_set import PoseSet
+from .pose_set_member import PoseSetMember

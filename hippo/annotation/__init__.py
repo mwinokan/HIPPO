@@ -1,7 +1,8 @@
 from .tag import Tag
 from .tag_type import TagType
 
-# from .inspiration import Inspiration
+from .inspiration import Inspiration
+
 # from .inspiration_score import InspirationScore
 # from .inspiration_score_type import InspirationScoreType
 # from .subsite import Subsite

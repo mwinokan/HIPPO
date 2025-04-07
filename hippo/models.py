@@ -90,7 +90,7 @@ class CompoundModel(AbstractModel):
 
     inchikey = models.CharField(max_length=27, unique=True)
     alias = models.CharField(max_length=60, blank=True, unique=True, null=True)
-    smiles = models.CharField(max_length=300)
+    smiles = models.CharField(max_length=300, unique=True)
     metadata = models.JSONField(default=dict, blank=True)
 
     mol = models.GeneratedField(
@@ -192,7 +192,7 @@ class PoseModel(AbstractModel):
     # target = models.ForeignKey(
     #     "Target", on_delete=models.CASCADE, related_name="_poses"
     # )
-    mol = MolField(blank=True)
+    mol = MolField(blank=False, unique=True)
     # energy_score = models.FloatField(blank=True, null=True)
     # distance_score = models.FloatField(blank=True, null=True)
     metadata = models.JSONField(default=dict, blank=True)
@@ -215,12 +215,12 @@ class PoseModel(AbstractModel):
     #     related_name="_poses",
     # )
 
-    # _inspirations = models.ManyToManyField(
-    #     "Pose",
-    #     through="Inspiration",
-    #     through_fields=("original", "derivative"),
-    #     related_name="_derivatives",
-    # )
+    _inspirations = models.ManyToManyField(
+        "Pose",
+        through="Inspiration",
+        through_fields=("derivative", "original"),
+        related_name="_derivatives",
+    )
     _tags = models.ManyToManyField("Tag", related_name="_poses")
 
     _shorthand = "P"
@@ -246,6 +246,37 @@ class PoseModel(AbstractModel):
             ),
         }
     )
+
+
+class PoseSetModel(AbstractModel):
+
+    class Meta:
+        abstract = True
+
+    _name_field = "name"
+
+    name = models.CharField(max_length=60, unique=True)
+
+
+class PoseSetMemberModel(AbstractModel):
+
+    class Meta:
+        abstract = True
+
+    parent = models.ForeignKey(
+        "PoseSet", on_delete=models.CASCADE, related_name="_poses"
+    )
+    pose = models.ForeignKey("Pose", on_delete=models.PROTECT, related_name="+")
+
+    pc1 = models.FloatField(null=True)
+    pc2 = models.FloatField(null=True)
+
+    review_types = {
+        "BAD": "Bad",
+        "GOOD": "Good",
+    }
+
+    review = models.CharField(max_length=4, null=True, choices=review_types)
 
 
 # class PoseScoreTypeModel(AbstractModel):
@@ -515,20 +546,21 @@ class TagTypeModel(AbstractModel):
     _name_field = "name"
 
 
-# class InspirationModel(AbstractModel):
-#     class Meta:
-#         abstract = True
+class InspirationModel(AbstractModel):
+    class Meta:
+        abstract = True
+        unique_together = ("original", "derivative")
 
-#     original = models.ForeignKey("Pose", on_delete=models.CASCADE, related_name="+")
+    original = models.ForeignKey("Pose", on_delete=models.CASCADE, related_name="+")
 
-#     derivative = models.ForeignKey("Pose", on_delete=models.CASCADE, related_name="+")
+    derivative = models.ForeignKey("Pose", on_delete=models.CASCADE, related_name="+")
 
-#     _score_types = models.ManyToManyField(
-#         "InspirationScoreType",
-#         through="InspirationScore",
-#         through_fields=("inspiration", "score_type"),
-#         related_name="_inspirations",
-#     )
+    # _score_types = models.ManyToManyField(
+    #     "InspirationScoreType",
+    #     through="InspirationScore",
+    #     through_fields=("inspiration", "score_type"),
+    #     related_name="_inspirations",
+    # )
 
 
 # class InspirationScoreTypeModel(AbstractModel):

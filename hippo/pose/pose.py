@@ -1,10 +1,10 @@
 from ..models import PoseModel
-from .pose_set import PoseSet
+from .pose_query_set import PoseQuerySet
 
 
 class Pose(PoseModel):
 
-    _objects = PoseSet.as_manager()
+    _objects = PoseQuerySet.as_manager()
     _parent_module = "pose"
 
     _custom_detail_view = True

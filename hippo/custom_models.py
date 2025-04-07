@@ -1,13 +1,13 @@
 from .protein import Target, Structure
 from .compound import Compound  # , CompoundScore, CompoundScoreType
-from .pose import Pose  # , PoseScore, PoseScoreType
+from .pose import Pose, PoseSet, PoseSetMember  # , PoseScore, PoseScoreType
 
 # from .quoting import Quote, Supplier
 from .annotation import (
     Tag,
     TagType,
     # Subsite,
-    # Inspiration,
+    Inspiration,
     # InspirationScore,
     # InspirationScoreType,
     # Observation,
@@ -17,6 +17,8 @@ from .annotation import (
 # from .interactions import Interaction, Feature
 # from .chemistry import Solvent, Reaction, Reactant, Product
 from .resources import File  # , Link
+
+# from .models import PoseSet, PoseSetMember
 
 # from .projects import Campaign, Iteration
 
@@ -44,9 +46,11 @@ MODELS = [
     # PoseScoreType,
     # CompoundScore,
     # CompoundScoreType,
-    # Inspiration,
+    Inspiration,
     # InspirationScore,
     # InspirationScoreType,
     # Campaign,
     # Iteration,
+    PoseSet,
+    PoseSetMember,
 ]

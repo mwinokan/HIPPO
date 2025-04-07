@@ -26,7 +26,9 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     # custom views
     path("pose_sdf/<int:pk>/", views.pose_sdf, name="pose_sdf"),
+    # path("pose_review_div/<int:pk>/", views.pose_review_div, name="pose_review_div"),
     path("pose_compare/<str:pks>/", views.pose_compare, name="pose_compare"),
+    path("pose_compare_3d/<str:pks>/", views.pose_compare_3d, name="pose_compare_3d"),
 ]
 
 for model_name, model_views in views.GENERATED_VIEWS.items():

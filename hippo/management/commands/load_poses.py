@@ -8,6 +8,7 @@ from pathlib import Path
 
 from rdkit.Chem import PandasTools
 from hippo.io.register import register_pose
+from hippo.custom_models import Pose, Inspiration
 
 
 class Command(BaseCommand):
@@ -41,12 +42,43 @@ class Command(BaseCommand):
         database_settings = settings.DATABASES["default"]
         database_path = database_settings["NAME"]
 
+        poses = {p.alias: p for p in Pose.objects.all()}
+        inspiration_objects = []
+
         for i, row in df.iterrows():
 
             if row["ID"] == "ver_1.2":
                 mrich.warning("Skipping Fragalysis header")
                 continue
 
+            if "ref_mols" in row:
+                inspiration_names = row["ref_mols"].split(",")
+
+                inspirations = []
+
+                for inspiration_name in inspiration_names:
+
+                    if inspiration_name in poses:
+                        inspirations.append(poses[inspiration_name])
+                    else:
+                        s = f"Unknown inspiration: {inspiration_name}"
+                        mrich.error(s)
+                        raise ValueError(s)
+
             mol = row["ROMol"]
 
-            register_pose(mol=mol)
+            data = dict(
+                mol=mol,
+            )
+
+            pose = register_pose(**data)
+
+            for inspiration in inspirations:
+                inspiration_objects.append(
+                    Inspiration(original=inspiration, derivative=pose)
+                )
+
+        Inspiration.objects.bulk_create(
+            inspiration_objects,
+            ignore_conflicts=True,
+        )

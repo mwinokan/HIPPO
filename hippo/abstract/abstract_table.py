@@ -48,6 +48,7 @@ class AbstractTable:
     #     return self._all_objects
 
     def get_str(self, name: bool = True) -> str:
+
         if name and self.name:
             s = f"{self.name}: "
         else:

@@ -6,7 +6,7 @@
 
 <div class="card">
 
-    <h2 class="center">{{ object.model_pill_html|default:object|safe }}</h1>
+    <h2 class="center">{{ object.model_pill_html|default:object|safe }}</h2>
     
     {% block pretable %}{% endblock %}
 
@@ -32,7 +32,7 @@
                         <td>
                             <span id="{{ field_name |add:'_text' }}" class="monospace">{{ value }}</span>
                             {% if render_dict.copyable %}
-                                <button onclick="copyToClipboard('{{ field_name |add:'_text' }}')"><i class="fa fa-copy" style="cursor:copy;"></i></button>
+                                <button class="btn" onclick="copyToClipboard('{{ field_name |add:'_text' }}')"><i class="fa fa-copy" style="cursor:copy;"></i></button>
                             {% endif %}
                         </td>
                     
@@ -67,6 +67,8 @@
 </div>
     
 <!-- CARDS/TOGGLES -->
+
+{% block precards %}{% endblock %}
 
 {% for field_name, values, render_dict in fields %}
 
@@ -146,7 +148,7 @@
 
 {% endfor %}
 
-<button><a href="{% url model_name|add:'_list' %}">Back to List</a></button>
-<button><a href="{{ object.get_admin_url }}">Edit</a></button>
+<button class="btn"><a href="{% url model_name|add:'_list' %}">Back to List</a></button>
+<button class="btn"><a href="{{ object.get_admin_url }}">Edit</a></button>
 
 {% endblock %}
