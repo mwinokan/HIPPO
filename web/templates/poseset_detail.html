@@ -18,13 +18,11 @@
             var pointIndex = data.points[0].pointIndex;
             var pose_id = data.points[0].customdata;
 
-            document.getElementById("selected_pose_id").innerHTML = pose_id;
-
             document.getElementById("form").style.display = "block";
             
             document.getElementById("pose_id_input").value = pose_id;
 
-            fetch(`/pose_compare_3d/${pose_id}?inspirations=True`)
+            fetch(`/pose_compare_3d/${pose_id}?inspirations=True&model_pills=True`)
             .then(response => response.text())
             .then(data => {
                 document.getElementById("selected_viewer").innerHTML = data;
@@ -50,8 +48,6 @@
 <div class="card">
 
     <h2>Selected</h2>
-
-    <p id="selected_pose_id"></p>
 
     <div id="selected_viewer"></div>
 

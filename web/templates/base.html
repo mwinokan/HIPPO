@@ -72,6 +72,18 @@
                 notification.style.display = "none";
             }, 3000);
         }
+    
+        function modelPill(elementId, modelName, pk){
+            fetch(`/model_pill/${modelName}/${pk}/`)
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById(elementId).innerHTML = data;
+                })
+                .catch(error => console.error("Error loading content:", error));
+        }
+
     </script>
+
+
 </body>
 </html>

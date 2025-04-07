@@ -315,6 +315,10 @@ class AbstractModel(models.Model):
     def __name__(self):
         return self.__class__.__name__
 
+    @property
+    def class_name(self):
+        return self.__class__.__name__
+
     # def __setattr__(self, key, value):
     #     if self._auto_save and key in self.wrapped_field_names:
     #         result = super().__setattr__(key, value)

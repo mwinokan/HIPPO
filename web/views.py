@@ -1,5 +1,5 @@
 from django.shortcuts import render, get_object_or_404, get_list_or_404, redirect
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.apps import apps
 from django.db.models.fields.related import ForeignKey
 
@@ -120,6 +120,8 @@ def pose_compare_3d(request, pks: str):
 
     context = {
         "poses": poses,
+        "colors": ["orange", "blue", "green", "yellow", "red"],
+        "model_pills": request.GET.get("model_pills", False),
     }
 
     return render(
@@ -128,6 +130,30 @@ def pose_compare_3d(request, pks: str):
         context,
     )
 
+
+# def model_pill(request, class_name: str, pk: int):
+
+#     context = {
+#         "class_name":class_name,
+#         "pk":pk,
+#     }
+
+#     from hippo import custom_models
+
+#     model = getattr(custom_models, class_name)
+
+#     instance = model.objects.get(id=pk)
+
+#     context["model"] = model
+#     context["instance"] = instance
+#     context["parent_module"] = instance._parent_module
+#     context["class_name"] = instance.class_name.lower()
+
+#     return render(
+#         request,
+#         "model_pill.html",
+#         context,
+#     )
 
 ### class based views
 
