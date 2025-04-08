@@ -9,7 +9,6 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from .orm.expressions import MolFromSmiles, MolPatternBfpFromSmiles
 from .orm.fields import MolField
 from .orm.validators import validate_list_of_integers, validate_coord
-from .abstract import AbstractModel
 
 from molparse.rdkit.features import FEATURE_FAMILIES, INTERACTION_TYPES
 

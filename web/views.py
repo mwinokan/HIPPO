@@ -4,7 +4,7 @@ from django.apps import apps
 from django.db.models.fields.related import ForeignKey
 
 # from .rendertypes import ContentRenderType
-from hippo.custom_models import Pose, PoseSet, PoseSetMember
+from hippo.models import Pose, PoseSet, PoseSetMember
 import plotly.graph_objects as go
 import plotly.io as pio
 
