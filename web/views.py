@@ -1,13 +1,25 @@
-from django.shortcuts import render, get_object_or_404, get_list_or_404, redirect
-from django.http import HttpResponse, JsonResponse
+from django.shortcuts import (
+    render,
+    get_object_or_404,
+    get_list_or_404,
+    redirect,
+    reverse,
+)
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+
+# from django.contrib import messages
 from django.apps import apps
 from django.db.models.fields.related import ForeignKey
+from django.db.models.fields.reverse_related import OneToOneRel
+from django.contrib.auth.decorators import login_required
+from django.core.management import call_command
 
 # from .rendertypes import ContentRenderType
-from hippo.models import Pose, PoseSet, PoseSetMember
+from hippo.models import MODELS, Pose, PoseSet, PoseSetMember, FragalysisDownload
 import plotly.graph_objects as go
 import plotly.io as pio
-
+from .forms import *
+import subprocess
 
 import mrich
 
@@ -15,30 +27,6 @@ import mrich
 
 
 def index(request):
-
-    # campaigns
-
-    # from hippo.projects import Campaign, Iteration
-
-    # # iterations = Iteration.objects.all()
-    # campaigns = Campaign.objects.all()
-
-    # iteration_content = []
-
-    # for campaign in campaigns:
-
-    #     targets = campaign.targets
-
-    #     for iteration in campaign.iterations.all():
-    #         iteration_content.append(
-    #             dict(
-    #                 name=iteration.long_name,
-    #                 targets=str(targets),
-    #                 status=iteration.get_status_display(),
-    #                 fg_style=iteration.get_status_fg_style(),
-    #                 bg_style=iteration.get_status_bg_style(),
-    #             )
-    #         )
 
     # display statistics on models
     app_config = apps.get_app_config("hippo")
@@ -133,29 +121,49 @@ def pose_compare_3d(request, pks: str):
     )
 
 
-# def model_pill(request, class_name: str, pk: int):
+@login_required
+def fragalysis_download(request):
 
-#     context = {
-#         "class_name":class_name,
-#         "pk":pk,
-#     }
+    if request.method == "POST":
+        form = FragalysisDownloadForm(request.POST)
 
-#     from hippo import custom_models
+        if form.is_valid():
+            download = form.save()  # Save to the database
 
-#     model = getattr(custom_models, class_name)
+            # Run the management command
+            subprocess.Popen(
+                ["python", "manage.py", "load_fragalysis", str(download.id)],
+            )
 
-#     instance = model.objects.get(id=pk)
+            return HttpResponseRedirect(
+                f"{reverse('fragalysis_download')}?id={download.id}"
+            )
 
-#     context["model"] = model
-#     context["instance"] = instance
-#     context["parent_module"] = instance._parent_module
-#     context["class_name"] = instance.class_name.lower()
+    else:
 
-#     return render(
-#         request,
-#         "model_pill.html",
-#         context,
-#     )
+        download_id = int(request.GET.get("id", 0))
+
+        if not download_id:
+            form = FragalysisDownloadForm()
+            messages = []
+            download = None
+
+        else:
+            download = FragalysisDownload.objects.get(id=download_id)
+            if message := download.message:
+                messages = download.message.split("\n")
+            else:
+                messages = []
+            form = None
+
+        context = {
+            "download": download,
+            "messages": messages,
+            "form": form,
+        }
+
+        return render(request, "fragalysis_download.html", context)
+
 
 ### class based views
 
@@ -187,6 +195,13 @@ class BaseDetailView(DetailView):
             elif isinstance(field, ForeignKey):
 
                 related = getattr(self.object, field_name)
+
+                field_name = field_name  # .removeprefix("_")  # .capitalize()
+                value = related
+
+            elif isinstance(field, OneToOneRel):
+
+                related = getattr(self.object, field_name, None)
 
                 field_name = field_name  # .removeprefix("_")  # .capitalize()
                 value = related
@@ -286,12 +301,12 @@ def get_models_for_app(app_label):
     return app_config.get_models()
 
 
-# Get all models in the app
-app_models = get_models_for_app("hippo")
+# # Get all models in the app
+# app_models = get_models_for_app("hippo")
 
 # Store generated views in a dictionary
 GENERATED_VIEWS = {}
-for model in app_models:
+for model in MODELS:
 
     list_view, detail_view = generate_views_for_model(model)
 

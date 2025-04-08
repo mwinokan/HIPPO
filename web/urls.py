@@ -23,12 +23,14 @@ urlpatterns = [
     # index
     path("", views.index, name="index"),
     # admin
+    path("accounts/", include("django.contrib.auth.urls")),
     path("admin/", admin.site.urls),
     # custom views
     # path("model_pill/<str:class_name>/<int:pk>/", views.model_pill, name="model_pill"),
     path("pose_sdf/<int:pk>/", views.pose_sdf, name="pose_sdf"),
     path("pose_compare/<str:pks>/", views.pose_compare, name="pose_compare"),
     path("pose_compare_3d/<str:pks>/", views.pose_compare_3d, name="pose_compare_3d"),
+    path("fragalysis_download/", views.fragalysis_download, name="fragalysis_download"),
 ]
 
 for model_name, model_views in views.GENERATED_VIEWS.items():

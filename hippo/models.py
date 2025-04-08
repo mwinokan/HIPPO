@@ -11,9 +11,11 @@ from .orm.fields import MolField
 from .orm.validators import validate_list_of_integers, validate_coord
 
 from molparse.rdkit.features import FEATURE_FAMILIES, INTERACTION_TYPES
+from django.shortcuts import reverse
 
 import sys
 import mrich
+import mcol
 
 sys.path.append("..")
 from web.rendertypes import FieldRenderType, ContentRenderType, DEFAULTS
@@ -36,6 +38,7 @@ class AbstractModel(models.Model):
 
     _shorthand = None
     _name_field = None
+    _parent_module = "resources"
 
     _custom_detail_view = False
 
@@ -82,7 +85,7 @@ class AbstractModel(models.Model):
         from rich.box import SIMPLE_HEAVY
         from rich.table import Table
 
-        fields = self.get_wrapped_field_names()
+        fields = self._meta.get_fields()
 
         table = Table(title=self.__rich__(), box=SIMPLE_HEAVY)
         table.add_column("Field", style="var_name")
@@ -91,7 +94,7 @@ class AbstractModel(models.Model):
         table.add_row(f"[bold]Model", f"[bold var_type]{self.__name__}")
 
         for field in fields:
-            value = getattr(self, field)
+            value = getattr(self, field.name, None)
 
             if not value:
                 continue
@@ -100,7 +103,7 @@ class AbstractModel(models.Model):
                 s = value.__rich__()
             else:
                 s = str(value)
-            table.add_row(f"[bold]{field}", s)
+            table.add_row(f"[bold]{field.name}", s)
 
         panel = Panel(table, expand=False)
         mrich.print(panel)
@@ -109,7 +112,7 @@ class AbstractModel(models.Model):
         self.full_clean()
         self.save()
 
-    def get_field_render_type(self, field, debug: bool = False):
+    def get_field_render_type(self, field, debug: bool = True):
 
         if field.name in self._field_render_types:
             data = self._field_render_types[field.name]
@@ -150,8 +153,8 @@ class AbstractModel(models.Model):
 
         id_str = self.id or "?"
 
-        if sh := self.shorthand:
-            s = f"{self.shorthand}{id_str}"
+        if sh := self._shorthand:
+            s = f"{self._shorthand}{id_str}"
         else:
             s = f"{self.__name__}_{id_str}"
 
@@ -184,8 +187,8 @@ class AbstractModel(models.Model):
 
 class Target(AbstractModel):
 
-    name = models.CharField(max_length=60, blank=True, unique=True)
-    metadata = models.JSONField(default=dict, blank=True)
+    name = models.CharField(max_length=200, blank=True, unique=True)
+    # metadata = models.JSONField(default=dict, blank=True)
 
     _shorthand = "T"
     _name_field = "name"
@@ -193,13 +196,20 @@ class Target(AbstractModel):
 
 class Structure(AbstractModel):
 
-    alias = models.CharField(max_length=60, blank=True, unique=True, null=True)
-    pdbblock = models.TextField(blank=True, null=True)
+    # class Meta:
+    #     unique_together = ("protein_file", "alias")
 
-    files = models.ManyToManyField("File", related_name="_structures")
+    alias = models.CharField(max_length=60, blank=True, unique=True, null=True)
+    pdb_block = models.TextField(blank=True, null=True)
+
+    # files = models.ManyToManyField("File", related_name="structures")
+
+    protein_file = models.OneToOneField(
+        "File", related_name="structure", on_delete=models.PROTECT
+    )
 
     target = models.ForeignKey(
-        "Target", on_delete=models.CASCADE, related_name="_structures"
+        "Target", on_delete=models.CASCADE, related_name="structures"
     )
 
     STRUCTURE_ORIGINS = {
@@ -214,12 +224,12 @@ class Structure(AbstractModel):
 
     resolution = models.FloatField(blank=True, null=True)
 
-    poses = models.ManyToManyField(
-        "Pose",
-        through="Placement",
-        through_fields=("structure", "pose"),
-        related_name="_structures",
-    )
+    # poses = models.ManyToManyField(
+    #     "Pose",
+    #     through="Placement",
+    #     through_fields=("structure", "pose"),
+    #     related_name="structures",
+    # )
 
     metadata = models.JSONField(default=dict, blank=True)
 
@@ -250,13 +260,14 @@ class Compound(AbstractModel):
     )
 
     scaffolds = models.ManyToManyField(
-        "Compound", related_name="_elaborations", blank=True
+        "Compound", related_name="elaborations", blank=True
     )
 
-    tags = models.ManyToManyField("Tag", related_name="_compounds", blank=True)
+    tags = models.ManyToManyField("Tag", related_name="compounds", blank=True)
 
     _shorthand = "C"
     _name_field = "alias"
+    _parent_module = "compound"
 
     _field_render_types = AbstractModel._field_render_types.copy()
     _field_render_types.update(
@@ -281,17 +292,71 @@ class Compound(AbstractModel):
 
         return value
 
+    def clean(self):
+        """Ensure the SMILES field is sanitized before validation."""
+        if self.smiles:
+            from .tools import sanitise_smiles
+
+            self.smiles = sanitise_smiles(self.smiles)
+        super().clean()
+
+    @classmethod
+    def bulk_register(
+        cls,
+        smiles: list[str],
+        alias: str | None = None,
+        metadata: str | dict | None = None,
+        radical: str = "remove",
+    ) -> None:
+
+        # from .compound import Compound
+        from .tools import inchikey_from_smiles, sanitise_smiles
+        from .orm.formatters import dict_formatter
+
+        if alias is None:
+            alias = [None] * len(smiles)
+
+        if metadata is None:
+            metadata = [None] * len(smiles)
+
+        # get or create instance
+        objects = []
+        for s, a, m in zip(smiles, alias, metadata):
+
+            s = sanitise_smiles(s, verbosity=False, radical=radical)
+            i = inchikey_from_smiles(s)
+            m = dict_formatter(m)
+
+            instance = cls(
+                smiles=s,
+                inchikey=i,
+                alias=a,
+                metadata=m,
+            )
+
+            objects.append(instance)
+
+        created_objs = cls.objects.bulk_create(
+            objects,
+            update_conflicts=True,
+            unique_fields=["inchikey"],
+            update_fields=["alias", "metadata"],
+        )
+
 
 ### LIGAND (3D)
 
 
 class Pose(AbstractModel):
+    class Meta:
+        unique_together = ("alias", "mol")
 
     inchikey = models.CharField(max_length=27, blank=True)
     alias = models.CharField(max_length=60, blank=True, unique=True, null=True)
     smiles = models.CharField(max_length=300, blank=True, null=True)
 
-    files = models.ManyToManyField("File", related_name="_poses")
+    # ligand_file = models.OneToOneField("File", related_name="pose", on_delete=models.PROTECT)
+    # files = models.ManyToManyField("File", related_name="+")
 
     mol = MolField(blank=False, unique=True)
     metadata = models.JSONField(default=dict, blank=True)
@@ -311,9 +376,9 @@ class Pose(AbstractModel):
         "Pose",
         through="Inspiration",
         through_fields=("derivative", "original"),
-        related_name="_derivatives",
+        related_name="derivatives",
     )
-    tags = models.ManyToManyField("Tag", related_name="_poses")
+    tags = models.ManyToManyField("Tag", related_name="poses")
 
     _shorthand = "P"
     _name_field = "alias"
@@ -475,7 +540,7 @@ class PoseSet(AbstractModel):
 class PoseSetMember(AbstractModel):
 
     parent = models.ForeignKey(
-        "PoseSet", on_delete=models.CASCADE, related_name="_poses"
+        "PoseSet", on_delete=models.CASCADE, related_name="poses"
     )
     pose = models.ForeignKey("Pose", on_delete=models.PROTECT, related_name="+")
 
@@ -498,7 +563,7 @@ class Tag(AbstractModel):
         unique_together = ("name", "type")
 
     name = models.CharField(max_length=60, blank=False)
-    type = models.ForeignKey("TagType", on_delete=models.RESTRICT, related_name="_tags")
+    type = models.ForeignKey("TagType", on_delete=models.RESTRICT, related_name="tags")
 
     _name_field = "name"
     _list_view_fields = ["name", "type"]
@@ -528,18 +593,18 @@ class Placement(AbstractModel):
         unique_together = ("structure", "pose")
 
     structure = models.ForeignKey(
-        "Structure", on_delete=models.RESTRICT, related_name="_placements"
+        "Structure", on_delete=models.RESTRICT, related_name="placements"
     )
 
-    pose = models.ForeignKey(
-        "Pose", on_delete=models.CASCADE, related_name="_placements"
+    pose = models.OneToOneField(
+        "Pose", on_delete=models.CASCADE, related_name="placement"
     )
 
     compound = models.ForeignKey(
-        "Compound", on_delete=models.RESTRICT, related_name="_placements"
+        "Compound", on_delete=models.RESTRICT, related_name="placements"
     )
 
-    method = models.TextField(blank=True, null=True)
+    # method = models.TextField(blank=True, null=True)
 
     metadata = models.JSONField(default=dict, blank=True)
 
@@ -594,6 +659,7 @@ class File(AbstractModel):
     )
 
     _name_field = "name"
+    _parent_module = "resources"
 
     @property
     def name(self):
@@ -602,6 +668,39 @@ class File(AbstractModel):
     @property
     def as_path(self):
         return Path(self.path)
+
+
+class FragalysisDownload(AbstractModel):
+
+    from fragalysis.requests import STACKS
+
+    STATUSES = {
+        0: "PENDING",
+        1: "DOWNLOADING",
+        2: "LOADING",
+        3: "COMPLETE",
+        4: "FAILED",
+    }
+
+    target_name = models.CharField(max_length=200)
+    target_access_string = models.CharField(max_length=200)
+
+    access_token = models.CharField(max_length=32, null=True, blank=True)
+    stack = models.CharField(
+        max_length=60, choices={v: f"{k} ({v})" for k, v in STACKS.items()}
+    )
+
+    time_start = models.DateTimeField(auto_now_add=True)
+    time_finished = models.DateTimeField(null=True)
+
+    status = models.PositiveIntegerField(default=0, choices=STATUSES)
+    message = models.TextField(null=True, blank=True)
+
+    target = models.ForeignKey(
+        "Target", on_delete=models.CASCADE, related_name="+", null=True
+    )
+
+    # _shorthand = "FragalysisDownload"
 
 
 MODELS = [

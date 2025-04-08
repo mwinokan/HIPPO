@@ -48,6 +48,9 @@ DEFAULTS = {
     "<class 'django.db.models.fields.related.ForeignKey'>": dict(
         type=FieldRenderType.TABLE, content=ContentRenderType.INSTANCE_PILL
     ),
+    "<class 'django.db.models.fields.reverse_related.OneToOneRel'>": dict(
+        type=FieldRenderType.TABLE, content=ContentRenderType.INSTANCE_PILL
+    ),
     "<class 'django.db.models.fields.TextField'>": dict(
         type=FieldRenderType.TOGGLE_CARD,
         content=ContentRenderType.TEXT_MONOSPACE,

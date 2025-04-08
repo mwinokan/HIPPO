@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="card">
+
+    <h1 class="w3-tag shadow89">Login</h1>
+
+    <div class="w3-panel w3-white shadow89 w3-responsive w3-padding" style="padding-left:0px;padding-right:0px;padding-bottom:3px">
+
+        <form method="post">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button class="w3-button w3-black w3-round" type="submit">Login</button>
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock %}
