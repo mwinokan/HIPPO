@@ -258,6 +258,16 @@ def dt_hash():
     return timehash
 
 
+def guess_file_format(path) -> str:
+    for suffix in File.FILE_FORMATS:
+        if path.name.endswith(suffix):
+            format_type = suffix
+            break
+    else:
+        raise ValueError(f"Unknown file extension: {path}")
+    return format_type
+
+
 # https://github.com/rdkit/rdkit-tutorials/blob/master/notebooks/005_Chemical_space_analysis_and_visualization.ipynb
 
 import numpy as np

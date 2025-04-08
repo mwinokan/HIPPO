@@ -17,7 +17,7 @@ import sys
 import mrich
 
 sys.path.append("..")
-from web.rendertypes import FieldRenderType, ContentRenderType
+from web.rendertypes import FieldRenderType, ContentRenderType, DEFAULTS
 
 CURRENCIES = {
     "EUR": "€",
@@ -25,13 +25,165 @@ CURRENCIES = {
     "GBP": "£",
 }
 
-### PROTEIN
+### ABSTRACT MODEL
 
 
-class TargetModel(AbstractModel):
+class AbstractModel(models.Model):
     class Meta:
         app_label = "hippo"
         abstract = True
+
+    id = models.BigAutoField(primary_key=True)
+
+    _shorthand = None
+    _name_field = None
+
+    _custom_detail_view = False
+
+    _field_render_types = {
+        "smiles": dict(
+            type=FieldRenderType.TABLE,
+            content=ContentRenderType.TEXT_MONOSPACE,
+            copyable=True,
+        ),
+        "alias": dict(
+            type=FieldRenderType.TABLE,
+            content=ContentRenderType.TEXT_MONOSPACE,
+            copyable=True,
+        ),
+        "inchikey": dict(
+            type=FieldRenderType.TABLE,
+            content=ContentRenderType.TEXT_MONOSPACE,
+            copyable=True,
+        ),
+        "mol": dict(type=FieldRenderType.TABLE, content=ContentRenderType.MOL_2D_SVG),
+        "pdbblock": dict(type=FieldRenderType.HIDDEN),
+        "metadata": dict(
+            type=FieldRenderType.TOGGLE_CARD, content=ContentRenderType.DICT_TABLE
+        ),
+    }
+
+    _list_view_fields = ["smiles", "inchikey", "mol"]
+
+    @property
+    def model_pill_html(self):
+        return f"""<div class="model-pill" style="
+        background:var(--color-{self.__name__.lower()}, 
+                   var(--color-{self._parent_module}));
+        color:var(--text-color-{self.__name__.lower()}, 
+              var(--text-color-{self._parent_module}));
+        ">{self}</div>"""
+
+    def get_absolute_url(self):
+        return reverse(f"{self.__name__.lower()}_detail", args=[str(self.id)])
+
+    def summary(self):
+
+        from rich.panel import Panel
+        from rich.box import SIMPLE_HEAVY
+        from rich.table import Table
+
+        fields = self.get_wrapped_field_names()
+
+        table = Table(title=self.__rich__(), box=SIMPLE_HEAVY)
+        table.add_column("Field", style="var_name")
+        table.add_column("Value", style="result")
+
+        table.add_row(f"[bold]Model", f"[bold var_type]{self.__name__}")
+
+        for field in fields:
+            value = getattr(self, field)
+
+            if not value:
+                continue
+
+            if hasattr(value, "__rich__"):
+                s = value.__rich__()
+            else:
+                s = str(value)
+            table.add_row(f"[bold]{field}", s)
+
+        panel = Panel(table, expand=False)
+        mrich.print(panel)
+
+    def clean_and_save(self, debug: bool = False):
+        self.full_clean()
+        self.save()
+
+    def get_field_render_type(self, field, debug: bool = False):
+
+        if field.name in self._field_render_types:
+            data = self._field_render_types[field.name]
+
+            if debug:
+                mrich.debug("custom", field.name, type(field), data)
+
+        else:
+            data = DEFAULTS.get(str(type(field)), None)
+
+            if debug:
+                mrich.debug("default", field.name, type(field), data)
+
+        if not data:
+            data = {}
+
+        if "type" not in data:
+            mrich.warning("No default field render type", field.name, str(type(field)))
+            data["type"] = "FieldRenderType.TABLE"
+
+        if "content" not in data:
+            mrich.warning(
+                "No default content render type", field.name, str(type(field))
+            )
+            data["content"] = "ContentRenderType.TEXT_NORMAL"
+
+        data["type"] = str(data["type"])
+        data["content"] = str(data["content"])
+
+        return data
+
+    def get_admin_url(self):
+        return reverse(f"admin:hippo_{self.__name__.lower()}_change", args=[self.id])
+
+    ### DUNDERS
+
+    def __str__(self) -> str:
+
+        id_str = self.id or "?"
+
+        if sh := self.shorthand:
+            s = f"{self.shorthand}{id_str}"
+        else:
+            s = f"{self.__name__}_{id_str}"
+
+        if field := self._name_field:
+            name_str = getattr(self, field)
+            if name_str:
+                return f'{s} "{name_str}"'
+
+        return s
+
+    def __repr__(self) -> str:
+        """ANSI formatted string representation"""
+        return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
+
+    def __rich__(self) -> str:
+        """Representation for mrich"""
+        return f"[bold]{self}"
+
+    @property
+    def __name__(self):
+        return self.__class__.__name__
+
+    @property
+    def class_name(self):
+        return self.__class__.__name__
+
+
+### PROTEIN
+
+
+class Target(AbstractModel):
 
     name = models.CharField(max_length=60, blank=True, unique=True)
     metadata = models.JSONField(default=dict, blank=True)
@@ -40,16 +192,12 @@ class TargetModel(AbstractModel):
     _name_field = "name"
 
 
-class StructureModel(AbstractModel):
-    class Meta:
-        app_label = "hippo"
-        abstract = True
+class Structure(AbstractModel):
 
     alias = models.CharField(max_length=60, blank=True, unique=True, null=True)
     pdbblock = models.TextField(blank=True, null=True)
-    # path = models.FilePathField(Path("/"), max_length=200, unique=True)
 
-    _files = models.ManyToManyField("File", related_name="_structures")
+    files = models.ManyToManyField("File", related_name="_structures")
 
     target = models.ForeignKey(
         "Target", on_delete=models.CASCADE, related_name="_structures"
@@ -67,7 +215,7 @@ class StructureModel(AbstractModel):
 
     resolution = models.FloatField(blank=True, null=True)
 
-    _poses = models.ManyToManyField(
+    poses = models.ManyToManyField(
         "Pose",
         through="Placement",
         through_fields=("structure", "pose"),
@@ -83,10 +231,7 @@ class StructureModel(AbstractModel):
 ### LIGAND (2D)
 
 
-class CompoundModel(AbstractModel):
-    class Meta:
-        app_label = "hippo"
-        abstract = True
+class Compound(AbstractModel):
 
     inchikey = models.CharField(max_length=27, unique=True)
     alias = models.CharField(max_length=60, blank=True, unique=True, null=True)
@@ -105,24 +250,11 @@ class CompoundModel(AbstractModel):
         db_persist=True,
     )
 
-    # _suppliers = models.ManyToManyField(
-    #     "Supplier",
-    #     through="Quote",
-    #     through_fields=("compound", "supplier"),
-    #     related_name="_compounds",
-    # )
-
-    _scaffolds = models.ManyToManyField(
+    scaffolds = models.ManyToManyField(
         "Compound", related_name="_elaborations", blank=True
     )
-    _tags = models.ManyToManyField("Tag", related_name="_compounds", blank=True)
 
-    # _score_types = models.ManyToManyField(
-    #     "CompoundScoreType",
-    #     through="CompoundScore",
-    #     through_fields=("compound", "score_type"),
-    #     related_name="_compounds",
-    # )
+    tags = models.ManyToManyField("Tag", related_name="_compounds", blank=True)
 
     _shorthand = "C"
     _name_field = "alias"
@@ -135,66 +267,34 @@ class CompoundModel(AbstractModel):
         }
     )
 
-    # _list_view_fields = AbstractModel._field_render_types.copy()
-    # _list_view_fields += [ "" ]
+    def get_mol_svg_text(self, width=300, height=200):
 
+        import re
+        from rdkit.Chem.Draw import MolDraw2DSVG
 
-# class CompoundScoreTypeModel(AbstractModel):
-#     class Meta:
-#         abstract = True
+        drawer = MolDraw2DSVG(width, height)
+        drawer.DrawMolecule(self.mol)
+        drawer.FinishDrawing()
+        value = drawer.GetDrawingText()
 
-#     name = models.CharField(max_length=30)
-#     method = models.CharField(max_length=30)
-#     unit = models.CharField(max_length=30)
-#     description = models.CharField(max_length=120)
+        # transparent background
+        value = re.sub(r"<rect style='opacity:1.0;fill:#FFFFFF.*> <\/rect>", "", value)
 
-
-# class CompoundScoreModel(AbstractModel):
-#     class Meta:
-#         abstract = True
-
-#     compound = models.ForeignKey(
-#         "Compound", on_delete=models.CASCADE, related_name="_scores"
-#     )
-#     score_type = models.ForeignKey(
-#         "CompoundScoreType", on_delete=models.CASCADE, related_name="_values"
-#     )
-
-#     value = models.FloatField()
+        return value
 
 
 ### LIGAND (3D)
 
 
-class PoseModel(AbstractModel):
-    class Meta:
-        app_label = "hippo"
-        abstract = True
+class Pose(AbstractModel):
 
     inchikey = models.CharField(max_length=27, blank=True)
     alias = models.CharField(max_length=60, blank=True, unique=True, null=True)
     smiles = models.CharField(max_length=300, blank=True, null=True)
 
-    # reference = models.ForeignKey(
-    #     "Pose", on_delete=models.SET_NULL, blank=True, null=True, related_name="+"
-    # )
+    files = models.ManyToManyField("File", related_name="_poses")
 
-    # structure = models.ForeignKey("Structure", on_delete=models.CASCADE, blank=False, null=False, related_name="_poses")
-
-    _files = models.ManyToManyField("File", related_name="_poses")
-
-    # mol_path = models.FilePathField(Path("/"), max_length=200, unique=True)
-    # complex_path = models.FilePathField(Path("/"), max_length=200, unique=True)
-
-    # compound = models.ForeignKey(
-    #     "Compound", on_delete=models.CASCADE, related_name="_poses"
-    # )
-    # target = models.ForeignKey(
-    #     "Target", on_delete=models.CASCADE, related_name="_poses"
-    # )
     mol = MolField(blank=False, unique=True)
-    # energy_score = models.FloatField(blank=True, null=True)
-    # distance_score = models.FloatField(blank=True, null=True)
     metadata = models.JSONField(default=dict, blank=True)
     is_fingerprinted = models.BooleanField(default=False)
 
@@ -208,23 +308,17 @@ class PoseModel(AbstractModel):
         max_length=10, choices=[(k, v) for k, v in POSE_ORIGINS.items()]
     )
 
-    # _score_types = models.ManyToManyField(
-    #     "PoseScoreType",
-    #     through="PoseScore",
-    #     through_fields=("pose", "score_type"),
-    #     related_name="_poses",
-    # )
-
-    _inspirations = models.ManyToManyField(
+    inspirations = models.ManyToManyField(
         "Pose",
         through="Inspiration",
         through_fields=("derivative", "original"),
         related_name="_derivatives",
     )
-    _tags = models.ManyToManyField("Tag", related_name="_poses")
+    tags = models.ManyToManyField("Tag", related_name="_poses")
 
     _shorthand = "P"
     _name_field = "alias"
+    _custom_detail_view = True
 
     _field_render_types = AbstractModel._field_render_types.copy()
     _field_render_types.update(
@@ -247,21 +341,139 @@ class PoseModel(AbstractModel):
         }
     )
 
+    def get_mol_svg_text(self, width=300, height=200):
 
-class PoseSetModel(AbstractModel):
+        import re
+        from rdkit.Chem.Draw import MolDraw2DSVG
+        from rdkit.Chem import MolToSmiles, MolFromSmiles
 
-    class Meta:
-        abstract = True
+        mol = MolFromSmiles(MolToSmiles(self.mol))
 
-    _name_field = "name"
+        drawer = MolDraw2DSVG(width, height)
+        drawer.DrawMolecule(mol)
+        drawer.FinishDrawing()
+        value = drawer.GetDrawingText()
+
+        # transparent background
+        value = re.sub(r"<rect style='opacity:1.0;fill:#FFFFFF.*> <\/rect>", "", value)
+        value = re.sub(r"<\?xml version='1\.0' encoding='iso-8859-1'\?>", "", value)
+
+        return value
+
+
+class PoseSet(AbstractModel):
 
     name = models.CharField(max_length=60, unique=True)
 
+    _name_field = "name"
+    _custom_detail_view = True
 
-class PoseSetMemberModel(AbstractModel):
+    def calculate_pca(self):
 
-    class Meta:
-        abstract = True
+        with mrich.loading("imports..."):
+            from ..tools import get_cfps
+            from sklearn.decomposition import PCA
+            import numpy as np
+            import pandas as pd
+
+        members = list(self.poses.values("id", "pose"))
+
+        pose_ids = [d["pose"] for d in members]
+
+        poses = Pose.objects.filter(id__in=pose_ids)
+
+        pose_mols = {d["id"]: d["mol"] for d in poses.values("id", "mol")}
+
+        for member in members:
+            mol = pose_mols[member["pose"]]
+            member["mol"] = mol
+
+        df = pd.DataFrame(members)
+
+        with mrich.loading("Getting Compound fingerprints"):
+            df["FP"] = df["mol"].map(get_cfps)
+
+        X = np.array([x.fp for x in df["FP"]])
+
+        with mrich.loading("Computing PCA"):
+            pca = PCA(n_components=2, random_state=0)
+            pca_fit = pca.fit_transform(X)
+
+        df["PC1"] = pca_fit.T[0]
+        df["PC2"] = pca_fit.T[1]
+
+        members = []
+
+        for i, row in df.iterrows():
+
+            members.append(
+                PoseSetMember(
+                    id=row["id"],
+                    pc1=row["PC1"],
+                    pc2=row["PC2"],
+                )
+            )
+
+        PoseSetMember.objects.bulk_update(members, fields=["pc1", "pc2"])
+
+    def generate_tsnee_fig(self):
+
+        import plotly.graph_objects as go
+
+        n_valid = [v for v in self.poses.values_list("pc1", flat=True) if v is not None]
+
+        if n_valid != self.poses.count():
+            self.calculate_pca()
+
+        members = self.poses
+
+        fig = go.Figure()
+
+        x = [m.pc1 for m in members]
+        y = [m.pc2 for m in members]
+
+        text = []
+        colors = []
+        pose_ids = []
+        for m in members:
+
+            pose = m.pose
+
+            text.append(str(pose))
+            pose_ids.append(pose.id)
+
+            match m.review:
+                case None:
+                    colors.append("gray")
+                case "GOOD":
+                    colors.append("rgb(0,255,0)")
+                case "BAD":
+                    colors.append("red")
+
+        trace = go.Scatter(
+            x=x,
+            y=y,
+            mode="markers",
+            marker=dict(
+                size=12,
+                color=colors,
+            ),
+            hovertemplate="%{text}<br>PC1: %{x}<br>PC2: %{y}<extra></extra>",
+            text=text,
+            customdata=pose_ids,
+        )
+
+        fig.add_trace(trace)
+
+        fig.update_layout(
+            margin=dict(l=20, r=20, t=20, b=20),
+            paper_bgcolor="rgba(0,0,0,0)",
+        )
+
+        return fig
+
+
+class PoseSetMember(AbstractModel):
 
     parent = models.ForeignKey(
         "PoseSet", on_delete=models.CASCADE, related_name="_poses"
@@ -279,266 +491,24 @@ class PoseSetMemberModel(AbstractModel):
     review = models.CharField(max_length=4, null=True, choices=review_types)
 
 
-# class PoseScoreTypeModel(AbstractModel):
-#     class Meta:
-#         abstract = True
-
-#     name = models.CharField(max_length=30)
-#     method = models.CharField(max_length=30)
-#     unit = models.CharField(max_length=30)
-#     description = models.CharField(max_length=120)
-
-
-# class PoseScoreModel(AbstractModel):
-
-#     class Meta:
-#         abstract = True
-
-#     pose = models.ForeignKey("Pose", on_delete=models.CASCADE, related_name="_scores")
-#     score_type = models.ForeignKey(
-#         "PoseScoreType", on_delete=models.CASCADE, related_name="_values"
-#     )
-
-#     value = models.FloatField()
-
-
-### INTERACTIONS
-
-
-# class FeatureModel(AbstractModel):
-
-#     class Meta:
-#         app_label = "hippo"
-#         abstract = True
-#         unique_together = (
-#             "family",
-#             "target",
-#             "chain_name",
-#             "residue_name",
-#             "residue_number",
-#             "atom_names",
-#         )
-
-#     family = models.CharField(max_length=30, choices={f: f for f in FEATURE_FAMILIES})
-
-#     target = models.ForeignKey(
-#         "Target",
-#         on_delete=models.CASCADE,
-#         related_name="_features",
-#     )
-
-#     chain_name = models.CharField(max_length=5)
-#     residue_name = models.CharField(max_length=10)
-#     residue_number = models.SmallIntegerField()
-#     atom_names = models.JSONField(default=dict)  # TODO: Validate as list
-
-#     _shorthand = "F"
-#     _name_field = "family"
-
-
-# class InteractionModel(AbstractModel):
-#     class Meta:
-#         app_label = "hippo"
-#         abstract = True
-#         unique_together = ("feature", "pose", "type", "family")
-
-#     family = models.CharField(max_length=30, choices={f: f for f in FEATURE_FAMILIES})
-#     type = models.CharField(
-#         max_length=30, choices={f: f for f in INTERACTION_TYPES.values()}
-#     )
-
-#     pose = models.ForeignKey(
-#         "Pose", on_delete=models.CASCADE, related_name="_interactions"
-#     )
-
-#     structure = models.ForeignKey(
-#         "Structure", on_delete=models.CASCADE, related_name="_interactions"
-#     )
-
-#     feature = models.ForeignKey(
-#         "Feature", on_delete=models.RESTRICT, related_name="_interactions"
-#     )
-
-#     atom_ids = models.JSONField(default=dict, validators=[validate_list_of_integers])
-#     prot_coord = models.JSONField(default=dict, validators=[validate_coord])
-#     lig_coord = models.JSONField(default=dict, validators=[validate_coord])
-#     distance = models.FloatField(validators=[MinValueValidator(0.0)])
-#     angle = models.FloatField(
-#         blank=True,
-#         null=True,
-#         validators=[MinValueValidator(0.0), MaxValueValidator(360)],
-#     )
-#     energy = models.FloatField(blank=True, null=True)
-
-#     _shorthand = "I"
-#     _name_field = "type"
-
-
-### PROCUREMENT
-
-
-# class QuoteModel(AbstractModel):
-#     class Meta:
-#         app_label = "hippo"
-#         abstract = True
-#         unique_together = ("amount", "supplier", "catalogue", "entry")
-
-#     amount = models.FloatField(validators=[MinValueValidator(0.0)])
-#     catalogue = models.CharField(max_length=60, blank=True)
-#     entry = models.CharField(max_length=60, blank=True)
-#     lead_time = models.FloatField(
-#         validators=[MinValueValidator(0.0)], blank=True, null=True
-#     )
-#     price = models.DecimalField(
-#         validators=[MinValueValidator(0.0)],
-#         blank=True,
-#         null=True,
-#         max_digits=8,
-#         decimal_places=2,
-#     )
-#     currency = models.CharField(max_length=3, blank=True, choices=CURRENCIES)
-#     date = models.DateField(default=date.today)
-
-#     compound = models.ForeignKey(
-#         "Compound", on_delete=models.RESTRICT, related_name="_quotes"
-#     )
-
-#     supplier = models.ForeignKey(
-#         "Supplier", on_delete=models.RESTRICT, related_name="_quotes"
-#     )
-
-#     purity = models.FloatField(
-#         blank=True,
-#         null=True,
-#         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
-#     )
-
-#     _shorthand = "Q"
-
-
-# class SupplierModel(AbstractModel):
-#     class Meta:
-#         app_label = "hippo"
-#         abstract = True
-
-#     name = models.CharField(max_length=30, unique=True)
-
-#     _name_field = "name"
-
-
-### CHEMISTRY
-
-
-# class ReactionModel(AbstractModel):
-#     class Meta:
-#         app_label = "hippo"
-#         abstract = True
-
-#     type = models.CharField(max_length=60, blank=False)
-
-#     _product_compounds = models.ManyToManyField(
-#         "Compound",
-#         through="Product",
-#         through_fields=("reaction", "compound"),
-#         related_name="_product_reactions",
-#     )
-
-#     yield_fraction = models.FloatField(
-#         default=1.0, validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
-#     )
-
-#     _reactant_compounds = models.ManyToManyField(
-#         "Compound",
-#         through="Reactant",
-#         through_fields=("reaction", "compound"),
-#         related_name="_reactant_reactions",
-#     )
-
-#     _shorthand = "R"
-#     _name_field = "type"
-
-
-# class ProductModel(AbstractModel):
-#     class Meta:
-#         app_label = "hippo"
-#         abstract = True
-#         unique_together = ("reaction", "compound")
-
-#     amount = models.FloatField(default=1.0, validators=[MinValueValidator(0.0)])
-
-#     reaction = models.ForeignKey(
-#         "Reaction",
-#         on_delete=models.CASCADE,
-#         related_name="_products",
-#     )
-
-#     compound = models.ForeignKey(
-#         "Compound", on_delete=models.RESTRICT, related_name="_reaction_products"
-#     )
-
-#     solvent = models.ForeignKey(
-#         "Solvent",
-#         null=True,
-#         blank=True,
-#         on_delete=models.RESTRICT,
-#         related_name="_products",
-#     )
-
-
-# class ReactantModel(AbstractModel):
-#     class Meta:
-#         app_label = "hippo"
-#         abstract = True
-#         unique_together = ("reaction", "compound")
-
-#     amount = models.FloatField(default=1.0, validators=[MinValueValidator(0.0)])
-#     reaction = models.ForeignKey(
-#         "Reaction", on_delete=models.CASCADE, related_name="_reactants"
-#     )
-#     compound = models.ForeignKey(
-#         "Compound", on_delete=models.RESTRICT, related_name="_reaction_reactants"
-#     )
-
-#     solvent = models.ForeignKey(
-#         "Solvent",
-#         null=True,
-#         blank=True,
-#         on_delete=models.RESTRICT,
-#         related_name="_reactants",
-#     )
-
-
-# class SolventModel(AbstractModel):
-#     class Meta:
-#         app_label = "hippo"
-#         abstract = True
-
-#     name = models.CharField(max_length=30, unique=True)
-
-#     _name_field = "name"
-
-
 ### ANNOTATION
 
 
-class TagModel(AbstractModel):
+class Tag(AbstractModel):
     class Meta:
-        app_label = "hippo"
-        abstract = True
         unique_together = ("name", "type")
 
     name = models.CharField(max_length=60, blank=False)
     type = models.ForeignKey("TagType", on_delete=models.RESTRICT, related_name="_tags")
 
     _name_field = "name"
-
-    # _list_view_fields = AbstractModel._field_render_types.copy()
     _list_view_fields = ["name", "type"]
 
+    def __str__(self):
+        return f'"{self.name}" [{self.type.name}]'
 
-class TagTypeModel(AbstractModel):
-    class Meta:
-        abstract = True
+
+class TagType(AbstractModel):
 
     name = models.CharField(max_length=30, blank=False, unique=True)
     origin = models.CharField(max_length=30, blank=True, null=True)
@@ -546,94 +516,16 @@ class TagTypeModel(AbstractModel):
     _name_field = "name"
 
 
-class InspirationModel(AbstractModel):
+class Inspiration(AbstractModel):
     class Meta:
-        abstract = True
         unique_together = ("original", "derivative")
 
     original = models.ForeignKey("Pose", on_delete=models.CASCADE, related_name="+")
-
     derivative = models.ForeignKey("Pose", on_delete=models.CASCADE, related_name="+")
 
-    # _score_types = models.ManyToManyField(
-    #     "InspirationScoreType",
-    #     through="InspirationScore",
-    #     through_fields=("inspiration", "score_type"),
-    #     related_name="_inspirations",
-    # )
 
-
-# class InspirationScoreTypeModel(AbstractModel):
-#     class Meta:
-#         abstract = True
-
-#     name = models.CharField(max_length=30)
-#     method = models.CharField(max_length=30)
-#     unit = models.CharField(max_length=30)
-#     description = models.CharField(max_length=120)
-
-
-# class InspirationScoreModel(AbstractModel):
-#     class Meta:
-#         abstract = True
-
-#     inspiration = models.ForeignKey(
-#         "Inspiration", on_delete=models.CASCADE, related_name="_scores"
-#     )
-#     score_type = models.ForeignKey(
-#         "InspirationScoreType", on_delete=models.CASCADE, related_name="_values"
-#     )
-
-#     value = models.FloatField()
-
-
-# class SubsiteModel(AbstractModel):
-#     class Meta:
-#         app_label = "hippo"
-#         abstract = True
-#         unique_together = ("target", "name")
-
-#     target = models.ForeignKey(
-#         "Target", on_delete=models.CASCADE, related_name="_subsites"
-#     )
-#     name = models.CharField(max_length=30)
-#     description = models.CharField(max_length=120, blank=True, null=True)
-#     metadata = models.JSONField(default=dict, blank=True)
-
-#     # _poses M2M field defined on
-
-#     _poses = models.ManyToManyField(
-#         "Pose",
-#         through="Observation",
-#         through_fields=("subsite", "pose"),
-#         related_name="_subsites",
-#     )
-
-#     _name_field = "name"
-
-
-# class ObservationModel(AbstractModel):
-#     class Meta:
-#         app_label = "hippo"
-#         abstract = True
-#         unique_together = ("subsite", "pose")
-
-#     subsite = models.ForeignKey(
-#         "Subsite", on_delete=models.RESTRICT, related_name="_observations"
-#     )
-#     pose = models.ForeignKey(
-#         "Pose", on_delete=models.CASCADE, related_name="_observations"
-#     )
-#     atom_ids = models.JSONField(default=dict)  # TODO: validation
-#     metadata = models.JSONField(default=dict, blank=True)
-
-#     _shorthand = "O"
-
-
-class PlacementModel(AbstractModel):
+class Placement(AbstractModel):
     class Meta:
-        app_label = "hippo"
-        abstract = True
         unique_together = ("structure", "pose")
 
     structure = models.ForeignKey(
@@ -656,10 +548,7 @@ class PlacementModel(AbstractModel):
 ### RESOURCE MANAGEMENT
 
 
-class FileModel(AbstractModel):
-
-    class Meta:
-        abstract = True
+class File(AbstractModel):
 
     FILE_FORMATS = {
         ".pdb": "Protein Data Bank (.pdb)",
@@ -674,7 +563,8 @@ class FileModel(AbstractModel):
         ".cif": "Crystallographic Information File (.cif)",
         # zip
         # tgz
-        # pkl.tgz
+        # tar.gz
+        # pkl.gz
     }
 
     FILE_CONTENTS = {
@@ -706,218 +596,25 @@ class FileModel(AbstractModel):
 
     _name_field = "name"
 
-
-# class LinkModel(AbstractModel):
-#     class Meta:
-#         abstract = True
-
-#     url = models.CharField(max_length=300)
-#     description = models.CharField(max_length=300)
-
-#     _iterations = models.ManyToManyField("Iteration", related_name="_links", blank=True)
-#     _poses = models.ManyToManyField("Pose", related_name="_links", blank=True)
-#     _targets = models.ManyToManyField("Target", related_name="_links", blank=True)
-#     _campaigns = models.ManyToManyField("Campaign", related_name="_links", blank=True)
-#     _subsites = models.ManyToManyField("Subsite", related_name="_links", blank=True)
-#     _structures = models.ManyToManyField("Structure", related_name="_links", blank=True)
-#     _files = models.ManyToManyField("File", related_name="_links", blank=True)
-#     _tags = models.ManyToManyField("Tag", related_name="_links", blank=True)
-#     _posescoretypes = models.ManyToManyField(
-#         "PoseScoreType", related_name="_links", blank=True
-#     )
-#     _compounds = models.ManyToManyField("Compound", related_name="_links", blank=True)
-#     _suppliers = models.ManyToManyField("Supplier", related_name="_links", blank=True)
-#     _quotes = models.ManyToManyField("Quote", related_name="_links", blank=True)
-
-
-### PROJECT MANAGEMENT
-
-
-# class CampaignModel(AbstractModel):
-
-#     class Meta:
-#         abstract = True
-
-#     name = models.CharField(max_length=30, unique=True)
-#     _targets = models.ManyToManyField("Target", related_name="_campaigns", blank=False)
-
-#     _name_field = "name"
-
-
-# class IterationModel(AbstractModel):
-
-#     class Meta:
-#         abstract = True
-
-#     ITERATION_STATUS = [
-#         ("P", "PENDING"),
-#         ("D", "DESIGN"),
-#         ("M", "MAKE"),
-#         ("T", "TEST"),
-#         ("A", "ANALYSE"),
-#         ("F", "FINISHED"),
-#         ("C", "CANCELLED"),
-#     ]
-
-#     number = models.PositiveSmallIntegerField(validators=[MinValueValidator(1)])
-
-#     campaign = models.ForeignKey(
-#         "Campaign",
-#         on_delete=models.CASCADE,
-#         related_name="_iterations",
-#     )
-
-#     status = models.CharField(max_length=1, choices=ITERATION_STATUS)
-
-#     _name_field = "long_name"
-
-
-### RECIPES
-
-
-# class Route(AbstractModel):
-
-#     _reactions = models.ManyToManyField(
-#         "Reaction",
-#         through="RouteStep",
-#         through_fields=("route", "reaction"),
-#         related_name="_structures",
-#     )
-
-
-# class RouteStep(AbstractModel):
-
-#     route = models.ForeignKey("Route", on_delete=models.CASCADE, related_name="_steps")
-#     reaction = models.ForeignKey(
-#         "Reaction", on_delete=models.RESTRICT, related_name="_steps"
-#     )
-
-#     number = models.PositiveSmallIntegerField()
-
-#     multiplier = models.FloatField(default=1.0)
-
-#     is_root = models.BooleanField()
-#     is_leaf = models.BooleanField()
-
-
-# class RandomRecipeGenerator(AbstractModel):
-
-#     _suppliers = models.ManyToManyField(
-#         "Supplier",
-#         # through="RecipeComponent",
-#         # through_fields=("recipe", "route"),
-#         related_name="+",
-#     )
-
-#     budget = models.DecimalField(
-#         validators=[MinValueValidator(0.0)],
-#         blank=True,
-#         null=True,
-#         max_digits=8,
-#         decimal_places=2,
-#     )
-#     currency = models.CharField(max_length=3, blank=True, choices=CURRENCIES)
-
-#     origin = models.ForeignKey(
-#         "Recipe", on_delete=models.RESTRICT, related_name="_generators"
-#     )
-
-
-# class Recipe(AbstractModel):
-
-#     generator = models.ForeignKey(
-#         "RandomRecipeGenerator", on_delete=models.RESTRICT, related_name="_recipes"
-#     )
-
-#     _routes = models.ManyToManyField(
-#         "Route",
-#         through="RecipeComponent",
-#         through_fields=("recipe", "route"),
-#         related_name="_recipes",
-#     )
-
-
-# class RecipeComponent(AbstractModel):
-
-#     recipe = models.ForeignKey(
-#         "Recipe", on_delete=models.CASCADE, related_name="_recipe_components"
-#     )
-#     route = models.ForeignKey(
-#         "Route", on_delete=models.RESTRICT, related_name="_recipe_components"
-#     )
-
-#     multiplier = models.FloatField(default=1.0)
-
-
-### SCORING
-
-
-# class RecipeScore(AbstractModel):
-
-#     recipe = models.ForeignKey(
-#         "Recipe", on_delete=models.CASCADE, related_name="_scores"
-#     )
-#     scorer = models.ForeignKey(
-#         "RecipeScorer", on_delete=models.RESTRICT, related_name="_scores"
-#     )
-
-#     score = models.FloatField(
-#         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
-#     )
-
-
-# class RecipeScorer(AbstractModel):
-
-#     _recipes = models.ManyToManyField(
-#         "Recipe",
-#         through="RecipeScore",
-#         through_fields=("scorer", "recipe"),
-#         related_name="_scorers",
-#     )
-
-#     _attributes = models.ManyToManyField(
-#         "ScoringAttribute",
-#         through="ScoringAttributeWeight",
-#         through_fields=("scorer", "attribute"),
-#         related_name="_scorers",
-#     )
-
-
-# class ScoringAttribute(AbstractModel):
-
-#     name = models.CharField(max_length=30, unique=True)
-
-#     attribute = models.CharField(max_length=90)
-
-#     _recipes = models.ManyToManyField(
-#         "Recipe",
-#         through="AttributeValue",
-#         through_fields=("attribute", "recipe"),
-#         related_name="+",
-#     )
-
-
-# class AttributeValue(AbstractModel):
-
-#     attribute = models.ForeignKey(
-#         "ScoringAttribute", on_delete=models.RESTRICT, related_name="_values"
-#     )
-#     recipe = models.ForeignKey("Recipe", on_delete=models.CASCADE, related_name="+")
-
-#     value = models.FloatField()
-
-
-# class ScoringAttributeWeight(AbstractModel):
-
-#     attribute = models.ForeignKey(
-#         "ScoringAttribute", on_delete=models.CASCADE, related_name="+"
-#     )
-#     scorer = models.ForeignKey(
-#         "RecipeScorer", on_delete=models.RESTRICT, related_name="_attribute_weights"
-#     )
-
-#     is_inversed = models.BooleanField()
-
-#     weight = models.FloatField(
-#         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
-#     )
+    @property
+    def name(self):
+        return Path(self.path).name
+
+    @property
+    def as_path(self):
+        return Path(self.path)
+
+
+MODELS = [
+    Target,
+    Compound,
+    Pose,
+    Tag,
+    TagType,
+    Structure,
+    Placement,
+    File,
+    Inspiration,
+    PoseSet,
+    PoseSetMember,
+]

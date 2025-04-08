@@ -81,7 +81,7 @@ WSGI_APPLICATION = "web.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db" / "HIPPO-DB.sqlite3",
+        "NAME": BASE_DIR / "db" / "HIPPO-DB_lean.sqlite3",
     }
 }
 
