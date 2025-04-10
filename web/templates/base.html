@@ -21,10 +21,11 @@
 
         <br>
 
-        <a href="{% url 'index' %}">
-            <button class="btn">Home</button>
-        </a>
+        <a href="{% url 'index' %}" class="btn">Home</a>
 
+        {% if not request.user.is_authenticated %}
+            <a href="{% url 'login' %}" class="btn">Login</a>
+        {% endif %}
 
     </header>
     <main>
