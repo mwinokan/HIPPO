@@ -280,6 +280,12 @@ def get_base_detail_context(context, model, instance):
             else:
                 continue
 
+        if rel_name := render_dict.get("follow_related", False):
+            try:
+                value = getattr(value, rel_name)
+            except AttributeError as e:
+                value = [getattr(v, rel_name) for v in value]
+
         if split := render_dict.get("split", False):
             value = value.split(split)
 

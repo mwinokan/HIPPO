@@ -414,7 +414,8 @@ class Pose(AbstractModel):
         through_fields=("derivative", "original"),
         related_name="derivatives",
     )
-    tags = models.ManyToManyField("Tag", related_name="poses")
+
+    # tags = models.ManyToManyField("Tag", related_name="poses", )
 
     _shorthand = "P"
     _name_field = "alias"
@@ -428,15 +429,10 @@ class Pose(AbstractModel):
                 content=ContentRenderType.TEXT_MONOSPACE,
                 copyable=False,
             ),
-            "_structures": dict(
-                type=FieldRenderType.TABLE,
+            "tags": dict(
+                type=FieldRenderType.HIDDEN,
                 content=ContentRenderType.INSTANCE_PILL,
-                zero_index=True,
-            ),
-            "_placements": dict(
-                type=FieldRenderType.TABLE,
-                content=ContentRenderType.INSTANCE_PILL,
-                zero_index=True,
+                follow_related="tag",
             ),
         }
     )
@@ -617,11 +613,32 @@ class Tag(AbstractModel):
 
 class TagType(AbstractModel):
 
-    name = models.CharField(max_length=30, blank=False, unique=True)
+    class Meta:
+        unique_together = ("name", "origin")
+
+    name = models.CharField(max_length=30, blank=False)
     origin = models.CharField(max_length=30, blank=True, null=True)
 
     _style = "annotation"
     _name_field = "name"
+
+    def __str__(self):
+        return f"TT{self.id} {self.name} ({self.origin})"
+
+
+class PoseTag(AbstractModel):
+
+    class Meta:
+        unique_together = ("pose", "tag")
+
+    pose = models.ForeignKey("Pose", related_name="tags", on_delete=models.CASCADE)
+    tag = models.ForeignKey("Tag", related_name="poses", on_delete=models.CASCADE)
+
+    _exclude_from_index = True
+
+    # @property
+    # def model_pill_html(self):
+    #     return self.tag.model_pill_html
 
 
 class Inspiration(AbstractModel):
@@ -806,7 +823,7 @@ class FragalysisDownload(AbstractModel):
             ),
             "message": dict(
                 type=FieldRenderType.TOGGLE_CARD,
-                content=ContentRenderType.TEXT_NORMAL,
+                content=ContentRenderType.TEXT_MONOSPACE,
                 split="\n",
             ),
             # "time_start": dict(
@@ -837,4 +854,5 @@ MODELS = [
     PoseSet,
     PoseSetMember,
     FragalysisDownload,
+    PoseTag,
 ]
