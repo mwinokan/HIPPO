@@ -32,23 +32,38 @@
         --color-pose: hsl(209 100% 39%);
         --text-color-pose: hsl(209 100% 90%);
 
-        --color-quoting: hsl(153 100% 39%);
+        --color-placement: hsl(180 90% 45%);
+        --text-color-placement: hsl(180 90% 100%);
+
+        --color-quoting: hsl(153 100% 25%);
         --text-color-quoting: hsl(153 100% 90%);
 
         --color-annotation: hsl(335 100% 39%);
-        --text-color-annotation: hsl(335 100% 90%);
+        --text-color-annotation: hsl(335 100% 95%);
 
         --color-interactions: hsl(71 100% 39%);
         --text-color-interactions: hsl(71 100% 90%);
 
         --color-chemistry: hsl(132 100% 39%);
+        --text-color-chemistry: hsl(132 100% 90%);
 
         --color-resources: hsl(132 0% 39%);
         --text-color-resources: hsl(132 0% 90%);
-        --text-color-chemistry: hsl(132 100% 90%);
+
+        --color-other: hsl(132 0% 5%);
+        --text-color-other: hsl(132 0% 90%);
 
         --color-projects: hsl(290 100% 39%);
         --text-color-projects: hsl(290 100% 90%);
+
+        --color-tag: hsl(2 53% 60%);
+        --text-color-tag: hsl(2 100% 100%);
+
+        --color-tagtype: hsl(2 53% 50%);
+        --text-color-tagtype: hsl(2 100% 100%);
+
+        --color-poseset: hsl(209 100% 18%);
+        --text-color-poseset: hsl(209 100% 90%);
 
 }
 
@@ -162,7 +177,7 @@ table {
     padding-bottom: 4px;
     border-radius: 32px;
     font-size: 100%;
-    margin: 1rem;
+/*    margin: 1rem;*/
     cursor: pointer;
 }
 
@@ -187,7 +202,7 @@ table {
     padding: 2px 8px;
     border-radius: 4px;
     border: 1px solid;
-    font-size:90%
+    font-size:90%;
 }
 /*
 table.bordered {
@@ -198,7 +213,7 @@ table.bordered {
 
 @media screen and (min-width: 601px) {
 th, td {
-    padding:8px 32px;
+    padding:4px 32px;
     display:table-cell;
     text-align:left;
     vertical-align:middle;

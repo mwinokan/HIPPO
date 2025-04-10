@@ -38,9 +38,12 @@ class AbstractModel(models.Model):
 
     _shorthand = None
     _name_field = None
-    _parent_module = "resources"
+    _style = "other"
 
+    _custom_list_view = False
     _custom_detail_view = False
+    _exclude_from_index = False
+    _has_list_view = True
 
     _field_render_types = {
         "smiles": dict(
@@ -53,13 +56,27 @@ class AbstractModel(models.Model):
             content=ContentRenderType.TEXT_MONOSPACE,
             copyable=True,
         ),
+        "origin": dict(
+            type=FieldRenderType.TABLE,
+            content=ContentRenderType.TEXT_MONOSPACE,
+            # copyable=False,
+        ),
+        "name": dict(
+            type=FieldRenderType.TABLE,
+            content=ContentRenderType.TEXT_MONOSPACE,
+            copyable=True,
+        ),
         "inchikey": dict(
             type=FieldRenderType.TABLE,
             content=ContentRenderType.TEXT_MONOSPACE,
             copyable=True,
         ),
         "mol": dict(type=FieldRenderType.TABLE, content=ContentRenderType.MOL_2D_SVG),
-        "pdbblock": dict(type=FieldRenderType.HIDDEN),
+        "pdb_block": dict(
+            type=FieldRenderType.TOGGLE_CARD,
+            content=ContentRenderType.TEXT_MONOSPACE,
+            split="\n",
+        ),
         "metadata": dict(
             type=FieldRenderType.TOGGLE_CARD, content=ContentRenderType.DICT_TABLE
         ),
@@ -71,10 +88,23 @@ class AbstractModel(models.Model):
     def model_pill_html(self):
         return f"""<div class="model-pill" style="
         background:var(--color-{self.__name__.lower()}, 
-                   var(--color-{self._parent_module}));
+                   var(--color-{self._style}));
         color:var(--text-color-{self.__name__.lower()}, 
-              var(--text-color-{self._parent_module}));
+              var(--text-color-{self._style}));
         ">{self}</div>"""
+
+    @property
+    def class_pill_html(cls):
+        return f"""<div class="model-pill" style="
+        background:var(--color-{cls.__name__.lower()}, 
+                   var(--color-{cls._style}));
+        color:var(--text-color-{cls.__name__.lower()}, 
+              var(--text-color-{cls._style}));
+        ">{cls.__name__}</div>"""
+
+    @property
+    def has_list_view(self):
+        return self._has_list_view
 
     def get_absolute_url(self):
         return reverse(f"{self.__name__.lower()}_detail", args=[str(self.id)])
@@ -108,11 +138,11 @@ class AbstractModel(models.Model):
         panel = Panel(table, expand=False)
         mrich.print(panel)
 
-    def clean_and_save(self, debug: bool = False):
+    def clean_and_save(self):
         self.full_clean()
         self.save()
 
-    def get_field_render_type(self, field, debug: bool = True):
+    def get_field_render_type(self, field, debug: bool = False):
 
         if field.name in self._field_render_types:
             data = self._field_render_types[field.name]
@@ -192,6 +222,7 @@ class Target(AbstractModel):
 
     _shorthand = "T"
     _name_field = "name"
+    _style = "projects"
 
 
 class Structure(AbstractModel):
@@ -235,6 +266,9 @@ class Structure(AbstractModel):
 
     _shorthand = "S"
     _name_field = "alias"
+    _style = "protein"
+
+    _list_view_fields = ["smiles", "target", "origin"]
 
 
 ### LIGAND (2D)
@@ -267,7 +301,7 @@ class Compound(AbstractModel):
 
     _shorthand = "C"
     _name_field = "alias"
-    _parent_module = "compound"
+    _style = "compound"
 
     _field_render_types = AbstractModel._field_render_types.copy()
     _field_render_types.update(
@@ -276,6 +310,8 @@ class Compound(AbstractModel):
             # "mol": dict(type=FieldRenderType.HIDDEN),
         }
     )
+
+    _list_view_fields = ["smiles"]
 
     def get_mol_svg_text(self, width=300, height=200):
 
@@ -405,6 +441,8 @@ class Pose(AbstractModel):
         }
     )
 
+    _list_view_fields = ["smiles"]
+
     def get_mol_svg_text(self, width=300, height=200):
 
         import re
@@ -431,6 +469,7 @@ class PoseSet(AbstractModel):
 
     _name_field = "name"
     _custom_detail_view = True
+    _style = "pose"
 
     def calculate_pca(self):
 
@@ -554,6 +593,9 @@ class PoseSetMember(AbstractModel):
 
     review = models.CharField(max_length=4, null=True, choices=review_types)
 
+    _style = "pose"
+    _exclude_from_index = True
+
 
 ### ANNOTATION
 
@@ -567,6 +609,7 @@ class Tag(AbstractModel):
 
     _name_field = "name"
     _list_view_fields = ["name", "type"]
+    _style = "annotation"
 
     def __str__(self):
         return f'"{self.name}" [{self.type.name}]'
@@ -577,6 +620,7 @@ class TagType(AbstractModel):
     name = models.CharField(max_length=30, blank=False, unique=True)
     origin = models.CharField(max_length=30, blank=True, null=True)
 
+    _style = "annotation"
     _name_field = "name"
 
 
@@ -586,6 +630,8 @@ class Inspiration(AbstractModel):
 
     original = models.ForeignKey("Pose", on_delete=models.CASCADE, related_name="+")
     derivative = models.ForeignKey("Pose", on_delete=models.CASCADE, related_name="+")
+
+    _style = "annotation"
 
 
 class Placement(AbstractModel):
@@ -607,6 +653,15 @@ class Placement(AbstractModel):
     # method = models.TextField(blank=True, null=True)
 
     metadata = models.JSONField(default=dict, blank=True)
+
+    _name_field = "name"
+    _style = "annotation"
+
+    _list_view_fields = ["structure", "compound"]
+
+    @property
+    def name(self):
+        return f"{self.structure.alias} w/ {self.compound.alias}"
 
 
 ### RESOURCE MANAGEMENT
@@ -659,7 +714,30 @@ class File(AbstractModel):
     )
 
     _name_field = "name"
-    _parent_module = "resources"
+    _style = "resources"
+
+    _field_render_types = AbstractModel._field_render_types.copy()
+    _field_render_types.update(
+        {
+            "content_type": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.TEXT_MONOSPACE,
+                copyable=False,
+            ),
+            "purpose": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.TEXT_MONOSPACE,
+                zero_index=True,
+            ),
+            "format_type": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.TEXT_MONOSPACE,
+                zero_index=True,
+            ),
+        }
+    )
+
+    _list_view_fields = ["content_type", "purpose"]
 
     @property
     def name(self):
@@ -700,6 +778,49 @@ class FragalysisDownload(AbstractModel):
         "Target", on_delete=models.CASCADE, related_name="+", null=True
     )
 
+    _custom_detail_view = True
+    _custom_list_view = True
+    _exclude_from_index = True
+    _has_list_view = False
+
+    _field_render_types = AbstractModel._field_render_types.copy()
+    _field_render_types.update(
+        {
+            "target_name": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.TEXT_MONOSPACE,
+                copyable=True,
+            ),
+            "target_access_string": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.TEXT_MONOSPACE,
+                copyable=True,
+            ),
+            "stack": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.LINK,
+            ),
+            "status": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.TEXT_DISPLAY,
+            ),
+            "message": dict(
+                type=FieldRenderType.TOGGLE_CARD,
+                content=ContentRenderType.TEXT_NORMAL,
+                split="\n",
+            ),
+            # "time_start": dict(
+            #     type=FieldRenderType.TABLE,
+            #     content=ContentRenderType.TEXT_NORMAL,
+            # ),
+            # "mol": dict(type=FieldRenderType.TABLE, content=ContentRenderType.MOL_2D_SVG),
+            # "pdbblock": dict(type=FieldRenderType.HIDDEN),
+            # "metadata": dict(
+            #     type=FieldRenderType.TOGGLE_CARD, content=ContentRenderType.DICT_TABLE
+            # ),
+        }
+    )
+
     # _shorthand = "FragalysisDownload"
 
 
@@ -715,4 +836,5 @@ MODELS = [
     Inspiration,
     PoseSet,
     PoseSetMember,
+    FragalysisDownload,
 ]

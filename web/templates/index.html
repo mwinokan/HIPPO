@@ -21,7 +21,7 @@
                 <tr>
                     <td>
                         <a href="{% url stat.model_name.lower|add:'_list' %}">
-                            {{ stat.model_name }}
+                            {{ stat.model.class_pill_html|default:stat.model|safe }}
                         </a>
                     </td>
                     

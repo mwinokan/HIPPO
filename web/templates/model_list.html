@@ -2,6 +2,8 @@
 
 {% load custom_tags %}
 
+{% block title %}{{model_name|title}} List{% endblock %}
+
 {% block content %}
 
 <div class="card">
@@ -54,11 +56,15 @@
 
                             {% elif render_dict.content == "ContentRenderType.MOL_2D_SVG" %}
 
-                                <td>{{ obj.get_mol_svg_text|safe }}</td>
+                                <td>
+                                    <div class="svg-container">
+                                        {{ obj.get_mol_svg_text|safe }}                                
+                                    </div>
+                                </td>
 
                             {% elif render_dict.content == "ContentRenderType.INSTANCE_PILL" %}
 
-                                <td><a>{{ obj|get:field_name|get:"model_pill_html"|default:"N/A"|safe }}</a></td>
+                                <td><a href="{% url obj.class_name|lower|add:"_detail" obj.pk %}"">{{ obj|get:field_name|get:"model_pill_html"|default:"N/A"|safe }}</a></td>
 
                             {% else %}
 

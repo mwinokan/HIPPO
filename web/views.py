@@ -9,10 +9,15 @@ from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 
 # from django.contrib import messages
 from django.apps import apps
-from django.db.models.fields.related import ForeignKey
-from django.db.models.fields.reverse_related import OneToOneRel
+from django.db.models.fields.related import ForeignKey, ManyToManyField
+from django.db.models.fields.reverse_related import (
+    OneToOneRel,
+    ManyToManyRel,
+    ManyToOneRel,
+)
 from django.contrib.auth.decorators import login_required
 from django.core.management import call_command
+from django.contrib.staticfiles import finders
 
 # from .rendertypes import ContentRenderType
 from hippo.models import MODELS, Pose, PoseSet, PoseSetMember, FragalysisDownload
@@ -22,21 +27,29 @@ from .forms import *
 import subprocess
 
 import mrich
+from mrich import print
+import re
+
 
 ### function based views
 
 
 def index(request):
 
-    # display statistics on models
-    app_config = apps.get_app_config("hippo")
-    models = app_config.get_models()
-
     model_stats = []
-    for model in sorted(models, key=lambda x: x.__name__):
+    # models = sorted(MODELS, key=lambda x: x.__name__)
+    models = MODELS
+    for model in models:
+        if model._exclude_from_index:
+            continue
+
         try:
             model_stats.append(
-                dict(model_name=model.__name__, model_count=model.objects.count())
+                dict(
+                    model_name=model.__name__,
+                    model_count=model.objects.count(),
+                    model=model,
+                )
             )
         except Exception as e:
             print(e)
@@ -144,25 +157,56 @@ def fragalysis_download(request):
         download_id = int(request.GET.get("id", 0))
 
         if not download_id:
+            # use custom template
             form = FragalysisDownloadForm()
-            messages = []
-            download = None
+            return render(request, "fragalysis_download.html", dict(form=form))
 
         else:
+
+            # use model_detail template
             download = FragalysisDownload.objects.get(id=download_id)
-            if message := download.message:
-                messages = download.message.split("\n")
-            else:
-                messages = []
-            form = None
+            context = get_base_detail_context(
+                dict(object=download),
+                FragalysisDownload,
+                download,
+            )
+            return render(request, "model_detail.html", context)
 
-        context = {
-            "download": download,
-            "messages": messages,
-            "form": form,
-        }
 
-        return render(request, "fragalysis_download.html", context)
+@login_required
+def pill_demo(request):
+
+    file_path = finders.find("css/style.css")
+
+    with open(file_path, "rt") as f:
+
+        searching = True
+        styles = []
+        for line in f:
+
+            if searching:
+                if "/* color by module */" in line:
+                    searching = False
+                continue
+
+            match = re.search(r"--color-(.*): \w*\(.*\);", line)
+
+            if not match:
+                continue
+
+            (style,) = match.groups()
+
+            styles.append(style)
+
+    pills = [
+        f"""<div class="model-pill" style="
+            background:var(--color-{style});
+            color:var(--text-color-{style});
+            ">{style}</div>"""
+        for style in styles
+    ]
+
+    return render(request, "pill_demo.html", {"pills": pills})
 
 
 ### class based views
@@ -173,66 +217,91 @@ from django.apps import apps
 ### auto-generated views
 
 
+def get_base_detail_context(context, model, instance):
+    context["model_name"] = model._meta.model_name
+
+    model_fields = model._meta.get_fields()
+
+    # mrich.print(model_fields)
+
+    fields = []
+    for field in model_fields:
+
+        field_name = field.name
+        render_dict = instance.get_field_render_type(field)
+        value = None
+
+        if not field.is_relation:
+            value = getattr(instance, field_name, None)
+            render_dict.setdefault("order", 0)
+
+        elif isinstance(field, ForeignKey):
+
+            related = getattr(instance, field_name)
+            render_dict.setdefault("order", 1)
+
+            field_name = field_name  # .removeprefix("_")  # .capitalize()
+            value = related
+
+        elif isinstance(field, OneToOneRel):
+
+            related = getattr(instance, field_name, None)
+            render_dict.setdefault("order", 1)
+
+            field_name = field_name  # .removeprefix("_")  # .capitalize()
+            value = related
+
+        elif (
+            isinstance(field, ManyToManyRel)
+            or isinstance(field, ManyToManyField)
+            or isinstance(field, ManyToOneRel)
+        ):
+
+            members = getattr(instance, field.name).all()
+            render_dict.setdefault("order", 2)
+
+            field_name = field_name  # .removeprefix("_") .capitalize()
+            value = members
+
+        else:
+
+            mrich.error("Unsupported field type", field_name, str(type(field)))
+
+        if render_dict["content"] == "ContentRenderType.TEXT_DISPLAY":
+            value = getattr(instance, f"get_{field_name}_display")()
+
+        if value is None:
+            continue
+
+        if render_dict.get("zero_index", False):
+
+            if members:
+                value = members[0]
+            else:
+                continue
+
+        if split := render_dict.get("split", False):
+            value = value.split(split)
+
+        elif hasattr(value, "__len__") and len(value) == 0:
+            continue
+
+        fields.append((field_name, value, render_dict))
+
+    fields = sorted(fields, key=lambda x: x[2].setdefault("order", 99))
+
+    context["fields"] = fields
+
+    return context
+
+
 class BaseDetailView(DetailView):
 
     _uri_param_str = "<int:pk>"
 
     def get_context_data(self, **kwargs):
-
         context = super().get_context_data(**kwargs)
-        context["model_name"] = self.model._meta.model_name
-
-        fields = []
-        for field in self.model._meta.get_fields():
-
-            field_name = field.name
-            render_dict = self.object.get_field_render_type(field)
-            value = None
-
-            if not field.is_relation:
-                value = getattr(self.object, field_name, None)
-
-            elif isinstance(field, ForeignKey):
-
-                related = getattr(self.object, field_name)
-
-                field_name = field_name  # .removeprefix("_")  # .capitalize()
-                value = related
-
-            elif isinstance(field, OneToOneRel):
-
-                related = getattr(self.object, field_name, None)
-
-                field_name = field_name  # .removeprefix("_")  # .capitalize()
-                value = related
-
-            else:
-
-                members = getattr(self.object, field.name).all()
-
-                field_name = field_name  # .removeprefix("_") .capitalize()
-                value = members
-
-            if value is None:
-                continue
-
-            if render_dict.get("zero_index", False):
-
-                if members:
-                    value = members[0]
-                else:
-                    continue
-
-            elif hasattr(value, "__len__") and len(value) == 0:
-                continue
-
-            fields.append((field_name, value, render_dict))
-
-        fields = sorted(fields, key=lambda x: x[0].count("_"))
-        fields = [(x[0].removeprefix("_"), x[1], x[2]) for x in fields]
-
-        context["fields"] = fields
-
+        context = get_base_detail_context(context, self.model, self.object)
         return context
 
 
@@ -255,34 +324,10 @@ def generate_views_for_model(model):
                 render_dict = self.model.get_field_render_type(self.model, field)
 
                 if field_name in self.model._list_view_fields:
-                    # if not field.is_relation and field_name in self.model._list_view_fields:
-                    #     # value = getattr(self.object, field_name, None)
-                    # print(field_name, render_dict)
                     fields.append((field_name, render_dict))
 
                 else:
                     continue
-                #     pass
-
-                # elif isinstance(field, ForeignKey):
-
-                #     related = getattr(self.object, field_name)
-
-                #     field_name = field_name.removeprefix("_")  # .capitalize()
-                #     value = related
-
-                # else:
-
-                #     members = getattr(self.object, field.name).all()
-
-                #     field_name = field_name.removeprefix("_").capitalize()
-                #     value = members
-
-                # if value is None:
-                #     continue
-
-                # elif hasattr(value, "__len__") and len(value) == 0:
-                #     continue
 
             context["fields"] = fields
 
@@ -310,7 +355,8 @@ for model in MODELS:
 
     list_view, detail_view = generate_views_for_model(model)
 
-    GENERATED_VIEWS[model._meta.model_name] = {"list_view": list_view}
+    if not model._custom_list_view:
+        GENERATED_VIEWS[model._meta.model_name] = {"list_view": list_view}
 
     if not model._custom_detail_view:
         GENERATED_VIEWS[model._meta.model_name]["detail_view"] = detail_view

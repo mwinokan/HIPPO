@@ -1,61 +1,8 @@
 {% extends "base.html" %}
 
-{% load custom_tags %}
-
 {% block content %}
 
 <div class="card">
-
-{% if download %}
-    
-    <h2 class="center">Fragalysis Download</h2>
-
-    <table>
-        <tr>
-            <td>ID</td>
-            <td>{{download.id}}</td>
-        </tr>
-        <tr>
-            <td>target_name</td>
-            <td>{{download.target_name}}</td>
-        </tr>
-        <tr>
-            <td>target_access_string</td>
-            <td>{{download.target_access_string}}</td>
-        </tr>
-        <tr>
-            <td>stack</td>
-            <td>{{download.stack}}</td>
-        </tr>
-        <tr>
-            <td>time_start</td>
-            <td>{{download.time_start}}</td>
-        </tr>
-        <tr>
-            <td>time_finished</td>
-            <td>{{download.time_finished}}</td>
-        </tr>
-        <tr>
-            <td>status</td>
-            <td>{{download.get_status_display}}</td>
-        </tr>
-        <tr>
-            <td>messages</td>
-            <td>
-                <ul>
-                    {% for message in messages %}
-                        <li>{{message}}</li>
-                    {% endfor %}
-                </ul>
-            </td>
-        </tr>
-        <tr>
-            <td>target</td>
-            <td>{{download.target}}</td>
-        </tr>
-    </table>
-
-{% else %}
 
     <h2 class="center">New Fragalysis Download</h2>
 
@@ -64,8 +11,6 @@
         {{ form }}
         <button type="submit" class="btn">Request Download</button>
     </form>
-
-{% endif %}
 
 </div>
 

@@ -7,6 +7,7 @@ class FieldRenderType(Enum):
     TABLE = 1
     CARD = 2
     TOGGLE_CARD = 3
+    TOGGLE_CARD_SINGLE = 4
 
 
 class ContentRenderType(Enum):
@@ -18,7 +19,9 @@ class ContentRenderType(Enum):
     DICT_TABLE = 5
     MOL_2D_SVG = 6
     BOOL = 7
-    OPTION = 7
+    LINK = 8
+    TEXT_DISPLAY = 9
+    # OPTION = 7
 
 
 DEFAULTS = {
@@ -51,9 +54,16 @@ DEFAULTS = {
     "<class 'django.db.models.fields.reverse_related.OneToOneRel'>": dict(
         type=FieldRenderType.TABLE, content=ContentRenderType.INSTANCE_PILL
     ),
+    "<class 'django.db.models.fields.related.OneToOneField'>": dict(
+        type=FieldRenderType.TABLE, content=ContentRenderType.INSTANCE_PILL
+    ),
     "<class 'django.db.models.fields.TextField'>": dict(
-        type=FieldRenderType.TOGGLE_CARD,
-        content=ContentRenderType.TEXT_MONOSPACE,
+        type=FieldRenderType.TOGGLE_CARD_SINGLE,
+        content=ContentRenderType.TEXT_NORMAL,
         copyable=True,
+    ),
+    "<class 'django.db.models.fields.DateTimeField'>": dict(
+        type=FieldRenderType.TABLE,
+        content=ContentRenderType.TEXT_NORMAL,
     ),
 }

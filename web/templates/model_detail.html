@@ -2,7 +2,11 @@
 
 {% load custom_tags %}
 
+{% block title %}{{object}}{% endblock %}
+
 {% block content %}
+
+{% block pretablecard %}{% endblock %}
 
 <div class="card">
 
@@ -26,6 +30,10 @@
                     {% if render_dict.content == "ContentRenderType.TEXT_NORMAL" %}
 
                         <td>{{ value }}</td>
+
+                    {% elif render_dict.content == "ContentRenderType.TEXT_DISPLAY" %}
+
+                        <td><span class="monospace">{{ value }}</span></td>
                     
                     {% elif render_dict.content == "ContentRenderType.TEXT_MONOSPACE" %}
 
@@ -34,6 +42,12 @@
                             {% if render_dict.copyable %}
                                 <button class="btn" onclick="copyToClipboard('{{ field_name |add:'_text' }}')"><i class="fa fa-copy" style="cursor:copy;"></i></button>
                             {% endif %}
+                        </td>
+
+                    {% elif render_dict.content == "ContentRenderType.LINK" %}
+
+                        <td>
+                            <a href="{{value}}">{{ value }}</a>
                         </td>
                     
                     {% elif render_dict.content == "ContentRenderType.INSTANCE_PILL" %}
@@ -95,6 +109,12 @@
             <h2>{{ field_name }} ({{ values|length }})</h2>
 
         {% endif %}
+
+        {% if render_dict.content == "ContentRenderType.TEXT_MONOSPACE" %}
+
+            <p class="monospace">
+
+        {% endif %}
         
         {% for member in values %}
 
@@ -117,6 +137,10 @@
 
                 </table>
 
+            {% elif render_dict.content|startswith:"ContentRenderType.TEXT" %}
+            
+                {{member}}<br>
+
             {% else %}
 
                 <p>UNSUPPORTED CONTENT TYPE {{ field_name }} {{render_dict.content}}</p>
@@ -124,6 +148,12 @@
             {% endif %}
         
         {% endfor %}
+
+        {% if render_dict.content == "ContentRenderType.TEXT_MONOSPACE" %}
+
+            </p>
+
+        {% endif %}
         
         {% if render_dict.type|startswith:"FieldRenderType.TOGGLE" %}
 
@@ -141,14 +171,56 @@
             </div>
 
         {% endif %}
+
         
+    </div>
+
+    {% elif render_dict.type|endswith:"TOGGLE_CARD_SINGLE" %}
+
+    <div class="card">
+            
+        <div class="h2-checkbox-container">
+                <h2 class="title">{{ field_name }}</h2>
+                <label class="switch">
+                    <input type="checkbox" id="{{ field_name }}_toggle_checkbox">
+                    <span class="slider round"></span>
+                </label>
+            </div>
+
+            <div id="{{ field_name }}_toggle_div" style="display:none;">
+
+                <p>{{values}}</p>
+
+            </div>
+
+            <script type="text/javascript">
+                document.getElementById('{{ field_name }}_toggle_checkbox').addEventListener('change', function() {
+                    const toggleDiv = document.getElementById('{{ field_name }}_toggle_div');
+                    if (this.checked) {
+                        toggleDiv.style.display = 'block'; // Show the div
+                    } else {
+                        toggleDiv.style.display = 'none'; // Hide the div
+                    }
+                });
+            </script>
+
     </div>
 
     {% endif %}
 
 {% endfor %}
 
+<script type="text/javascript">
+    document.addEventListener("DOMContentLoaded", function() {
+        document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            checkbox.checked = false;
+        });
+    });
+</script>
+
+{% if object.has_list_view %}
 <button class="btn"><a href="{% url model_name|add:'_list' %}">Back to List</a></button>
+{% endif %}
 <button class="btn"><a href="{{ object.get_admin_url }}">Edit</a></button>
 
 {% endblock %}

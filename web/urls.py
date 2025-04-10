@@ -25,6 +25,7 @@ urlpatterns = [
     # admin
     path("accounts/", include("django.contrib.auth.urls")),
     path("admin/", admin.site.urls),
+    path("pill_demo/", views.pill_demo, name="pill_demo"),
     # custom views
     # path("model_pill/<str:class_name>/<int:pk>/", views.model_pill, name="model_pill"),
     path("pose_sdf/<int:pk>/", views.pose_sdf, name="pose_sdf"),

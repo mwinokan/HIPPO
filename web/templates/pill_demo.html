@@ -1,0 +1,20 @@
+
+{% extends 'base.html' %}
+
+{% block title %}HIPPO Pill Demo{% endblock %}
+
+{% block content %}
+
+<div class="card">
+
+    <h2 class="center">Model Pill Styles</h2>
+
+            {% for pill in pills %}
+
+            {{ pill|safe }}
+
+            {% endfor %}
+                        
+</div>
+
+{% endblock %}
