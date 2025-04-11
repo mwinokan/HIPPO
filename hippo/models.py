@@ -218,7 +218,6 @@ class AbstractModel(models.Model):
 class Target(AbstractModel):
 
     name = models.CharField(max_length=200, blank=True, unique=True)
-    # metadata = models.JSONField(default=dict, blank=True)
 
     _shorthand = "T"
     _name_field = "name"
@@ -277,9 +276,10 @@ class Structure(AbstractModel):
 class Compound(AbstractModel):
 
     inchikey = models.CharField(max_length=27, unique=True)
-    alias = models.CharField(max_length=60, blank=True, unique=True, null=True)
     smiles = models.CharField(max_length=300, unique=True)
-    metadata = models.JSONField(default=dict, blank=True)
+
+    # alias = models.CharField(max_length=60, blank=True, unique=True, null=True)
+    # metadata = models.JSONField(default=dict, blank=True)
 
     mol = models.GeneratedField(
         expression=MolFromSmiles("smiles", "mol"),
@@ -293,14 +293,12 @@ class Compound(AbstractModel):
         db_persist=True,
     )
 
-    scaffolds = models.ManyToManyField(
-        "Compound", related_name="elaborations", blank=True
-    )
-
-    tags = models.ManyToManyField("Tag", related_name="compounds", blank=True)
+    # scaffolds = models.ManyToManyField(
+    #     "Compound", related_name="elaborations", blank=True
+    # )
 
     _shorthand = "C"
-    _name_field = "alias"
+    # _name_field = "inchikey"
     _style = "compound"
 
     _field_render_types = AbstractModel._field_render_types.copy()
@@ -308,6 +306,16 @@ class Compound(AbstractModel):
         {
             "pattern_bfp": dict(type=FieldRenderType.HIDDEN),
             # "mol": dict(type=FieldRenderType.HIDDEN),
+            # "origin": dict(
+            #     type=FieldRenderType.TABLE,
+            #     content=ContentRenderType.TEXT_MONOSPACE,
+            #     copyable=False,
+            # ),
+            # "tags": dict(
+            #     type=FieldRenderType.HIDDEN,
+            #     content=ContentRenderType.INSTANCE_PILL,
+            #     follow_related="tag",
+            # ),
         }
     )
 
@@ -340,44 +348,42 @@ class Compound(AbstractModel):
     def bulk_register(
         cls,
         smiles: list[str],
-        alias: str | None = None,
         metadata: str | dict | None = None,
         radical: str = "remove",
-    ) -> None:
+    ) -> dict[str, str]:
 
         # from .compound import Compound
         from .tools import inchikey_from_smiles, sanitise_smiles
         from .orm.formatters import dict_formatter
-
-        if alias is None:
-            alias = [None] * len(smiles)
 
         if metadata is None:
             metadata = [None] * len(smiles)
 
         # get or create instance
         objects = []
-        for s, a, m in zip(smiles, alias, metadata):
+        smiles_map = {}
+        for s, m in zip(smiles, metadata):
 
-            s = sanitise_smiles(s, verbosity=False, radical=radical)
+            s_new = sanitise_smiles(s, verbosity=False, radical=radical)
             i = inchikey_from_smiles(s)
             m = dict_formatter(m)
 
+            smiles_map[s] = s_new
+
             instance = cls(
-                smiles=s,
+                smiles=s_new,
                 inchikey=i,
-                alias=a,
-                metadata=m,
             )
 
             objects.append(instance)
 
-        created_objs = cls.objects.bulk_create(
+        cls.objects.bulk_create(
             objects,
-            update_conflicts=True,
-            unique_fields=["inchikey"],
-            update_fields=["alias", "metadata"],
+            ignore_conflicts=True,
+            unique_fields=["smiles", "inchikey"],
         )
+
+        return smiles_map
 
 
 ### LIGAND (3D)
@@ -390,9 +396,6 @@ class Pose(AbstractModel):
     inchikey = models.CharField(max_length=27, blank=True)
     alias = models.CharField(max_length=60, blank=True, unique=True, null=True)
     smiles = models.CharField(max_length=300, blank=True, null=True)
-
-    # ligand_file = models.OneToOneField("File", related_name="pose", on_delete=models.PROTECT)
-    # files = models.ManyToManyField("File", related_name="+")
 
     mol = MolField(blank=False, unique=True)
     metadata = models.JSONField(default=dict, blank=True)
@@ -414,8 +417,6 @@ class Pose(AbstractModel):
         through_fields=("derivative", "original"),
         related_name="derivatives",
     )
-
-    # tags = models.ManyToManyField("Tag", related_name="poses", )
 
     _shorthand = "P"
     _name_field = "alias"
@@ -610,6 +611,17 @@ class Tag(AbstractModel):
     def __str__(self):
         return f'"{self.name}" [{self.type.name}]'
 
+    _field_render_types = AbstractModel._field_render_types.copy()
+    _field_render_types.update(
+        {
+            "poses": dict(
+                type=FieldRenderType.TOGGLE_CARD,
+                content=ContentRenderType.INSTANCE_PILL,
+                follow_related="pose",
+            ),
+        }
+    )
+
 
 class TagType(AbstractModel):
 
@@ -636,9 +648,18 @@ class PoseTag(AbstractModel):
 
     _exclude_from_index = True
 
-    # @property
-    # def model_pill_html(self):
-    #     return self.tag.model_pill_html
+
+class CompoundTag(AbstractModel):
+
+    class Meta:
+        unique_together = ("compound", "tag")
+
+    compound = models.ForeignKey(
+        "Compound", related_name="tags", on_delete=models.CASCADE
+    )
+    tag = models.ForeignKey("Tag", related_name="compounds", on_delete=models.CASCADE)
+
+    _exclude_from_index = True
 
 
 class Inspiration(AbstractModel):
@@ -678,7 +699,7 @@ class Placement(AbstractModel):
 
     @property
     def name(self):
-        return f"{self.structure.alias} w/ {self.compound.alias}"
+        return f"{self.structure.alias} w/ {self.compound}"
 
 
 ### RESOURCE MANAGEMENT
@@ -855,4 +876,5 @@ MODELS = [
     PoseSetMember,
     FragalysisDownload,
     PoseTag,
+    CompoundTag,
 ]

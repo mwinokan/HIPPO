@@ -9,6 +9,7 @@
     <title>{% block title %}HIPPO{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link rel="icon" type="image/x-icon" href="{% static 'media/hippo_logo_64p.png' %}">
     <script src="https://3Dmol.org/build/3Dmol-min.js"></script>     
     <script src="https://cdn.plot.ly/plotly-3.0.1.min.js" charset="utf-8"></script>
     <!-- <script src="https://cdn.plot.ly/plotly-latest.min.js"></script> -->
@@ -24,7 +25,7 @@
         <a href="{% url 'index' %}" class="btn">Home</a>
 
         {% if not request.user.is_authenticated %}
-            <a href="{% url 'login' %}" class="btn">Login</a>
+            <a href="{% url 'login' %}?next=/" class="btn">Login</a>
         {% endif %}
 
     </header>

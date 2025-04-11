@@ -115,177 +115,185 @@ class Command(BaseCommand):
 
         df = pd.read_csv(metadata_csv)
 
-        print(df.iloc[0])
+        ## COMPOUNDS
 
-        # ## COMPOUNDS
+        if debug:
+            mrich.debug("target", target)
+            mrich.debug("Creating Compounds")
 
-        # if debug:
-        #     mrich.debug("target", target)
-        #     mrich.debug("Creating Compounds")
+        smiles_map = Compound.bulk_register(smiles=df["Smiles"])
 
-        # Compound.bulk_register(smiles=df["Smiles"], alias=df["Compound code"])
-        # download.message += "\nCompounds registered"
+        download.message += "\nCompounds registered"
 
-        # compounds = {c.alias: c for c in Compound.objects.all()}
+        compounds = {
+            c.smiles: c for c in Compound.objects.filter(smiles__in=smiles_map.values())
+        }
+        compounds = {s_old: compounds[s_new] for s_old, s_new in smiles_map.items()}
 
-        # ## FILES
+        ## FILES
 
-        # if debug:
-        #     mrich.debug("Creating Files")
+        if debug:
+            mrich.debug("Creating Files")
 
-        # files = []
+        files = []
 
-        # for file in aligned_files.glob("*/*_apo-desolv.pdb"):
-        #     files.append(
-        #         File(
-        #             path=file,
-        #             format_type=".pdb",
-        #             content_type="PROTEIN",
-        #             purpose="INPUT",
-        #         )
-        #     )
+        for file in aligned_files.glob("*/*_apo-desolv.pdb"):
+            files.append(
+                File(
+                    path=file,
+                    format_type=".pdb",
+                    content_type="PROTEIN",
+                    purpose="INPUT",
+                )
+            )
 
-        # File.objects.bulk_create(
-        #     files,
-        #     ignore_conflicts=True,
-        #     unique_fields=("path",),
-        # )
+        File.objects.bulk_create(
+            files,
+            ignore_conflicts=True,
+            unique_fields=("path",),
+        )
 
-        # files = {
-        #     f.path: f
-        #     for f in File.objects.filter(
-        #         format_type=".pdb",
-        #         content_type="PROTEIN",
-        #         purpose="INPUT",
-        #     )
-        # }
+        files = {
+            f.path: f
+            for f in File.objects.filter(
+                format_type=".pdb",
+                content_type="PROTEIN",
+                purpose="INPUT",
+            )
+        }
 
-        # download.message += "\napo-desolv PDBs registered"
+        download.message += "\napo-desolv PDBs registered"
 
-        # ## STRUCTURES
+        ## STRUCTURES
 
-        # if debug:
-        #     mrich.debug("Creating Structures")
+        if debug:
+            mrich.debug("Creating Structures")
 
-        # structures = []
-        # for short_code, alias in (
-        #     df[["Code", "Experiment code"]].drop_duplicates("Experiment code").values
-        # ):
+        structures = []
+        for short_code, alias in (
+            df[["Code", "Experiment code"]].drop_duplicates("Experiment code").values
+        ):
 
-        #     p = str(aligned_files / short_code / (short_code + "_apo-desolv.pdb"))
+            p = str(aligned_files / short_code / (short_code + "_apo-desolv.pdb"))
 
-        #     file = files[p]
+            file = files[p]
 
-        #     pdb_block = file.as_path.read_text(encoding="utf-8")
+            pdb_block = file.as_path.read_text(encoding="utf-8")
 
-        #     structures.append(
-        #         Structure(
-        #             target=target,
-        #             alias=alias,
-        #             pdb_block=pdb_block,
-        #             protein_file=file,
-        #             origin="EXPERIMENT",
-        #             resolution=None,
-        #             metadata={},
-        #         )
-        #     )
+            structures.append(
+                Structure(
+                    target=target,
+                    alias=alias,
+                    pdb_block=pdb_block,
+                    protein_file=file,
+                    origin="EXPERIMENT",
+                    resolution=None,
+                    metadata={},
+                )
+            )
 
-        # Structure.objects.bulk_create(
-        #     structures,
-        #     update_conflicts=True,
-        #     unique_fields=["protein_file"],
-        #     update_fields=["pdb_block", "resolution", "metadata"],
-        # )
+        Structure.objects.bulk_create(
+            structures,
+            update_conflicts=True,
+            unique_fields=["protein_file"],
+            update_fields=["pdb_block", "resolution", "metadata"],
+        )
 
-        # structures = {
-        #     s.alias: s
-        #     for s in Structure.objects.filter(
-        #         target=target,
-        #         origin="EXPERIMENT",
-        #     )
-        # }
-
-        # download.message += "\nStructures registered"
-
-        # with transaction.atomic():
-
-        #     ## POSES
-
-        #     if debug:
-        #         mrich.debug("Creating Poses")
-
-        #     poses = []
-        #     for i, row in df.iterrows():
-
-        #         alias = row["Code"]
-        #         inchikey = inchikey_from_smiles(row["Smiles"])
-
-        #         sdf_file = aligned_files / alias / (alias + "_ligand.sdf")
-        #         sdf = PandasTools.LoadSDF(str(sdf_file))
-
-        #         if len(sdf) > 1:
-        #             download.message += f"\nWARNING: Multiple molecules in {sdf_file}"
-
-        #         mol = sdf["ROMol"].iloc[0]
-
-        #         poses.append(
-        #             Pose(
-        #                 inchikey=inchikey,
-        #                 alias=alias,
-        #                 mol=mol,
-        #                 smiles=row["Smiles"],
-        #                 metadata={},
-        #                 origin="EXPERIMENT",
-        #             )
-        #         )
-
-        #     Pose.objects.bulk_create(
-        #         poses,
-        #         update_conflicts=True,
-        #         unique_fields=["alias", "mol"],
-        #         update_fields=["metadata"],
-        #     )
-
-        poses = {
-            p.alias: p
-            for p in Pose.objects.filter(
+        structures = {
+            s.alias: s
+            for s in Structure.objects.filter(
+                target=target,
                 origin="EXPERIMENT",
             )
         }
 
-        #     ## PLACEMENTS
+        download.message += "\nStructures registered"
 
-        #     if debug:
-        #         mrich.debug("Creating Placements")
+        with transaction.atomic():
 
-        #     placements = []
-        #     for i, row in df.iterrows():
+            ## POSES
 
-        #         structure = structures[row["Experiment code"]]
-        #         pose = poses[row["Code"]]
+            if debug:
+                mrich.debug("Creating Poses")
 
-        #         compound = compounds.get(row["Compound code"], None)
+            poses = []
+            for i, row in df.iterrows():
 
-        #         if not compound:
-        #             download.message += (
-        #                 f"\nERROR: Can't get compound with alias {row['Compound code']}"
-        #             )
-        #             download.message += f"\nERROR: Placement registration skipped ({structure}, {pose})"
-        #             continue
+                alias = row["Code"]
+                inchikey = inchikey_from_smiles(row["Smiles"])
 
-        #         placements.append(
-        #             Placement(
-        #                 structure=structure,
-        #                 pose=pose,
-        #                 compound=compound,
-        #             )
-        #         )
+                sdf_file = aligned_files / alias / (alias + "_ligand.sdf")
+                sdf = PandasTools.LoadSDF(str(sdf_file))
 
-        #     Placement.objects.bulk_create(
-        #         placements,
-        #         ignore_conflicts=True,
-        #         unique_fields=["structure", "pose"],
-        #     )
+                if len(sdf) > 1:
+                    download.message += f"\nWARNING: Multiple molecules in {sdf_file}"
+
+                mol = sdf["ROMol"].iloc[0]
+
+                poses.append(
+                    Pose(
+                        inchikey=inchikey,
+                        alias=alias,
+                        mol=mol,
+                        smiles=row["Smiles"],
+                        metadata={},
+                        origin="EXPERIMENT",
+                    )
+                )
+
+            Pose.objects.bulk_create(
+                poses,
+                update_conflicts=True,
+                unique_fields=["alias", "mol"],
+                update_fields=["metadata"],
+            )
+
+            poses = {
+                p.alias: p
+                for p in Pose.objects.filter(
+                    origin="EXPERIMENT",
+                )
+            }
+
+            download.message += "\nPoses registered"
+
+            ## PLACEMENTS
+
+            if debug:
+                mrich.debug("Creating Placements")
+
+            placements = []
+            for i, row in df.iterrows():
+
+                structure = structures[row["Experiment code"]]
+                pose = poses[row["Code"]]
+
+                compound = compounds.get(row["Compound code"], None)
+
+                if not compound:
+                    download.message += (
+                        f"\nERROR: Can't get compound with alias {row['Compound code']}"
+                    )
+                    download.message += (
+                        f"\nERROR: Placement registration skipped ({structure}, {pose})"
+                    )
+                    continue
+
+                placements.append(
+                    Placement(
+                        structure=structure,
+                        pose=pose,
+                        compound=compound,
+                    )
+                )
+
+            Placement.objects.bulk_create(
+                placements,
+                ignore_conflicts=True,
+                unique_fields=["structure", "pose"],
+            )
+
+            download.message += "\nPlacements registered"
 
         ## PARSE TAGS
 
@@ -293,11 +301,11 @@ class Command(BaseCommand):
         # XCA_SITE_TAG_FIELDS
         # CURATOR_TAG_TYPES
 
-        tags = []
+        pose_tags = []
 
         for col in df.columns:
 
-            # curator tags
+            # curator pose_tags
             if match := re.search(r"^\[([a-zA-Z]*)\] (.*)$", col):
                 tag_type, tag_name = match.groups()
                 tag_origin = "Fragalysis Curator"
@@ -308,7 +316,7 @@ class Command(BaseCommand):
                 tag_origin = "Fragalysis/XCA"
 
             else:
-                mrich.warning(col)
+                # mrich.warning(col)
                 continue
 
             for pose_alias, value in df[["Code", col]].values:
@@ -320,7 +328,7 @@ class Command(BaseCommand):
                     tag_name = value
 
                 pose = poses[pose_alias]
-                tags.append(
+                pose_tags.append(
                     dict(
                         pose=pose,
                         tag_type=tag_type,
@@ -329,7 +337,26 @@ class Command(BaseCommand):
                     )
                 )
 
-        tag_df = pd.DataFrame(tags)
+        comp_tags = []
+        for comp_alias, smiles in df[["Compound code", "Smiles"]].values:
+
+            if comp_alias.startswith("Z"):
+                tag_type = "ZINC ID"
+            elif comp_alias.startswith("ASAP-"):
+                tag_type = "ASAP ID"
+
+            comp_tags.append(
+                dict(
+                    compound=compounds[smiles],
+                    tag_type=tag_type,
+                    tag_name=comp_alias,
+                    tag_origin="Fragalysis/SoakDB",
+                )
+            )
+
+        pose_tag_df = pd.DataFrame(pose_tags)
+        comp_tag_df = pd.DataFrame(comp_tags)
+        combined_tag_df = pd.concat([pose_tag_df, comp_tag_df])
 
         ## CREATE TAG TYPES
 
@@ -338,7 +365,7 @@ class Command(BaseCommand):
 
         tag_types = []
         for tag_type, tag_origin in (
-            tag_df[["tag_type", "tag_origin"]].drop_duplicates().values
+            combined_tag_df[["tag_type", "tag_origin"]].drop_duplicates().values
         ):
 
             tag_types.append(
@@ -357,9 +384,11 @@ class Command(BaseCommand):
         tag_types = {
             (t.name, t.origin): t
             for t in TagType.objects.filter(
-                origin__in=["Fragalysis Curator", "Fragalysis/XCA"]
+                origin__in=["Fragalysis Curator", "Fragalysis/XCA", "Fragalysis/SoakDB"]
             )
         }
+
+        download.message += "\nTagTypes registered"
 
         ## CREATE TAGS
 
@@ -368,7 +397,9 @@ class Command(BaseCommand):
 
         tag_objs = []
         for tag_type, tag_origin, tag_name in (
-            tag_df[["tag_type", "tag_origin", "tag_name"]].drop_duplicates().values
+            combined_tag_df[["tag_type", "tag_origin", "tag_name"]]
+            .drop_duplicates()
+            .values
         ):
 
             tag_type = tag_types[(tag_type, tag_origin)]
@@ -383,14 +414,16 @@ class Command(BaseCommand):
 
         tag_objs = {(t.name, t.type_id): t for t in Tag.objects.all()}
 
+        download.message += "\nTags registered"
+
         ## CREATE POSE TAGS
 
         if debug:
             mrich.debug("Creating PoseTags")
 
         delete_ids = set()
-        pose_tags = []
-        for d in tags:
+        pose_tag_objs = []
+        for d in pose_tags:
 
             pose = d["pose"]
             tag_type = tag_types[d["tag_type"], d["tag_origin"]]
@@ -399,7 +432,7 @@ class Command(BaseCommand):
 
             delete_ids.add(pose.id)
 
-            pose_tags.append(
+            pose_tag_objs.append(
                 PoseTag(
                     pose=pose,
                     tag=tag_obj,
@@ -412,10 +445,48 @@ class Command(BaseCommand):
                 PoseTag.objects.filter(pose_id__in=delete_ids).delete()
 
             PoseTag.objects.bulk_create(
-                pose_tags,
+                pose_tag_objs,
                 ignore_conflicts=True,
                 unique_fields=["pose", "tag"],
             )
+
+            download.message += "\nPoseTags registered"
+
+        ## CREATE COMPOUND TAGS
+
+        if debug:
+            mrich.debug("Creating CompoundTags")
+
+        delete_ids = set()
+        # print(comp_tags)
+        comp_tag_objs = []
+        for d in comp_tags:
+
+            compound = d["compound"]
+            tag_type = tag_types[d["tag_type"], d["tag_origin"]]
+            tag_name = d["tag_name"]
+            tag_obj = tag_objs[tag_name, tag_type.id]
+
+            delete_ids.add(compound.id)
+
+            comp_tag_objs.append(
+                CompoundTag(
+                    compound=compound,
+                    tag=tag_obj,
+                )
+            )
+
+        with transaction.atomic():
+
+            if clear_previous_tag:
+                CompoundTag.objects.filter(compound_id__in=delete_ids).delete()
+
+            CompoundTag.objects.bulk_create(
+                comp_tag_objs,
+                ignore_conflicts=True,
+                unique_fields=["compound", "tag"],
+            )
+            download.message += "\nCompoundTags registered"
 
         ## SITES
 

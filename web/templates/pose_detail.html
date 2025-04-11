@@ -29,34 +29,3 @@
 </script>
 
 {% endblock %}
-
-{% block precards %}
-
-<div class="card">
-    
-    <table>
-
-        <h2 class="title">Tags</h2>
-        
-        <tr>
-            <th>Tag</th>
-            <th>Type</th>
-            <th>Origin</th>
-        
-        {% for posetag in object.tags.all %}
-        
-        <tr>
-            <td><a href="{% url 'tag_detail' posetag.tag.pk %}">{{ posetag.tag.model_pill_html|safe }}</a></td>
-            <!-- <td><span class="monospace">{{ posetag.tag.name }}</span></td> -->
-            <td><span class="monospace">{{ posetag.tag.type.name }}</span></td>
-            <td><span class="monospace">{{ posetag.tag.type.origin }}</span></td>
-        </tr>
-        
-        {% endfor %}
-
-    </table>
-
-</div>
-
-
-{% endblock %}
