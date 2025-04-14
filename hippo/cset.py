@@ -1150,19 +1150,23 @@ class CompoundSet:
             b = Checkbox(description="Name", value=True)
             c = Checkbox(description="Summary", value=False)
             d = Checkbox(description="2D", value=True)
-            e = Checkbox(description="poses", value=False)
-            f = Checkbox(description="reactions", value=False)
-            g = Checkbox(description="tags", value=False)
-            h = Checkbox(description="quotes", value=False)
+            e = Checkbox(description="Poses", value=False)
+            f = Checkbox(description="Reactions", value=False)
+            g = Checkbox(description="Tags", value=False)
+            h = Checkbox(description="Quotes", value=False)
             i = Checkbox(description="Metadata", value=False)
+            j = Checkbox(description="Classify", value=False)
 
             ui1 = GridBox(
-                [b, c, d, e], layout=Layout(grid_template_columns="repeat(4, 100px)")
+                [b, c, d], layout=Layout(grid_template_columns="repeat(3, 100px)")
             )
             ui2 = GridBox(
-                [f, g, h, i], layout=Layout(grid_template_columns="repeat(4, 100px)")
+                [e, f, g], layout=Layout(grid_template_columns="repeat(3, 100px)")
             )
-            ui = VBox([a, ui1, ui2])
+            ui3 = GridBox(
+                [h, i, j], layout=Layout(grid_template_columns="repeat(3, 100px)")
+            )
+            ui = VBox([a, ui1, ui2, ui3])
 
             def widget(
                 i,
@@ -1174,6 +1178,7 @@ class CompoundSet:
                 tags=True,
                 quotes=True,
                 metadata=True,
+                classify=True,
             ):
                 """
 
@@ -1199,12 +1204,12 @@ class CompoundSet:
 
                 if poses and (pset := comp.poses):
                     for p in pset:
-                        print(repr(p))
+                        mrich.print(p)
                     pset.draw()
 
                 if reactions and (reactions := comp.reactions):
                     for r in reactions:
-                        print(repr(r))
+                        mrich.print(r)
                         r.draw()
 
                 if tags:
@@ -1217,7 +1222,11 @@ class CompoundSet:
 
                 if metadata:
                     mrich.title("Metadata:")
-                    pprint(comp.metadata)
+                    mrich.print(comp.metadata)
+
+                if classify:
+                    mrich.title("Classification:")
+                    comp.classify()
 
             out = interactive_output(
                 widget,
@@ -1231,6 +1240,7 @@ class CompoundSet:
                     "tags": g,
                     "quotes": h,
                     "metadata": i,
+                    "classify": j,
                 },
             )
 
