@@ -470,8 +470,12 @@ class PoseSet(AbstractModel):
 
     def calculate_pca(self):
 
+        if not self.poses.count():
+            mrich.warning("No poses")
+            return
+
         with mrich.loading("imports..."):
-            from ..tools import get_cfps
+            from .tools import get_cfps
             from sklearn.decomposition import PCA
             import numpy as np
             import pandas as pd
@@ -529,26 +533,33 @@ class PoseSet(AbstractModel):
 
         fig = go.Figure()
 
-        x = [m.pc1 for m in members]
-        y = [m.pc2 for m in members]
-
         text = []
         colors = []
         pose_ids = []
-        for m in members:
 
-            pose = m.pose
+        if members.count():
 
-            text.append(str(pose))
-            pose_ids.append(pose.id)
+            x = [m.pc1 for m in members]
+            y = [m.pc2 for m in members]
 
-            match m.review:
-                case None:
-                    colors.append("gray")
-                case "GOOD":
-                    colors.append("rgb(0,255,0)")
-                case "BAD":
-                    colors.append("red")
+            for m in members:
+
+                pose = m.pose
+
+                text.append(str(pose))
+                pose_ids.append(pose.id)
+
+                match m.review:
+                    case None:
+                        colors.append("gray")
+                    case "GOOD":
+                        colors.append("rgb(0,255,0)")
+                    case "BAD":
+                        colors.append("red")
+
+        else:
+            x = []
+            y = []
 
         trace = go.Scatter(
             x=x,
@@ -760,17 +771,19 @@ class File(AbstractModel):
             "content_type": dict(
                 type=FieldRenderType.TABLE,
                 content=ContentRenderType.TEXT_MONOSPACE,
-                copyable=False,
+            ),
+            "path": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.TEXT_MONOSPACE,
+                copyable=True,
             ),
             "purpose": dict(
                 type=FieldRenderType.TABLE,
                 content=ContentRenderType.TEXT_MONOSPACE,
-                zero_index=True,
             ),
             "format_type": dict(
                 type=FieldRenderType.TABLE,
                 content=ContentRenderType.TEXT_MONOSPACE,
-                zero_index=True,
             ),
         }
     )
@@ -871,7 +884,7 @@ class SdfUpload(AbstractModel):
         "File", on_delete=models.RESTRICT, related_name="+", null=True
     )
 
-    pose_set = models.ForeignKey(
+    pose_set = models.OneToOneField(
         "PoseSet", on_delete=models.CASCADE, related_name="+", null=True
     )
 
