@@ -6,6 +6,7 @@ __pycache__/
 tests/A71EV2A
 tests/targets
 
+media/
 data/
 
 # C extensions

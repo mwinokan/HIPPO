@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="card">
+
+    <h2 class="center">New SDF Upload</h2>
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form }}
+        <button type="submit" class="btn">Upload</button>
+    </form>
+
+</div>
+
+{% endblock %}

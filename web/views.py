@@ -152,6 +152,9 @@ def fragalysis_download(request):
                 f"{reverse('fragalysis_download')}?id={download.id}"
             )
 
+        else:
+            return HttpResponseRedirect(reverse("fragalysis_download"))
+
     else:
 
         download_id = int(request.GET.get("id", 0))
@@ -169,6 +172,48 @@ def fragalysis_download(request):
                 dict(object=download),
                 FragalysisDownload,
                 download,
+            )
+            return render(request, "model_detail.html", context)
+
+
+@login_required
+def sdf_upload(request):
+
+    if request.method == "POST":
+        form = SdfUploadForm(request.POST, request.FILES)
+
+        print(form)
+
+        if form.is_valid():
+
+            uploaded_file = form.cleaned_data["input_file"]
+
+            upload = form.save()  # Save to the database
+
+            # Run the management command
+            subprocess.Popen(
+                ["python", "manage.py", "load_sdf", str(upload.id)],
+            )
+
+        return HttpResponseRedirect(f"{reverse('sdf_upload')}?id={upload.id}")
+
+    else:
+
+        upload_id = int(request.GET.get("id", 0))
+
+        if not upload_id:
+            # use custom template
+            form = SdfUploadForm()
+            return render(request, "sdf_upload.html", dict(form=form))
+
+        else:
+
+            # use model_detail template
+            upload = SdfUpload.objects.get(id=upload_id)
+            context = get_base_detail_context(
+                dict(object=upload),
+                SdfUpload,
+                upload,
             )
             return render(request, "model_detail.html", context)
 

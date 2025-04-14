@@ -847,19 +847,81 @@ class FragalysisDownload(AbstractModel):
                 content=ContentRenderType.TEXT_MONOSPACE,
                 split="\n",
             ),
-            # "time_start": dict(
-            #     type=FieldRenderType.TABLE,
-            #     content=ContentRenderType.TEXT_NORMAL,
-            # ),
-            # "mol": dict(type=FieldRenderType.TABLE, content=ContentRenderType.MOL_2D_SVG),
-            # "pdbblock": dict(type=FieldRenderType.HIDDEN),
-            # "metadata": dict(
-            #     type=FieldRenderType.TOGGLE_CARD, content=ContentRenderType.DICT_TABLE
-            # ),
         }
     )
 
     # _shorthand = "FragalysisDownload"
+
+
+class SdfUpload(AbstractModel):
+
+    STATUSES = {
+        0: "PENDING",
+        1: "LOADING",
+        2: "COMPLETE",
+        3: "FAILED",
+    }
+
+    target = models.ForeignKey("Target", on_delete=models.CASCADE, related_name="+")
+
+    protein_field_name = models.CharField(default="ref_pdb", max_length=32)
+    inspirations_field_name = models.CharField(default="ref_mols", max_length=32)
+    input_file = models.FileField(upload_to="media/sdf_uploads/")
+    sdf_file = models.ForeignKey(
+        "File", on_delete=models.RESTRICT, related_name="+", null=True
+    )
+
+    pose_set = models.ForeignKey(
+        "PoseSet", on_delete=models.CASCADE, related_name="+", null=True
+    )
+
+    time_start = models.DateTimeField(auto_now_add=True)
+    time_finished = models.DateTimeField(null=True)
+
+    status = models.PositiveIntegerField(default=0, choices=STATUSES)
+    message = models.TextField(null=True, blank=True)
+
+    _custom_detail_view = True
+    _custom_list_view = True
+    _exclude_from_index = True
+    _has_list_view = False
+
+    _field_render_types = AbstractModel._field_render_types.copy()
+    _field_render_types.update(
+        {
+            # "target_name": dict(
+            #     type=FieldRenderType.TABLE,
+            #     content=ContentRenderType.TEXT_MONOSPACE,
+            #     copyable=True,
+            # ),
+            # "target_access_string": dict(
+            #     type=FieldRenderType.TABLE,
+            #     content=ContentRenderType.TEXT_MONOSPACE,
+            #     copyable=True,
+            # ),
+            "input_file": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.TEXT_MONOSPACE,
+            ),
+            "protein_field_name": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.TEXT_MONOSPACE,
+            ),
+            "inspirations_field_name": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.TEXT_MONOSPACE,
+            ),
+            "status": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.TEXT_DISPLAY,
+            ),
+            "message": dict(
+                type=FieldRenderType.TOGGLE_CARD,
+                content=ContentRenderType.TEXT_MONOSPACE,
+                split="\n",
+            ),
+        }
+    )
 
 
 MODELS = [
@@ -875,6 +937,7 @@ MODELS = [
     PoseSet,
     PoseSetMember,
     FragalysisDownload,
+    SdfUpload,
     PoseTag,
     CompoundTag,
 ]

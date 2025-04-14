@@ -84,6 +84,8 @@
 
 {% block precards %}{% endblock %}
 
+{% if object.tags is not None %}
+
 <div class="card">
     
     <table>
@@ -109,6 +111,8 @@
     </table>
 
 </div>
+
+{% endif %}
 
 {% for field_name, values, render_dict in fields %}
 

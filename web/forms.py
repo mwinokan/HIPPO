@@ -1,5 +1,5 @@
 from django import forms
-from hippo.models import FragalysisDownload
+from hippo.models import FragalysisDownload, SdfUpload
 
 
 class FragalysisDownloadForm(forms.ModelForm):
@@ -10,4 +10,15 @@ class FragalysisDownloadForm(forms.ModelForm):
             "target_access_string",
             "access_token",
             "stack",
+        ]
+
+
+class SdfUploadForm(forms.ModelForm):
+    class Meta:
+        model = SdfUpload
+        fields = [
+            "target",
+            "input_file",
+            "protein_field_name",
+            "inspirations_field_name",
         ]
