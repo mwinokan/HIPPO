@@ -39,9 +39,6 @@ class Command(BaseCommand):
 
         mrich.var("#molecules", len(df))
 
-        database_settings = settings.DATABASES["default"]
-        database_path = database_settings["NAME"]
-
         poses = {p.alias: p for p in Pose.objects.all()}
         inspiration_objects = []
 

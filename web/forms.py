@@ -21,4 +21,5 @@ class SdfUploadForm(forms.ModelForm):
             "input_file",
             "protein_field_name",
             "inspirations_field_name",
+            "pose_origins",
         ]

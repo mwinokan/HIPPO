@@ -112,14 +112,14 @@ def pose_compare_3d(request, pks: str):
 
     pk_list = pks.split(",")
 
-    poses = Pose.filter(pk__in=pk_list)
+    poses = Pose.objects.filter(pk__in=pk_list)
 
     if inspirations := request.GET.get("inspirations"):
         assert len(poses) == 1
 
         pose = poses[0]
 
-        poses = [i for i in pose.inspirations] + [pose]
+        poses = [i for i in pose.inspirations.all()] + [pose]
 
     context = {
         "poses": poses,

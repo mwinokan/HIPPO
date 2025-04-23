@@ -7,33 +7,28 @@ import mrich
 from mrich import print
 from pathlib import Path
 
-from rdkit.Chem import PandasTools
-from fragalysis.requests import download_target
-from hippo.tools import inchikey_from_smiles
+from rdkit.Chem import PandasTools, MolToSmiles
+from hippo.tools import inchikey_from_smiles, sanitise_smiles
 from hippo.models import *
 import pandas as pd
 import re
 
 
 class Command(BaseCommand):
-    help = "Import a Target and its Poses from fragalysis"
+    help = "Import Poses from an SDF for a given target"
 
     def add_arguments(self, parser):
         parser.add_argument("upload_id", type=int)
-        # parser.add_argument("--existing", type=str)
-        # parser.add_argument("--debug", action="store_true")
 
     def handle(
         self,
         upload_id: int,
-        # existing: str = None,
-        # clear_previous_tag: bool = True,
         debug: bool = False,
         *args,
         **kwargs,
     ):
 
-        mrich.h1("load_fragalysis")
+        mrich.h1("Load SDF")
         mrich.var("upload_id", upload_id)
 
         upload = SdfUpload.objects.get(id=upload_id)
@@ -45,108 +40,211 @@ class Command(BaseCommand):
 
         file_path = Path(upload.input_file.path)
 
-        # register the File
+        try:
 
-        file, _ = File.objects.get_or_create(
-            path=file_path,
-            format_type=".sdf",
-            content_type="LIGAND",
-            purpose="INPUT",
-        )
+            ### LOAD DF
 
-        # register the PoseSet
+            df = PandasTools.LoadSDF(str(file_path.resolve()))
 
-        upload.message += "\nRegistering PoseSet"
-        upload.save()
+            if df.iloc[0]["ID"] == "ver_1.2":
+                header = df.iloc[0].copy()
+                df = df.iloc[1:].copy()
+            else:
+                header = None
 
-        if not (pset := upload.pose_set):
-            pset = PoseSet(name=file_path.name)
-            pset.full_clean()
-            pset.save()
-
-            upload.pose_set = pset
+            upload.message += f"\nLoaded DataFrame, len={len(df)}"
             upload.save()
 
-        ### LOAD DF
+            if upload.protein_field_name not in df.columns:
+                upload.message += (
+                    f"\nERROR: {upload.protein_field_name=} column required"
+                )
+                upload.status = 3
+                upload.time_finished = timezone.now()
+                upload.save()
+                return
 
-        df = PandasTools.LoadSDF(str(file_path.resolve()))
+            if upload.inspirations_field_name not in df.columns:
+                upload.message += (
+                    f"\nERROR: {upload.inspirations_field_name=} column required"
+                )
+                upload.status = 3
+                upload.time_finished = timezone.now()
+                upload.save()
+                return
 
-        upload.message += f"\nLoaded DataFrame, len={len(df)}"
-        upload.save()
+            # register the File
 
-        ### PLACEMENTS
+            file, _ = File.objects.get_or_create(
+                path=file_path,
+                format_type=".sdf",
+                content_type="LIGAND",
+                purpose="INPUT",
+            )
 
-        ### COMPOUNDS
+            # register the PoseSet
 
-        ### POSES
+            upload.message += "\nRegistering PoseSet"
+            upload.save()
 
-        ### INSPIRATIONS
+            if not (pset := upload.pose_set):
+                pset = PoseSet(name=file_path.name)
+                pset.full_clean()
+                pset.save()
 
-        ### POSESETMEMBERS
+                upload.pose_set = pset
+                upload.save()
 
-        print(df.iloc[0])
+            ### GET STRUCTURES
 
-        # for i,row in df.iterrows():
+            structures = {
+                s.alias: s for s in Structure.objects.filter(target=upload.target)
+            }
 
-        ### LOAD POSES FOR INSPIRATIONS
+            alias_tt = TagType.objects.get(name="Observation Code", origin="Fragalysis")
 
-        # existing_poses = {
-        #     p.alias: p
-        #     for p in Pose.objects.prefetch_related(
-        #         "placement__structure__target"
-        #     ).filter(
-        #         placement__structure__target=upload.target,
-        #     )
-        # }
+            pose_query = PoseTag.objects.select_related(
+                "tag", "pose__placement__structure"
+            ).filter(
+                pose__placement__structure__target_id=upload.target_id,
+                tag__type=alias_tt,
+            )
 
-        # pose_data = []
-        # inspiration_objects = []
+            structures.update(
+                {pt.tag.name: pt.pose.placement.structure for pt in pose_query}
+            )
 
-        # for i, row in df.iterrows():
+            ### COMPOUNDS
 
-        #     if row["ID"] == "ver_1.2":
-        #         upload.message += "Skipping Fragalysis header"
-        #         upload.save()
-        #         continue
+            df["smiles"] = df["ROMol"].apply(MolToSmiles)
 
-        #     mol = row["ROMol"]
+            smiles_map = Compound.bulk_register(smiles=df["smiles"])
 
-        #     smiles =
+            upload.message += "\nCompounds registered"
+            upload.save()
 
-        #     inchikey = inchikey_from_smiles(row["Smiles"])
+            compounds = {
+                c.smiles: c
+                for c in Compound.objects.filter(smiles__in=smiles_map.values())
+            }
+            compounds = {
+                s_old: compounds[smiles] for s_old, smiles in smiles_map.items()
+            }
 
-        #     pose_data.append(dict(pose=Pose(
+            with transaction.atomic():
 
-        #     )))
+                ### POSES
 
-        # #     if "ref_mols" in row:
-        # #         inspiration_names = row["ref_mols"].split(",")
+                poses = {}
+                for i, row in df.iterrows():
 
-        # #         inspirations = []
+                    pose = Pose(
+                        origin=upload.pose_origins,
+                        smiles=row["smiles"],
+                        inchikey=inchikey_from_smiles(row["smiles"]),
+                        mol=row["ROMol"],
+                    )
 
-        # #         for inspiration_name in inspiration_names:
+                    poses[i] = pose
 
-        # #             if inspiration_name in poses:
-        # #                 inspirations.append(poses[inspiration_name])
-        # #             else:
-        # #                 s = f"Unknown inspiration: {inspiration_name}"
-        # #                 mrich.error(s)
-        # #                 raise ValueError(s)
+                Pose.objects.bulk_create(
+                    poses.values(),
+                    update_conflicts=True,
+                    unique_fields=["mol"],
+                    update_fields=["origin"],
+                )
 
-        # #     mol = row["ROMol"]
+                upload.message += "\nPoses registered"
+                upload.save()
 
-        # #     data = dict(
-        # #         mol=mol,
-        # #     )
+                ### PLACEMENTS
 
-        # #     pose = register_pose(**data)
+                placements = []
 
-        # #     for inspiration in inspirations:
-        # #         inspiration_objects.append(
-        # #             Inspiration(original=inspiration, derivative=pose)
-        # #         )
+                for i, row in df.iterrows():
 
-        # # Inspiration.objects.bulk_create(
-        # #     inspiration_objects,
-        # #     ignore_conflicts=True,
-        # # )
+                    structure_key = row[upload.protein_field_name]
+
+                    structure = structures[structure_key]
+
+                    assert (
+                        structure
+                    ), f"No structure found for {upload.protein_field_name}={structure_key}"
+
+                    placements.append(
+                        Placement(
+                            structure=structure,
+                            pose=poses[i],
+                            compound=compounds[row["smiles"]],
+                        )
+                    )
+
+                Placement.objects.bulk_create(
+                    placements,
+                    ignore_conflicts=True,
+                    unique_fields=["structure", "pose"],
+                )
+
+                upload.message += "\nPlacements registered"
+                upload.save()
+
+                ### INSPIRATIONS
+
+                pose_lookup = {pt.tag.name: pt.pose for pt in pose_query}
+
+                inspirations = []
+
+                for i, row in df.iterrows():
+
+                    ref_names = row[upload.inspirations_field_name].split(",")
+
+                    for ref_name in ref_names:
+
+                        inspirations.append(
+                            Inspiration(
+                                original=pose_lookup[ref_name],
+                                derivative=poses[i],
+                            )
+                        )
+
+                Inspiration.objects.bulk_create(
+                    inspirations,
+                    ignore_conflicts=True,
+                    unique_fields=["original", "derivative"],
+                )
+
+                upload.message += "\nInspirations registered"
+                upload.save()
+
+                ### POSESETMEMBERS
+
+                members = []
+                for i, row in df.iterrows():
+
+                    members.append(
+                        PoseSetMember(
+                            parent=pset,
+                            pose=poses[i],
+                        )
+                    )
+
+                PoseSetMember.objects.bulk_create(
+                    members, ignore_conflicts=True, unique_fields=["parent", "pose"]
+                )
+
+                upload.message += "\nPoseSetMembers registered"
+                upload.message += "\nLoading OK"
+                upload.time_finished = timezone.now()
+                upload.status = 2
+                upload.save()
+
+        except Exception as e:
+            # print(inchikey_from_smiles("Cn1nc(C(=O)NCCc2cocn2)c2ccccc21"))
+            # print("Cn1nc(C(=O)NCCc2cocn2)c2ccccc21" in smiles_map.keys())
+            # print("Cn1nc(C(=O)NCCc2cocn2)c2ccccc21" in compounds.keys())
+            mrich.error(e)
+            upload.message += f"\n{e.__class__.__name__.upper()}: {e}"
+            upload.time_finished = timezone.now()
+            upload.status = 3
+            upload.save()
+            raise

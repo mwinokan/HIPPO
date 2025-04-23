@@ -275,8 +275,8 @@ class Structure(AbstractModel):
 
 class Compound(AbstractModel):
 
-    inchikey = models.CharField(max_length=27, unique=True)
     smiles = models.CharField(max_length=300, unique=True)
+    inchikey = models.CharField(max_length=27, unique=True)
 
     # alias = models.CharField(max_length=60, blank=True, unique=True, null=True)
     # metadata = models.JSONField(default=dict, blank=True)
@@ -311,15 +311,15 @@ class Compound(AbstractModel):
             #     content=ContentRenderType.TEXT_MONOSPACE,
             #     copyable=False,
             # ),
-            # "tags": dict(
-            #     type=FieldRenderType.HIDDEN,
-            #     content=ContentRenderType.INSTANCE_PILL,
-            #     follow_related="tag",
-            # ),
+            "tags": dict(
+                type=FieldRenderType.HIDDEN,
+                content=ContentRenderType.INSTANCE_PILL,
+                follow_related="tag",
+            ),
         }
     )
 
-    _list_view_fields = ["smiles"]
+    _list_view_fields = ["smiles", "mol"]
 
     def get_mol_svg_text(self, width=300, height=200):
 
@@ -365,7 +365,7 @@ class Compound(AbstractModel):
         for s, m in zip(smiles, metadata):
 
             s_new = sanitise_smiles(s, verbosity=False, radical=radical)
-            i = inchikey_from_smiles(s)
+            i = inchikey_from_smiles(s_new)
             m = dict_formatter(m)
 
             smiles_map[s] = s_new
@@ -390,11 +390,11 @@ class Compound(AbstractModel):
 
 
 class Pose(AbstractModel):
-    class Meta:
-        unique_together = ("alias", "mol")
+    # class Meta:
+    # unique_together = ("mol")
 
     inchikey = models.CharField(max_length=27, blank=True)
-    alias = models.CharField(max_length=60, blank=True, unique=True, null=True)
+    # alias = models.CharField(max_length=60, blank=True, unique=True, null=True)
     smiles = models.CharField(max_length=300, blank=True, null=True)
 
     mol = MolField(blank=False, unique=True)
@@ -419,7 +419,7 @@ class Pose(AbstractModel):
     )
 
     _shorthand = "P"
-    _name_field = "alias"
+    # _name_field = "alias"
     _custom_detail_view = True
 
     _field_render_types = AbstractModel._field_render_types.copy()
@@ -539,10 +539,11 @@ class PoseSet(AbstractModel):
 
         if members.count():
 
-            x = [m.pc1 for m in members]
-            y = [m.pc2 for m in members]
+            qset = members.all()
+            x = [m.pc1 for m in qset]
+            y = [m.pc2 for m in qset]
 
-            for m in members:
+            for m in qset:
 
                 pose = m.pose
 
@@ -585,6 +586,9 @@ class PoseSet(AbstractModel):
 
 
 class PoseSetMember(AbstractModel):
+
+    class Meta:
+        unique_together = ("parent", "pose")
 
     parent = models.ForeignKey(
         "PoseSet", on_delete=models.CASCADE, related_name="poses"
@@ -671,6 +675,9 @@ class CompoundTag(AbstractModel):
     tag = models.ForeignKey("Tag", related_name="compounds", on_delete=models.CASCADE)
 
     _exclude_from_index = True
+
+    # def __str__(self):
+    #     return f"CT{self.id} \"{self.}\" [{self.type}]"
 
 
 class Inspiration(AbstractModel):
@@ -856,7 +863,7 @@ class FragalysisDownload(AbstractModel):
                 content=ContentRenderType.TEXT_DISPLAY,
             ),
             "message": dict(
-                type=FieldRenderType.TOGGLE_CARD,
+                type=FieldRenderType.CARD,
                 content=ContentRenderType.TEXT_MONOSPACE,
                 split="\n",
             ),
@@ -885,7 +892,7 @@ class SdfUpload(AbstractModel):
     )
 
     pose_set = models.OneToOneField(
-        "PoseSet", on_delete=models.CASCADE, related_name="+", null=True
+        "PoseSet", on_delete=models.SET_NULL, related_name="+", null=True
     )
 
     time_start = models.DateTimeField(auto_now_add=True)
@@ -893,6 +900,12 @@ class SdfUpload(AbstractModel):
 
     status = models.PositiveIntegerField(default=0, choices=STATUSES)
     message = models.TextField(null=True, blank=True)
+
+    pose_origins = models.CharField(
+        max_length=10,
+        default="COMPUTED",
+        choices=[(k, v) for k, v in Pose.POSE_ORIGINS.items()],
+    )
 
     _custom_detail_view = True
     _custom_list_view = True
@@ -929,9 +942,14 @@ class SdfUpload(AbstractModel):
                 content=ContentRenderType.TEXT_DISPLAY,
             ),
             "message": dict(
-                type=FieldRenderType.TOGGLE_CARD,
+                type=FieldRenderType.CARD,
                 content=ContentRenderType.TEXT_MONOSPACE,
                 split="\n",
+            ),
+            "pose_origins": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.TEXT_MONOSPACE,
+                copyable=False,
             ),
         }
     )
