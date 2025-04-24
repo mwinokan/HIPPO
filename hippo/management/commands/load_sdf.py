@@ -235,23 +235,23 @@ class Command(BaseCommand):
                 upload.message += "\nPoseSetMembers registered"
                 upload.save()
 
-                ### UMAP
+            ### UMAP
 
-                if upload.compute_umap:
+            if upload.compute_umap:
 
-                    upload.message += "\nCalculating UMAP"
+                upload.message += "\nCalculating UMAP"
+                upload.save()
+
+                ok = pset.compute_umap()
+
+                if not ok:
+                    upload.message += "\nWARNING: Failed to compute UMAP"
                     upload.save()
 
-                    ok = pset.compute_umap()
-
-                    if not ok:
-                        upload.message += "\nWARNING: Failed to compute UMAP"
-                        upload.save()
-
-                upload.message += f"\nSUCCESS: Finished loading {upload}"
-                upload.time_finished = timezone.now()
-                upload.status = 2
-                upload.save()
+            upload.message += f"\nSUCCESS: Finished loading {upload}"
+            upload.time_finished = timezone.now()
+            upload.status = 2
+            upload.save()
 
         except Exception as e:
             # print(inchikey_from_smiles("Cn1nc(C(=O)NCCc2cocn2)c2ccccc21"))
