@@ -527,61 +527,127 @@ class PoseSet(AbstractModel):
     def generate_tsnee_fig(self):
 
         import plotly.graph_objects as go
+        from pandas import DataFrame
+        import numpy as np
 
-        n_valid = len(
-            [v for v in self.poses.values_list("pc1", flat=True) if v is not None]
-        )
-
-        if n_valid != self.poses.count():
+        # Compute UMAP embedding if needed
+        if self.poses.filter(pc1__isnull=False).count() != self.poses.count():
             self.compute_umap()
+        else:
+            mrich.debug("No UMAP embedding needed")
+
+        # Extrapolate human reviews
+        if (
+            self.poses.filter(review__isnull=True, predicted_score__isnull=True).count()
+            != 0
+        ):
+            self.extrapolate_reviews()
+        else:
+            mrich.debug("No extrapolation needed")
 
         members = self.poses
 
-        fig = go.Figure()
+        df = DataFrame(
+            members.values(
+                "pose_id",
+                "pc1",
+                "pc2",
+                "review",
+                "predicted_score",
+                "prediction_confidence",
+            )
+        )
 
-        text = []
-        colors = []
-        pose_ids = []
+        fig = go.Figure()
 
         if members.count():
 
-            qset = members.all()
-            x = [m.pc1 for m in qset]
-            y = [m.pc2 for m in qset]
+            df_good = df[df["review"] == 1]
+            df_bad = df[df["review"] == 0]
+            df_test = df[df["review"].isnull()]
 
-            for m in qset:
+            if not len(df_good) and not len(df_bad):
+                # no reviews, so no extrapolation
+                fig.add_trace(
+                    go.Scatter(
+                        name="unreviewed",
+                        x=df["pc1"],
+                        y=df["pc2"],
+                        mode="markers",
+                        marker=dict(color="gray", size=10),
+                        hovertemplate="%{text}<br>PC1: %{x}<br>PC2: %{y}<extra></extra>",
+                        text=df["pose_id"].apply(lambda x: f"P{x}"),
+                        customdata=df["pose_id"],
+                    )
+                )
 
-                pose = m.pose
+            else:
+                # GOOD HUMAN REVIEWS
 
-                text.append(str(pose))
-                pose_ids.append(pose.id)
+                customdata = [(pose_id, 1, 1) for pose_id in df_good["pose_id"]]
 
-                match m.review:
-                    case None:
-                        colors.append("gray")
-                    case "GOOD":
-                        colors.append("rgb(0,255,0)")
-                    case "BAD":
-                        colors.append("red")
+                fig.add_trace(
+                    go.Scatter(
+                        name="GOOD",
+                        x=df_good["pc1"],
+                        y=df_good["pc2"],
+                        mode="markers",
+                        marker=dict(color="rgb(0,255,0)", symbol="star", size=10),
+                        hovertemplate="%{text}<br>PC1: %{x}<br>PC2: %{y}<extra></extra>",
+                        text=df_good["pose_id"].apply(lambda x: f"P{x} [GOOD]"),
+                        customdata=customdata,
+                    )
+                )
 
-        else:
-            x = []
-            y = []
+                # BAD HUMAN REVIEWS
 
-        trace = go.Scatter(
-            x=x,
-            y=y,
-            mode="markers",
-            marker=dict(
-                size=12,
-                color=colors,
-            ),
-            hovertemplate="%{text}<br>PC1: %{x}<br>PC2: %{y}<extra></extra>",
-            text=text,
-            customdata=pose_ids,
-        )
+                customdata = [(pose_id, 0, 1) for pose_id in df_bad["pose_id"]]
 
-        fig.add_trace(trace)
+                fig.add_trace(
+                    go.Scatter(
+                        name="BAD",
+                        x=df_bad["pc1"],
+                        y=df_bad["pc2"],
+                        mode="markers",
+                        marker=dict(color="red", symbol="star", size=10),
+                        hovertemplate="%{text}<br>PC1: %{x}<br>PC2: %{y}<extra></extra>",
+                        text=df_bad["pose_id"].apply(lambda x: f"P{x} [BAD]"),
+                        customdata=customdata,
+                    )
+                )
+
+                # EXTRAPOLATED
+
+                data = df_test[
+                    ["pose_id", "predicted_score", "prediction_confidence"]
+                ].values
+
+                customdata = [(a, b, c) for a, b, c in data]
+                text = [
+                    f"P{a} [GOOD?]" if b > 0.5 else f"P{a} [BAD?]" for a, b, _ in data
+                ]
+
+                fig.add_trace(
+                    go.Scatter(
+                        name="Predicted",
+                        x=df_test["pc1"],
+                        y=df_test["pc2"],
+                        mode="markers",
+                        marker=dict(
+                            color=df_test["predicted_score"],
+                            colorscale=[
+                                [0.0, "red"],
+                                [0.5, "white"],
+                                [1.0, "rgb(0,255,0)"],
+                            ],
+                            opacity=np.maximum(df_test["prediction_confidence"], 0.2),
+                            line=dict(color="black", width=1),
+                        ),
+                        hovertemplate="%{text}<br>PC1: %{x}<br>PC2: %{y}<br>Predicted: %{customdata[1]}<br>Confidence: %{customdata[2]}<extra></extra>",
+                        text=text,
+                        customdata=customdata,
+                    )
+                )
 
         fig.update_layout(
             margin=dict(l=20, r=20, t=20, b=20),
@@ -589,6 +655,74 @@ class PoseSet(AbstractModel):
         )
 
         return fig
+
+    def extrapolate_reviews(self):
+
+        self.summary()
+
+        if not self.poses.count():
+            return
+
+        from pandas import DataFrame
+
+        df = DataFrame(self.poses.values("pose_id", "pc1", "pc2", "review"))
+
+        df_train = df[df["review"].notnull()]
+        df_good = df[df["review"] == 1]
+        df_bad = df[df["review"] == 0]
+        df_test = df[df["review"].isnull()]
+
+        mrich.var("#total", len(df))
+        mrich.var("#train", len(df_train))
+        mrich.var("#test", len(df_test))
+
+        if not len(df_train):
+            mrich.warning("Can't extrapolate, no reviews")
+            return
+
+        if not len(df_test):
+            mrich.warning("Can't extrapolate, no unreviewed")
+            return
+
+        X_train = df_train[["pc1", "pc2"]].values
+        y_train = df_train["review"].apply(lambda x: 1 if x else 0).values
+        X_test = df_test[["pc1", "pc2"]].values
+
+        with mrich.loading("imports..."):
+            from sklearn.gaussian_process import GaussianProcessRegressor
+            from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C
+
+        kernel = C(1.0, (1e-3, 1e3)) * RBF(
+            length_scale=1.0, length_scale_bounds=(1e-2, 1e2)
+        )
+        gpr = GaussianProcessRegressor(
+            kernel=kernel, n_restarts_optimizer=10, alpha=1e-2
+        )
+        gpr.fit(X_train, y_train)
+        y_pred_mean, y_pred_std = gpr.predict(X_test, return_std=True)
+        df.loc[df["review"].isnull(), "pred_mean"] = y_pred_mean
+        df.loc[df["review"].isnull(), "pred_std"] = y_pred_std
+
+        members = []
+        for i, row in df[df["review"].isnull()].iterrows():
+            members.append(
+                PoseSetMember(
+                    pose_id=row["pose_id"],
+                    parent=self,
+                    predicted_score=row["pred_mean"],
+                    prediction_confidence=row["pred_std"],
+                )
+            )
+
+        PoseSetMember.objects.bulk_create(
+            members,
+            update_conflicts=True,
+            unique_fields=["parent", "pose"],
+            update_fields=["predicted_score", "prediction_confidence"],
+        )
+
+    def clear_reviews(self):
+        self.poses.update(review=None)
 
 
 class PoseSetMember(AbstractModel):
@@ -604,12 +738,25 @@ class PoseSetMember(AbstractModel):
     pc1 = models.FloatField(null=True)
     pc2 = models.FloatField(null=True)
 
+    predicted_score = models.FloatField(
+        null=True,
+        # validators=[
+        #     MinValueValidator(0.0),
+        #     MaxValueValidator(1.0)
+        # ],
+    )
+
+    prediction_confidence = models.FloatField(
+        null=True,
+        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
+    )
+
     review_types = {
-        "BAD": "Bad",
-        "GOOD": "Good",
+        0: "Bad",
+        1: "Good",
     }
 
-    review = models.CharField(max_length=4, null=True, choices=review_types)
+    review = models.IntegerField(null=True, choices=review_types)
 
     _style = "pose"
     _exclude_from_index = True

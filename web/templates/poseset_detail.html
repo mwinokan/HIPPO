@@ -16,7 +16,7 @@
         // Add click event listener
         document.getElementById("fig").on('plotly_click', function(data){
             var pointIndex = data.points[0].pointIndex;
-            var pose_id = data.points[0].customdata;
+            var pose_id = data.points[0].customdata[0];
 
             document.getElementById("form").style.display = "block";
             
@@ -59,8 +59,8 @@
 
         <label for="review">Review:</label>
         <select name="review" id="review">
-            <option value="GOOD" selected>GOOD</option>
-            <option value="BAD">BAD</option>
+            <option value="1" selected>GOOD</option>
+            <option value="0">BAD</option>
         </select>
     <button type="submit">Update</button>
 </form>
