@@ -13,6 +13,7 @@ from hippo.tools import inchikey_from_smiles
 from hippo.models import *
 import pandas as pd
 import re
+from numpy import nan
 
 
 class Command(BaseCommand):
@@ -115,6 +116,8 @@ class Command(BaseCommand):
             download.save()
 
             df = pd.read_csv(metadata_csv)
+
+            df["Compound code"] = df["Compound code"].replace({nan: None})
 
             ## COMPOUNDS
 
@@ -342,6 +345,9 @@ class Command(BaseCommand):
 
             comp_tags = []
             for comp_alias, smiles in df[["Compound code", "Smiles"]].values:
+
+                if not comp_alias:
+                    continue
 
                 if comp_alias.startswith("Z"):
                     tag_type = "ZINC ID"
