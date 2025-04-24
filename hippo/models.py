@@ -541,11 +541,9 @@ class PoseSet(AbstractModel):
             self.poses.filter(
                 review__isnull=False, predicted_score__isnull=False
             ).count()
-            != 0
+            or self.poses.filter(predicted_score__isnull=True).count()
         ):
             self.extrapolate_reviews()
-        else:
-            mrich.debug("No extrapolation needed")
 
         members = self.poses
 
@@ -643,10 +641,12 @@ class PoseSet(AbstractModel):
                                 [0.5, "white"],
                                 [1.0, "rgb(0,255,0)"],
                             ],
-                            opacity=np.maximum(df_test["prediction_confidence"], 0.2),
+                            opacity=np.maximum(
+                                1 - df_test["prediction_confidence"], 0.2
+                            ),
                             line=dict(color="black", width=1),
                         ),
-                        hovertemplate="%{text}<br>PC1: %{x}<br>PC2: %{y}<br>Predicted: %{customdata[1]}<br>Confidence: %{customdata[2]}<extra></extra>",
+                        hovertemplate="%{text}<br>PC1: %{x}<br>PC2: %{y}<br>Predicted: %{customdata[1]}<br>Uncertainty: %{customdata[2]}<extra></extra>",
                         text=text,
                         customdata=customdata,
                     )
