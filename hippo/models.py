@@ -16,6 +16,7 @@ from django.shortcuts import reverse
 import sys
 import mrich
 import mcol
+from mrich import print
 
 sys.path.append("..")
 from web.rendertypes import FieldRenderType, ContentRenderType, DEFAULTS
@@ -462,72 +463,77 @@ class Pose(AbstractModel):
 
 class PoseSet(AbstractModel):
 
-    name = models.CharField(max_length=60, unique=True)
+    name = models.CharField(max_length=300, unique=True)
 
     _name_field = "name"
     _custom_detail_view = True
     _style = "pose"
 
-    def calculate_pca(self):
+    def compute_umap(self):
 
-        if not self.poses.count():
+        mrich.bold(self, ".compute_umap()")
+
+        n = self.poses.count()
+
+        mrich.var("#poses", n)
+
+        if not n:
             mrich.warning("No poses")
-            return
+            return False
 
         with mrich.loading("imports..."):
-            from .tools import get_cfps
-            from sklearn.decomposition import PCA
+            from math import comb
+            from itertools import combinations
+            from mucos import MuCOS_score
             import numpy as np
-            import pandas as pd
+            import umap
 
-        members = list(self.poses.values("id", "pose"))
+        distance_matrix = np.zeros((n, n))
 
-        pose_ids = [d["pose"] for d in members]
+        members = list(self.poses.prefetch_related("pose").all())
 
-        poses = Pose.objects.filter(id__in=pose_ids)
+        n_combos = comb(n, 2)
 
-        pose_mols = {d["id"]: d["mol"] for d in poses.values("id", "mol")}
+        mrich.var("#pairs", n_combos)
 
-        for member in members:
-            mol = pose_mols[member["pose"]]
-            member["mol"] = mol
+        combos = combinations(range(n), 2)
 
-        df = pd.DataFrame(members)
+        for i, j in mrich.track(
+            combos, total=n_combos, prefix="computing distance_matrix"
+        ):
+            m1 = members[i].pose.mol
+            m2 = members[j].pose.mol
+            dist = 1 - MuCOS_score(m1, m2)
+            distance_matrix[i, j] = dist
+            distance_matrix[j, i] = dist
 
-        with mrich.loading("Getting Compound fingerprints"):
-            df["FP"] = df["mol"].map(get_cfps)
+        with mrich.loading("Creating reducer"):
+            reducer = umap.UMAP(metric="precomputed")
 
-        X = np.array([x.fp for x in df["FP"]])
+        with mrich.loading("Creating embedding"):
+            embedding = reducer.fit_transform(distance_matrix)
 
-        with mrich.loading("Computing PCA"):
-            pca = PCA(n_components=2, random_state=0)
-            pca_fit = pca.fit_transform(X)
+        x = embedding[:, 0]
+        y = embedding[:, 1]
 
-        df["PC1"] = pca_fit.T[0]
-        df["PC2"] = pca_fit.T[1]
-
-        members = []
-
-        for i, row in df.iterrows():
-
-            members.append(
-                PoseSetMember(
-                    id=row["id"],
-                    pc1=row["PC1"],
-                    pc2=row["PC2"],
-                )
-            )
+        for m, x, y in zip(members, x, y):
+            m.pc1 = x
+            m.pc2 = y
 
         PoseSetMember.objects.bulk_update(members, fields=["pc1", "pc2"])
+
+        return True
 
     def generate_tsnee_fig(self):
 
         import plotly.graph_objects as go
 
-        n_valid = [v for v in self.poses.values_list("pc1", flat=True) if v is not None]
+        n_valid = len(
+            [v for v in self.poses.values_list("pc1", flat=True) if v is not None]
+        )
 
         if n_valid != self.poses.count():
-            self.calculate_pca()
+            self.compute_umap()
 
         members = self.poses
 
@@ -833,7 +839,11 @@ class FragalysisDownload(AbstractModel):
     message = models.TextField(null=True, blank=True)
 
     target = models.ForeignKey(
-        "Target", on_delete=models.CASCADE, related_name="+", null=True
+        "Target",
+        on_delete=models.CASCADE,
+        related_name="+",
+        null=True,
+        blank=True,
     )
 
     _custom_detail_view = True
@@ -894,6 +904,8 @@ class SdfUpload(AbstractModel):
     pose_set = models.OneToOneField(
         "PoseSet", on_delete=models.SET_NULL, related_name="+", null=True
     )
+
+    compute_umap = models.BooleanField(default=True)
 
     time_start = models.DateTimeField(auto_now_add=True)
     time_finished = models.DateTimeField(null=True)

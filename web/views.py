@@ -83,7 +83,7 @@ def pose_compare(request, pks: str):
 
     pk_list = pks.split(",")
 
-    poses = Pose.filter(pk__in=pk_list)
+    poses = Pose.objects.filter(pk__in=pk_list)
 
     # if inspirations := request.GET.get("inspirations"):
     #     assert len(poses) == 1
@@ -99,7 +99,9 @@ def pose_compare(request, pks: str):
         "last_index": len(poses) - 1,
     }
 
-    context["mocassin"] = poses.score_set(method="mocassin")
+    context["pose_ids"] = [p.id for p in poses]
+
+    # context["mocassin"] = poses.score_set(method="mocassin")
 
     return render(
         request,
@@ -181,8 +183,6 @@ def sdf_upload(request):
 
     if request.method == "POST":
         form = SdfUploadForm(request.POST, request.FILES)
-
-        print(form)
 
         if form.is_valid():
 

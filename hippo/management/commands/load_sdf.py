@@ -233,7 +233,22 @@ class Command(BaseCommand):
                 )
 
                 upload.message += "\nPoseSetMembers registered"
-                upload.message += "\nLoading OK"
+                upload.save()
+
+                ### UMAP
+
+                if upload.compute_umap:
+
+                    upload.message += "\nCalculating UMAP"
+                    upload.save()
+
+                    ok = pset.compute_umap()
+
+                    if not ok:
+                        upload.message += "\nWARNING: Failed to compute UMAP"
+                        upload.save()
+
+                upload.message += f"\nSUCCESS: Finished loading {upload}"
                 upload.time_finished = timezone.now()
                 upload.status = 2
                 upload.save()
