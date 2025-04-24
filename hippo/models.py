@@ -538,7 +538,9 @@ class PoseSet(AbstractModel):
 
         # Extrapolate human reviews
         if (
-            self.poses.filter(review__isnull=True, predicted_score__isnull=True).count()
+            self.poses.filter(
+                review__isnull=False, predicted_score__isnull=False
+            ).count()
             != 0
         ):
             self.extrapolate_reviews()
@@ -568,6 +570,7 @@ class PoseSet(AbstractModel):
 
             if not len(df_good) and not len(df_bad):
                 # no reviews, so no extrapolation
+                customdata = [(pose_id, None, None) for pose_id in df["pose_id"]]
                 fig.add_trace(
                     go.Scatter(
                         name="unreviewed",
@@ -577,7 +580,7 @@ class PoseSet(AbstractModel):
                         marker=dict(color="gray", size=10),
                         hovertemplate="%{text}<br>PC1: %{x}<br>PC2: %{y}<extra></extra>",
                         text=df["pose_id"].apply(lambda x: f"P{x}"),
-                        customdata=df["pose_id"],
+                        customdata=customdata,
                     )
                 )
 
@@ -663,7 +666,7 @@ class PoseSet(AbstractModel):
         if not self.poses.count():
             return
 
-        from pandas import DataFrame
+        from pandas import DataFrame, isna
 
         df = DataFrame(self.poses.values("pose_id", "pc1", "pc2", "review"))
 
@@ -704,15 +707,29 @@ class PoseSet(AbstractModel):
         df.loc[df["review"].isnull(), "pred_std"] = y_pred_std
 
         members = []
-        for i, row in df[df["review"].isnull()].iterrows():
-            members.append(
-                PoseSetMember(
-                    pose_id=row["pose_id"],
-                    parent=self,
-                    predicted_score=row["pred_mean"],
-                    prediction_confidence=row["pred_std"],
+        for i, row in df.iterrows():
+
+            if isna(row["review"]):
+
+                members.append(
+                    PoseSetMember(
+                        pose_id=row["pose_id"],
+                        parent=self,
+                        predicted_score=row["pred_mean"],
+                        prediction_confidence=row["pred_std"],
+                    )
                 )
-            )
+
+            else:
+
+                members.append(
+                    PoseSetMember(
+                        pose_id=row["pose_id"],
+                        parent=self,
+                        predicted_score=None,
+                        prediction_confidence=None,
+                    )
+                )
 
         PoseSetMember.objects.bulk_create(
             members,
