@@ -489,8 +489,8 @@ class PoseSet(AbstractModel):
 
         mrich.var("#poses", n)
 
-        if not n:
-            mrich.warning("No poses")
+        if n < 3:
+            mrich.warning("Not enough poses")
             return False
 
         with mrich.loading("imports..."):
