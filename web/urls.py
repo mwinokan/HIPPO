@@ -28,6 +28,7 @@ urlpatterns = [
     path("pill_demo/", views.pill_demo, name="pill_demo"),
     # custom views
     # path("model_pill/<str:class_name>/<int:pk>/", views.model_pill, name="model_pill"),
+    path("structure_pdb/<int:pk>/", views.structure_pdb, name="structure_pdb"),
     path("pose_sdf/<int:pk>/", views.pose_sdf, name="pose_sdf"),
     path("pose_compare/<str:pks>/", views.pose_compare, name="pose_compare"),
     path("pose_compare_3d/<str:pks>/", views.pose_compare_3d, name="pose_compare_3d"),

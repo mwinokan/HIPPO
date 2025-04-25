@@ -20,7 +20,7 @@ from django.core.management import call_command
 from django.contrib.staticfiles import finders
 
 # from .rendertypes import ContentRenderType
-from hippo.models import MODELS, Pose, PoseSet, PoseSetMember, FragalysisDownload
+from hippo.models import *
 import plotly.graph_objects as go
 import plotly.io as pio
 from .forms import *
@@ -77,6 +77,18 @@ def pose_sdf(request, pk: int):
     text = MolToMolBlock(pose.mol)
 
     return HttpResponse(text, content_type="chemical/x-mdl-sdfile")
+
+
+def structure_pdb(request, pk: int):
+
+    structure = Structure.objects.get(id=pk)
+
+    if not structure:
+        return HttpResponse("Unknown Structure", status=400, content_type="text/plain")
+
+    text = structure.pdb_block
+
+    return HttpResponse(text, content_type="chemical/x-pdb")
 
 
 def pose_compare(request, pks: str):
@@ -432,6 +444,24 @@ class PoseDetailView(BaseDetailView):
 
         # Otherwise, assume it's a custom field (e.g., 'pose_code')
         return get_object_or_404(Pose, alias=value)
+
+    def get_context_data(self, *args, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        colors = ["orange", "blue", "green", "yellow", "red"]
+
+        context["inspirations"] = [
+            (inspiration, color)
+            for inspiration, color in zip(self.object.inspirations.all(), colors)
+        ]
+        context["structure"] = self.object.placement.structure
+
+        context["show_structure"] = self.request.GET.get("structure", "True") == "True"
+        context["show_inspirations"] = (
+            self.request.GET.get("inspirations", "False") == "True"
+        )
+
+        return context
 
 
 class PoseSetDetailView(BaseDetailView):

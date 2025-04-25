@@ -10,21 +10,140 @@
     <div id="viewer" style="width: 100%; height: 400px; position: relative;"></div>
 </div>
 
-<script>
-    let sdfUrl = "{% url 'pose_sdf' object.pk %}";  // Fetch SDF
+<br>
 
-    fetch(sdfUrl)
-        .then(response => response.text())
-        .then(sdfData => {
-            let viewer = $3Dmol.createViewer("viewer");
-            viewer.addModel(sdfData, "sdf");  // Add SDF model
-            viewer.setBackgroundColor("a7cfee", 0.0)
-            viewer.setStyle({}, { stick: {} });  // Stick representation
-            viewer.setStyle({ elem: "C" }, { stick: { color: "white" } });  // recolor carbons
-            viewer.zoomTo();  // Zoom to molecule
-            viewer.render();  // Render the molecule
+<div class="monospace">
+    <div class="h2-checkbox-container">
+        <label class="switch">
+            <input type="checkbox" id="structure_toggle_checkbox">
+            <span class="slider round"></span>
+        </label>
+        <a href="{% url 'structure_detail' structure.pk %}">{{structure.model_pill_html|safe}}</a>
+    </div>
+
+    {% if inspirations %}
+
+        {% for inspiration, color in inspirations %}
+
+        <div class="h2-checkbox-container">
+            <label class="switch">
+                <input type="checkbox" id="inspiration_toggle_checkbox_{{forloop.counter0}}">
+                <span class="slider round"></span>
+            </label>
+            <a href="{% url 'pose_detail' inspiration.pk %}">
+                <div class="model-pill" style="background:{{color}};color:white;">{{inspiration}}
+                </div>
+            </a>
+        </div>
+
+        {% endfor %}
+
+    {% endif %}
+</div>
+
+<script>
+
+    document.addEventListener("DOMContentLoaded", function loadPoseComparison() {
+        
+        let viewer = $3Dmol.createViewer("viewer");
+
+        viewer.setBackgroundColor("a7cfee", 0.0)
+        
+        let pdbUrl = "{% url 'structure_pdb' structure.pk %}";  // Fetch PDB
+        let sdfUrl = "{% url 'pose_sdf' object.pk %}";  // Fetch PDB
+
+        let proteinSurfaceID;
+
+        const proteinStyle = {cartoon:{color:"white"}, line: {linewidth:2}};
+
+        Promise.all([
+            fetch(pdbUrl).then(response => response.text()),
+            fetch(sdfUrl).then(response => response.text()),
+            {% for inspiration,color in inspirations %}
+            fetch("{% url 'pose_sdf' inspiration.pk %}").then(response => response.text()),
+            {% endfor %}
+
+        ])
+        .then(([pdbData, sdfData, 
+            {% for inspiration,color in inspirations %}
+            sdfData_{{forloop.counter0}},
+            {% endfor %}
+        ]) => {
+            viewer.addModel(pdbData, "pdb");
+            viewer.addModel(sdfData, "sdf");
+            {% for inspiration,color in inspirations %}
+                viewer.addModel(sdfData_{{forloop.counter0}}, "sdf");
+                viewer.setStyle({},{});
+            {% endfor %}
+
+            viewer.setStyle({model:0},{});
+            viewer.setStyle({model:1}, { stick: {} });
+            viewer.setStyle({model:1, elem: "C" }, { stick: { color: "white" } });
+
+            viewer.zoomTo({model:1});
+            viewer.render();
+
+            // Add structure toggle switch listener
+            
+            const structureToggle = document.getElementById("structure_toggle_checkbox");
+
+            async function structureStyleToggle () {
+                if (structureToggle.checked) {
+                    viewer.setStyle({model:0}, proteinStyle);
+                    proteinSurfaceID = await viewer.addSurface($3Dmol.SurfaceType.MS, {
+                        opacity: 0.9,
+                        color: 'white',
+                        model: 0
+                    }, {model:0});
+
+                } else {
+                    viewer.setStyle({model:0}, {});
+                    viewer.removeSurface(proteinSurfaceID);
+                }
+                viewer.render();
+            }
+            
+            console.log("show_structure {{show_structure}}");
+            console.log("show_inspirations {{show_inspirations}}");
+
+            {% if show_structure %}
+            structureToggle.checked = true;
+            structureStyleToggle();
+            {% endif %}
+            structureToggle.addEventListener("change", structureStyleToggle);
+
+            // Add inspiration toggle switch listeners
+
+            async function inspirationStyleToggle (toggle, inspirationIndex, color) {
+
+                let modelIndex = 2 + inspirationIndex;
+
+                if (toggle.checked) {
+                    viewer.setStyle({model:modelIndex}, { stick: {} });
+                    viewer.setStyle({model:modelIndex, elem: "C" }, { stick: { color: color } });
+                } else {
+                    viewer.setStyle({model:modelIndex}, {});
+                }
+                viewer.render();
+            }
+            
+            {% for inspiration,color in inspirations %}
+            const inspirationToggle{{forloop.counter0}} = document.getElementById("inspiration_toggle_checkbox_{{forloop.counter0}}");
+            
+            {% if show_inspirations %}
+            inspirationToggle{{forloop.counter0}}.checked = true;
+            inspirationStyleToggle(inspirationToggle{{forloop.counter0}}, {{forloop.counter0}}, "{{color}}");
+            {% endif %}
+
+            inspirationToggle{{forloop.counter0}}.addEventListener("change", function() {
+                inspirationStyleToggle(inspirationToggle{{forloop.counter0}}, {{forloop.counter0}}, "{{color}}");
+            });
+            {% endfor %}
+
         })
-        .catch(error => console.error("Error loading SDF:", error));
+        .catch(error => console.error("Error loading models:", error));
+    
+    });
 
 </script>
 
