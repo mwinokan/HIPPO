@@ -17,7 +17,7 @@
         document.getElementById("fig").on('plotly_click', function(data){
             var pointIndex = data.points[0].pointIndex;
             var pose_id = data.points[0].customdata[0];
-            window.open(`/pose/${pose_id}/`, '_blank');
+            window.open(`/pose/${pose_id}/?inspirations=True&poseset_redirect={{object.pk}}`, '_blank');
         });
 
     </script>
@@ -44,7 +44,7 @@
         {% for member in uncertain_poses %}
         
         <tr>
-            <td><a href="{% url 'pose_detail' member.pose.pk %}" target="_blank" rel="noopener noreferrer">{{member.pose.model_pill_html|safe}}</a></td>
+            <td><a href="{% url 'pose_detail' member.pose.pk %}?inspirations=True&poseset_redirect={{object.pk}}" target="_blank" rel="noopener noreferrer">{{member.pose.model_pill_html|safe}}</a></td>
             <td style="text-align:right;"><span class="monospace">{{ member.predicted_score|floatformat:2 }}</span></td>
             <td style="text-align:right;"><span class="monospace">{{ member.prediction_uncertainty|floatformat:2 }}</span></td>
         </tr>

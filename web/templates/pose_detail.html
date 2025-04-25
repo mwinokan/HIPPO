@@ -51,6 +51,10 @@
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
         <p>Review this pose: {{review_form.review}}&nbsp;<button type="submit" class="btn">Update</button></p>
+
+        {% if poseset_redirect %}
+            <input type="hidden" name="poseset_redirect" value="{{poseset_redirect}}">
+        {% endif %}
     </form>
 
     {% endif %}

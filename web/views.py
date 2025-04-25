@@ -469,6 +469,9 @@ class PoseDetailView(BaseDetailView):
 
         context["review_form"] = review_form
 
+        if pset_id := self.request.GET.get("poseset_redirect", None):
+            context["poseset_redirect"] = int(pset_id)
+
         return context
 
     def post(self, request, *args, **kwargs):
@@ -485,6 +488,9 @@ class PoseDetailView(BaseDetailView):
         if value != review.review:
             review.review = value
             review.save()
+
+        if pset_id := request.POST.get("poseset_redirect", None):
+            return redirect("poseset_detail", int(pset_id))
 
         return redirect("pose_detail", pose.pk)
 
@@ -503,7 +509,7 @@ class PoseSetDetailView(BaseDetailView):
         fig = pio.to_json(fig)
         context["fig"] = fig
 
-        unreviewed = self.object.unreviewed
+        unreviewed = self.object.unreviewed.filter(predicted_score__isnull=False)
 
         if unreviewed.count():
             context["uncertain_poses"] = unreviewed.select_related("pose").order_by(
