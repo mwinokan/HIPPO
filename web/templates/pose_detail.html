@@ -7,34 +7,34 @@
 <br>
 
 <div class="monospace" style="padding:0;">
-    <div id="viewer" style="width: 100%; height: 400px; position: relative;"></div>
+    <div id="viewer" style="width: 100%; height: 600px; position: relative;"></div>
 </div>
 
 <br>
 
-<div class="monospace">
-    <div class="h2-checkbox-container">
-        <label class="switch">
-            <input type="checkbox" id="structure_toggle_checkbox">
-            <span class="slider round"></span>
-        </label>
-        <a href="{% url 'structure_detail' structure.pk %}">{{structure.model_pill_html|safe}}</a>
-    </div>
+<div class="h2-checkbox-container">
+    
+    <a href="{% url 'structure_detail' structure.pk %}">
+        <div class="model-pill" style="background:var(--color-protein);color:var(--text-color-protein);">{{structure}}
+            <label class="switch">
+                <input type="checkbox" id="structure_toggle_checkbox">
+                <span class="slider round"></span>
+            </label>
+        </div>
+    </a>
 
     {% if inspirations %}
 
         {% for inspiration, color in inspirations %}
 
-        <div class="h2-checkbox-container">
-            <label class="switch">
-                <input type="checkbox" id="inspiration_toggle_checkbox_{{forloop.counter0}}">
-                <span class="slider round"></span>
-            </label>
-            <a href="{% url 'pose_detail' inspiration.pk %}">
-                <div class="model-pill" style="background:{{color}};color:white;">{{inspiration}}
-                </div>
-            </a>
-        </div>
+        <a href="{% url 'pose_detail' inspiration.pk %}">
+            <div class="model-pill" style="background:{{color}};color:white;">{{inspiration}}
+                <label class="switch">
+                    <input type="checkbox" id="inspiration_toggle_checkbox_{{forloop.counter0}}">
+                    <span class="slider round"></span>
+                </label>
+            </div>
+        </a>
 
         {% endfor %}
 
@@ -50,8 +50,7 @@
 
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
-        {{review_form.review}}
-        <button type="submit" class="btn">Update</button>
+        <p>Review this pose: {{review_form.review}}&nbsp;<button type="submit" class="btn">Update</button></p>
     </form>
 
     {% endif %}
