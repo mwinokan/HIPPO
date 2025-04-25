@@ -39,6 +39,23 @@
         {% endfor %}
 
     {% endif %}
+
+</div>
+
+<br>
+
+<div class="monospace">
+
+    {% if user.is_authenticated %}
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{review_form.review}}
+        <button type="submit" class="btn">Update</button>
+    </form>
+
+    {% endif %}
+
 </div>
 
 <script>

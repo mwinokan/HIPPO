@@ -461,7 +461,32 @@ class PoseDetailView(BaseDetailView):
             self.request.GET.get("inspirations", "False") == "True"
         )
 
+        review = PoseReview.objects.filter(
+            user=self.request.user, pose=self.object
+        ).first()
+
+        review_form = PoseReviewForm(instance=review)
+
+        context["review_form"] = review_form
+
         return context
+
+    def post(self, request, *args, **kwargs):
+
+        pose = self.get_object()
+
+        value = request.POST["review"]
+
+        review = PoseReview.objects.filter(user=request.user, pose=pose).first()
+
+        if not review:
+            review = PoseReview(user=request.user, pose=pose)
+
+        if value != review.review:
+            review.review = value
+            review.save()
+
+        return redirect("pose_detail", pose.pk)
 
 
 class PoseSetDetailView(BaseDetailView):
@@ -474,9 +499,16 @@ class PoseSetDetailView(BaseDetailView):
     def get_context_data(self, *args, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        fig = self.object.generate_tsnee_fig()
+        fig = self.object.generate_umap_fig()
         fig = pio.to_json(fig)
         context["fig"] = fig
+
+        unreviewed = self.object.unreviewed
+
+        if unreviewed.count():
+            context["uncertain_poses"] = unreviewed.select_related("pose").order_by(
+                "-prediction_uncertainty"
+            )[:10]
 
         return context
 
@@ -503,17 +535,6 @@ class PoseSetDetailView(BaseDetailView):
 
         # Redirect to a success URL or reload the detail view with the updated data
         return redirect("poseset_detail", pk=obj.pk)
-
-    # def get_object(self):
-
-    #     value = self.kwargs.get("value")
-
-    #     # Check if lookup_value is an integer (PK lookup)
-    #     if value.isdigit():
-    #         return get_object_or_404(PoseSet, pk=int(value))
-
-    #     # Otherwise, assume it's a custom field (e.g., 'pose_code')
-    #     return get_object_or_404(PoseSet, alias=value)
 
 
 GENERATED_VIEWS["pose"]["detail_view"] = PoseDetailView

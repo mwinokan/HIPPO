@@ -12,11 +12,15 @@ from .orm.validators import validate_list_of_integers, validate_coord
 
 from molparse.rdkit.features import FEATURE_FAMILIES, INTERACTION_TYPES
 from django.shortcuts import reverse
+from django.contrib.auth.models import User
+from django.db.models import Avg
 
 import sys
 import mrich
 import mcol
 from mrich import print
+
+from decimal import Decimal
 
 sys.path.append("..")
 from web.rendertypes import FieldRenderType, ContentRenderType, DEFAULTS
@@ -431,11 +435,8 @@ class Pose(AbstractModel):
                 content=ContentRenderType.TEXT_MONOSPACE,
                 copyable=False,
             ),
-            "tags": dict(
-                type=FieldRenderType.HIDDEN,
-                content=ContentRenderType.INSTANCE_PILL,
-                follow_related="tag",
-            ),
+            "tags": dict(type=FieldRenderType.HIDDEN),
+            "reviews": dict(type=FieldRenderType.HIDDEN),
         }
     )
 
@@ -460,6 +461,14 @@ class Pose(AbstractModel):
 
         return value
 
+    def __str__(self):
+        tag = self.tags.filter(
+            tag__type__name="Observation Code", tag__type__origin="Fragalysis"
+        ).first()
+        if tag:
+            return f'P{self.id} "{tag.tag.name}"'
+        return f"P{self.id}"
+
 
 class PoseSet(AbstractModel):
 
@@ -468,6 +477,9 @@ class PoseSet(AbstractModel):
     _name_field = "name"
     _custom_detail_view = True
     _style = "pose"
+
+    _field_render_types = AbstractModel._field_render_types.copy()
+    _field_render_types.update({"poses": dict(type=FieldRenderType.HIDDEN)})
 
     def compute_umap(self):
 
@@ -524,7 +536,11 @@ class PoseSet(AbstractModel):
 
         return True
 
-    def generate_tsnee_fig(self):
+    @property
+    def unreviewed(self):
+        return self.poses.filter(pose__reviews__isnull=True)
+
+    def generate_umap_fig(self):
 
         import plotly.graph_objects as go
         from pandas import DataFrame
@@ -536,37 +552,52 @@ class PoseSet(AbstractModel):
         else:
             mrich.debug("No UMAP embedding needed")
 
-        # Extrapolate human reviews
-        if (
-            self.poses.filter(
-                review__isnull=False, predicted_score__isnull=False
-            ).count()
-            or self.poses.filter(predicted_score__isnull=True).count()
-        ):
-            self.extrapolate_reviews()
-
         members = self.poses
 
-        df = DataFrame(
-            members.values(
-                "pose_id",
-                "pc1",
-                "pc2",
-                "review",
-                "predicted_score",
-                "prediction_confidence",
-            )
+        annotated = members.annotate(review=Avg("pose__reviews__review"))
+
+        mrich.var(
+            "reviewed w/ prediction",
+            annotated.filter(
+                review__isnull=False, predicted_score__isnull=False
+            ).count(),
         )
+        mrich.var(
+            "unreviewed w/o prediction",
+            annotated.filter(review__isnull=True, predicted_score__isnull=True).count(),
+        )
+
+        if (
+            annotated.filter(
+                review__isnull=False, predicted_score__isnull=False
+            ).count()
+            or annotated.filter(
+                review__isnull=True, predicted_score__isnull=True
+            ).count()
+        ):
+            self.extrapolate_reviews()
+        else:
+            mrich.debug("No extrapolation needed")
+
+        data = annotated.values(
+            "pose_id",
+            "pc1",
+            "pc2",
+            "predicted_score",
+            "prediction_uncertainty",
+            "review",
+        )  # .annotate(review=Avg("pose__reviews__review"))
+
+        df = DataFrame(data)
 
         fig = go.Figure()
 
         if members.count():
 
-            df_good = df[df["review"] == 1]
-            df_bad = df[df["review"] == 0]
+            df_train = df[~df["review"].isnull()]
             df_test = df[df["review"].isnull()]
 
-            if not len(df_good) and not len(df_bad):
+            if not len(df_train):
                 # no reviews, so no extrapolation
                 customdata = [(pose_id, None, None) for pose_id in df["pose_id"]]
                 fig.add_trace(
@@ -583,36 +614,34 @@ class PoseSet(AbstractModel):
                 )
 
             else:
-                # GOOD HUMAN REVIEWS
 
-                customdata = [(pose_id, 1, 1) for pose_id in df_good["pose_id"]]
+                # HUMAN REVIEWS
 
-                fig.add_trace(
-                    go.Scatter(
-                        name="GOOD",
-                        x=df_good["pc1"],
-                        y=df_good["pc2"],
-                        mode="markers",
-                        marker=dict(color="rgb(0,255,0)", symbol="star", size=10),
-                        hovertemplate="%{text}<br>PC1: %{x}<br>PC2: %{y}<extra></extra>",
-                        text=df_good["pose_id"].apply(lambda x: f"P{x} [GOOD]"),
-                        customdata=customdata,
-                    )
-                )
-
-                # BAD HUMAN REVIEWS
-
-                customdata = [(pose_id, 0, 1) for pose_id in df_bad["pose_id"]]
+                customdata = [
+                    (pose_id, review, 1)
+                    for pose_id, review in df_train[["pose_id", "review"]].values
+                ]
 
                 fig.add_trace(
                     go.Scatter(
-                        name="BAD",
-                        x=df_bad["pc1"],
-                        y=df_bad["pc2"],
+                        name="Reviewed",
+                        x=df_train["pc1"],
+                        y=df_train["pc2"],
                         mode="markers",
-                        marker=dict(color="red", symbol="star", size=10),
-                        hovertemplate="%{text}<br>PC1: %{x}<br>PC2: %{y}<extra></extra>",
-                        text=df_bad["pose_id"].apply(lambda x: f"P{x} [BAD]"),
+                        marker=dict(
+                            color=(1 + df_train["review"]) / 2,
+                            symbol="star",
+                            size=10,
+                            colorscale=[
+                                [0.0, "red"],
+                                [0.5, "white"],
+                                [1.0, "rgb(0,255,0)"],
+                            ],
+                            line=dict(color="black", width=1),
+                            cmin=0,
+                            cmax=1,
+                        ),
+                        hovertemplate="P%{customdata[0]} [%{customdata[1]}]<br>PC1: %{x}<br>PC2: %{y}<extra></extra>",
                         customdata=customdata,
                     )
                 )
@@ -620,13 +649,10 @@ class PoseSet(AbstractModel):
                 # EXTRAPOLATED
 
                 data = df_test[
-                    ["pose_id", "predicted_score", "prediction_confidence"]
+                    ["pose_id", "predicted_score", "prediction_uncertainty"]
                 ].values
 
-                customdata = [(a, b, c) for a, b, c in data]
-                text = [
-                    f"P{a} [GOOD?]" if b > 0.5 else f"P{a} [BAD?]" for a, b, _ in data
-                ]
+                customdata = [(int(a), b, c) for a, b, c in data]
 
                 fig.add_trace(
                     go.Scatter(
@@ -635,19 +661,20 @@ class PoseSet(AbstractModel):
                         y=df_test["pc2"],
                         mode="markers",
                         marker=dict(
-                            color=df_test["predicted_score"],
+                            color=(1 + df_test["predicted_score"]) / 2,
                             colorscale=[
                                 [0.0, "red"],
                                 [0.5, "white"],
                                 [1.0, "rgb(0,255,0)"],
                             ],
                             opacity=np.maximum(
-                                1 - df_test["prediction_confidence"], 0.2
+                                1 - df_test["prediction_uncertainty"], 0.2
                             ),
                             line=dict(color="black", width=1),
+                            cmin=0,
+                            cmax=1,
                         ),
-                        hovertemplate="%{text}<br>PC1: %{x}<br>PC2: %{y}<br>Predicted: %{customdata[1]}<br>Uncertainty: %{customdata[2]}<extra></extra>",
-                        text=text,
+                        hovertemplate="P%{customdata[0]} [%{customdata[1]:.2f} +/- %{customdata[2]:.2f}]<br>PC1: %{x}<br>PC2: %{y}<br>Predicted: %{customdata[1]}<br>Uncertainty: %{customdata[2]}<extra></extra>",
                         customdata=customdata,
                     )
                 )
@@ -661,23 +688,23 @@ class PoseSet(AbstractModel):
 
     def extrapolate_reviews(self):
 
-        self.summary()
-
         if not self.poses.count():
             return
 
         from pandas import DataFrame, isna
 
-        df = DataFrame(self.poses.values("pose_id", "pc1", "pc2", "review"))
+        data = self.poses.values("pose_id", "pc1", "pc2").annotate(
+            review=Avg("pose__reviews__review")
+        )
+
+        df = DataFrame(data)
 
         df_train = df[df["review"].notnull()]
-        df_good = df[df["review"] == 1]
-        df_bad = df[df["review"] == 0]
         df_test = df[df["review"].isnull()]
 
-        mrich.var("#total", len(df))
-        mrich.var("#train", len(df_train))
-        mrich.var("#test", len(df_test))
+        # mrich.var("#total", len(df))
+        # mrich.var("#train", len(df_train))
+        # mrich.var("#test", len(df_test))
 
         if not len(df_train):
             mrich.warning("Can't extrapolate, no reviews")
@@ -688,7 +715,7 @@ class PoseSet(AbstractModel):
             return
 
         X_train = df_train[["pc1", "pc2"]].values
-        y_train = df_train["review"].apply(lambda x: 1 if x else 0).values
+        y_train = df_train["review"].values
         X_test = df_test[["pc1", "pc2"]].values
 
         with mrich.loading("imports..."):
@@ -716,7 +743,7 @@ class PoseSet(AbstractModel):
                         pose_id=row["pose_id"],
                         parent=self,
                         predicted_score=row["pred_mean"],
-                        prediction_confidence=row["pred_std"],
+                        prediction_uncertainty=row["pred_std"],
                     )
                 )
 
@@ -727,7 +754,7 @@ class PoseSet(AbstractModel):
                         pose_id=row["pose_id"],
                         parent=self,
                         predicted_score=None,
-                        prediction_confidence=None,
+                        prediction_uncertainty=None,
                     )
                 )
 
@@ -735,11 +762,8 @@ class PoseSet(AbstractModel):
             members,
             update_conflicts=True,
             unique_fields=["parent", "pose"],
-            update_fields=["predicted_score", "prediction_confidence"],
+            update_fields=["predicted_score", "prediction_uncertainty"],
         )
-
-    def clear_reviews(self):
-        self.poses.update(review=None)
 
 
 class PoseSetMember(AbstractModel):
@@ -763,20 +787,50 @@ class PoseSetMember(AbstractModel):
         # ],
     )
 
-    prediction_confidence = models.FloatField(
+    prediction_uncertainty = models.FloatField(
         null=True,
         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
     )
 
-    review_types = {
-        0: "Bad",
-        1: "Good",
-    }
+    # review_types = {
+    #     0: "Bad",
+    #     1: "Good",
+    # }
 
-    review = models.IntegerField(null=True, choices=review_types)
+    # review = models.IntegerField(null=True, choices=review_types)
 
     _style = "pose"
     _exclude_from_index = True
+
+
+class PoseReview(AbstractModel):
+
+    class Meta:
+        unique_together = ("user", "pose")
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="+")
+    pose = models.ForeignKey(Pose, on_delete=models.CASCADE, related_name="reviews")
+
+    REVIEW_TYPES = {
+        Decimal("-1.00"): "Very Bad",
+        Decimal("-0.75"): "Bad",
+        Decimal("0.00"): "Neutral",
+        Decimal("0.75"): "Good",
+        Decimal("1.00"): "Great",
+    }
+
+    review = models.DecimalField(
+        max_digits=4,
+        decimal_places=2,
+        choices=[(k, v) for k, v in REVIEW_TYPES.items()],
+    )
+
+    _style = "annotation"
+
+    def __str__(self):
+        return (
+            f"PR{self.id} {self.user}: P{self.pose.id} => {self.get_review_display()}"
+        )
 
 
 ### ANNOTATION
@@ -1147,4 +1201,5 @@ MODELS = [
     SdfUpload,
     PoseTag,
     CompoundTag,
+    PoseReview,
 ]

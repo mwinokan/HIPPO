@@ -84,7 +84,7 @@
 
 {% block precards %}{% endblock %}
 
-{% if object.tags is not None %}
+{% if object.tags is not None and object.tags.count %}
 
 <div class="card">
     
@@ -104,6 +104,33 @@
             <!-- <td><span class="monospace">{{ tag.tag.name }}</span></td> -->
             <td><span class="monospace">{{ tag.tag.type.name }}</span></td>
             <td><span class="monospace">{{ tag.tag.type.origin }}</span></td>
+        </tr>
+        
+        {% endfor %}
+
+    </table>
+
+</div>
+
+{% endif %}
+
+{% if object.reviews is not None and object.reviews.count %}
+
+<div class="card">
+    
+    <table>
+
+        <h2 class="title">Reviews</h2>
+        
+        <tr>
+            <th>User</th>
+            <th>Review</th>
+        
+        {% for pr in object.reviews.all %}
+        
+        <tr>
+            <td><span class="monospace">{{ pr.user }}</span></td>
+            <td><span class="monospace">{{ pr.get_review_display }}</span></td>
         </tr>
         
         {% endfor %}

@@ -1,5 +1,5 @@
 from django import forms
-from hippo.models import FragalysisDownload, SdfUpload
+from hippo.models import FragalysisDownload, SdfUpload, PoseReview
 
 
 class FragalysisDownloadForm(forms.ModelForm):
@@ -23,4 +23,12 @@ class SdfUploadForm(forms.ModelForm):
             "inspirations_field_name",
             "pose_origins",
             "compute_umap",
+        ]
+
+
+class PoseReviewForm(forms.ModelForm):
+    class Meta:
+        model = PoseReview
+        fields = [
+            "review",
         ]

@@ -17,24 +17,7 @@
         document.getElementById("fig").on('plotly_click', function(data){
             var pointIndex = data.points[0].pointIndex;
             var pose_id = data.points[0].customdata[0];
-
-            document.getElementById("form").style.display = "block";
-            
-            document.getElementById("pose_id_input").value = pose_id;
-
-            fetch(`/pose_compare_3d/${pose_id}?inspirations=True&model_pills=True`)
-            .then(response => response.text())
-            .then(data => {
-                document.getElementById("selected_viewer").innerHTML = data;
-                const scripts = document.querySelectorAll("#selected_viewer script");
-                scripts.forEach(script => {
-                    const newScript = document.createElement("script");
-                    newScript.text = script.textContent;
-                    document.head.appendChild(newScript);
-                    script.remove();
-                });
-            })
-            .catch(error => console.error("Error loading content:", error));
+            window.open(`/pose/${pose_id}/`, '_blank');
         });
 
     </script>
@@ -45,26 +28,33 @@
 
 {% block precards %} 
 
+{% if uncertain_poses %}
+
 <div class="card">
+    
+    <table>
 
-    <h2>Selected</h2>
+        <h2 class="title">Poses to review next</h2>
+        
+        <tr>
+            <th>Pose</th>
+            <th style="text-align:right;">Predicted Score</th>
+            <th style="text-align:right;">Uncertainty</th>
+        
+        {% for member in uncertain_poses %}
+        
+        <tr>
+            <td><a href="{% url 'pose_detail' member.pose.pk %}" target="_blank" rel="noopener noreferrer">{{member.pose.model_pill_html|safe}}</a></td>
+            <td style="text-align:right;"><span class="monospace">{{ member.predicted_score|floatformat:2 }}</span></td>
+            <td style="text-align:right;"><span class="monospace">{{ member.prediction_uncertainty|floatformat:2 }}</span></td>
+        </tr>
+        
+        {% endfor %}
 
-    <div id="selected_viewer"></div>
-
-    <form id="form" style="display:none;" method="post">
-        {% csrf_token %}
-
-        <label for="related_model">Pose:</label>
-        <input type="number" name="pose" id="pose_id_input" value="1" required readonly>
-
-        <label for="review">Review:</label>
-        <select name="review" id="review">
-            <option value="1" selected>GOOD</option>
-            <option value="0">BAD</option>
-        </select>
-    <button type="submit">Update</button>
-</form>
+    </table>
 
 </div>
+
+{% endif %}
 
 {% endblock %}
