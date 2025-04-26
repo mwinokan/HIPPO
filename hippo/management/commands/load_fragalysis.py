@@ -249,6 +249,7 @@ class Command(BaseCommand):
                         smiles=row["Smiles"],
                         metadata={},
                         origin="EXPERIMENT",
+                        ligand_energy=Pose.calculate_ligand_energy(mol),
                     )
 
                     poses[i] = pose

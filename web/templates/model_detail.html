@@ -21,6 +21,8 @@
 
             <!-- TABLE OF FIELDS -->
 
+            {% block pretablerows %}{% endblock %}
+
             {% for field_name, value, render_dict in fields %}
 
                 {% if render_dict.type == "FieldRenderType.TABLE" %}
@@ -73,6 +75,9 @@
                 {% endif %}
 
             {% endfor %}
+
+            {% block posttablerows %}{% endblock %}
+
         </tbody>
     </table>
 

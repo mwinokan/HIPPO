@@ -22,7 +22,9 @@ class SdfUploadForm(forms.ModelForm):
             "protein_field_name",
             "inspirations_field_name",
             "pose_origins",
-            "compute_umap",
+            "compute_embedding",
+            "binding_energy_field_name",
+            "inspiration_distance_field_name",
         ]
 
 

@@ -15,6 +15,7 @@ from django.db.models.fields.reverse_related import (
     ManyToManyRel,
     ManyToOneRel,
 )
+from django.db.models import Count, Avg
 from django.contrib.auth.decorators import login_required
 from django.core.management import call_command
 from django.contrib.staticfiles import finders
@@ -22,6 +23,7 @@ from django.contrib.staticfiles import finders
 # from .rendertypes import ContentRenderType
 from hippo.models import *
 import plotly.graph_objects as go
+import plotly.express as px
 import plotly.io as pio
 from .forms import *
 import subprocess
@@ -502,19 +504,193 @@ class PoseSetDetailView(BaseDetailView):
 
     _uri_param_str = "<int:pk>"
 
-    def get_context_data(self, *args, **kwargs):
+    def get_context_data(self, n_suggestions=3, *args, **kwargs):
         context = super().get_context_data(**kwargs)
 
         fig = self.object.generate_umap_fig()
-        fig = pio.to_json(fig)
-        context["fig"] = fig
+        context["fig"] = pio.to_json(fig)
+
+        x = list(
+            self.object.poses.annotate(review_count=Count("pose__reviews")).values_list(
+                "review_count", flat=True
+            )
+        )
+
+        from collections import Counter
+
+        review_count_distribution = Counter(x)
+
+        values = []
+        labels = []
+        for count in range(max(review_count_distribution.keys()) + 1):
+            if not count:
+                labels.append(f"Unreviewed")
+            else:
+                labels.append(f"{count} review")
+            values.append(review_count_distribution.get(count, 0))
+
+        fig = go.Figure(
+            go.Pie(values=values, labels=labels, textinfo="label+value+percent")
+        )
+        fig.update_layout(
+            margin=dict(l=20, r=20, t=20, b=20),
+            paper_bgcolor="rgba(0,0,0,0)",
+            xaxis_title="#reviews",
+            xaxis_range=[0, max(x)],
+        )
+        context["hist_review"] = pio.to_json(fig)
+
+        x = list(
+            self.object.poses.filter(predicted_score__isnull=False).values_list(
+                "predicted_score", flat=True
+            )
+        )
+        fig = go.Figure(go.Histogram(x=x))
+        fig.update_layout(
+            margin=dict(l=20, r=20, t=20, b=20),
+            paper_bgcolor="rgba(0,0,0,0)",
+            xaxis_title="Predicted Score",
+            xaxis_range=[-1, 1],
+        )
+        context["hist_predicted"] = pio.to_json(fig)
+
+        x = list(
+            self.object.poses.filter(predicted_score__isnull=False).values_list(
+                "prediction_uncertainty", flat=True
+            )
+        )
+        fig = go.Figure(go.Histogram(x=x))
+        fig.update_layout(
+            margin=dict(l=20, r=20, t=20, b=20),
+            paper_bgcolor="rgba(0,0,0,0)",
+            xaxis_title="Prediction Uncertainty (STD)",
+            xaxis_range=[0, 1],
+        )
+        context["hist_uncertainty"] = pio.to_json(fig)
+
+        ### graphs of GPR dimensions not in UMAP
+
+        data = list(
+            self.object.poses.select_related("pose", "pose__reviews")
+            # .filter(predicted_score__isnull=False)
+            .annotate(review=Avg("pose__reviews__review")).values(
+                "pose__binding_energy",
+                "pose__inspiration_distance",
+                "pose__ligand_energy",
+                "predicted_score",
+                "prediction_uncertainty",
+                "review",
+            )
+        )
+
+        y = [d["predicted_score"] for d in data if d["predicted_score"] is not None]
+        y_err = [
+            d["prediction_uncertainty"]
+            for d in data
+            if d["predicted_score"] is not None
+        ]
+
+        x = [
+            d["pose__binding_energy"] for d in data if d["predicted_score"] is not None
+        ]
+        fig = go.Figure(
+            go.Scatter(
+                name="Predictions",
+                x=x,
+                y=y,
+                mode="markers",
+                error_y=dict(type="data", array=y_err, visible=True),
+            )
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                name="Reviews",
+                x=x,
+                y=[d["review"] for d in data if d["predicted_score"] is None],
+                mode="markers",
+                marker=dict(symbol="star"),
+            )
+        )
+        fig.update_layout(
+            margin=dict(l=20, r=20, t=20, b=20),
+            paper_bgcolor="rgba(0,0,0,0)",
+            xaxis_title="Binding Energy [kcal/mol]",
+            yaxis_title="Predicted Score",
+            yaxis_range=[-1, 1],
+        )
+        context["binding_energy"] = pio.to_json(fig)
+
+        x = [
+            d["pose__inspiration_distance"]
+            for d in data
+            if d["predicted_score"] is not None
+        ]
+        fig = go.Figure(
+            go.Scatter(
+                name="Predictions",
+                x=x,
+                y=y,
+                mode="markers",
+                error_y=dict(type="data", array=y_err, visible=True),
+            )
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                name="Reviews",
+                x=x,
+                y=[d["review"] for d in data if d["predicted_score"] is None],
+                mode="markers",
+                marker=dict(symbol="star"),
+            )
+        )
+        fig.update_layout(
+            margin=dict(l=20, r=20, t=20, b=20),
+            paper_bgcolor="rgba(0,0,0,0)",
+            xaxis_title="Inspiration Distance / RMSD [Å]",
+            yaxis_title="Predicted Score",
+            yaxis_range=[-1, 1],
+        )
+        context["inspiration_distance"] = pio.to_json(fig)
+
+        x = [d["pose__ligand_energy"] for d in data if d["predicted_score"] is not None]
+        fig = go.Figure(
+            go.Scatter(
+                name="Predictions",
+                x=x,
+                y=y,
+                mode="markers",
+                error_y=dict(type="data", array=y_err, visible=True),
+            )
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                name="Reviews",
+                x=x,
+                y=[d["review"] for d in data if d["predicted_score"] is None],
+                mode="markers",
+                marker=dict(symbol="star"),
+            )
+        )
+        fig.update_layout(
+            margin=dict(l=20, r=20, t=20, b=20),
+            paper_bgcolor="rgba(0,0,0,0)",
+            xaxis_title="Ligand Energy",
+            yaxis_title="Predicted Score",
+            yaxis_range=[-1, 1],
+        )
+        context["ligand_energy"] = pio.to_json(fig)
+
+        # active learning suggestions
 
         unreviewed = self.object.unreviewed.filter(predicted_score__isnull=False)
 
         if unreviewed.count():
             context["uncertain_poses"] = unreviewed.select_related("pose").order_by(
                 "-prediction_uncertainty"
-            )[:10]
+            )[:n_suggestions]
 
         return context
 

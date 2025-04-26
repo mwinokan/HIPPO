@@ -88,7 +88,7 @@ class Command(BaseCommand):
             upload.save()
 
             if not (pset := upload.pose_set):
-                pset = PoseSet(name=file_path.name)
+                pset = PoseSet(name=file_path.name.removesuffix(".sdf"))
                 pset.full_clean()
                 pset.save()
 
@@ -143,6 +143,11 @@ class Command(BaseCommand):
                         smiles=row["smiles"],
                         inchikey=inchikey_from_smiles(row["smiles"]),
                         mol=row["ROMol"],
+                        inspiration_distance=row[
+                            upload.inspiration_distance_field_name
+                        ],
+                        binding_energy=row[upload.binding_energy_field_name],
+                        ligand_energy=Pose.calculate_ligand_energy(row["ROMol"]),
                     )
 
                     poses[i] = pose
@@ -151,7 +156,7 @@ class Command(BaseCommand):
                     poses.values(),
                     update_conflicts=True,
                     unique_fields=["mol"],
-                    update_fields=["origin"],
+                    update_fields=["origin", "inspiration_distance", "binding_energy"],
                 )
 
                 upload.message += "\nPoses registered"
@@ -237,12 +242,12 @@ class Command(BaseCommand):
 
             ### UMAP
 
-            if upload.compute_umap:
+            if upload.compute_embedding:
 
                 upload.message += "\nCalculating UMAP"
                 upload.save()
 
-                ok = pset.compute_umap()
+                ok = pset.compute_embedding()
 
                 if not ok:
                     upload.message += "\nWARNING: Failed to compute UMAP"

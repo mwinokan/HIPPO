@@ -395,11 +395,8 @@ class Compound(AbstractModel):
 
 
 class Pose(AbstractModel):
-    # class Meta:
-    # unique_together = ("mol")
 
     inchikey = models.CharField(max_length=27, blank=True)
-    # alias = models.CharField(max_length=60, blank=True, unique=True, null=True)
     smiles = models.CharField(max_length=300, blank=True, null=True)
 
     mol = MolField(blank=False, unique=True)
@@ -423,6 +420,12 @@ class Pose(AbstractModel):
         related_name="derivatives",
     )
 
+    inspiration_distance = models.FloatField(
+        validators=[MinValueValidator(0.0)], null=True
+    )
+    binding_energy = models.FloatField(null=True)
+    ligand_energy = models.FloatField(null=False)
+
     _shorthand = "P"
     # _name_field = "alias"
     _custom_detail_view = True
@@ -431,6 +434,21 @@ class Pose(AbstractModel):
     _field_render_types.update(
         {
             "origin": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.TEXT_MONOSPACE,
+                copyable=False,
+            ),
+            "inspiration_distance": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.TEXT_MONOSPACE,
+                copyable=False,
+            ),
+            "binding_energy": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.TEXT_MONOSPACE,
+                copyable=False,
+            ),
+            "ligand_energy": dict(
                 type=FieldRenderType.TABLE,
                 content=ContentRenderType.TEXT_MONOSPACE,
                 copyable=False,
@@ -461,6 +479,22 @@ class Pose(AbstractModel):
 
         return value
 
+    @classmethod
+    def calculate_ligand_energy(cls, mol):
+        from rdkit.Chem import Mol
+        from rdkit.Chem.AllChem import UFFGetMoleculeForceField, UFFOptimizeMolecule
+
+        mol = Mol(mol)
+        energy_current = UFFGetMoleculeForceField(mol).CalcEnergy()
+        UFFOptimizeMolecule(mol)
+        energy_minimised = UFFGetMoleculeForceField(mol).CalcEnergy()
+        return energy_current - energy_minimised
+
+    def save(self, *args, **kwargs):
+        if self.ligand_energy is None and self.mol:
+            self.ligand_energy = self.calculate_ligand_energy()
+        super().save(*args, **kwargs)
+
     def __str__(self):
         tag = self.tags.filter(
             tag__type__name="Observation Code", tag__type__origin="Fragalysis"
@@ -479,11 +513,16 @@ class PoseSet(AbstractModel):
     _style = "pose"
 
     _field_render_types = AbstractModel._field_render_types.copy()
-    _field_render_types.update({"poses": dict(type=FieldRenderType.HIDDEN)})
+    _field_render_types.update(
+        {
+            "poses": dict(type=FieldRenderType.HIDDEN),
+            "upload": dict(type=FieldRenderType.HIDDEN),
+        }
+    )
 
-    def compute_umap(self):
+    def compute_embedding(self):
 
-        mrich.bold(self, ".compute_umap()")
+        mrich.bold(self, ".compute_embedding()")
 
         n = self.poses.count()
 
@@ -500,24 +539,86 @@ class PoseSet(AbstractModel):
             import numpy as np
             import umap
 
-        distance_matrix = np.zeros((n, n))
-
-        members = list(self.poses.prefetch_related("pose").all())
+        # get related poses
+        members = self.poses.prefetch_related("pose").all()
+        pose_ids = set(members.values_list("pose_id", flat=True))
+        poses = {
+            p.id: p
+            for p in Pose.objects.filter(id__in=pose_ids).prefetch_related(
+                "inspirations"
+            )
+        }
 
         n_combos = comb(n, 2)
-
         mrich.var("#pairs", n_combos)
 
-        combos = combinations(range(n), 2)
+        # get existing relevant pairs
+        existing = set(
+            PosePair.objects.filter(
+                models.Q(pose1_id__in=pose_ids) | models.Q(pose2_id__in=pose_ids)
+            ).values_list("pose1_id", "pose2_id")
+        )
+        mrich.var("#existing pairs", len(existing))
 
-        for i, j in mrich.track(
-            combos, total=n_combos, prefix="computing distance_matrix"
-        ):
-            m1 = members[i].pose.mol
-            m2 = members[j].pose.mol
-            dist = 1 - MuCOS_score(m1, m2)
+        # calculate combinations
+        combos = combinations(members.values_list("pose_id", flat=True), 2)
+        combos = set(tuple(sorted(t)) for t in combos) - existing
+
+        mrich.var("#new pairs", len(combos))
+
+        # create missing pairs
+        if combos:
+            new_pairs = []
+            for pose1_id, pose2_id in mrich.track(combos):
+
+                pose1 = poses[pose1_id]
+                pose2 = poses[pose2_id]
+
+                molecular_similarity = MuCOS_score(pose1.mol, pose2.mol)
+
+                # inspiration similarity
+                ref_ids1 = set(pose1.inspirations.values_list("id", flat=True))
+                ref_ids2 = set(pose2.inspirations.values_list("id", flat=True))
+                all_refs = ref_ids1.union(ref_ids2)
+                shared_refs = ref_ids1.intersection(ref_ids2)
+                if not all_refs:
+                    inspiration_similarity = 0
+                else:
+                    inspiration_similarity = len(shared_refs) / len(all_refs)
+
+                new_pairs.append(
+                    PosePair(
+                        pose1_id=pose1_id,
+                        pose2_id=pose2_id,
+                        molecular_similarity=molecular_similarity,
+                        inspiration_similarity=inspiration_similarity,
+                    )
+                )
+
+            PosePair.objects.bulk_create(new_pairs)
+
+        # get all relevant pairs
+        pairs = PosePair.objects.filter(
+            models.Q(pose1_id__in=pose_ids) | models.Q(pose2_id__in=pose_ids)
+        )
+
+        # lookup dict from pose ID
+        member_indices = {m.pose_id: i for i, m in enumerate(members)}
+
+        # compute distance matrix
+        distance_matrix = np.zeros((n, n))
+        for pair in pairs:
+            i = member_indices[pair.pose1_id]
+            j = member_indices[pair.pose2_id]
+            dist = pair.distance
             distance_matrix[i, j] = dist
             distance_matrix[j, i] = dist
+
+        """ 
+        ## ADD TO SIMILARITY COMPARISON
+            - distance_score similarity
+            - energy_score similarity
+        """
 
         with mrich.loading("Creating reducer"):
             reducer = umap.UMAP(metric="precomputed")
@@ -540,15 +641,20 @@ class PoseSet(AbstractModel):
     def unreviewed(self):
         return self.poses.filter(pose__reviews__isnull=True)
 
-    def generate_umap_fig(self):
+    def generate_umap_fig(
+        self, force_embedding: bool = False, force_extrapolation: bool = False
+    ):
 
         import plotly.graph_objects as go
         from pandas import DataFrame
         import numpy as np
 
         # Compute UMAP embedding if needed
-        if self.poses.filter(pc1__isnull=False).count() != self.poses.count():
-            self.compute_umap()
+        if (
+            self.poses.filter(pc1__isnull=False).count() != self.poses.count()
+            or force_embedding
+        ):
+            self.compute_embedding()
         else:
             mrich.debug("No UMAP embedding needed")
 
@@ -574,6 +680,7 @@ class PoseSet(AbstractModel):
             or annotated.filter(
                 review__isnull=True, predicted_score__isnull=True
             ).count()
+            or force_extrapolation
         ):
             self.extrapolate_reviews()
         else:
@@ -686,41 +793,70 @@ class PoseSet(AbstractModel):
 
         return fig
 
-    def extrapolate_reviews(self):
+    # def generate_score_
+
+    def extrapolate_reviews(self, debug: bool = False):
 
         if not self.poses.count():
             return
 
+        mrich.bold(self, ".extrapolate_reviews()")
+
         from pandas import DataFrame, isna
 
-        data = self.poses.values("pose_id", "pc1", "pc2").annotate(
-            review=Avg("pose__reviews__review")
+        data = (
+            self.poses.select_related("pose")
+            .values(
+                "pose_id",
+                "pc1",
+                "pc2",
+                "pose__inspiration_distance",
+                "pose__binding_energy",
+                "pose__ligand_energy",
+            )
+            .annotate(review=Avg("pose__reviews__review"))
         )
 
         df = DataFrame(data)
 
+        df["pose__inspiration_distance"] = df["pose__inspiration_distance"].fillna(10)
+        df["pose__binding_energy"] = df["pose__inspiration_distance"].fillna(100)
+        df["pose__ligand_energy"] = df["pose__ligand_energy"].fillna(200)
+
         df_train = df[df["review"].notnull()]
         df_test = df[df["review"].isnull()]
 
-        # mrich.var("#total", len(df))
-        # mrich.var("#train", len(df_train))
-        # mrich.var("#test", len(df_test))
+        if debug:
+            mrich.var("#total", len(df))
+            mrich.var("#train", len(df_train))
+            mrich.var("#test", len(df_test))
 
         if not len(df_train):
             mrich.warning("Can't extrapolate, no reviews")
+            self.clear_predictions()
             return
 
         if not len(df_test):
             mrich.warning("Can't extrapolate, no unreviewed")
+            self.clear_predictions()
             return
 
-        X_train = df_train[["pc1", "pc2"]].values
+        cols = [
+            "pc1",
+            "pc2",
+            "pose__inspiration_distance",
+            "pose__binding_energy",
+            "pose__ligand_energy",
+        ]
+
+        X_train = df_train[cols].values
         y_train = df_train["review"].values
-        X_test = df_test[["pc1", "pc2"]].values
+        X_test = df_test[cols].values
 
         with mrich.loading("imports..."):
             from sklearn.gaussian_process import GaussianProcessRegressor
             from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C
+            import numpy as np
 
         kernel = C(1.0, (1e-3, 1e3)) * RBF(
             length_scale=1.0, length_scale_bounds=(1e-2, 1e2)
@@ -729,8 +865,17 @@ class PoseSet(AbstractModel):
             kernel=kernel, n_restarts_optimizer=10, alpha=1e-2
         )
         gpr.fit(X_train, y_train)
+
         y_pred_mean, y_pred_std = gpr.predict(X_test, return_std=True)
-        df.loc[df["review"].isnull(), "pred_mean"] = y_pred_mean
+
+        if debug:
+            mrich.var("mean prediction STD", np.mean(y_pred_std))
+            mrich.var("max prediction STD", np.max(y_pred_std))
+            mrich.var("min prediction STD", np.min(y_pred_std))
+
+        df.loc[df["review"].isnull(), "pred_mean"] = [
+            max(-1, min(1, v)) for v in y_pred_mean
+        ]
         df.loc[df["review"].isnull(), "pred_std"] = y_pred_std
 
         members = []
@@ -765,6 +910,9 @@ class PoseSet(AbstractModel):
             update_fields=["predicted_score", "prediction_uncertainty"],
         )
 
+    def clear_predictions(self):
+        self.poses.update(predicted_score=None, prediction_uncertainty=None)
+
 
 class PoseSetMember(AbstractModel):
 
@@ -781,23 +929,13 @@ class PoseSetMember(AbstractModel):
 
     predicted_score = models.FloatField(
         null=True,
-        # validators=[
-        #     MinValueValidator(0.0),
-        #     MaxValueValidator(1.0)
-        # ],
+        validators=[MinValueValidator(-1.0), MaxValueValidator(1.0)],
     )
 
     prediction_uncertainty = models.FloatField(
         null=True,
         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
     )
-
-    # review_types = {
-    #     0: "Bad",
-    #     1: "Good",
-    # }
-
-    # review = models.IntegerField(null=True, choices=review_types)
 
     _style = "pose"
     _exclude_from_index = True
@@ -815,6 +953,7 @@ class PoseReview(AbstractModel):
         Decimal("-1.00"): "Very Bad",
         Decimal("-0.75"): "Bad",
         Decimal("0.00"): "Neutral",
+        Decimal("0.25"): "Interesting",
         Decimal("0.75"): "Good",
         Decimal("1.00"): "Great",
     }
@@ -831,6 +970,38 @@ class PoseReview(AbstractModel):
         return (
             f"PR{self.id} {self.user}: P{self.pose.id} => {self.get_review_display()}"
         )
+
+
+class PosePair(AbstractModel):
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["pose1", "pose2"], name="unique_pair"),
+            models.CheckConstraint(
+                check=models.Q(pose1_id__lt=models.F("pose2_id")), name="pose_order"
+            ),
+        ]
+
+    pose1 = models.ForeignKey("Pose", related_name="+", on_delete=models.CASCADE)
+    pose2 = models.ForeignKey("Pose", related_name="+", on_delete=models.CASCADE)
+
+    molecular_similarity = models.FloatField(
+        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
+    )
+    inspiration_similarity = models.FloatField(
+        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
+    )
+
+    @property
+    def similarity(self):
+        return 0.8 * self.molecular_similarity + 0.2 * self.inspiration_similarity
+
+    @property
+    def distance(self):
+        return 1 - self.similarity
+
+    def __str__(self):
+        return f"PP{self.id} (P{self.pose1_id}, P{self.pose2_id})"
 
 
 ### ANNOTATION
@@ -1114,16 +1285,23 @@ class SdfUpload(AbstractModel):
 
     protein_field_name = models.CharField(default="ref_pdb", max_length=32)
     inspirations_field_name = models.CharField(default="ref_mols", max_length=32)
+    binding_energy_field_name = models.CharField(
+        default="energy_score", max_length=32, blank=True, null=True
+    )
+    inspiration_distance_field_name = models.CharField(
+        default="distance_score", max_length=32, blank=True, null=True
+    )
+    # ligand_energy_field_name = models.CharField(default="ref_mols", max_length=32, blank=True, null=True)
     input_file = models.FileField(upload_to="media/sdf_uploads/")
     sdf_file = models.ForeignKey(
         "File", on_delete=models.RESTRICT, related_name="+", null=True
     )
 
     pose_set = models.OneToOneField(
-        "PoseSet", on_delete=models.SET_NULL, related_name="+", null=True
+        "PoseSet", on_delete=models.SET_NULL, related_name="upload", null=True
     )
 
-    compute_umap = models.BooleanField(default=True)
+    compute_embedding = models.BooleanField(default=True)
 
     time_start = models.DateTimeField(auto_now_add=True)
     time_finished = models.DateTimeField(null=True)
@@ -1202,4 +1380,5 @@ MODELS = [
     PoseTag,
     CompoundTag,
     PoseReview,
+    PosePair,
 ]

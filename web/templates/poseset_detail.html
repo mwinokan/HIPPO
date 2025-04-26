@@ -2,6 +2,23 @@
 
 {% load custom_tags %}
 
+{% block posttablerows%}
+
+{% if object.upload %}
+
+<tr>
+    <td style="font-weight:bold;">Target</td>
+    <td><a href="/target/{{object.upload.target.pk}}/">{{ object.upload.target.model_pill_html|default:object.upload.target|safe }}</a></td>
+</tr>
+<tr>
+    <td style="font-weight:bold;">Upload</td>
+    <td><a href="/sdf_upload/?id={{object.upload.pk}}">{{ object.upload.model_pill_html|default:object.upload|safe }}</a></td>
+</tr>
+
+{% endif %}
+
+{% endblock %}
+
 {% block posttable %} 
 
 <div>
@@ -17,7 +34,7 @@
         document.getElementById("fig").on('plotly_click', function(data){
             var pointIndex = data.points[0].pointIndex;
             var pose_id = data.points[0].customdata[0];
-            window.open(`/pose/${pose_id}/?inspirations=True&poseset_redirect={{object.pk}}`, '_blank');
+            window.location.href = `/pose/${pose_id}/?inspirations=True&poseset_redirect={{object.pk}}`;        
         });
 
     </script>
@@ -32,9 +49,9 @@
 
 <div class="card">
     
-    <table>
+    <h2 class="title">Poses to review next</h2>
 
-        <h2 class="title">Poses to review next</h2>
+    <table>
         
         <tr>
             <th>Pose</th>
@@ -44,7 +61,7 @@
         {% for member in uncertain_poses %}
         
         <tr>
-            <td><a href="{% url 'pose_detail' member.pose.pk %}?inspirations=True&poseset_redirect={{object.pk}}" target="_blank" rel="noopener noreferrer">{{member.pose.model_pill_html|safe}}</a></td>
+            <td><a href="{% url 'pose_detail' member.pose.pk %}?inspirations=True&poseset_redirect={{object.pk}}">{{member.pose.model_pill_html|safe}}</a></td>
             <td style="text-align:right;"><span class="monospace">{{ member.predicted_score|floatformat:2 }}</span></td>
             <td style="text-align:right;"><span class="monospace">{{ member.prediction_uncertainty|floatformat:2 }}</span></td>
         </tr>
@@ -56,5 +73,71 @@
 </div>
 
 {% endif %}
+
+<div class="card">
+
+    <h2>Fitting statistics</h2>
+    
+    <h3>Review Distribution</h3>
+
+    <div id="hist_review" style="width:100%;height:300px;"></div>
+
+    <script>
+        var fig = {{ hist_review|safe }};
+        var config = { responsive: true }
+        Plotly.newPlot('hist_review', fig.data, fig.layout, config);
+    </script>
+
+    <h3>Predicted Score Distribution</h3>
+
+    <div id="hist_predicted" style="width:100%;height:300px;"></div>
+
+    <script>
+        var fig = {{ hist_predicted|safe }};
+        var config = { responsive: true }
+        Plotly.newPlot('hist_predicted', fig.data, fig.layout, config);
+    </script>
+    
+    <h3>Prediction Uncertainty Distribution</h3>
+
+    <div id="hist_uncertainty" style="width:100%;height:300px;"></div>
+
+    <script>
+        var fig = {{ hist_uncertainty|safe }};
+        var config = { responsive: true }
+        Plotly.newPlot('hist_uncertainty', fig.data, fig.layout, config);
+    </script>
+    
+    <h3>Binding Energy (Placement ddG)</h3>
+
+    <div id="binding_energy" style="width:100%;height:300px;"></div>
+
+    <script>
+        var fig = {{ binding_energy|safe }};
+        var config = { responsive: true }
+        Plotly.newPlot('binding_energy', fig.data, fig.layout, config);
+    </script>
+    
+    <h3>Inspiration Distance (Placement RMSD)</h3>
+
+    <div id="inspiration_distance" style="width:100%;height:300px;"></div>
+
+    <script>
+        var fig = {{ inspiration_distance|safe }};
+        var config = { responsive: true }
+        Plotly.newPlot('inspiration_distance', fig.data, fig.layout, config);
+    </script>
+    
+    <h3>Ligand Energy / Strain</h3>
+
+    <div id="ligand_energy" style="width:100%;height:300px;"></div>
+
+    <script>
+        var fig = {{ ligand_energy|safe }};
+        var config = { responsive: true }
+        Plotly.newPlot('ligand_energy', fig.data, fig.layout, config);
+    </script>
+
+</div>
 
 {% endblock %}
