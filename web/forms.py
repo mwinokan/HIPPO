@@ -34,3 +34,12 @@ class PoseReviewForm(forms.ModelForm):
         fields = [
             "review",
         ]
+
+
+class SearchForm(forms.Form):
+
+    query = forms.CharField(label="Query", max_length=200)
+    target = forms.BooleanField(label="Target", initial=True, required=False)
+    structure = forms.BooleanField(label="Structure", initial=True, required=False)
+    compound = forms.BooleanField(label="Compound", initial=True, required=False)
+    pose = forms.BooleanField(label="Pose", initial=True, required=False)

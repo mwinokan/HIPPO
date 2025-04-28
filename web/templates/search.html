@@ -1,0 +1,81 @@
+
+{% extends 'base.html' %}
+
+{% block title %}HIPPO Search{% endblock %}
+
+{% block content %}
+
+<div class="card">
+
+    <h2 class="center">Search</h2>
+
+    <form method="post">
+        {% csrf_token %}
+        <div style="padding-left:1em;padding-right:1em;padding-bottom:1em;">
+            <h3>Query</h3>
+            <p>
+                {{form.query}}
+                <button class="btn" type="submit">Search</button>
+            </p>
+
+            <p>
+                {% if form.query.errors %}
+                    {% for error in form.query.errors %}
+                    <span class="error">
+                        {{ error }}
+                    </span>
+                    {% endfor %}
+                {% endif %}
+            </p>
+
+            <h3>Search object types:</h3>
+            <p>
+                {{form.target}}{{form.target.label}}<br>
+                {{form.structure}}{{form.structure.label}}<br>
+                {{form.compound}}{{form.compound.label}}<br>
+                {{form.pose}}{{form.pose.label}}
+            </p>
+
+        </div>
+    </form>
+
+</div>
+
+<div class="card">
+    <h2 class="center">Help</h2>
+    
+    <h3>Search for Targets</h3>
+
+    <ul>
+        <li>Ensure <span class="monospace">Target</span> is enabled.</li>
+        <li>Search by HIPPO ID: e.g. <span class="monospace">T1</span></li>
+        <li>Search by name: e.g. <span class="monospace">A71EV2A</span></li>
+    </ul>
+
+    <h3>Search for Structures</h3>
+
+    <ul>
+        <li>Ensure <span class="monospace">Structure</span> is enabled.</li>
+        <li>Search by HIPPO ID: e.g. <span class="monospace">S1</span></li>
+        <li>Search by alias: e.g. <span class="monospace">A71EV2A-x0450</span></li>
+    </ul>
+
+    <h3>Search for Compounds</h3>
+
+    <ul>
+        <li>Ensure <span class="monospace">Compound</span> is enabled.</li>
+        <li>Search by HIPPO ID: e.g. <span class="monospace">C1</span></li>
+        <li>Search by smiles: e.g. <span class="monospace">CN(C)C(=O)c1ccc(F)cc1Br</span></li>
+        <li>Search by inchikey: e.g. <span class="monospace">CGUIJOTZYHWBSQ-UHFFFAOYSA-N</span></li>
+    </ul>
+
+    <h3>Search for Poses</h3>
+
+    <ul>
+        <li>Ensure <span class="monospace">Pose</span> is enabled.</li>
+        <li>Search by HIPPO ID: e.g. <span class="monospace">P1</span></li>
+    </ul>
+
+</div>
+
+{% endblock %}

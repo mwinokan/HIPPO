@@ -228,6 +228,10 @@ class Target(AbstractModel):
     _name_field = "name"
     _style = "projects"
 
+    @property
+    def poses(self):
+        return Pose.objects.filter(placement__structure__target=self)
+
 
 class Structure(AbstractModel):
 
@@ -913,6 +917,9 @@ class PoseSet(AbstractModel):
     def clear_predictions(self):
         self.poses.update(predicted_score=None, prediction_uncertainty=None)
 
+    def clear_embedding(self):
+        self.poses.update(pc1=None, pc2=None)
+
 
 class PoseSetMember(AbstractModel):
 
@@ -965,6 +972,7 @@ class PoseReview(AbstractModel):
     )
 
     _style = "annotation"
+    _exclude_from_index = True
 
     def __str__(self):
         return (
@@ -992,6 +1000,8 @@ class PosePair(AbstractModel):
         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
     )
 
+    _exclude_from_index = True
+
     @property
     def similarity(self):
         return 0.8 * self.molecular_similarity + 0.2 * self.inspiration_similarity
@@ -1017,6 +1027,7 @@ class Tag(AbstractModel):
     _name_field = "name"
     _list_view_fields = ["name", "type"]
     _style = "annotation"
+    _exclude_from_index = True
 
     def __str__(self):
         return f'"{self.name}" [{self.type.name}]'
@@ -1043,6 +1054,7 @@ class TagType(AbstractModel):
 
     _style = "annotation"
     _name_field = "name"
+    _exclude_from_index = True
 
     def __str__(self):
         return f"TT{self.id} {self.name} ({self.origin})"
@@ -1083,6 +1095,7 @@ class Inspiration(AbstractModel):
     derivative = models.ForeignKey("Pose", on_delete=models.CASCADE, related_name="+")
 
     _style = "annotation"
+    _exclude_from_index = True
 
 
 class Placement(AbstractModel):

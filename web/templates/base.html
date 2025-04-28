@@ -28,6 +28,17 @@
             <a href="{% url 'login' %}?next=/" class="btn">Login</a>
         {% endif %}
 
+        <div style="padding-top:10px">
+            <form method="post" action="{% url 'search' %}">
+                {% csrf_token %}
+                <input class="btn" type="text" name="query" placeholder="Search..." required>
+                <input type="hidden" name="target" value="true">
+                <input type="hidden" name="structure" value="true">
+                <input type="hidden" name="compound" value="true">
+                <input type="hidden" name="pose" value="true">
+            </form>
+        </div>
+
     </header>
     <main>
         {% block content %}{% endblock %}

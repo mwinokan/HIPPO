@@ -17,6 +17,35 @@
 
 <div class="card">
 
+    <h2 class="center">Targets</h2>
+
+    <table>
+
+        <tr>
+            <th>Target</th>
+            <th>Structures</th>
+            <th>Poses</th>
+        </tr>
+
+        {% for target in targets %}
+        
+        <tr>
+            <td>
+                <a href="{% url 'target_detail' target.pk %}">{{ target.model_pill_html|default:target|safe }}</a>
+            </td>
+
+            <td>{{target.structures.count}}</td>
+            <td>{{target.poses.count}}</td>
+        </tr>
+
+        {% endfor %}
+
+    </table>
+
+</div>
+
+<div class="card">
+
     <h2 class="center">Database Statistics</h2>
 
     <table>

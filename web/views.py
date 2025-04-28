@@ -27,6 +27,7 @@ import plotly.express as px
 import plotly.io as pio
 from .forms import *
 import subprocess
+from hippo.tools import sanitise_smiles, SanitisationError
 
 import mrich
 from mrich import print
@@ -38,32 +39,35 @@ import re
 
 def index(request):
 
+    context = {}
+
+    ### Targets
+
+    context["targets"] = Target.objects.all().order_by("name")
+
+    ### Model Stats
+
     model_stats = []
-    # models = sorted(MODELS, key=lambda x: x.__name__)
-    models = MODELS
-    for model in models:
+    for model in MODELS:
         if model._exclude_from_index:
             continue
 
-        try:
-            model_stats.append(
-                dict(
-                    model_name=model.__name__,
-                    model_count=model.objects.count(),
-                    model=model,
-                )
+        model_stats.append(
+            dict(
+                model_name=model.__name__,
+                model_count=model.objects.count(),
+                model=model,
             )
-        except Exception as e:
-            print(e)
-            continue
+        )
+
+    context["model_stats"] = model_stats
+
+    # context["search_form"] = SearchForm()
 
     return render(
         request,
         "index.html",
-        dict(
-            model_stats=model_stats,
-            # iteration_content=iteration_content
-        ),
+        context,
     )
 
 
@@ -268,6 +272,105 @@ def pill_demo(request):
     return render(request, "pill_demo.html", {"pills": pills})
 
 
+def search(request):
+
+    if request.method == "POST":
+        form = SearchForm(request.POST)
+        if form.is_valid():
+            query = form.cleaned_data["query"]
+            # mrich.debug("Search", query)
+            # mrich.print(form.cleaned_data)
+
+            if request.POST.get("target"):
+
+                if match := re.match("^T([0-9]*)$", query):
+                    (pk,) = match.groups()
+                    # mrich.debug("target: pk", pk)
+                    try:
+                        target = Target.objects.get(id=pk)
+                        return redirect("target_detail", pk=target.pk)
+                    except Target.DoesNotExist:
+                        pass
+
+                try:
+                    target = Target.objects.get(name=query)
+                    return redirect("target_detail", pk=target.pk)
+                except Target.DoesNotExist:
+                    pass
+
+            if request.POST.get("structure"):
+
+                if match := re.match("^S([0-9]*)$", query):
+                    (pk,) = match.groups()
+                    # mrich.debug("structure: pk", pk)
+                    try:
+                        structure = Structure.objects.get(id=pk)
+                        return redirect("structure_detail", pk=structure.pk)
+                    except Structure.DoesNotExist:
+                        pass
+
+                try:
+                    structure = Structure.objects.get(alias=query)
+                    return redirect("structure_detail", pk=structure.pk)
+                except Structure.DoesNotExist:
+                    pass
+
+            if request.POST.get("compound"):
+
+                if match := re.match(r"^C([0-9]*)$", query):
+                    (pk,) = match.groups()
+                    # mrich.debug("compound: pk", pk)
+                    try:
+                        compound = Compound.objects.get(id=pk)
+                        return redirect("compound_detail", pk=compound.pk)
+                    except Compound.DoesNotExist:
+                        pass
+
+                # EXACT INCHIKEY LOOKUP
+                if match := re.match(r"^[A-Z]{14}\-[A-Z]{10}(\-[A-Z])?$", query):
+                    (inchikey,) = match.groups()
+                    try:
+                        compound = Compound.objects.get(inchikey=inchikey)
+                        return redirect("compound_detail", pk=compound.pk)
+                    except Compound.DoesNotExist:
+                        pass
+
+                # EXACT SMILES LOOKUP
+                try:
+                    smiles = sanitise_smiles(query)
+                    compound = Compound.objects.get(smiles=smiles)
+                    return redirect("compound_detail", pk=compound.pk)
+
+                except Compound.DoesNotExist:
+                    pass
+
+                except SanitisationError:
+                    pass
+
+            if request.POST.get("pose"):
+
+                if match := re.match("^P([0-9]*)$", query):
+                    (pk,) = match.groups()
+                    try:
+                        pose = Pose.objects.get(id=pk)
+                        return redirect("pose_detail", value=pose.pk)
+                    except Pose.DoesNotExist:
+                        pass
+
+                # try:
+                #     pose = Pose.objects.get(alias=query)
+                #     return redirect('pose_detail', pk=pose.pk)
+                # except Pose.DoesNotExist:
+                #     pass
+
+            form.add_error("query", "No matches found")
+
+    else:
+        form = SearchForm()
+
+    return render(request, "search.html", {"form": form})
+
+
 ### class based views
 
 from django.views.generic import ListView, DetailView
@@ -441,11 +544,11 @@ class PoseDetailView(BaseDetailView):
         value = self.kwargs.get("value")
 
         # Check if lookup_value is an integer (PK lookup)
-        if value.isdigit():
-            return get_object_or_404(Pose, pk=int(value))
+        # if value.isdigit():
+        return get_object_or_404(Pose, pk=int(value))
 
-        # Otherwise, assume it's a custom field (e.g., 'pose_code')
-        return get_object_or_404(Pose, alias=value)
+        # # Otherwise, assume it's a custom field (e.g., 'pose_code')
+        # return get_object_or_404(Pose, alias=value)
 
     def get_context_data(self, *args, **kwargs):
         context = super().get_context_data(**kwargs)

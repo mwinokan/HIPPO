@@ -204,6 +204,15 @@ table {
     border: 1px solid;
     font-size:90%;
 }
+
+.error {
+    background-color: var(--color-white-overlay);
+    color: red;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid;
+    font-size:90%;
+}
 /*
 table.bordered {
     border-radius: 4px;

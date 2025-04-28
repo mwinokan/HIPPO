@@ -26,6 +26,7 @@ urlpatterns = [
     path("accounts/", include("django.contrib.auth.urls")),
     path("admin/", admin.site.urls),
     path("pill_demo/", views.pill_demo, name="pill_demo"),
+    path("search/", views.search, name="search"),
     # custom views
     # path("model_pill/<str:class_name>/<int:pk>/", views.model_pill, name="model_pill"),
     path("structure_pdb/<int:pk>/", views.structure_pdb, name="structure_pdb"),
