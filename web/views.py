@@ -566,13 +566,14 @@ class PoseDetailView(BaseDetailView):
             self.request.GET.get("inspirations", "False") == "True"
         )
 
-        review = PoseReview.objects.filter(
-            user=self.request.user, pose=self.object
-        ).first()
+        if self.request.user.is_authenticated:
+            review = PoseReview.objects.filter(
+                user=self.request.user, pose=self.object
+            ).first()
 
-        review_form = PoseReviewForm(instance=review)
+            review_form = PoseReviewForm(instance=review)
 
-        context["review_form"] = review_form
+            context["review_form"] = review_form
 
         if pset_id := self.request.GET.get("poseset_redirect", None):
             context["poseset_redirect"] = int(pset_id)
