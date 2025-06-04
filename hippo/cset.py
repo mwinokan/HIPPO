@@ -350,6 +350,24 @@ class CompoundTable:
         """Plot a tanimoto similarity plot of these compounds"""
         return self[:].plot_tsnee(**kwargs)
 
+    def write_smiles_csv(self, file: str) -> None:
+        """Write a CSV of the smiles contained in this set to a file
+
+        :param file: path of the CSV file
+
+        """
+        from pandas import DataFrame
+
+        records = self.db.execute(
+            """SELECT compound_id, compound_smiles FROM compound ORDER BY compound_id"""
+        ).fetchall()
+
+        data = [dict(id=id, smiles=smiles) for id, smiles in records]
+
+        df = DataFrame(data)
+        mrich.writing(file)
+        df.to_csv(file, index=False)
+
     ### DUNDERS
 
     def __call__(
