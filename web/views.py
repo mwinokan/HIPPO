@@ -456,6 +456,14 @@ def get_base_detail_context(context, model, instance):
 
         fields.append((field_name, value, render_dict))
 
+    if props := instance._prop_field_rendertypes:
+        for field_name, d in props.items():
+            value = getattr(instance, d["prop"])
+            d.setdefault("order", 0)
+            d["type"] = str(d["type"])
+            d["content"] = str(d["content"])
+            fields.append((field_name, value, d))
+
     fields = sorted(fields, key=lambda x: x[2].setdefault("order", 99))
 
     context["fields"] = fields
@@ -479,6 +487,7 @@ def generate_views_for_model(model):
         model = model
         template_name = f"model_list.html"
         context_object_name = f"{model._meta.model_name}_list"
+        paginate_by = 100
 
         def get_context_data(self, **kwargs):
             context = super().get_context_data(**kwargs)

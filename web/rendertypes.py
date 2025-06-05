@@ -62,7 +62,21 @@ DEFAULTS = {
         content=ContentRenderType.TEXT_NORMAL,
         copyable=True,
     ),
+    "<class 'django.db.models.fields.FloatField'>": dict(
+        type=FieldRenderType.TABLE,
+        content=ContentRenderType.TEXT_MONOSPACE,
+        copyable=True,
+    ),
+    "<class 'django.db.models.fields.DecimalField'>": dict(
+        type=FieldRenderType.TABLE,
+        content=ContentRenderType.TEXT_MONOSPACE,
+        copyable=True,
+    ),
     "<class 'django.db.models.fields.DateTimeField'>": dict(
+        type=FieldRenderType.TABLE,
+        content=ContentRenderType.TEXT_NORMAL,
+    ),
+    "<class 'django.db.models.fields.DateField'>": dict(
         type=FieldRenderType.TABLE,
         content=ContentRenderType.TEXT_NORMAL,
     ),

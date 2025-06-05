@@ -87,6 +87,8 @@ class AbstractModel(models.Model):
         ),
     }
 
+    _prop_field_rendertypes = {}
+
     _list_view_fields = ["smiles", "inchikey", "mol"]
 
     @property
@@ -1128,6 +1130,122 @@ class Placement(AbstractModel):
         return f"{self.structure.alias} w/ {self.compound}"
 
 
+### PROCUREMENT
+
+
+class Supplier(AbstractModel):
+
+    name = models.CharField(max_length=30, unique=True)
+
+    _shorthand = "Su"
+    _style = "quoting"
+    _name_field = "name"
+
+
+class Quote(AbstractModel):
+
+    class Meta:
+        unique_together = ("amount", "supplier", "catalogue", "entry")
+
+    supplier = models.ForeignKey(
+        "Supplier", on_delete=models.CASCADE, related_name="quotes"
+    )
+    compound = models.ForeignKey(
+        "Compound", on_delete=models.CASCADE, related_name="quotes"
+    )
+
+    amount = models.FloatField()  # mg
+    catalogue = models.CharField(max_length=90, null=True, blank=True)
+    entry = models.CharField(max_length=60)
+    lead_time = models.FloatField(null=True, blank=True)
+    date = models.DateField()
+    purity = models.FloatField(null=True, blank=True)
+
+    price = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+    )
+
+    currency = models.CharField(max_length=3, choices=CURRENCIES)
+
+    smiles = models.CharField(max_length=300, unique=False)
+
+    mol = models.GeneratedField(
+        expression=MolFromSmiles("smiles", "mol"),
+        output_field=MolField(blank=True),
+        db_persist=True,
+    )
+
+    _style = "quoting"
+
+    _list_view_fields = ["supplier", "compound", "entry"]
+
+    _field_render_types = AbstractModel._field_render_types.copy()
+    _field_render_types.update(
+        {
+            "compound": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.INSTANCE_PILL,
+                order=-1,
+            ),
+            "supplier": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.INSTANCE_PILL,
+                order=-1,
+            ),
+            "entry": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.TEXT_MONOSPACE,
+                copyable=True,
+            ),
+            "lead_time": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.TEXT_MONOSPACE,
+                copyable=False,
+            ),
+            "currency": dict(
+                type=FieldRenderType.HIDDEN,
+            ),
+            "price": dict(
+                type=FieldRenderType.HIDDEN,
+            ),
+            "mol": dict(
+                type=FieldRenderType.HIDDEN,
+            ),
+        }
+    )
+
+    _prop_field_rendertypes = {
+        "price": dict(
+            prop="price_str",
+            type=FieldRenderType.TABLE,
+            content=ContentRenderType.TEXT_MONOSPACE,
+            copyable=True,
+        ),
+    }
+
+    @property
+    def price_str(self) -> str:
+        return f"{self.get_currency_display()}{self.price}"
+
+    def __str__(self):
+        """Unformatted string representation"""
+        if self.purity:
+            purity = f" @ {self.purity:.0%}"
+        else:
+            purity = ""
+
+        if self.supplier == "Stock":
+            s = f"Q{self.id} {self.compound} In Stock: {self.amount:}mg{purity}"
+        else:
+            s = f"Q{self.id} {self.compound} {self.entry} {self.amount}mg{purity} = {self.currency}{self.price}"
+
+        if self.lead_time:
+            s += f" ({self.lead_time} days)"
+
+        return s
+
+
 ### RESOURCE MANAGEMENT
 
 
@@ -1394,4 +1512,6 @@ MODELS = [
     CompoundTag,
     PoseReview,
     PosePair,
+    Supplier,
+    Quote,
 ]
