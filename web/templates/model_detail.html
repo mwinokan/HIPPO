@@ -106,9 +106,49 @@
         
         <tr>
             <td><a href="{% url 'tag_detail' tag.tag.pk %}">{{ tag.tag.model_pill_html|safe }}</a></td>
-            <!-- <td><span class="monospace">{{ tag.tag.name }}</span></td> -->
             <td><span class="monospace">{{ tag.tag.type.name }}</span></td>
             <td><span class="monospace">{{ tag.tag.type.origin }}</span></td>
+        </tr>
+        
+        {% endfor %}
+
+    </table>
+
+</div>
+
+{% endif %}
+
+{% if object.quotes is not None and object.quotes.count %}
+
+<div class="card">
+    
+    <table>
+
+        <h2 class="title">Quotes</h2>
+        
+        <tr>
+            <th>Quote</th>
+            <th>Supplier</th>
+            <th>Catalogue</th>
+            <th>Entry</th>
+            <th>Amount</th>
+            <th>Price</th>
+            <th>Lead Time (days)</th>
+        
+        {% for quote in object.quotes.all %}
+        
+        <tr>
+            <td>
+                <a href="{% url 'quote_detail' quote.pk %}">
+                    <div class="model-pill" style="background:var(--color-quoting);color:var(--text-color-quoting);">Q{{quote.pk}}</div>
+                </a>
+            </td>
+            <td><span class="monospace">{{ quote.supplier.name }}</span></td>
+            <td><span class="monospace">{{ quote.catalogue }}</span></td>
+            <td><span class="monospace">{{ quote.entry }}</span></td>
+            <td><span class="monospace">{{ quote.amount }}</span></td>
+            <td><span class="monospace">{{ quote.price_str }}</span></td>
+            <td><span class="monospace">{{ quote.lead_time }}</span></td>
         </tr>
         
         {% endfor %}
