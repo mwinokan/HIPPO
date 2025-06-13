@@ -614,8 +614,14 @@ class PoseSet(AbstractModel):
         # compute distance matrix
         distance_matrix = np.zeros((n, n))
         for pair in pairs:
-            i = member_indices[pair.pose1_id]
-            j = member_indices[pair.pose2_id]
+            i = member_indices.get(pair.pose1_id)
+            j = member_indices.get(pair.pose2_id)
+
+            if not i:
+                mrich.error(f"Could not get index for Pose w/ id={pair.pose1_id}")
+            if not j:
+                mrich.error(f"Could not get index for Pose w/ id={pair.pose2_id}")
+
             dist = pair.distance
             distance_matrix[i, j] = dist
             distance_matrix[j, i] = dist
