@@ -88,6 +88,24 @@ def calculate_interactions(
     mrich.success("Completed")
 
 
+@app.command()
+def verify():
+    """Verify installation"""
+
+    import os
+
+    try:
+        animal = setup_animal("_test.sqlite")
+        c = animal.register_compound(smiles="COc1ccc2sc(N)nc2c1")
+        c.mol
+        mrich.success("HIPPO/rdkit/chemicalite installations are compatible")
+    except Exception as e:
+        mrich.error(e)
+
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
+
 def main():
     app()
 
