@@ -20,6 +20,7 @@ def calculate_scaffolds(
     database: str,
     backup: bool = True,
 ):
+    """Calculate scaffold/superstructure relationships for all compounds"""
 
     mrich.h1("hippo.calculate_scaffolds")
 
@@ -51,6 +52,7 @@ def calculate_interactions(
     backup: bool = True,
     force: bool = False,
 ):
+    """Calculate interactions for all poses"""
 
     mrich.h1("hippo.calculate_interactions")
 
