@@ -1606,45 +1606,12 @@ class HIPPO:
 
         n_before = self.num_compounds
 
-        values = []
-
-        if len(smiles) > 1000:
-            generator = mrich.track(smiles, prefix="Sanitising...")
-        else:
-            generator = smiles
-
-        for s in generator:
-
-            try:
-                new_smiles = sanitise_smiles(
-                    s,
-                    sanitisation_failed="error",
-                    radical=radical,
-                    verbosity=sanitisation_verbosity,
-                )
-            except SanitisationError as e:
-                mrich.error(f"Could not sanitise {s=}")
-                mrich.error(str(e))
-                continue
-            except AssertionError:
-                mrich.error(f"Could not sanitise {s=}")
-                continue
-
-            inchikey = inchikey_from_smiles(new_smiles)
-            values.append((inchikey, new_smiles))
-
-        sql = """
-        INSERT OR IGNORE INTO compound(compound_inchikey, compound_smiles, compound_mol, compound_pattern_bfp, compound_morgan_bfp)
-        VALUES(?1, ?2, mol_from_smiles(?2), mol_pattern_bfp(mol_from_smiles(?2), 2048), mol_morgan_bfp(mol_from_smiles(?2), 2, 2048))
-        """
-
-        if debug:
-            mrich.debug("Inserting...")
-
-        self.db.executemany(sql, values)
-        self.db.commit()
-
-        self.db.update_compound_pattern_bfp_table()
+        values = self.db.register_compounds(
+            smiles=smiles,
+            radical=radical,
+            sanitisation_verbosity=sanitisation_verbosity,
+            debug=debug,
+        )
 
         diff = self.num_compounds - n_before
 
