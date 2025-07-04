@@ -96,8 +96,10 @@ def verify():
 
     import os
 
+    file_path = "_test.sqlite"
+
     try:
-        animal = setup_animal("_test.sqlite")
+        animal = setup_animal(file_path, backup=False)
         c = animal.register_compound(smiles="COc1ccc2sc(N)nc2c1")
         c.mol
         mrich.success("HIPPO/rdkit/chemicalite installations are compatible")
