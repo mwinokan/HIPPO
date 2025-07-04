@@ -3189,7 +3189,11 @@ class Database:
     ### COMPOUND QUERY
 
     def query_substructure(
-        self, query: str, fast: bool = True, none: str = "error"
+        self,
+        query: str,
+        fast: bool = True,
+        none: str = "error",
+        smarts: bool = False,
     ) -> "CompoundSet":
         """Search for compounds by substructure
 
@@ -3200,13 +3204,27 @@ class Database:
 
         """
 
+        if smarts:
+            func = "mol_from_smarts"
+        else:
+            func = "mol_from_smiles"
+
         # smiles
         if isinstance(query, str):
 
             if fast:
-                sql = f"SELECT compound.compound_id FROM compound, compound_pattern_bfp AS bfp WHERE compound.compound_id = bfp.compound_id AND mol_is_substruct(compound.compound_mol, mol_from_smiles(?))"
+                sql = f"""
+                SELECT compound.compound_id 
+                FROM compound, compound_pattern_bfp AS bfp 
+                WHERE compound.compound_id = bfp.compound_id 
+                AND mol_is_substruct(compound.compound_mol, {func}(?))
+                """
+
             else:
-                sql = f"SELECT compound_id FROM compound WHERE mol_is_substruct(compound_mol, mol_from_smiles(?))"
+                sql = f"""
+                SELECT compound_id FROM compound 
+                WHERE mol_is_substruct(compound_mol, {func}(?))
+                """
 
         else:
 
