@@ -2323,11 +2323,17 @@ class Database:
         murcko_data = {}
         generic_data = {}
         generic_to_murcko = {}
-        for c_id, smiles in compound_records:
+        for c_id, smiles in mrich.track(compound_records):
 
             # murcko
 
-            murcko_smiles = sanitise_smiles(MurckoScaffoldSmiles(smiles))
+            try:
+                murcko_smiles = sanitise_smiles(MurckoScaffoldSmiles(smiles))
+            except KeyboardInterrupt:
+                raise
+            except:
+                mrich.error("can't make murcko:", smiles)
+                continue
 
             if murcko_smiles not in murcko_data:
                 murcko_data[murcko_smiles] = set()
@@ -2336,9 +2342,15 @@ class Database:
 
             # generic
 
-            generic_smiles = sanitise_smiles(
-                MolToSmiles(MakeScaffoldGeneric(MolFromSmiles(murcko_smiles)))
-            )
+            try:
+                generic_smiles = sanitise_smiles(
+                    MolToSmiles(MakeScaffoldGeneric(MolFromSmiles(murcko_smiles)))
+                )
+            except KeyboardInterrupt:
+                raise
+            except:
+                mrich.error("can't make generic:", murcko_smiles)
+                continue
 
             if generic_smiles not in generic_data:
                 generic_data[generic_smiles] = set()
@@ -2401,6 +2413,8 @@ class Database:
             murcko_id = murcko_inchikey_lookup[murcko_s2i[murcko_smiles]]
             for c_id in c_ids:
                 pairs.append((murcko_id, c_id))
+
+        pairs = [(a, b) for a, b in pairs if a != b]
 
         mrich.var("#murcko scaffold relations", len(pairs))
 
