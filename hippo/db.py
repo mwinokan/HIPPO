@@ -2986,6 +2986,23 @@ class Database:
 
         return clustered
 
+    def get_compound_scaffold_dict(self) -> dict[int, set[int]]:
+        """Get a dictionary mapping scaffold_base compound ID's to a set of their superstructure IDs"""
+
+        records = self.select(
+            table="scaffold",
+            query="scaffold_base, scaffold_superstructure",
+            multiple=True,
+        )
+
+        data = {}
+        for base, elab in records:
+            if base not in data:
+                data[base] = set()
+            data[base].add(elab)
+
+        return data
+
     def get_compound_tag_dict(
         self,
         cset: "CompoundSet | None" = None,
