@@ -2178,7 +2178,7 @@ class HIPPO:
     def quote_compounds(
         self,
         ref_animal: "HIPPO",
-        compounds: CompoundSet,
+        compounds: CompoundSet | None = None,
         debug: bool = False,
     ) -> "CompoundSet,CompoundSet":
         """Transfer quotes from another reference :class:`.HIPPO` animal object (e.g. the one from https://github.com/mwinokan/EnamineCatalogs)
@@ -2187,7 +2187,11 @@ class HIPPO:
         :param compounds: A :class:`.CompoundSet` containing the compounds to be quoted
         """
 
-        inchikeys = compounds.inchikeys
+        if compounds is not None:
+            inchikeys = compounds.inchikeys
+
+        else:
+            inchikeys = self.compounds.inchikeys
 
         sql = f"""
         SELECT quote_id, quote_smiles, quote_amount, quote_supplier, quote_catalogue, quote_entry, quote_lead_time, quote_price, quote_currency, quote_purity, quote_date, quote_compound FROM quote
@@ -2220,25 +2224,33 @@ class HIPPO:
                 quote_compound,
             ) = record
 
-            compound = self.compounds(smiles=quote_smiles)
+            try:
+                compound = self.compounds(smiles=quote_smiles)
+            except Exception as e:
+                mrich.error(e)
+                continue
 
             if debug:
                 mrich.debug("Inserting quote for", compound)
 
-            self.db.insert_quote(
-                compound=compound,
-                supplier=quote_supplier,
-                catalogue=quote_catalogue,
-                entry=quote_entry,
-                amount=quote_amount,
-                price=quote_price,
-                currency=quote_currency,
-                purity=quote_purity,
-                lead_time=quote_lead_time,
-                smiles=quote_smiles,
-                date=quote_date,
-                commit=False,
-            )
+            try:
+                self.db.insert_quote(
+                    compound=compound,
+                    supplier=quote_supplier,
+                    catalogue=quote_catalogue,
+                    entry=quote_entry,
+                    amount=quote_amount,
+                    price=quote_price,
+                    currency=quote_currency,
+                    purity=quote_purity,
+                    lead_time=quote_lead_time,
+                    smiles=quote_smiles,
+                    date=quote_date,
+                    commit=False,
+                )
+            except Exception as e:
+                mrich.error(e)
+                continue
 
             quoted_compound_ids.add(compound.id)
 

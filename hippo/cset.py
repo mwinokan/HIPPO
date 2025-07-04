@@ -100,6 +100,16 @@ class CompoundTable:
         return [q for q, in result]
 
     @property
+    def inchikeys(self) -> list[str]:
+        """Returns the inchikeys of all compounds"""
+        result = self.db.select(
+            query="compound_inchikey",
+            table="compound",
+            multiple=True,
+        )
+        return [q for q, in result]
+
+    @property
     def tags(self) -> set[str]:
         """Returns the set of unique tags present in this compound set"""
         values = self.db.select_where(
