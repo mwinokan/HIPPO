@@ -2794,6 +2794,36 @@ class Database:
 
         return clustered
 
+    def get_compound_tag_dict(
+        self,
+        cset: "CompoundSet | None" = None,
+    ) -> dict[int, set[str]]:
+        """Get a dictionary mapping compound ID's to their tags"""
+
+        if cset:
+            raise NotImplementedError
+
+        records = self.select(
+            query="tag_name, tag_compound", table="tag", multiple=True
+        )
+
+        data = {}
+        for tag_name, compound_id in records:
+            if compound_id not in data:
+                data[compound_id] = set()
+            data[compound_id].add(tag_name)
+
+        # null IDS
+        comp_ids = self.select(table="compound", query="compound_id", multiple=True)
+        comp_ids = set(q for q, in comp_ids)
+
+        null_ids = comp_ids - set(data.keys())
+
+        for c_id in null_ids:
+            data[c_id] = set()
+
+        return data
+
     def get_pose_id_interaction_ids_dict(self, pset: "PoseSet") -> dict[int, set]:
         """Get a dictionary mapping :class:`.Pose` ID's to their associated :class:`.Interaction` ID's"""
         records = self.execute(
@@ -3191,6 +3221,7 @@ class Database:
     def query_substructure(
         self,
         query: str,
+        *,
         fast: bool = True,
         none: str = "error",
         smarts: bool = False,
