@@ -9,6 +9,7 @@ def get_scaffold_network(
     notebook: bool = True,
     depth: int = 5,
     scaffold_tag: str | None = None,
+    exclude_tag: str | None = None,
 ) -> "pyvis.network.Network":
     """Use PyVis to display a network of molecules connected by scaffold relationships in the database"""
 
@@ -73,12 +74,29 @@ def get_scaffold_network(
 
     if compounds and not scaffolds:
 
-        if depth > 1:
-            mrich.warning("depth > 1 not supported")
-            depth = 1
+        mrich.var("recursion depth", depth)
+        mrich.var("#compounds", len(compounds))
 
-        mrich.var("#superstructures", len(compounds))
-        records = get_scaffold_records(compounds=compounds)
+        records = []
+        n = 0
+        while n < depth:
+
+            if not compounds:
+                break
+
+            results = get_scaffold_records(compounds=compounds)
+
+            if results:
+                records.extend(results)
+                compounds = animal.compounds[[a for a, b in results]]
+                n += 1
+            else:
+                break
+
+        if n == depth:
+            mrich.warning(
+                "Reached recursion depth. More scaffolds may be in the database"
+            )
 
     elif scaffolds and not compounds:
 
@@ -118,10 +136,17 @@ def get_scaffold_network(
 
             base = animal.db.get_compound(id=base_id)
 
-            if scaffold_tag and scaffold_tag not in base.tags:
+            base_tags = base.tags
+
+            if scaffold_tag and scaffold_tag not in base_tags:
                 continue
 
             compound = animal.db.get_compound(id=compound_id)
+
+            if exclude_tag and (
+                exclude_tag in base_tags or exclude_tag in compound.tags
+            ):
+                continue
 
             add_node(base)
             add_node(compound)
