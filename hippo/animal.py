@@ -2366,6 +2366,8 @@ class HIPPO:
         depth: int = 5,
         scaffold_tag: str | None = None,
         exclude_tag: str | None = None,
+        physics: bool = True,
+        arrows: bool = True,
     ) -> "pyvis.network.Network":
         """Use PyVis to display a network of molecules connected by scaffold relationships in the database"""
         from .pyvis import get_scaffold_network
@@ -2378,6 +2380,8 @@ class HIPPO:
             depth=depth,
             scaffold_tag=scaffold_tag,
             exclude_tag=exclude_tag,
+            physics=physics,
+            arrows=arrows,
         )
 
     ### COMPOUND DESIGN

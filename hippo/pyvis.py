@@ -10,16 +10,20 @@ def get_scaffold_network(
     depth: int = 5,
     scaffold_tag: str | None = None,
     exclude_tag: str | None = None,
+    physics: bool = True,
+    arrows: bool = True,
 ) -> "pyvis.network.Network":
     """Use PyVis to display a network of molecules connected by scaffold relationships in the database"""
 
     from pyvis.network import Network
     from molparse.rdkit import smiles_to_pngstr
 
-    net = Network(notebook=notebook)
+    net = Network(notebook=notebook, cdn_resources="in_line")
 
     nodes = set()
     edges = set()
+
+    arrows = "to" if arrows else None
 
     def add_node(compound):
 
@@ -34,6 +38,7 @@ def get_scaffold_network(
             title=str(compound),
             shape="circularImage",
             image=f"data:image/png;base64,{pngstr}",
+            physics=physics,
         )
 
         nodes.add(compound.id)
@@ -48,6 +53,7 @@ def get_scaffold_network(
         net.add_edge(
             base.id,
             compound.id,
+            arrows=arrows,
             # label="PDE5",
             # title="Protein target",
             # color="purple"
