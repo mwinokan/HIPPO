@@ -2363,7 +2363,7 @@ class HIPPO:
         compounds: "CompoundSet | None" = None,
         scaffolds: "CompoundSet | None" = None,
         notebook: bool = True,
-        depth: int = 1,
+        depth: int = 5,
         scaffold_tag: str | None = None,
     ) -> "pyvis.network.Network":
         """Use PyVis to display a network of molecules connected by scaffold relationships in the database"""

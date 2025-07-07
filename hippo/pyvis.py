@@ -7,7 +7,7 @@ def get_scaffold_network(
     scaffolds="CompoundSet | None",
     # filename: "str | Path" = "network.html",
     notebook: bool = True,
-    depth: int = 1,
+    depth: int = 5,
     scaffold_tag: str | None = None,
 ) -> "pyvis.network.Network":
     """Use PyVis to display a network of molecules connected by scaffold relationships in the database"""
@@ -16,9 +16,6 @@ def get_scaffold_network(
     from molparse.rdkit import smiles_to_pngstr
 
     net = Network(notebook=notebook)
-
-    if depth != 1:
-        raise NotImplementedError
 
     nodes = set()
     edges = set()
@@ -63,22 +60,51 @@ def get_scaffold_network(
                 table="scaffold",
                 key=f"scaffold_base IN {scaffolds.str_ids}",
                 multiple=True,
+                none="quiet",
             )
         elif compounds:
             return animal.db.select_all_where(
                 table="scaffold",
                 key=f"scaffold_superstructure IN {compounds.str_ids}",
                 multiple=True,
+                none="quiet",
             )
         raise ValueError
 
     if compounds and not scaffolds:
+
+        if depth > 1:
+            mrich.warning("depth > 1 not supported")
+            depth = 1
+
         mrich.var("#superstructures", len(compounds))
         records = get_scaffold_records(compounds=compounds)
 
     elif scaffolds and not compounds:
+
+        mrich.var("recursion depth", depth)
         mrich.var("#scaffolds", len(scaffolds))
-        records = get_scaffold_records(scaffolds=scaffolds)
+
+        records = []
+        n = 0
+        while n < depth:
+
+            if not scaffolds:
+                break
+
+            results = get_scaffold_records(scaffolds=scaffolds)
+
+            if results:
+                records.extend(results)
+                scaffolds = animal.compounds[[b for a, b in results]]
+                n += 1
+            else:
+                break
+
+        if n == depth:
+            mrich.warning(
+                "Reached recursion depth. More superstructures may be in the database"
+            )
 
     else:
         raise ValueError
@@ -87,7 +113,7 @@ def get_scaffold_network(
 
     if records:
         for base_id, compound_id in mrich.track(
-            records, prefix="Adding scaffolds and edges"
+            records, prefix="Adding nodes and edges"
         ):
 
             base = animal.db.get_compound(id=base_id)
