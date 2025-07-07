@@ -2358,6 +2358,26 @@ class HIPPO:
 
         return plot_pose_interactions(self, **kwargs)
 
+    def get_scaffold_network(
+        self,
+        compounds: "CompoundSet | None" = None,
+        scaffolds: "CompoundSet | None" = None,
+        notebook: bool = True,
+        depth: int = 1,
+        scaffold_tag: str | None = None,
+    ) -> "pyvis.network.Network":
+        """Use PyVis to display a network of molecules connected by scaffold relationships in the database"""
+        from .pyvis import get_scaffold_network
+
+        return get_scaffold_network(
+            self,
+            compounds=compounds,
+            scaffolds=scaffolds,
+            notebook=notebook,
+            depth=depth,
+            scaffold_tag=scaffold_tag,
+        )
+
     ### COMPOUND DESIGN
 
     # def fragmenstein_merge(self,
