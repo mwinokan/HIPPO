@@ -809,7 +809,7 @@ class PoseSet:
 
     @property
     def str_ids(self) -> str:
-        """Return an SQL formatted tuple string of the :class:`.Compound` IDs"""
+        """Return an SQL formatted tuple string of the :class:`.Pose` IDs"""
         return str(tuple(self.ids)).replace(",)", ")")
 
     @property

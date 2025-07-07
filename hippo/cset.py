@@ -100,6 +100,11 @@ class CompoundTable:
         return [q for q, in result]
 
     @property
+    def str_ids(self) -> str:
+        """Return an SQL formatted tuple string of the :class:`.Compound` IDs"""
+        return str(tuple(self.ids)).replace(",)", ")")
+
+    @property
     def inchikeys(self) -> list[str]:
         """Returns the inchikeys of all compounds"""
         result = self.db.select(
@@ -228,28 +233,47 @@ class CompoundTable:
     def get_by_tag(
         self,
         tag: str,
-        **kwargs,
+        inverse: bool = False,
     ) -> "CompoundSet":
         """Get all child compounds with a certain tag
 
         :param tag: tag to filter by
 
         """
-        values = self.db.select_where(
-            query="tag_compound",
-            table="tag",
-            key="name",
-            value=tag,
-            multiple=True,
-            **kwargs,
-        )
+
+        if not inverse:
+
+            values = self.db.select_where(
+                query="tag_compound", table="tag", key="name", value=tag, multiple=True
+            )
+
+        else:
+
+            values = self.db.select_where(
+                query="tag_compound", table="tag", key="name", value=tag, multiple=True
+            )
+
+            if not values:
+                return self
+
+            ids = [v for v, in values if v]
+
+            values = self.db.select_where(
+                query="compound_id",
+                table="compound",
+                key=f"compound_id NOT IN {str(tuple(ids))}",
+                multiple=True,
+            )
 
         if not values:
             return None
 
         ids = [v for v, in values if v]
         cset = self[ids]
-        cset._name = f"compounds tagged {tag}"
+        if inverse:
+            cset._name = f"compounds not tagged {tag}"
+        else:
+            cset._name = f"compounds tagged {tag}"
         return cset
 
     def get_by_metadata(
@@ -941,6 +965,7 @@ class CompoundSet:
     def get_by_tag(
         self,
         tag: str,
+        inverse: bool = False,
     ) -> "CompoundSet":
         """Get all child compounds with a certain tag"""
 
@@ -950,7 +975,13 @@ class CompoundSet:
             key=f'tag_name = "{tag}" AND tag_compound IN {self.str_ids}',
             multiple=True,
         )
-        ids = [v for v, in values if v and v in self.ids]
+
+        if inverse:
+            matches = set(v for v, in values)
+            ids = [i for i in self.ids if i not in matches]
+        else:
+            ids = [v for v, in values]
+
         return CompoundSet(self.db, ids)
 
     def get_by_metadata(self, key: str, value: str | None = None) -> "CompoundSet":
