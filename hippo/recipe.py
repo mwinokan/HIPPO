@@ -13,7 +13,15 @@ class Recipe:
 
     _db = None
 
-    def __init__(self, db, *, products, reactants, intermediates, reactions):
+    def __init__(
+        self,
+        db: "Database",
+        *,
+        products: "IngredientSet",
+        reactants: "IngredientSet",
+        intermediates: "IngredientSet",
+        reactions: "ReactionSet",
+    ):
 
         from .cset import IngredientSet
         from .rset import ReactionSet
@@ -682,6 +690,32 @@ class Recipe:
         self = cls.__new__(cls)
         self.__init__(
             db,
+            products=products,
+            reactants=reactants,
+            intermediates=intermediates,
+            reactions=reactions,
+        )
+
+        return self
+
+    @classmethod
+    def empty(
+        cls,
+        db: "Database",
+    ):
+
+        from .cset import IngredientSet
+        from .rset import ReactionSet
+
+        products = IngredientSet(db)
+        reactants = IngredientSet(db)
+        intermediates = IngredientSet(db)
+        reactions = ReactionSet(db)
+
+        # Create the object
+        self = cls.__new__(cls)
+        self.__init__(
+            db=db,
             products=products,
             reactants=reactants,
             intermediates=intermediates,
