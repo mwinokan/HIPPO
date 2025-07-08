@@ -7,7 +7,6 @@ import mcol
 import mrich
 
 
-# @dataclass
 class Recipe:
     """A Recipe stores data corresponding to a specific synthetic recipe involving several products, reactants, intermediates, and reactions."""
 
@@ -691,9 +690,18 @@ class Recipe:
             db, data["reactants"], supplier=data["reactant_supplier"]
         )
 
+        if "compounds" in data:
+            compounds = IngredientSet.from_ingredient_dicts(
+                db, data["compounds"], supplier=data["compound_supplier"]
+            )
+        else:
+            compounds = IngredientSet(db)
+
         if clear_quotes:
             reactants.df["quote_id"] = None
             reactants.df["quoted_amount"] = None
+            compounds.df["quote_id"] = None
+            compounds.df["quoted_amount"] = None
 
         # ReactionSet
         reactions = ReactionSet(db, data["reaction_ids"], sort=False)
@@ -703,6 +711,7 @@ class Recipe:
             mrich.var("intermediates", intermediates)
             mrich.var("products", products)
             mrich.var("reactions", reactions)
+            mrich.var("compounds", compounds)
 
         # Create the object
         self = cls.__new__(cls)
@@ -712,6 +721,7 @@ class Recipe:
             reactants=reactants,
             intermediates=intermediates,
             reactions=reactions,
+            compounds=compounds,
         )
 
         return self
@@ -1286,7 +1296,9 @@ class Recipe:
 
         if reactant_supplier:
             data["reactant_supplier"] = self.reactants.supplier
-        # data['lead_time'] = self.lead_time
+
+        if compound_supplier:
+            data["compound_supplier"] = self.compounds.supplier
 
         # IngredientSets
         if compound_ids_only:
@@ -1294,12 +1306,14 @@ class Recipe:
             data["intermediate_ids"] = self.intermediates.compound_ids
             if products:
                 data["products_ids"] = self.products.compound_ids
+            data["compound_ids"] = self.compounds.compound_ids
 
         else:
             data["reactants"] = self.reactants.df.to_dict(orient="list")
             data["intermediates"] = self.intermediates.df.to_dict(orient="list")
             if products:
                 data["products"] = self.products.df.to_dict(orient="list")
+            data["compounds"] = self.compounds.df.to_dict(orient="list")
 
         # ReactionSet
         data["reaction_ids"] = self.reactions.ids
