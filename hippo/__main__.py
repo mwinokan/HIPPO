@@ -20,6 +20,7 @@ def calculate_scaffolds(
     database: str,
     backup: bool = True,
 ):
+    """Calculate scaffold/superstructure relationships for all compounds"""
 
     mrich.h1("hippo.calculate_scaffolds")
 
@@ -51,6 +52,7 @@ def calculate_interactions(
     backup: bool = True,
     force: bool = False,
 ):
+    """Calculate interactions for all poses"""
 
     mrich.h1("hippo.calculate_interactions")
 
@@ -86,6 +88,26 @@ def calculate_interactions(
     mrich.var("#fingerprinted", animal.poses.num_fingerprinted)
 
     mrich.success("Completed")
+
+
+@app.command()
+def verify():
+    """Verify installation"""
+
+    import os
+
+    file_path = "_test.sqlite"
+
+    try:
+        animal = setup_animal(file_path, backup=False)
+        c = animal.register_compound(smiles="COc1ccc2sc(N)nc2c1")
+        c.mol
+        mrich.success("HIPPO/rdkit/chemicalite installations are compatible")
+    except Exception as e:
+        mrich.error(e)
+
+    if os.path.exists(file_path):
+        os.remove(file_path)
 
 
 def main():
