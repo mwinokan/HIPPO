@@ -1243,6 +1243,7 @@ class Recipe:
         *,
         price: bool = True,
         reactant_supplier: bool = True,
+        compound_supplier: bool = True,
         database: bool = True,
         timestamp: bool = True,
         compound_ids_only: bool = False,
@@ -1832,6 +1833,7 @@ class Recipe:
             reactants=self.reactants.copy(),
             intermediates=self.intermediates.copy(),
             reactions=self.reactions.copy(),
+            compounds=self.compounds.copy(),
             # supplier=self.supplier
         )
 

@@ -2165,6 +2165,7 @@ class IngredientSet:
     @classmethod
     def from_compounds(
         cls,
+        *,
         compounds: "CompoundSet | None" = None,
         ids: list[int] | None = None,
         db: "Database | None" = None,
@@ -2580,6 +2581,16 @@ class IngredientSet:
             supplier=self.supplier,
             data=self.df.to_dict(orient=data_orient),
         )
+
+    def pop(self) -> Ingredient:
+        """Pop the last compound in this set"""
+        item = self[self.df.index[-1]]
+        self.df.drop(self.df.index[-1], inplace=True)
+        return item
+
+    def shuffle(self) -> None:
+        """Randomises the order of compounds in this set"""
+        self._data = self.df.sample(frac=1).reset_index(drop=True)
 
     ### DUNDERS
 
