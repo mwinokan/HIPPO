@@ -706,7 +706,12 @@ class CompoundSet:
             table="pose",
             key=f"pose_compound in {self.str_ids}",
             multiple=True,
+            none="warning",
         )
+
+        if not ids:
+            return PoseSet(self.db, {})
+
         ids = [v for v, in ids]
         return PoseSet(self.db, ids)
 

@@ -60,8 +60,9 @@ class Recipe:
 
         # caches
         self._product_compounds = None
-        self._product_poses = None
-        self._product_interactions = None
+        self._poses = None
+        self._interactions = None
+        self._combined_compounds = None
 
     ### FACTORIES
 
@@ -744,12 +745,12 @@ class Recipe:
         return self._compounds
 
     @property
-    def product_poses(self) -> "PoseSet":
+    def poses(self) -> "PoseSet":
         """Product poses"""
-        if self._product_poses is None:
-            self._product_poses = self.product_compounds.poses
-            self._product_poses._name = f"product poses of {self}"
-        return self._product_poses
+        if self._poses is None:
+            self._poses = self.combined_compounds.poses
+            self._poses._name = f"poses of {self}"
+        return self._poses
 
     @property
     def product_compounds(self) -> "CompoundSet":
@@ -760,11 +761,23 @@ class Recipe:
         return self._product_compounds
 
     @property
-    def product_interactions(self) -> "InteractionSet":
+    def combined_compound_ids(self) -> set[int]:
+        return set(self.product_compounds.ids) | set(self.compounds.ids)
+
+    @property
+    def combined_compounds(self) -> "CompoundSet":
+        """Combined product and no-chem compounds"""
+        if self._combined_compounds is None:
+            self._combined_compounds = CompoundSet(self.db, self.combined_compound_ids)
+            self._combined_compounds._name = f"combined compounds of {self}"
+        return self._combined_compounds
+
+    @property
+    def interactions(self) -> "InteractionSet":
         """Product pose interactions"""
-        if self._product_interactions is None:
-            self._product_interactions = self.product_poses.interactions
-        return self._product_interactions
+        if self._interactions is None:
+            self._interactions = self.poses.interactions
+        return self._interactions
 
     @property
     def product(self) -> "Ingredient":
@@ -824,7 +837,7 @@ class Recipe:
     @property
     def num_compounds(self) -> int:
         """Return the number of compounds"""
-        return len(self.compounds)
+        return len(self.combined_compound_ids)
 
     @property
     def num_reactions(self):
