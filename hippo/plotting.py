@@ -1759,6 +1759,9 @@ def plot_compound_tsnee(
     title: str | None = None,
     subtitle: str | None = None,
     legend: bool = False,
+    symbol: str = "type",
+    sort_by: str = "type",
+    color: str = "cluster",
     **kwargs,
 ) -> "plotly.graph_objects.Figure":
 
@@ -1773,6 +1776,8 @@ def plot_compound_tsnee(
 
     with mrich.loading("Getting Compound fingerprints"):
         df["FP"] = df["mol"].map(get_cfps)
+
+    df["bases"] = df["bases"].map(lambda x: x if not isinstance(x, float) else None)
 
     def get_cluster(row):
 
@@ -1789,13 +1794,16 @@ def plot_compound_tsnee(
     def get_type(row):
 
         if row["bases"] is None:
-            return "base"
+            return "scaffold"
 
         return "elaboration"
 
     with mrich.loading("Adding columns"):
         df["cluster"] = df.apply(get_cluster, axis=1)
         df["type"] = df.apply(get_type, axis=1)
+
+    if sort_by:
+        df = df.sort_values(by=sort_by)
 
     X = np.array([x.fp for x in df["FP"]])
 
@@ -1831,8 +1839,8 @@ def plot_compound_tsnee(
             x="PC1",
             y="PC2",
             hover_data=hover_data,
-            color="cluster",
-            symbol="type",
+            color=color,
+            symbol=symbol,
             **kwargs,
         )
 
