@@ -495,8 +495,6 @@ class Recipe:
         if pick_first:
             combinations = [combinations[0]]
 
-        mrich.print()
-
         solutions = []
 
         if n_comps > 1:
