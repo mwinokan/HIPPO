@@ -3439,6 +3439,29 @@ class Database:
 
         return None
 
+    def get_scaffold_similarity_dict(
+        self, scaffolds: "CompoundSet | None" = None
+    ) -> list[dict]:
+
+        sql = """
+        SELECT scaffold_base as a, scaffold_superstructure as b, bfp_tanimoto(c.fp, d.fp) AS t
+        FROM scaffold
+        INNER JOIN compound_pattern_bfp AS c ON a = c.compound_id
+        INNER JOIN compound_pattern_bfp AS d ON b = d.compound_id
+        """
+
+        if scaffolds:
+
+            sql += f" WHERE a IN {scaffolds.str_ids}"
+
+        records = self.execute(sql).fetchall()
+
+        data = []
+        for a, b, s in mrich.track(records):
+            data.append(dict(base_id=a, superstructure_id=b, similarity=s))
+
+        return data
+
     ### COMPOUND QUERY
 
     def query_substructure(
