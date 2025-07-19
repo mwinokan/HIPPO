@@ -2679,9 +2679,6 @@ class IngredientSet:
 
     def __getattr__(self, key: str):
         """For missing attributes try getting from associated :class:`.CompoundSet`"""
-        # if hasattr(self, key):
-        # return getattr(self, key)
-        # else:
         return getattr(self.compounds, key)
 
     def __contains__(self, other: Compound | Ingredient | int):
