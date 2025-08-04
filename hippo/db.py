@@ -2301,7 +2301,7 @@ class Database:
 
         return values
 
-    def calculate_all_murcko_scaffolds(self):
+    def calculate_all_murcko_scaffolds(self, generic: bool = True):
 
         n_before = self.count("scaffold")
 
@@ -2342,24 +2342,26 @@ class Database:
 
             # generic
 
-            try:
-                generic_smiles = sanitise_smiles(
-                    MolToSmiles(MakeScaffoldGeneric(MolFromSmiles(murcko_smiles)))
-                )
-            except KeyboardInterrupt:
-                raise
-            except:
-                mrich.error("can't make generic:", murcko_smiles)
-                continue
+            if generic:
 
-            if generic_smiles not in generic_data:
-                generic_data[generic_smiles] = set()
+                try:
+                    generic_smiles = sanitise_smiles(
+                        MolToSmiles(MakeScaffoldGeneric(MolFromSmiles(murcko_smiles)))
+                    )
+                except KeyboardInterrupt:
+                    raise
+                except:
+                    mrich.error("can't make generic:", murcko_smiles)
+                    continue
 
-            if generic_smiles not in generic_to_murcko:
-                generic_to_murcko[generic_smiles] = set()
+                if generic_smiles not in generic_data:
+                    generic_data[generic_smiles] = set()
 
-            generic_data[generic_smiles].add(c_id)
-            generic_to_murcko[generic_smiles].add(murcko_smiles)
+                if generic_smiles not in generic_to_murcko:
+                    generic_to_murcko[generic_smiles] = set()
+
+                generic_data[generic_smiles].add(c_id)
+                generic_to_murcko[generic_smiles].add(murcko_smiles)
 
         mrich.var("#murcko scaffolds", len(murcko_data))
         mrich.var("#generic murcko scaffolds", len(generic_data))
