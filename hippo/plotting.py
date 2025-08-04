@@ -967,7 +967,15 @@ def plot_numbers(animal, subtitle=None):
 
 
 @hippo_graph
-def plot_compound_property(animal, prop, compounds=None, style="bar", null=None, hover_data=None, custom_data=None):
+def plot_compound_property(
+    animal,
+    prop,
+    compounds=None,
+    style="bar",
+    null=None,
+    hover_data=None,
+    custom_data=None,
+):
     """Get an arbitrary property from all the compounds in animal.compounds
 
             If one property, plot a 1D histogram
@@ -1034,7 +1042,13 @@ def plot_compound_property(animal, prop, compounds=None, style="bar", null=None,
         title = f"Compound {prop[0]} vs {prop[1]}"
 
         func = eval(f"px.{style}")
-        fig = func(plot_data, x=prop[0], y=prop[1], hover_data=hover_data, custom_data=custom_data)
+        fig = func(
+            plot_data,
+            x=prop[0],
+            y=prop[1],
+            hover_data=hover_data,
+            custom_data=custom_data,
+        )
 
         fig.update_layout(xaxis_title=prop[0], yaxis_title=prop[1])
 
@@ -1312,7 +1326,7 @@ def plot_pose_property(
         else:
 
             # if style == "bar":
-                # style = "scatter"
+            # style = "scatter"
 
             func = eval(f"px.{style}")
             fig = func(
