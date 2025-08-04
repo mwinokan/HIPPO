@@ -2246,6 +2246,21 @@ class Database:
                 "Found", diff, "new substructure-superstructure relationships"
             )
 
+    def reinitialise_molecules(self):
+        """In the case where the Mol binaries in a database are throwing unpickling errors, run this to reinitialise them all from their smiles."""
+
+        mrich.var("#compounds", self.count("compound"))
+
+        sql = """
+        UPDATE your_table_name
+        SET compound_mol = mol_from_smiles(compound_smiles);
+        """
+        
+        with mrich.loading("Reinitialising compounds..."):
+            self.execute(sql)
+
+        mrich.success("compound_mol records updated")
+
     ### GETTERS
 
     def get_compound(

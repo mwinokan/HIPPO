@@ -967,7 +967,7 @@ def plot_numbers(animal, subtitle=None):
 
 
 @hippo_graph
-def plot_compound_property(animal, prop, compounds=None, style="bar", null=None):
+def plot_compound_property(animal, prop, compounds=None, style="bar", null=None, hover_data=None, custom_data=None):
     """Get an arbitrary property from all the compounds in animal.compounds
 
             If one property, plot a 1D histogram
@@ -983,6 +983,9 @@ def plot_compound_property(animal, prop, compounds=None, style="bar", null=None)
 
     if not isinstance(prop, list):
         prop = [prop]
+
+    if hover_data is None:
+        hover_data = []
 
     plot_data = []
 
@@ -1026,12 +1029,12 @@ def plot_compound_property(animal, prop, compounds=None, style="bar", null=None)
 
     elif len(prop) == 2:
 
-        hover_data = prop + ["smiles"]
+        hover_data = prop + ["smiles"] + hover_data
 
         title = f"Compound {prop[0]} vs {prop[1]}"
 
         func = eval(f"px.{style}")
-        fig = func(plot_data, x=prop[0], y=prop[1], hover_data=hover_data)
+        fig = func(plot_data, x=prop[0], y=prop[1], hover_data=hover_data, custom_data=custom_data)
 
         fig.update_layout(xaxis_title=prop[0], yaxis_title=prop[1])
 
@@ -1059,6 +1062,7 @@ def plot_pose_property(
     log_y=False,
     subtitle=None,
     data_only=False,
+    custom_data=None,
     **kwargs,
 ):
     """Get an arbitrary property from all the poses in animal.poses
@@ -1307,8 +1311,8 @@ def plot_pose_property(
 
         else:
 
-            if style == "bar":
-                style = "scatter"
+            # if style == "bar":
+                # style = "scatter"
 
             func = eval(f"px.{style}")
             fig = func(
@@ -1317,6 +1321,7 @@ def plot_pose_property(
                 y=prop[1],
                 color=color,
                 hover_data=hover_data,
+                custom_data=custom_data,
                 **kwargs,
             )
 
