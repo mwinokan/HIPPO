@@ -2411,16 +2411,18 @@ class Database:
 
         ### TAG GENERICS
 
-        generic_ids = self.select_id_where(
-            table="compound",
-            key=f"compound_inchikey IN {tuple(generic_s2i.values())}",
-            multiple=True,
-        )
+        if generic:
 
-        self.executemany(
-            """INSERT OR IGNORE INTO tag (tag_name, tag_compound) VALUES (?,?)""",
-            [("GenericMurckoScaffold", i) for i, in generic_ids],
-        )
+            generic_ids = self.select_id_where(
+                table="compound",
+                key=f"compound_inchikey IN {tuple(generic_s2i.values())}",
+                multiple=True,
+            )
+
+            self.executemany(
+                """INSERT OR IGNORE INTO tag (tag_name, tag_compound) VALUES (?,?)""",
+                [("GenericMurckoScaffold", i) for i, in generic_ids],
+            )
 
         ### ADD MURCKO SCAFFOLD RELATIONS
 
