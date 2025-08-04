@@ -2246,6 +2246,21 @@ class Database:
                 "Found", diff, "new substructure-superstructure relationships"
             )
 
+    def reinitialise_molecules(self):
+        """In the case where the Mol binaries in a database are throwing unpickling errors, run this to reinitialise them all from their smiles."""
+
+        mrich.var("#compounds", self.count("compound"))
+
+        sql = """
+        UPDATE your_table_name
+        SET compound_mol = mol_from_smiles(compound_smiles);
+        """
+
+        with mrich.loading("Reinitialising compounds..."):
+            self.execute(sql)
+
+        mrich.success("compound_mol records updated")
+
     def register_compounds(
         self,
         *,
@@ -2301,7 +2316,7 @@ class Database:
 
         return values
 
-    def calculate_all_murcko_scaffolds(self):
+    def calculate_all_murcko_scaffolds(self, generic: bool = True):
 
         n_before = self.count("scaffold")
 
@@ -2342,24 +2357,26 @@ class Database:
 
             # generic
 
-            try:
-                generic_smiles = sanitise_smiles(
-                    MolToSmiles(MakeScaffoldGeneric(MolFromSmiles(murcko_smiles)))
-                )
-            except KeyboardInterrupt:
-                raise
-            except:
-                mrich.error("can't make generic:", murcko_smiles)
-                continue
+            if generic:
 
-            if generic_smiles not in generic_data:
-                generic_data[generic_smiles] = set()
+                try:
+                    generic_smiles = sanitise_smiles(
+                        MolToSmiles(MakeScaffoldGeneric(MolFromSmiles(murcko_smiles)))
+                    )
+                except KeyboardInterrupt:
+                    raise
+                except:
+                    mrich.error("can't make generic:", murcko_smiles)
+                    continue
 
-            if generic_smiles not in generic_to_murcko:
-                generic_to_murcko[generic_smiles] = set()
+                if generic_smiles not in generic_data:
+                    generic_data[generic_smiles] = set()
 
-            generic_data[generic_smiles].add(c_id)
-            generic_to_murcko[generic_smiles].add(murcko_smiles)
+                if generic_smiles not in generic_to_murcko:
+                    generic_to_murcko[generic_smiles] = set()
+
+                generic_data[generic_smiles].add(c_id)
+                generic_to_murcko[generic_smiles].add(murcko_smiles)
 
         mrich.var("#murcko scaffolds", len(murcko_data))
         mrich.var("#generic murcko scaffolds", len(generic_data))
@@ -2373,10 +2390,11 @@ class Database:
 
         ### REGISTER GENERICS
 
-        generic_values = self.register_compounds(
-            smiles=generic_data.keys(), sanitisation_verbosity=False, sanitise=False
-        )
-        generic_s2i = {s: i for i, s in generic_values}
+        if generic:
+            generic_values = self.register_compounds(
+                smiles=generic_data.keys(), sanitisation_verbosity=False, sanitise=False
+            )
+            generic_s2i = {s: i for i, s in generic_values}
 
         ### TAG MURCKOS
 
@@ -2393,16 +2411,18 @@ class Database:
 
         ### TAG GENERICS
 
-        generic_ids = self.select_id_where(
-            table="compound",
-            key=f"compound_inchikey IN {tuple(generic_s2i.values())}",
-            multiple=True,
-        )
+        if generic:
 
-        self.executemany(
-            """INSERT OR IGNORE INTO tag (tag_name, tag_compound) VALUES (?,?)""",
-            [("GenericMurckoScaffold", i) for i, in generic_ids],
-        )
+            generic_ids = self.select_id_where(
+                table="compound",
+                key=f"compound_inchikey IN {tuple(generic_s2i.values())}",
+                multiple=True,
+            )
+
+            self.executemany(
+                """INSERT OR IGNORE INTO tag (tag_name, tag_compound) VALUES (?,?)""",
+                [("GenericMurckoScaffold", i) for i, in generic_ids],
+            )
 
         ### ADD MURCKO SCAFFOLD RELATIONS
 
@@ -2425,32 +2445,37 @@ class Database:
 
         ### ADD GENERIC SCAFFOLD RELATIONS
 
-        pairs = []
+        if generic:
 
-        generic_inchikey_lookup = self.get_compound_inchikey_id_dict(
-            generic_s2i.values()
-        )
-        for generic_smiles, c_ids in generic_data.items():
-            generic_id = generic_inchikey_lookup[generic_s2i[generic_smiles]]
-            for c_id in c_ids:
-                pairs.append((generic_id, c_id))
+            pairs = []
 
-        for generic_smiles, murcko_smiles_list in generic_to_murcko.items():
-            generic_id = generic_inchikey_lookup[generic_s2i[generic_smiles]]
-            for murcko_smiles in murcko_smiles_list:
-                murcko_id = murcko_inchikey_lookup[murcko_s2i[murcko_smiles]]
-                pairs.append((generic_id, murcko_id))
+            generic_inchikey_lookup = self.get_compound_inchikey_id_dict(
+                generic_s2i.values()
+            )
+            for generic_smiles, c_ids in generic_data.items():
+                generic_id = generic_inchikey_lookup[generic_s2i[generic_smiles]]
+                for c_id in c_ids:
+                    pairs.append((generic_id, c_id))
 
-        pairs = [(a, b) for a, b in pairs if a != b]
+            for generic_smiles, murcko_smiles_list in generic_to_murcko.items():
+                generic_id = generic_inchikey_lookup[generic_s2i[generic_smiles]]
+                for murcko_smiles in murcko_smiles_list:
+                    murcko_id = murcko_inchikey_lookup[murcko_s2i[murcko_smiles]]
+                    pairs.append((generic_id, murcko_id))
 
-        mrich.var("#generic murcko scaffold relations", len(pairs))
+            pairs = [(a, b) for a, b in pairs if a != b]
 
-        self.executemany(
-            """INSERT OR IGNORE INTO scaffold (scaffold_base, scaffold_superstructure) VALUES (?,?)""",
-            pairs,
-        )
+            mrich.var("#generic murcko scaffold relations", len(pairs))
 
-        return murcko_data, generic_data
+            self.executemany(
+                """INSERT OR IGNORE INTO scaffold (scaffold_base, scaffold_superstructure) VALUES (?,?)""",
+                pairs,
+            )
+
+        if generic:
+            return murcko_data, generic_data
+        else:
+            return murcko_data
 
     ### GETTERS
 
@@ -3438,6 +3463,29 @@ class Database:
             return entry[0]
 
         return None
+
+    def get_scaffold_similarity_dict(
+        self, scaffolds: "CompoundSet | None" = None
+    ) -> list[dict]:
+
+        sql = """
+        SELECT scaffold_base as a, scaffold_superstructure as b, bfp_tanimoto(c.fp, d.fp) AS t
+        FROM scaffold
+        INNER JOIN compound_pattern_bfp AS c ON a = c.compound_id
+        INNER JOIN compound_pattern_bfp AS d ON b = d.compound_id
+        """
+
+        if scaffolds:
+
+            sql += f" WHERE a IN {scaffolds.str_ids}"
+
+        records = self.execute(sql).fetchall()
+
+        data = []
+        for a, b, s in mrich.track(records):
+            data.append(dict(base_id=a, superstructure_id=b, similarity=s))
+
+        return data
 
     ### COMPOUND QUERY
 

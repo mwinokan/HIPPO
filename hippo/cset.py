@@ -706,7 +706,12 @@ class CompoundSet:
             table="pose",
             key=f"pose_compound in {self.str_ids}",
             multiple=True,
+            none="warning",
         )
+
+        if not ids:
+            return PoseSet(self.db, {})
+
         ids = [v for v, in ids]
         return PoseSet(self.db, ids)
 
@@ -2165,6 +2170,7 @@ class IngredientSet:
     @classmethod
     def from_compounds(
         cls,
+        *,
         compounds: "CompoundSet | None" = None,
         ids: list[int] | None = None,
         db: "Database | None" = None,
@@ -2581,6 +2587,16 @@ class IngredientSet:
             data=self.df.to_dict(orient=data_orient),
         )
 
+    def pop(self) -> Ingredient:
+        """Pop the last compound in this set"""
+        item = self[self.df.index[-1]]
+        self.df.drop(self.df.index[-1], inplace=True)
+        return item
+
+    def shuffle(self) -> None:
+        """Randomises the order of compounds in this set"""
+        self._data = self.df.sample(frac=1).reset_index(drop=True)
+
     ### DUNDERS
 
     def __len__(self):
@@ -2663,9 +2679,6 @@ class IngredientSet:
 
     def __getattr__(self, key: str):
         """For missing attributes try getting from associated :class:`.CompoundSet`"""
-        # if hasattr(self, key):
-        # return getattr(self, key)
-        # else:
         return getattr(self.compounds, key)
 
     def __contains__(self, other: Compound | Ingredient | int):

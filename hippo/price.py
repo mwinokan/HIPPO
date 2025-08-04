@@ -29,6 +29,9 @@ class Price:
             assert not amount, f"Null Price can't have {amount=}"
             amount = None
 
+        if amount is not None:
+            amount = float(amount)
+
         self._amount = amount
         self._currency = currency
 

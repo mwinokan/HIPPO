@@ -88,7 +88,7 @@ class Quote:
             catalogue=biggest_pack.catalogue,
             entry=biggest_pack.entry,
             amount=required_amount,
-            price=estimated_price,
+            price=estimated_price.amount,
             currency=biggest_pack.currency,
             purity=biggest_pack.purity,
             lead_time=biggest_pack.lead_time,
