@@ -408,6 +408,7 @@ class Recipe:
 
         options = []
 
+        ok = 0
         mrich.var("#compounds", n_comps)
 
         for comp, a in mrich.track(
@@ -415,7 +416,6 @@ class Recipe:
             prefix="Solving individual compound recipes...",
             total=n_comps,
         ):
-
             comp_options = []
 
             if use_routes:
@@ -478,7 +478,11 @@ class Recipe:
                 if debug:
                     mrich.debug(f"{comp_options=}")
             else:
-                mrich.success(f"Found solution for compound={comp}")
+                if n_comps <= 200:
+                    mrich.success(f"Found solution for compound={comp}")
+                ok += 1
+                mrich.set_progress_field("ok", ok)
+                mrich.set_progress_field("n", n_comps)
 
             options.append(comp_options)
 
@@ -492,16 +496,17 @@ class Recipe:
         if not solve_combinations:
             return combinations
 
-        if pick_first:
-            combinations = [combinations[0]]
+        # if pick_first:
+        #     combinations = [combinations[0]]
 
         solutions = []
 
         if n_comps > 1:
-            generator = mrich.track(combinations, prefix="Combining recipes...")
+            generator = mrich.track(combinations, prefix="Combining recipes...", total=len(combinations))
         else:
             generator = combinations
 
+        ok = 0
         for combo in generator:
 
             if debug:
@@ -518,6 +523,9 @@ class Recipe:
                 solution += recipe
 
             solutions.append(solution)
+            ok += 1
+            mrich.set_progress_field("ok", ok)
+            mrich.set_progress_field("n", len(combinations))
 
         if not solutions:
             mrich.error("No solutions")
@@ -825,7 +833,7 @@ class Recipe:
     @property
     def price(self) -> "Price":
         """Get the price of the reactants"""
-        return self.reactants.price + self.compounds.price
+        return self.reactants.get_price() + self.compounds.get_price()
 
     @property
     def num_products(self) -> int:
@@ -1838,13 +1846,19 @@ class Recipe:
 
     def copy(self) -> "Recipe":
         """Copy this recipe"""
+
+        if hasattr(self, "compounds"):
+            compounds = self.compounds.copy()
+        else:
+            compounds = None
+
         return Recipe(
             self.db,
             products=self.products.copy(),
             reactants=self.reactants.copy(),
             intermediates=self.intermediates.copy(),
             reactions=self.reactions.copy(),
-            compounds=self.compounds.copy(),
+            compounds=compounds,
             # supplier=self.supplier
         )
 
@@ -2031,6 +2045,8 @@ class Recipe:
         result.intermediates += other.intermediates
         result.reactions += other.reactions
         result.products += other.products
+        if hasattr(other, "compounds"):
+            result.compounds += other.compounds
         return result
 
 
@@ -2125,6 +2141,11 @@ class Route(Recipe):
     def id(self) -> int:
         """Route ID"""
         return self._id
+
+    @property
+    def price(self) -> "Price":
+        """Get the price of the reactants"""
+        return self.reactants.price
 
     ### METHODS
 
