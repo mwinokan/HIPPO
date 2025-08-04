@@ -1606,45 +1606,12 @@ class HIPPO:
 
         n_before = self.num_compounds
 
-        values = []
-
-        if len(smiles) > 1000:
-            generator = mrich.track(smiles, prefix="Sanitising...")
-        else:
-            generator = smiles
-
-        for s in generator:
-
-            try:
-                new_smiles = sanitise_smiles(
-                    s,
-                    sanitisation_failed="error",
-                    radical=radical,
-                    verbosity=sanitisation_verbosity,
-                )
-            except SanitisationError as e:
-                mrich.error(f"Could not sanitise {s=}")
-                mrich.error(str(e))
-                continue
-            except AssertionError:
-                mrich.error(f"Could not sanitise {s=}")
-                continue
-
-            inchikey = inchikey_from_smiles(new_smiles)
-            values.append((inchikey, new_smiles))
-
-        sql = """
-        INSERT OR IGNORE INTO compound(compound_inchikey, compound_smiles, compound_mol, compound_pattern_bfp, compound_morgan_bfp)
-        VALUES(?1, ?2, mol_from_smiles(?2), mol_pattern_bfp(mol_from_smiles(?2), 2048), mol_morgan_bfp(mol_from_smiles(?2), 2, 2048))
-        """
-
-        if debug:
-            mrich.debug("Inserting...")
-
-        self.db.executemany(sql, values)
-        self.db.commit()
-
-        self.db.update_compound_pattern_bfp_table()
+        values = self.db.register_compounds(
+            smiles=smiles,
+            radical=radical,
+            sanitisation_verbosity=sanitisation_verbosity,
+            debug=debug,
+        )
 
         diff = self.num_compounds - n_before
 
@@ -2178,7 +2145,7 @@ class HIPPO:
     def quote_compounds(
         self,
         ref_animal: "HIPPO",
-        compounds: CompoundSet,
+        compounds: CompoundSet | None = None,
         debug: bool = False,
     ) -> "CompoundSet,CompoundSet":
         """Transfer quotes from another reference :class:`.HIPPO` animal object (e.g. the one from https://github.com/mwinokan/EnamineCatalogs)
@@ -2187,7 +2154,11 @@ class HIPPO:
         :param compounds: A :class:`.CompoundSet` containing the compounds to be quoted
         """
 
-        inchikeys = compounds.inchikeys
+        if compounds is not None:
+            inchikeys = compounds.inchikeys
+
+        else:
+            inchikeys = self.compounds.inchikeys
 
         sql = f"""
         SELECT quote_id, quote_smiles, quote_amount, quote_supplier, quote_catalogue, quote_entry, quote_lead_time, quote_price, quote_currency, quote_purity, quote_date, quote_compound FROM quote
@@ -2220,25 +2191,33 @@ class HIPPO:
                 quote_compound,
             ) = record
 
-            compound = self.compounds(smiles=quote_smiles)
+            try:
+                compound = self.compounds(smiles=quote_smiles)
+            except Exception as e:
+                mrich.error(e)
+                continue
 
             if debug:
                 mrich.debug("Inserting quote for", compound)
 
-            self.db.insert_quote(
-                compound=compound,
-                supplier=quote_supplier,
-                catalogue=quote_catalogue,
-                entry=quote_entry,
-                amount=quote_amount,
-                price=quote_price,
-                currency=quote_currency,
-                purity=quote_purity,
-                lead_time=quote_lead_time,
-                smiles=quote_smiles,
-                date=quote_date,
-                commit=False,
-            )
+            try:
+                self.db.insert_quote(
+                    compound=compound,
+                    supplier=quote_supplier,
+                    catalogue=quote_catalogue,
+                    entry=quote_entry,
+                    amount=quote_amount,
+                    price=quote_price,
+                    currency=quote_currency,
+                    purity=quote_purity,
+                    lead_time=quote_lead_time,
+                    smiles=quote_smiles,
+                    date=quote_date,
+                    commit=False,
+                )
+            except Exception as e:
+                mrich.error(e)
+                continue
 
             quoted_compound_ids.add(compound.id)
 
@@ -2378,6 +2357,32 @@ class HIPPO:
         from .plotting import plot_pose_interactions
 
         return plot_pose_interactions(self, **kwargs)
+
+    def get_scaffold_network(
+        self,
+        compounds: "CompoundSet | None" = None,
+        scaffolds: "CompoundSet | None" = None,
+        notebook: bool = True,
+        depth: int = 5,
+        scaffold_tag: str | None = None,
+        exclude_tag: str | None = None,
+        physics: bool = True,
+        arrows: bool = True,
+    ) -> "pyvis.network.Network":
+        """Use PyVis to display a network of molecules connected by scaffold relationships in the database"""
+        from .pyvis import get_scaffold_network
+
+        return get_scaffold_network(
+            self,
+            compounds=compounds,
+            scaffolds=scaffolds,
+            notebook=notebook,
+            depth=depth,
+            scaffold_tag=scaffold_tag,
+            exclude_tag=exclude_tag,
+            physics=physics,
+            arrows=arrows,
+        )
 
     ### COMPOUND DESIGN
 

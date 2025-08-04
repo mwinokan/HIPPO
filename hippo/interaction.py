@@ -98,6 +98,16 @@ class Interaction:
         return self._feature
 
     @property
+    def residue_name(self) -> str:
+        """Returns the associated :class:`.Feature`'s residue name"""
+        return self.feature.residue_name
+
+    @property
+    def residue_number(self) -> int:
+        """Returns the associated :class:`.Feature`'s residue number"""
+        return self.feature.residue_number
+
+    @property
     def atom_ids(self) -> list[int]:
         """Returns the indices of atoms making up the ligand feature"""
         return self._atom_ids

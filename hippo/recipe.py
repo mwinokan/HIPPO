@@ -7,27 +7,52 @@ import mcol
 import mrich
 
 
-# @dataclass
 class Recipe:
     """A Recipe stores data corresponding to a specific synthetic recipe involving several products, reactants, intermediates, and reactions."""
 
     _db = None
 
-    def __init__(self, db, *, products, reactants, intermediates, reactions):
+    def __init__(
+        self,
+        db: "Database",
+        *,
+        products: "IngredientSet | None" = None,
+        reactants: "IngredientSet | None" = None,
+        intermediates: "IngredientSet | None" = None,
+        reactions: "ReactionSet | None" = None,
+        compounds: "IngredientSet | None" = None,
+    ):
 
         from .cset import IngredientSet
         from .rset import ReactionSet
+
+        if products is None:
+            products = IngredientSet(db)
+
+        if reactants is None:
+            reactants = IngredientSet(db)
+
+        if intermediates is None:
+            intermediates = IngredientSet(db)
+
+        if compounds is None:
+            compounds = IngredientSet(db)
+
+        if reactions is None:
+            reactions = ReactionSet(db)
 
         # check typing
         assert isinstance(products, IngredientSet)
         assert isinstance(reactants, IngredientSet)
         assert isinstance(intermediates, IngredientSet)
+        assert isinstance(compounds, IngredientSet)
         assert isinstance(reactions, ReactionSet)
 
         self._products = products
         self._reactants = reactants
         self._intermediates = intermediates
         self._reactions = reactions
+        self._compounds = compounds
         self._db = db
         self._hash = None
 
@@ -35,8 +60,9 @@ class Recipe:
 
         # caches
         self._product_compounds = None
-        self._product_poses = None
-        self._product_interactions = None
+        self._poses = None
+        self._interactions = None
+        self._combined_compounds = None
 
     ### FACTORIES
 
@@ -382,6 +408,7 @@ class Recipe:
 
         options = []
 
+        ok = 0
         mrich.var("#compounds", n_comps)
 
         for comp, a in mrich.track(
@@ -389,7 +416,6 @@ class Recipe:
             prefix="Solving individual compound recipes...",
             total=n_comps,
         ):
-
             comp_options = []
 
             if use_routes:
@@ -452,7 +478,11 @@ class Recipe:
                 if debug:
                     mrich.debug(f"{comp_options=}")
             else:
-                mrich.success(f"Found solution for compound={comp}")
+                if n_comps <= 200:
+                    mrich.success(f"Found solution for compound={comp}")
+                ok += 1
+                mrich.set_progress_field("ok", ok)
+                mrich.set_progress_field("n", n_comps)
 
             options.append(comp_options)
 
@@ -466,18 +496,17 @@ class Recipe:
         if not solve_combinations:
             return combinations
 
-        if pick_first:
-            combinations = [combinations[0]]
-
-        mrich.print()
+        # if pick_first:
+        #     combinations = [combinations[0]]
 
         solutions = []
 
         if n_comps > 1:
-            generator = mrich.track(combinations, prefix="Combining recipes...")
+            generator = mrich.track(combinations, prefix="Combining recipes...", total=len(combinations))
         else:
             generator = combinations
 
+        ok = 0
         for combo in generator:
 
             if debug:
@@ -494,6 +523,9 @@ class Recipe:
                 solution += recipe
 
             solutions.append(solution)
+            ok += 1
+            mrich.set_progress_field("ok", ok)
+            mrich.set_progress_field("n", len(combinations))
 
         if not solutions:
             mrich.error("No solutions")
@@ -665,9 +697,18 @@ class Recipe:
             db, data["reactants"], supplier=data["reactant_supplier"]
         )
 
+        if "compounds" in data:
+            compounds = IngredientSet.from_ingredient_dicts(
+                db, data["compounds"], supplier=data["compound_supplier"]
+            )
+        else:
+            compounds = IngredientSet(db)
+
         if clear_quotes:
             reactants.df["quote_id"] = None
             reactants.df["quoted_amount"] = None
+            compounds.df["quote_id"] = None
+            compounds.df["quoted_amount"] = None
 
         # ReactionSet
         reactions = ReactionSet(db, data["reaction_ids"], sort=False)
@@ -677,6 +718,7 @@ class Recipe:
             mrich.var("intermediates", intermediates)
             mrich.var("products", products)
             mrich.var("reactions", reactions)
+            mrich.var("compounds", compounds)
 
         # Create the object
         self = cls.__new__(cls)
@@ -686,6 +728,7 @@ class Recipe:
             reactants=reactants,
             intermediates=intermediates,
             reactions=reactions,
+            compounds=compounds,
         )
 
         return self
@@ -703,12 +746,17 @@ class Recipe:
         return self._products
 
     @property
-    def product_poses(self) -> "PoseSet":
+    def compounds(self) -> "IngredientSet":
+        """Product :class:`.IngredientSet`"""
+        return self._compounds
+
+    @property
+    def poses(self) -> "PoseSet":
         """Product poses"""
-        if self._product_poses is None:
-            self._product_poses = self.product_compounds.poses
-            self._product_poses._name = f"product poses of {self}"
-        return self._product_poses
+        if self._poses is None:
+            self._poses = self.combined_compounds.poses
+            self._poses._name = f"poses of {self}"
+        return self._poses
 
     @property
     def product_compounds(self) -> "CompoundSet":
@@ -719,11 +767,23 @@ class Recipe:
         return self._product_compounds
 
     @property
-    def product_interactions(self) -> "InteractionSet":
+    def combined_compound_ids(self) -> set[int]:
+        return set(self.product_compounds.ids) | set(self.compounds.ids)
+
+    @property
+    def combined_compounds(self) -> "CompoundSet":
+        """Combined product and no-chem compounds"""
+        if self._combined_compounds is None:
+            self._combined_compounds = CompoundSet(self.db, self.combined_compound_ids)
+            self._combined_compounds._name = f"combined compounds of {self}"
+        return self._combined_compounds
+
+    @property
+    def interactions(self) -> "InteractionSet":
         """Product pose interactions"""
-        if self._product_interactions is None:
-            self._product_interactions = self.product_poses.interactions
-        return self._product_interactions
+        if self._interactions is None:
+            self._interactions = self.poses.interactions
+        return self._interactions
 
     @property
     def product(self) -> "Ingredient":
@@ -773,12 +833,17 @@ class Recipe:
     @property
     def price(self) -> "Price":
         """Get the price of the reactants"""
-        return self.reactants.price
+        return self.reactants.get_price() + self.compounds.get_price()
 
     @property
     def num_products(self) -> int:
         """Return the number of products"""
         return len(self.products)
+
+    @property
+    def num_compounds(self) -> int:
+        """Return the number of compounds"""
+        return len(self.combined_compound_ids)
 
     @property
     def num_reactions(self):
@@ -804,6 +869,45 @@ class Recipe:
     def score(self):
         """Return the Recipe score"""
         return self._score
+
+    @property
+    def type(self) -> str:
+
+        if self.empty:
+            return "EMPTY"
+
+        chem = bool(self.reactions)
+        nochem = bool(self.compounds)
+
+        if chem and nochem:
+            return "MIXED"
+
+        if chem and not nochem:
+            return "CHEM"
+
+        if nochem and not chem:
+            return "NOCHEM"
+
+    @property
+    def empty(self) -> bool:
+        """Is this Recipe empty?"""
+
+        if self.reactants:
+            return False
+
+        if self.products:
+            return False
+
+        if self.intermediates:
+            return False
+
+        if self.reactions:
+            return False
+
+        if self.compounds:
+            return False
+
+        return True
 
     ### METHODS
 
@@ -1065,33 +1169,45 @@ class Recipe:
                 mrich.var("\nprice", price.amount, price.currency)
                 # mrich.var('lead-time', self.lead_time, 'working days))
 
-        mrich.h3(f"{len(self.products)} products")
+        if self.products:
+            mrich.h3(f"{len(self.products)} products")
 
-        if len(self.products) < 100:
-            for product in self.products:
-                mrich.var(str(product.compound), f"{product.amount:.2f}", "mg")
+            if len(self.products) < 100:
+                for product in self.products:
+                    mrich.var(str(product.compound), f"{product.amount:.2f}", "mg")
 
-        mrich.h3(f"{len(self.intermediates)} intermediates")
+        if self.intermediates:
+            mrich.h3(f"{len(self.intermediates)} intermediates")
 
-        if len(self.intermediates) < 100:
-            for intermediate in self.intermediates:
-                mrich.var(
-                    str(intermediate.compound),
-                    f"{intermediate.amount:.2f}",
-                    "mg",
-                )
+            if len(self.intermediates) < 100:
+                for intermediate in self.intermediates:
+                    mrich.var(
+                        str(intermediate.compound),
+                        f"{intermediate.amount:.2f}",
+                        "mg",
+                    )
 
-        mrich.h3(f"{len(self.reactants)} reactants")
+        if self.reactants:
+            mrich.h3(f"{len(self.reactants)} reactants")
 
-        if len(self.reactants) < 100:
-            for reactant in self.reactants:
-                mrich.var(str(reactant.compound), f"{reactant.amount:.2f}", "mg")
+            if len(self.reactants) < 100:
+                for reactant in self.reactants:
+                    mrich.var(str(reactant.compound), f"{reactant.amount:.2f}", "mg")
 
-        mrich.h3(f"{len(self.reactions)} reactions")
+        if self.reactions:
+            mrich.h3(f"{len(self.reactions)} reactions")
 
-        if len(self.reactions) < 100:
-            for reaction in self.reactions:
-                mrich.var(str(reaction), reaction.reaction_str, reaction.type)
+            if len(self.reactions) < 100:
+                for reaction in self.reactions:
+                    mrich.var(str(reaction), reaction.reaction_str, reaction.type)
+
+        if self.compounds:
+
+            mrich.h3(f"{len(self.compounds)} compounds")
+
+            if len(self.compounds) < 100:
+                for compound in self.compounds:
+                    mrich.var(str(compound.compound), f"{compound.amount:.2f}", "mg")
 
     def get_ingredient(self, id) -> "Ingredient":
         """Get an ingredient by its compound ID
@@ -1146,6 +1262,7 @@ class Recipe:
         *,
         price: bool = True,
         reactant_supplier: bool = True,
+        compound_supplier: bool = True,
         database: bool = True,
         timestamp: bool = True,
         compound_ids_only: bool = False,
@@ -1199,7 +1316,9 @@ class Recipe:
 
         if reactant_supplier:
             data["reactant_supplier"] = self.reactants.supplier
-        # data['lead_time'] = self.lead_time
+
+        if compound_supplier:
+            data["compound_supplier"] = self.compounds.supplier
 
         # IngredientSets
         if compound_ids_only:
@@ -1207,12 +1326,14 @@ class Recipe:
             data["intermediate_ids"] = self.intermediates.compound_ids
             if products:
                 data["products_ids"] = self.products.compound_ids
+            data["compound_ids"] = self.compounds.compound_ids
 
         else:
             data["reactants"] = self.reactants.df.to_dict(orient="list")
             data["intermediates"] = self.intermediates.df.to_dict(orient="list")
             if products:
                 data["products"] = self.products.df.to_dict(orient="list")
+            data["compounds"] = self.compounds.df.to_dict(orient="list")
 
         # ReactionSet
         data["reaction_ids"] = self.reactions.ids
@@ -1725,12 +1846,19 @@ class Recipe:
 
     def copy(self) -> "Recipe":
         """Copy this recipe"""
+
+        if hasattr(self, "compounds"):
+            compounds = self.compounds.copy()
+        else:
+            compounds = None
+
         return Recipe(
             self.db,
             products=self.products.copy(),
             reactants=self.reactants.copy(),
             intermediates=self.intermediates.copy(),
             reactions=self.reactions.copy(),
+            compounds=compounds,
             # supplier=self.supplier
         )
 
@@ -1854,6 +1982,10 @@ class Recipe:
 
         return True
 
+    def add_ingredient(self, ingredient: "Ingredient", amount: float = 1):
+        """Add an :class:`.Ingredient` object for direct purchase (no associated reactions)"""
+        self.compounds.add(ingredient)
+
     ### DUNDERS
 
     def __str__(self) -> str:
@@ -1871,18 +2003,33 @@ class Recipe:
 
     def __longstr(self) -> str:
         """Unformatted string representation"""
-        if self.intermediates:
-            s = f"{self.reactants} --> {self.intermediates} --> {self.products} via {self.reactions}"
+
+        if self.empty:
+            return f"Empty Recipe()"
+
+        if self.reactions:
+
+            if self.intermediates:
+                s = f"{self.reactants} --> {self.intermediates} --> {self.products} via {self.reactions}"
+            else:
+                s = f"{self.reactants} --> {self.products} via {self.reactions}"
+
+            if self.score:
+                s += f", score={self.score:.3f}"
+
+            if self.hash:
+                return f"Recipe_{self.hash}({s})"
+
+            return f"Recipe({s})"
+
         else:
-            s = f"{self.reactants} --> {self.products} via {self.reactions}"
 
-        if self.score:
-            s += f", score={self.score:.3f}"
+            s = f"{self.compounds}"
 
-        if self.hash:
-            return f"Recipe_{self.hash}({s})"
+            if self.hash:
+                return f"Recipe_{self.hash}({s})"
 
-        return f"Recipe({s})"
+            return f"Recipe(#compounds={self.num_compounds} [no-chem])"
 
     def __repr__(self) -> str:
         """ANSI Formatted string representation"""
@@ -1892,12 +2039,14 @@ class Recipe:
         """Rich Formatted string representation"""
         return f"[bold underline]{self.__longstr()}"
 
-    def __add__(self, other):
+    def __add__(self, other: "Recipe"):
         result = self.copy()
         result.reactants += other.reactants
         result.intermediates += other.intermediates
         result.reactions += other.reactions
         result.products += other.products
+        if hasattr(other, "compounds"):
+            result.compounds += other.compounds
         return result
 
 
@@ -1992,6 +2141,11 @@ class Route(Recipe):
     def id(self) -> int:
         """Route ID"""
         return self._id
+
+    @property
+    def price(self) -> "Price":
+        """Get the price of the reactants"""
+        return self.reactants.price
 
     ### METHODS
 
