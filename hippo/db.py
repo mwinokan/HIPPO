@@ -2255,7 +2255,7 @@ class Database:
         UPDATE your_table_name
         SET compound_mol = mol_from_smiles(compound_smiles);
         """
-        
+
         with mrich.loading("Reinitialising compounds..."):
             self.execute(sql)
 
@@ -2390,10 +2390,11 @@ class Database:
 
         ### REGISTER GENERICS
 
-        generic_values = self.register_compounds(
-            smiles=generic_data.keys(), sanitisation_verbosity=False, sanitise=False
-        )
-        generic_s2i = {s: i for i, s in generic_values}
+        if generic:
+            generic_values = self.register_compounds(
+                smiles=generic_data.keys(), sanitisation_verbosity=False, sanitise=False
+            )
+            generic_s2i = {s: i for i, s in generic_values}
 
         ### TAG MURCKOS
 
@@ -2442,32 +2443,37 @@ class Database:
 
         ### ADD GENERIC SCAFFOLD RELATIONS
 
-        pairs = []
+        if generic:
 
-        generic_inchikey_lookup = self.get_compound_inchikey_id_dict(
-            generic_s2i.values()
-        )
-        for generic_smiles, c_ids in generic_data.items():
-            generic_id = generic_inchikey_lookup[generic_s2i[generic_smiles]]
-            for c_id in c_ids:
-                pairs.append((generic_id, c_id))
+            pairs = []
 
-        for generic_smiles, murcko_smiles_list in generic_to_murcko.items():
-            generic_id = generic_inchikey_lookup[generic_s2i[generic_smiles]]
-            for murcko_smiles in murcko_smiles_list:
-                murcko_id = murcko_inchikey_lookup[murcko_s2i[murcko_smiles]]
-                pairs.append((generic_id, murcko_id))
+            generic_inchikey_lookup = self.get_compound_inchikey_id_dict(
+                generic_s2i.values()
+            )
+            for generic_smiles, c_ids in generic_data.items():
+                generic_id = generic_inchikey_lookup[generic_s2i[generic_smiles]]
+                for c_id in c_ids:
+                    pairs.append((generic_id, c_id))
 
-        pairs = [(a, b) for a, b in pairs if a != b]
+            for generic_smiles, murcko_smiles_list in generic_to_murcko.items():
+                generic_id = generic_inchikey_lookup[generic_s2i[generic_smiles]]
+                for murcko_smiles in murcko_smiles_list:
+                    murcko_id = murcko_inchikey_lookup[murcko_s2i[murcko_smiles]]
+                    pairs.append((generic_id, murcko_id))
 
-        mrich.var("#generic murcko scaffold relations", len(pairs))
+            pairs = [(a, b) for a, b in pairs if a != b]
 
-        self.executemany(
-            """INSERT OR IGNORE INTO scaffold (scaffold_base, scaffold_superstructure) VALUES (?,?)""",
-            pairs,
-        )
+            mrich.var("#generic murcko scaffold relations", len(pairs))
 
-        return murcko_data, generic_data
+            self.executemany(
+                """INSERT OR IGNORE INTO scaffold (scaffold_base, scaffold_superstructure) VALUES (?,?)""",
+                pairs,
+            )
+
+        if generic:
+            return murcko_data, generic_data
+        else:
+            return murcko_data
 
     ### GETTERS
 
