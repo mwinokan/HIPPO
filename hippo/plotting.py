@@ -1789,7 +1789,6 @@ def plot_compound_tsnee(
     title: str | None = None,
     subtitle: str | None = None,
     legend: bool = False,
-    color="cluster",
     symbol: str = "type",
     sort_by: str = "type",
     color: str = "cluster",
