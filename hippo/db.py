@@ -2139,6 +2139,7 @@ class Database:
         self.execute(sql)
 
     def update_compound_pattern_bfp_table(self):
+        """Update the compound pattern BFP table"""
         self.execute(
             """
             INSERT INTO compound_pattern_bfp
@@ -2203,6 +2204,7 @@ class Database:
         return delete
 
     def calculate_all_scaffolds(self):
+        """Determine and insert records for all substructure/superstructure relationships in the Compound table"""
 
         n_before = self.count("scaffold")
 
@@ -2270,6 +2272,7 @@ class Database:
         sanitise: bool = True,
         debug: bool = False,
     ) -> list[tuple[str, str]]:
+        """Bulk register compounds"""
 
         values = []
 
@@ -2317,6 +2320,10 @@ class Database:
         return values
 
     def calculate_all_murcko_scaffolds(self, generic: bool = True):
+        """Determine Murcko and optionally generic Murcko scaffolds for all Compounds in the Database and add relevant records.
+
+        :param generic: Calculate generic (single bonds and all carbon) scaffolds as well
+        """
 
         n_before = self.count("scaffold")
 
@@ -3467,6 +3474,7 @@ class Database:
     def get_scaffold_similarity_dict(
         self, scaffolds: "CompoundSet | None" = None
     ) -> list[dict]:
+        """Get a dictionary mapping scaffold :class:`.Compound` IDs to their superstructure's IDs"""
 
         sql = """
         SELECT scaffold_base as a, scaffold_superstructure as b, bfp_tanimoto(c.fp, d.fp) AS t

@@ -502,7 +502,9 @@ class Recipe:
         solutions = []
 
         if n_comps > 1:
-            generator = mrich.track(combinations, prefix="Combining recipes...", total=len(combinations))
+            generator = mrich.track(
+                combinations, prefix="Combining recipes...", total=len(combinations)
+            )
         else:
             generator = combinations
 
