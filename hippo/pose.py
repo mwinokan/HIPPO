@@ -1402,7 +1402,7 @@ class Pose:
         display(draw_grid(mols, labels=labels))
 
     def summary(
-        self, metadata: bool = True, tags: bool = True, subsite: bool = True
+        self, metadata: bool = True, tags: bool = True, subsites: bool = True
     ) -> None:
         """Print a summary of this pose
 

@@ -1471,6 +1471,7 @@ class CompoundSet:
         bases: bool = False,
         elabs: bool = False,
         routes: bool = False,
+        debug: bool = False,
         # count_by_target: bool = False,
         **kwargs,
     ) -> "DataFrame":
@@ -1525,9 +1526,16 @@ class CompoundSet:
         WHERE compound_id IN {self.str_ids}
         """
 
+        if debug: 
+            mrich.debug("querying...")
         records = self.db.execute(sql).fetchall()
 
-        for row in records:
+        if debug:
+            generator = mrich.track(records)
+        else:
+            generator = records
+        
+        for row in generator:
 
             row = list(row)
 
@@ -1561,6 +1569,7 @@ class CompoundSet:
         df = DataFrame(data)
 
         if poses or num_poses:
+            if debug: mrich.debug("adding pose column")
             from .pset import PoseSet
 
             lookup = self.db.get_compound_id_pose_ids_dict(self)
@@ -1570,6 +1579,7 @@ class CompoundSet:
                 df["num_poses"] = df["id"].apply(lambda x: len(lookup.get(x, {})))
 
         if num_reactant or num_reactions:
+            if debug: mrich.debug("adding reaction column(s)")
             tuples = self.db.get_reactant_product_tuples(self.ids, deduplicated=False)
 
             if num_reactant:
@@ -1587,6 +1597,7 @@ class CompoundSet:
                 df["num_reactions"] = df["id"].apply(lambda x: lookup.get(x, 0))
 
         if bases or elabs:
+            if debug: mrich.debug("adding scaffold column(s)")
             tuples = self.db.get_scaffold_tuples(self.ids)
 
             if bases:
@@ -1604,10 +1615,12 @@ class CompoundSet:
                 df["elabs"] = df["id"].apply(lambda x: lookup.get(x, set()))
 
         if tags:
+            if debug: mrich.debug("adding tag column(s)")
             lookup = self.db.get_compound_tag_dict()
             df["tags"] = df["id"].apply(lambda x: lookup.get(x, {}))
 
         if routes:
+            if debug: mrich.debug("adding route column(s)")
             lookup = self.db.get_product_id_routes_dict()
             df["routes"] = df["id"].apply(lambda x: lookup.get(x, {}))
 
