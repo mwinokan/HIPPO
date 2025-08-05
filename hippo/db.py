@@ -2908,7 +2908,7 @@ class Database:
         return {route_id: route_product for route_id, route_product in records}
 
     def get_product_id_routes_dict(self) -> dict[int, set[int]]:
-        """Get a dictionary mapping route ID's to their product :class:`.Compound`"""
+        """Get a dictionary mapping product :class:`.Compound` to their route IDs"""
         records = self.execute("SELECT route_id, route_product FROM route").fetchall()
 
         lookup = {}
@@ -3487,6 +3487,44 @@ class Database:
 
         return data
 
+    def get_reactant_product_tuples(
+        self, compound_ids: list | None = None, deduplicated: bool = True
+    ) -> set[tuple[int, int]]:
+        """Get tuples of (reactant, product) :class:`.Compound` IDs"""
+
+        sql = """
+        SELECT reactant_compound, reaction_product FROM reactant
+        INNER JOIN reaction ON reactant_reaction = reaction_id
+        """
+
+        if compound_ids:
+            str_ids = str(tuple(compound_ids)).replace(",)", ")")
+            sql += (
+                f"WHERE reactant_compound IN {str_ids} OR reaction_product IN {str_ids}"
+            )
+
+        records = self.execute(sql)
+        if deduplicated:
+            return set((a, b) for a, b in records)
+        else:
+            return [(a, b) for a, b in records]
+
+    def get_scaffold_tuples(
+        self, compound_ids: list | None = None
+    ) -> set[tuple[int, int]]:
+        """Get tuples of (reactant, product) :class:`.Compound` IDs"""
+
+        sql = """
+        SELECT scaffold_base, scaffold_superstructure FROM scaffold
+        """
+
+        if compound_ids:
+            str_ids = str(tuple(compound_ids)).replace(",)", ")")
+            sql += f"WHERE scaffold_base IN {str_ids} OR scaffold_superstructure IN {str_ids}"
+
+        records = self.execute(sql)
+        return set((a, b) for a, b in records)
+
     ### COMPOUND QUERY
 
     def query_substructure(
@@ -3516,7 +3554,7 @@ class Database:
 
             if fast:
                 sql = f"""
-                SELECT compound.compound_id 
+                SELECT compound.compound_id, compound.compound_inchikey 
                 FROM compound, compound_pattern_bfp AS bfp 
                 WHERE compound.compound_id = bfp.compound_id 
                 AND mol_is_substruct(compound.compound_mol, {func}(?))
@@ -3524,7 +3562,7 @@ class Database:
 
             else:
                 sql = f"""
-                SELECT compound_id FROM compound 
+                SELECT compound_id, compound_inchikey FROM compound 
                 WHERE mol_is_substruct(compound_mol, {func}(?))
                 """
 
@@ -3546,7 +3584,25 @@ class Database:
 
         from .cset import CompoundSet
 
-        return CompoundSet(self, [i for i, in result])
+        if not smarts:
+            smiles = query
+            try:
+                smiles = sanitise_smiles(smiles, sanitisation_failed="error")
+            except SanitisationError as e:
+                mrich.error(f"Could not sanitise {smiles=}")
+                mrich.error(str(e))
+                return None
+            except AssertionError:
+                mrich.error(f"Could not sanitise {smiles=}")
+                return None
+                return c
+            inchikey = inchikey_from_smiles(smiles)
+
+            ids = [i for i, key in result if key != inchikey]
+            return CompoundSet(self, ids)
+
+        else:
+            return CompoundSet(self, [i for i, _ in result])
 
     def query_similarity(
         self,
