@@ -977,7 +977,15 @@ def plot_numbers(animal, subtitle=None):
 
 
 @hippo_graph
-def plot_compound_property(animal, prop, compounds=None, style="bar", null=None):
+def plot_compound_property(
+    animal,
+    prop,
+    compounds=None,
+    style="bar",
+    null=None,
+    hover_data=None,
+    custom_data=None,
+):
     """Get an arbitrary property from all the compounds in animal.compounds
 
             If one property, plot a 1D histogram
@@ -993,6 +1001,9 @@ def plot_compound_property(animal, prop, compounds=None, style="bar", null=None)
 
     if not isinstance(prop, list):
         prop = [prop]
+
+    if hover_data is None:
+        hover_data = []
 
     plot_data = []
 
@@ -1036,12 +1047,18 @@ def plot_compound_property(animal, prop, compounds=None, style="bar", null=None)
 
     elif len(prop) == 2:
 
-        hover_data = prop + ["smiles"]
+        hover_data = prop + ["smiles"] + hover_data
 
         title = f"Compound {prop[0]} vs {prop[1]}"
 
         func = eval(f"px.{style}")
-        fig = func(plot_data, x=prop[0], y=prop[1], hover_data=hover_data)
+        fig = func(
+            plot_data,
+            x=prop[0],
+            y=prop[1],
+            hover_data=hover_data,
+            custom_data=custom_data,
+        )
 
         fig.update_layout(xaxis_title=prop[0], yaxis_title=prop[1])
 
@@ -1069,6 +1086,7 @@ def plot_pose_property(
     log_y=False,
     subtitle=None,
     data_only=False,
+    custom_data=None,
     **kwargs,
 ):
     """Get an arbitrary property from all the poses in animal.poses
@@ -1317,8 +1335,8 @@ def plot_pose_property(
 
         else:
 
-            if style == "bar":
-                style = "scatter"
+            # if style == "bar":
+            # style = "scatter"
 
             func = eval(f"px.{style}")
             fig = func(
@@ -1327,6 +1345,7 @@ def plot_pose_property(
                 y=prop[1],
                 color=color,
                 hover_data=hover_data,
+                custom_data=custom_data,
                 **kwargs,
             )
 
@@ -1771,7 +1790,9 @@ def plot_compound_tsnee(
     subtitle: str | None = None,
     legend: bool = False,
     color="cluster",
-    symbol="type",
+    symbol: str = "type",
+    sort_by: str = "type",
+    color: str = "cluster",
     **kwargs,
 ) -> "plotly.graph_objects.Figure":
 
@@ -1812,6 +1833,37 @@ def plot_compound_tsnee(
     with mrich.loading("Getting Compound fingerprints"):
         df["FP"] = df["mol"].map(get_cfps)
 
+<<<<<<< HEAD
+=======
+    df["bases"] = df["bases"].map(lambda x: x if not isinstance(x, float) else None)
+
+    def get_cluster(row):
+
+        bases = row["bases"]
+
+        if not bases:
+            return row["id"]
+
+        if len(bases) == 1:
+            return list(bases)[0]
+
+        return tuple(bases)
+
+    def get_type(row):
+
+        if row["bases"] is None:
+            return "scaffold"
+
+        return "elaboration"
+
+    with mrich.loading("Adding columns"):
+        df["cluster"] = df.apply(get_cluster, axis=1)
+        df["type"] = df.apply(get_type, axis=1)
+
+    if sort_by:
+        df = df.sort_values(by=sort_by)
+
+>>>>>>> 325bedd8ef361af8c7441d54c4ad2c97b241a8e3
     X = np.array([x.fp for x in df["FP"]])
 
     with mrich.loading("Computing PCA"):

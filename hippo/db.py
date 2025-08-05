@@ -14,7 +14,7 @@ from .metadata import MetaData
 from .target import Target
 from .feature import Feature
 from .recipe import Recipe, Route
-from .tools import inchikey_from_smiles
+from .tools import inchikey_from_smiles, sanitise_smiles, SanitisationError
 
 from pathlib import Path
 
@@ -2139,6 +2139,7 @@ class Database:
         self.execute(sql)
 
     def update_compound_pattern_bfp_table(self):
+        """Update the compound pattern BFP table"""
         self.execute(
             """
             INSERT INTO compound_pattern_bfp
@@ -2203,6 +2204,7 @@ class Database:
         return delete
 
     def calculate_all_scaffolds(self):
+        """Determine and insert records for all substructure/superstructure relationships in the Compound table"""
 
         n_before = self.count("scaffold")
 
@@ -2245,6 +2247,242 @@ class Database:
             mrich.warning(
                 "Found", diff, "new substructure-superstructure relationships"
             )
+
+    def reinitialise_molecules(self):
+        """In the case where the Mol binaries in a database are throwing unpickling errors, run this to reinitialise them all from their smiles."""
+
+        mrich.var("#compounds", self.count("compound"))
+
+        sql = """
+        UPDATE your_table_name
+        SET compound_mol = mol_from_smiles(compound_smiles);
+        """
+
+        with mrich.loading("Reinitialising compounds..."):
+            self.execute(sql)
+
+        mrich.success("compound_mol records updated")
+
+    def register_compounds(
+        self,
+        *,
+        smiles: list[str],
+        radical: str = "warning",
+        sanitisation_verbosity: bool = True,
+        sanitise: bool = True,
+        debug: bool = False,
+    ) -> list[tuple[str, str]]:
+        """Bulk register compounds"""
+
+        values = []
+
+        if len(smiles) > 1000:
+            generator = mrich.track(smiles, prefix="Sanitising...")
+        else:
+            generator = smiles
+
+        for s in generator:
+
+            if sanitise:
+                try:
+                    new_smiles = sanitise_smiles(
+                        s,
+                        sanitisation_failed="error",
+                        radical=radical,
+                        verbosity=sanitisation_verbosity,
+                    )
+                except SanitisationError as e:
+                    mrich.error(f"Could not sanitise {s=}")
+                    mrich.error(str(e))
+                    continue
+                except AssertionError:
+                    mrich.error(f"Could not sanitise {s=}")
+                    continue
+            else:
+                new_smiles = s
+
+            inchikey = inchikey_from_smiles(new_smiles)
+            values.append((inchikey, new_smiles))
+
+        sql = """
+        INSERT OR IGNORE INTO compound(compound_inchikey, compound_smiles, compound_mol, compound_pattern_bfp, compound_morgan_bfp)
+        VALUES(?1, ?2, mol_from_smiles(?2), mol_pattern_bfp(mol_from_smiles(?2), 2048), mol_morgan_bfp(mol_from_smiles(?2), 2, 2048))
+        """
+
+        if debug:
+            mrich.debug("Inserting...")
+
+        self.executemany(sql, values)
+        self.commit()
+
+        self.update_compound_pattern_bfp_table()
+
+        return values
+
+    def calculate_all_murcko_scaffolds(self, generic: bool = True):
+        """Determine Murcko and optionally generic Murcko scaffolds for all Compounds in the Database and add relevant records.
+
+        :param generic: Calculate generic (single bonds and all carbon) scaffolds as well
+        """
+
+        n_before = self.count("scaffold")
+
+        mrich.var("#compounds", self.count("compound"))
+        mrich.var("#scaffold defs", n_before)
+
+        from rdkit.Chem import MolFromSmiles, MolToSmiles
+        from rdkit.Chem.Scaffolds.MurckoScaffold import (
+            MurckoScaffoldSmiles,
+            MakeScaffoldGeneric,
+        )
+
+        compound_records = self.select(
+            query="compound_id, compound_smiles", table="compound", multiple=True
+        )
+
+        ### CALCULATE SCAFFOLDS
+
+        murcko_data = {}
+        generic_data = {}
+        generic_to_murcko = {}
+        for c_id, smiles in mrich.track(compound_records):
+
+            # murcko
+
+            try:
+                murcko_smiles = sanitise_smiles(MurckoScaffoldSmiles(smiles))
+            except KeyboardInterrupt:
+                raise
+            except:
+                mrich.error("can't make murcko:", smiles)
+                continue
+
+            if murcko_smiles not in murcko_data:
+                murcko_data[murcko_smiles] = set()
+
+            murcko_data[murcko_smiles].add(c_id)
+
+            # generic
+
+            if generic:
+
+                try:
+                    generic_smiles = sanitise_smiles(
+                        MolToSmiles(MakeScaffoldGeneric(MolFromSmiles(murcko_smiles)))
+                    )
+                except KeyboardInterrupt:
+                    raise
+                except:
+                    mrich.error("can't make generic:", murcko_smiles)
+                    continue
+
+                if generic_smiles not in generic_data:
+                    generic_data[generic_smiles] = set()
+
+                if generic_smiles not in generic_to_murcko:
+                    generic_to_murcko[generic_smiles] = set()
+
+                generic_data[generic_smiles].add(c_id)
+                generic_to_murcko[generic_smiles].add(murcko_smiles)
+
+        mrich.var("#murcko scaffolds", len(murcko_data))
+        mrich.var("#generic murcko scaffolds", len(generic_data))
+
+        ### REGISTER MURCKOS
+
+        murcko_values = self.register_compounds(
+            smiles=murcko_data.keys(), sanitisation_verbosity=False, sanitise=False
+        )
+        murcko_s2i = {s: i for i, s in murcko_values}
+
+        ### REGISTER GENERICS
+
+        if generic:
+            generic_values = self.register_compounds(
+                smiles=generic_data.keys(), sanitisation_verbosity=False, sanitise=False
+            )
+            generic_s2i = {s: i for i, s in generic_values}
+
+        ### TAG MURCKOS
+
+        murcko_ids = self.select_id_where(
+            table="compound",
+            key=f"compound_inchikey IN {tuple(murcko_s2i.values())}",
+            multiple=True,
+        )
+
+        self.executemany(
+            """INSERT OR IGNORE INTO tag (tag_name, tag_compound) VALUES (?,?)""",
+            [("MurckoScaffold", i) for i, in murcko_ids],
+        )
+
+        ### TAG GENERICS
+
+        if generic:
+
+            generic_ids = self.select_id_where(
+                table="compound",
+                key=f"compound_inchikey IN {tuple(generic_s2i.values())}",
+                multiple=True,
+            )
+
+            self.executemany(
+                """INSERT OR IGNORE INTO tag (tag_name, tag_compound) VALUES (?,?)""",
+                [("GenericMurckoScaffold", i) for i, in generic_ids],
+            )
+
+        ### ADD MURCKO SCAFFOLD RELATIONS
+
+        pairs = []
+
+        murcko_inchikey_lookup = self.get_compound_inchikey_id_dict(murcko_s2i.values())
+        for murcko_smiles, c_ids in murcko_data.items():
+            murcko_id = murcko_inchikey_lookup[murcko_s2i[murcko_smiles]]
+            for c_id in c_ids:
+                pairs.append((murcko_id, c_id))
+
+        pairs = [(a, b) for a, b in pairs if a != b]
+
+        mrich.var("#murcko scaffold relations", len(pairs))
+
+        self.executemany(
+            """INSERT OR IGNORE INTO scaffold (scaffold_base, scaffold_superstructure) VALUES (?,?)""",
+            pairs,
+        )
+
+        ### ADD GENERIC SCAFFOLD RELATIONS
+
+        if generic:
+
+            pairs = []
+
+            generic_inchikey_lookup = self.get_compound_inchikey_id_dict(
+                generic_s2i.values()
+            )
+            for generic_smiles, c_ids in generic_data.items():
+                generic_id = generic_inchikey_lookup[generic_s2i[generic_smiles]]
+                for c_id in c_ids:
+                    pairs.append((generic_id, c_id))
+
+            for generic_smiles, murcko_smiles_list in generic_to_murcko.items():
+                generic_id = generic_inchikey_lookup[generic_s2i[generic_smiles]]
+                for murcko_smiles in murcko_smiles_list:
+                    murcko_id = murcko_inchikey_lookup[murcko_s2i[murcko_smiles]]
+                    pairs.append((generic_id, murcko_id))
+
+            pairs = [(a, b) for a, b in pairs if a != b]
+
+            mrich.var("#generic murcko scaffold relations", len(pairs))
+
+            self.executemany(
+                """INSERT OR IGNORE INTO scaffold (scaffold_base, scaffold_superstructure) VALUES (?,?)""",
+                pairs,
+            )
+
+        if generic:
+            return murcko_data, generic_data
+        else:
+            return murcko_data
 
     ### GETTERS
 
@@ -2677,7 +2915,7 @@ class Database:
         return {route_id: route_product for route_id, route_product in records}
 
     def get_product_id_routes_dict(self) -> dict[int, set[int]]:
-        """Get a dictionary mapping route ID's to their product :class:`.Compound`"""
+        """Get a dictionary mapping product :class:`.Compound` to their route IDs"""
         records = self.execute("SELECT route_id, route_product FROM route").fetchall()
 
         lookup = {}
@@ -2793,6 +3031,53 @@ class Database:
             return fractions
 
         return clustered
+
+    def get_compound_scaffold_dict(self) -> dict[int, set[int]]:
+        """Get a dictionary mapping scaffold_base compound ID's to a set of their superstructure IDs"""
+
+        records = self.select(
+            table="scaffold",
+            query="scaffold_base, scaffold_superstructure",
+            multiple=True,
+        )
+
+        data = {}
+        for base, elab in records:
+            if base not in data:
+                data[base] = set()
+            data[base].add(elab)
+
+        return data
+
+    def get_compound_tag_dict(
+        self,
+        cset: "CompoundSet | None" = None,
+    ) -> dict[int, set[str]]:
+        """Get a dictionary mapping compound ID's to their tags"""
+
+        if cset:
+            raise NotImplementedError
+
+        records = self.select(
+            query="tag_name, tag_compound", table="tag", multiple=True
+        )
+
+        data = {}
+        for tag_name, compound_id in records:
+            if compound_id not in data:
+                data[compound_id] = set()
+            data[compound_id].add(tag_name)
+
+        # null IDS
+        comp_ids = self.select(table="compound", query="compound_id", multiple=True)
+        comp_ids = set(q for q, in comp_ids)
+
+        null_ids = comp_ids - set(data.keys())
+
+        for c_id in null_ids:
+            data[c_id] = set()
+
+        return data
 
     def get_pose_id_interaction_ids_dict(self, pset: "PoseSet") -> dict[int, set]:
         """Get a dictionary mapping :class:`.Pose` ID's to their associated :class:`.Interaction` ID's"""
@@ -3186,10 +3471,77 @@ class Database:
 
         return None
 
+    def get_scaffold_similarity_dict(
+        self, scaffolds: "CompoundSet | None" = None
+    ) -> list[dict]:
+        """Get a dictionary mapping scaffold :class:`.Compound` IDs to their superstructure's IDs"""
+
+        sql = """
+        SELECT scaffold_base as a, scaffold_superstructure as b, bfp_tanimoto(c.fp, d.fp) AS t
+        FROM scaffold
+        INNER JOIN compound_pattern_bfp AS c ON a = c.compound_id
+        INNER JOIN compound_pattern_bfp AS d ON b = d.compound_id
+        """
+
+        if scaffolds:
+
+            sql += f" WHERE a IN {scaffolds.str_ids}"
+
+        records = self.execute(sql).fetchall()
+
+        data = []
+        for a, b, s in mrich.track(records):
+            data.append(dict(base_id=a, superstructure_id=b, similarity=s))
+
+        return data
+
+    def get_reactant_product_tuples(
+        self, compound_ids: list | None = None, deduplicated: bool = True
+    ) -> set[tuple[int, int]]:
+        """Get tuples of (reactant, product) :class:`.Compound` IDs"""
+
+        sql = """
+        SELECT reactant_compound, reaction_product FROM reactant
+        INNER JOIN reaction ON reactant_reaction = reaction_id
+        """
+
+        if compound_ids:
+            str_ids = str(tuple(compound_ids)).replace(",)", ")")
+            sql += (
+                f"WHERE reactant_compound IN {str_ids} OR reaction_product IN {str_ids}"
+            )
+
+        records = self.execute(sql)
+        if deduplicated:
+            return set((a, b) for a, b in records)
+        else:
+            return [(a, b) for a, b in records]
+
+    def get_scaffold_tuples(
+        self, compound_ids: list | None = None
+    ) -> set[tuple[int, int]]:
+        """Get tuples of (reactant, product) :class:`.Compound` IDs"""
+
+        sql = """
+        SELECT scaffold_base, scaffold_superstructure FROM scaffold
+        """
+
+        if compound_ids:
+            str_ids = str(tuple(compound_ids)).replace(",)", ")")
+            sql += f"WHERE scaffold_base IN {str_ids} OR scaffold_superstructure IN {str_ids}"
+
+        records = self.execute(sql)
+        return set((a, b) for a, b in records)
+
     ### COMPOUND QUERY
 
     def query_substructure(
-        self, query: str, fast: bool = True, none: str = "error"
+        self,
+        query: str,
+        *,
+        fast: bool = True,
+        none: str = "error",
+        smarts: bool = False,
     ) -> "CompoundSet":
         """Search for compounds by substructure
 
@@ -3200,13 +3552,27 @@ class Database:
 
         """
 
+        if smarts:
+            func = "mol_from_smarts"
+        else:
+            func = "mol_from_smiles"
+
         # smiles
         if isinstance(query, str):
 
             if fast:
-                sql = f"SELECT compound.compound_id FROM compound, compound_pattern_bfp AS bfp WHERE compound.compound_id = bfp.compound_id AND mol_is_substruct(compound.compound_mol, mol_from_smiles(?))"
+                sql = f"""
+                SELECT compound.compound_id, compound.compound_inchikey 
+                FROM compound, compound_pattern_bfp AS bfp 
+                WHERE compound.compound_id = bfp.compound_id 
+                AND mol_is_substruct(compound.compound_mol, {func}(?))
+                """
+
             else:
-                sql = f"SELECT compound_id FROM compound WHERE mol_is_substruct(compound_mol, mol_from_smiles(?))"
+                sql = f"""
+                SELECT compound_id, compound_inchikey FROM compound 
+                WHERE mol_is_substruct(compound_mol, {func}(?))
+                """
 
         else:
 
@@ -3226,7 +3592,25 @@ class Database:
 
         from .cset import CompoundSet
 
-        return CompoundSet(self, [i for i, in result])
+        if not smarts:
+            smiles = query
+            try:
+                smiles = sanitise_smiles(smiles, sanitisation_failed="error")
+            except SanitisationError as e:
+                mrich.error(f"Could not sanitise {smiles=}")
+                mrich.error(str(e))
+                return None
+            except AssertionError:
+                mrich.error(f"Could not sanitise {smiles=}")
+                return None
+                return c
+            inchikey = inchikey_from_smiles(smiles)
+
+            ids = [i for i, key in result if key != inchikey]
+            return CompoundSet(self, ids)
+
+        else:
+            return CompoundSet(self, [i for i, _ in result])
 
     def query_similarity(
         self,

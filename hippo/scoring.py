@@ -10,9 +10,9 @@ import mrich
 DATA_COLUMNS = [
     "score",
     "price",
-    "product_compound_ids",
-    "product_pose_ids",
-    "product_interaction_ids",
+    "compound_ids",
+    "pose_ids",
+    "interaction_ids",
 ]
 
 
@@ -105,6 +105,26 @@ class Scorer:
         ]
 
         self.__init__(db=db, recipes=rset, attributes=attributes, populate=False)
+
+        skip = skip or []
+
+        if not db.count("interaction"):
+            mrich.warning("No interactions in DB, skipping related metrics")
+            skip.append("interaction_count")
+            skip.append("interaction_balance")
+
+        if not db.count("pose"):
+            mrich.warning("No poses in DB, skipping related metrics")
+            skip.append("num_inspirations")
+            skip.append("num_inspiration_sets")
+            skip.append("avg_energy_score")
+            skip.append("avg_distance_score")
+
+        if not db.count("scaffold"):
+            mrich.warning("No scaffold entries in DB, skipping related metrics")
+            skip.append("num_bases")
+            skip.append("num_bases_elaborated")
+            skip.append("elaboration_balance")
 
         # custom attributes
         for key, attribute in [
@@ -399,9 +419,9 @@ class Scorer:
 
         df = self._data.drop(
             columns=[
-                "product_compound_ids",
-                "product_pose_ids",
-                "product_interaction_ids",
+                "compound_ids",
+                "pose_ids",
+                "interaction_ids",
             ]
         )
 
@@ -488,7 +508,7 @@ class Scorer:
 
         ### Product Compound IDs
 
-        col = "product_compound_ids"
+        col = "compound_ids"
         null = df[col].isnull()
 
         # populate missing product compound ids
@@ -497,18 +517,18 @@ class Scorer:
             assert len(df[null]) == null.sum()
             for key in df[null].index.values:
                 recipe = self.recipes[key]
-                df.at[key, col] = recipe.products.compound_ids
+                df.at[key, col] = recipe.combined_compound_ids
 
         ### Product Pose IDs
 
-        col = "product_pose_ids"
+        col = "pose_ids"
         null = df[col].isnull()
 
-        # populate missing product compound ids
+        # populate missing product pose ids
         if null.sum():
 
             compound_ids = set()
-            for ids in df[null]["product_compound_ids"]:
+            for ids in df[null]["compound_ids"]:
                 for id in ids:
                     compound_ids.add(id)
 
@@ -521,7 +541,7 @@ class Scorer:
             for key in df[null].index.values:
                 assert len(df[null]) == null.sum()
                 recipe = self.recipes[key]
-                comp_ids = df["product_compound_ids"][key]
+                comp_ids = df["compound_ids"][key]
 
                 row = df.loc[key]
 
@@ -535,14 +555,14 @@ class Scorer:
 
         ### Product Interaction IDs
 
-        col = "product_interaction_ids"
+        col = "interaction_ids"
         null = df[col].isnull()
 
-        # populate missing product compound ids
+        # populate missing product interaction ids
         if null.sum():
 
             pose_ids = set()
-            for ids in df[null]["product_pose_ids"]:
+            for ids in df[null]["pose_ids"]:
                 for id in ids:
                     pose_ids.add(id)
 
@@ -555,7 +575,7 @@ class Scorer:
             for key in df[null].index.values:
                 assert len(df[null]) == null.sum()
                 recipe = self.recipes[key]
-                pose_ids = df["product_pose_ids"][key]
+                pose_ids = df["pose_ids"][key]
 
                 row = df.loc[key]
 
@@ -580,23 +600,23 @@ class Scorer:
 
             row = self._data.loc[key]
 
-            if recipe._product_compounds is None:
-                ids = row["product_compound_ids"]
+            if recipe._combined_compounds is None:
+                ids = row["compound_ids"]
                 cache = CompoundSet(self.db, ids)
                 cache._name = f"Recipe_{key} products"
-                recipe._product_compounds = cache
+                recipe._combined_compounds = cache
 
-            if recipe._product_poses is None:
-                ids = row["product_pose_ids"]
+            if recipe._poses is None:
+                ids = row["pose_ids"]
                 cache = PoseSet(self.db, ids)
                 cache._name = f"Recipe_{key} product poses"
                 recipe._product_poses = cache
 
-            if recipe._product_interactions is None:
-                ids = row["product_interaction_ids"]
+            if recipe._interactions is None:
+                ids = row["interaction_ids"]
                 cache = InteractionSet(self.db, ids)
                 cache._name = f"Recipe_{key} product interactions"
-                recipe._product_interactions = cache
+                recipe._interactions = cache
 
     def _dump_json(self):
         path = self.json_path
@@ -975,10 +995,10 @@ DEFAULT_ATTRIBUTES = {
     "num_bases": dict(
         type="custom",
         weight=1.0,
-        function=lambda r: r.product_compounds.count_by_tag(tag="Syndirella base"),
+        function=lambda r: r.combined_compounds.count_by_tag(tag="Syndirella base"),
         description="The number of Syndirella base compounds in this selection. Higher is better.",
     ),
-    "num_products": dict(
+    "num_compounds": dict(
         type="standard",
         weight=1.0,
         description="The number of product compounds in this selection. Higher is better.",
@@ -986,67 +1006,67 @@ DEFAULT_ATTRIBUTES = {
     "num_bases_elaborated": dict(
         type="custom",
         weight=1.0,
-        function=lambda r: r.product_compounds.num_bases_elaborated,
+        function=lambda r: r.combined_compounds.num_bases_elaborated,
         description="The number of Syndirella base compounds that have at least one elaboration in this selection. Higher is better.",
     ),
     "elaboration_balance": dict(
         type="custom",
         weight=1.0,
-        function=lambda r: r.product_compounds.elaboration_balance,
+        function=lambda r: r.combined_compounds.elaboration_balance,
         description="A measure for how evenly base compounds have been elaborated using an h-index. Higher is better.",
     ),  ### REALLY UNPERFORMANT?
     "num_inspirations": dict(
         type="custom",
         weight=1.0,
-        function=lambda r: r.product_poses.num_inspirations,
+        function=lambda r: r.poses.num_inspirations,
         description="The number of unique fragment compounds that inspired poses for product compounds in this selection. Higher is better.",
     ),
     "num_inspiration_sets": dict(
         type="custom",
         weight=1.0,
-        function=lambda r: r.product_poses.num_inspiration_sets,
+        function=lambda r: r.poses.num_inspiration_sets,
         description="The number of unique fragment combinations that inspired poses for product compounds in this selection. Higher is better.",
     ),
     # "risk_diversity": dict(
     #     type="custom",
     #     weight=0.0,
-    #     function=lambda r: r.product_compounds.risk_diversity,
+    #     function=lambda r: r.combined_compounds.risk_diversity,
     #     description="A measure of how evenly spread the risk of elaborations are for each base compound. Risk in this case refers to the number of atoms added. Higher is better",
     # ), # REMOVED BECAUSE IT DOES NOT NECESSARILY IMPROVE AS PRODUCTS ARE ADDED
     "interaction_count": dict(
         type="custom",
         weight=1.0,
-        function=lambda r: r.product_interactions.num_features,
+        function=lambda r: r.interactions.num_features,
         description="The number of protein features that are being interecated with in this selection. Higher is better.",
     ),
     "interaction_balance": dict(
         type="custom",
         weight=0.0,
-        function=lambda r: r.product_interactions.per_feature_count_hirsch,
+        function=lambda r: r.interactions.per_feature_count_hirsch,
         description="A measure for how evenly protein features are being interacted with in this selection using an h-index. Higher is better",
     ),
     "num_subsites": dict(
         type="custom",
         weight=1.0,
-        function=lambda r: r.product_poses.num_subsites,
+        function=lambda r: r.poses.num_subsites,
         description="Count the number of subsites that poses in this set come into contact with. Higher is better.",
     ),
     "subsite_balance": dict(
         type="custom",
         weight=0.0,
-        function=lambda r: r.product_poses.subsite_balance,
+        function=lambda r: r.poses.subsite_balance,
         description="Count the number of subsites that poses in this set come into contact with",
     ),
     "avg_distance_score": dict(
         type="custom",
         weight=-0.0,
-        function=lambda r: r.product_poses.avg_distance_score,
+        function=lambda r: r.poses.avg_distance_score,
         description="Average distance score (e.g. RMSD to fragment inspirations) for poses in this set. Lower is better.",
     ),
     "avg_energy_score": dict(
         type="custom",
         weight=-0.0,
-        function=lambda r: r.product_poses.avg_energy_score,
+        function=lambda r: r.poses.avg_energy_score,
         description="Average energy score (e.g. binding ddG) for poses in this set. Lower is better.",
     ),
     # "reaction_risk": dict(type='custom', weight=1.0, function=None),

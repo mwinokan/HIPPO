@@ -100,6 +100,21 @@ class CompoundTable:
         return [q for q, in result]
 
     @property
+    def str_ids(self) -> str:
+        """Return an SQL formatted tuple string of the :class:`.Compound` IDs"""
+        return str(tuple(self.ids)).replace(",)", ")")
+
+    @property
+    def inchikeys(self) -> list[str]:
+        """Returns the inchikeys of all compounds"""
+        result = self.db.select(
+            query="compound_inchikey",
+            table="compound",
+            multiple=True,
+        )
+        return [q for q, in result]
+
+    @property
     def tags(self) -> set[str]:
         """Returns the set of unique tags present in this compound set"""
         values = self.db.select_where(
@@ -218,28 +233,47 @@ class CompoundTable:
     def get_by_tag(
         self,
         tag: str,
-        **kwargs,
+        inverse: bool = False,
     ) -> "CompoundSet":
         """Get all child compounds with a certain tag
 
         :param tag: tag to filter by
 
         """
-        values = self.db.select_where(
-            query="tag_compound",
-            table="tag",
-            key="name",
-            value=tag,
-            multiple=True,
-            **kwargs,
-        )
+
+        if not inverse:
+
+            values = self.db.select_where(
+                query="tag_compound", table="tag", key="name", value=tag, multiple=True
+            )
+
+        else:
+
+            values = self.db.select_where(
+                query="tag_compound", table="tag", key="name", value=tag, multiple=True
+            )
+
+            if not values:
+                return self
+
+            ids = [v for v, in values if v]
+
+            values = self.db.select_where(
+                query="compound_id",
+                table="compound",
+                key=f"compound_id NOT IN {str(tuple(ids))}",
+                multiple=True,
+            )
 
         if not values:
             return None
 
         ids = [v for v, in values if v]
         cset = self[ids]
-        cset._name = f"compounds tagged {tag}"
+        if inverse:
+            cset._name = f"compounds not tagged {tag}"
+        else:
+            cset._name = f"compounds tagged {tag}"
         return cset
 
     def get_by_metadata(
@@ -672,7 +706,12 @@ class CompoundSet:
             table="pose",
             key=f"pose_compound in {self.str_ids}",
             multiple=True,
+            none="warning",
         )
+
+        if not ids:
+            return PoseSet(self.db, {})
+
         ids = [v for v, in ids]
         return PoseSet(self.db, ids)
 
@@ -931,6 +970,7 @@ class CompoundSet:
     def get_by_tag(
         self,
         tag: str,
+        inverse: bool = False,
     ) -> "CompoundSet":
         """Get all child compounds with a certain tag"""
 
@@ -940,7 +980,13 @@ class CompoundSet:
             key=f'tag_name = "{tag}" AND tag_compound IN {self.str_ids}',
             multiple=True,
         )
-        ids = [v for v, in values if v and v in self.ids]
+
+        if inverse:
+            matches = set(v for v, in values)
+            ids = [i for i in self.ids if i not in matches]
+        else:
+            ids = [v for v, in values]
+
         return CompoundSet(self.db, ids)
 
     def get_by_metadata(self, key: str, value: str | None = None) -> "CompoundSet":
@@ -1411,31 +1457,40 @@ class CompoundSet:
 
     def get_df(
         self,
+        smiles: bool = True,
+        inchikey: bool = False,
+        alias: bool = True,
         mol: bool = False,
         metadata: bool = False,
+        expand_metadata: bool = True,
         poses: bool = False,
-        count_by_target: bool = False,
         num_reactant: bool = False,
         num_reactions: bool = False,
+        num_poses: bool = False,
+        tags: bool = False,
         bases: bool = False,
         elabs: bool = False,
-        tags: bool = False,
-        num_poses: bool = False,
-        num_routes: bool = False,
-        alias: bool = True,
+        routes: bool = False,
+        # count_by_target: bool = False,
         **kwargs,
     ) -> "DataFrame":
         """Get a DataFrame representation of this set
 
+        :param smiles: include SMILES column (Default value = True)
+        :param inchikey: include InChIKey column (Default value = False)
+        :param alias: include alias column (Default value = True)
         :param mol: include ``rdkit.Chem.Mol`` in output (Default value = False)
         :param metadata: include metadata in output (Default value = False)
+        :param expand_metadata: create separate column for each metadata key (Default value = True)
         :param poses: include poses in output (Default value = False)
-        :param count_by_target: count poses by target (Default value = False)
-        :param num_reactant: include num_reactant column
-        :param num_reactions: include num_reactions column
+        :param num_reactant: include num_poses column
+        :param num_reactant: include num_reactant column (number of reactions where compound is a reactant)
+        :param num_reactions: include num_reactions column (number of reactions where compound is a product)
+        :param tags: include tags column
         :param bases: include bases column
         :param elabs: include elabs column
-        :param tags: include tags column
+
+        # :param count_by_target: count poses by target (Default value = False)
 
         """
 
@@ -1445,100 +1500,118 @@ class CompoundSet:
 
         data = []
 
-        if not any(
-            [
-                # poses,
-                count_by_target,
-                num_reactant,
-                num_reactions,
-                # bases,
-                elabs,
-                tags,
-                num_poses,
-                num_routes,
-            ]
-        ):
+        query = ["compound_id"]
 
-            sql = f"""
-            SELECT compound_id, compound_inchikey, compound_alias, compound_smiles, mol_to_binary_mol(compound_mol), compound_metadata
-            FROM compound
-            WHERE compound_id IN {self.str_ids}
-            """
+        if smiles:
+            query.append("compound_smiles")
 
-            records = self.db.execute(sql)
+        if inchikey:
+            query.append("compound_inchikey")
 
-            for id, inchikey, alias, smiles, mol_bytes, meta_str in records:
-                d = dict(
-                    id=id,
-                    inchikey=inchikey,
-                    alias=alias,
-                    smiles=smiles,
-                )
+        if alias:
+            query.append("compound_alias")
 
-                if mol:
-                    d["mol"] = Mol(mol_bytes)
+        if mol:
+            query.append("mol_to_binary_mol(compound_mol)")
 
-                if metadata and meta_str:
-                    d["metadata"] = loads(meta_str)
+        if metadata:
+            query.append("compound_metadata")
 
-                data.append(d)
+        query = ", ".join(query)
 
-            if bases:
+        sql = f"""
+        SELECT {query}
+        FROM compound
+        WHERE compound_id IN {self.str_ids}
+        """
 
-                sql = f"""
-                SELECT scaffold_superstructure, scaffold_base
-                FROM scaffold
-                WHERE scaffold_superstructure IN {self.str_ids}
-                """
+        records = self.db.execute(sql).fetchall()
 
-                records = self.db.execute(sql)
+        for row in records:
 
-                lookup = {}
-                for compound_id, base_id in records:
-                    lookup.setdefault(compound_id, set())
-                    if base_id:
-                        lookup[compound_id].add(base_id)
+            row = list(row)
 
-                for d in data:
-                    if d["id"] in lookup:
-                        d["bases"] = lookup[d["id"]]
+            d = dict(id=row.pop(0))
 
-        else:
+            if smiles:
+                d["smiles"] = row.pop(0)
 
-            ##### PRE-REFACTOR USING BIG QUERY
-            mrich.warning("Using slower Compound.get_dict() method")
+            if inchikey:
+                d["inchikey"] = row.pop(0)
 
-            for comp in mrich.track(self, prefix="Creating compound dataframe"):
-                d = comp.get_dict(
-                    mol=mol,
-                    metadata=metadata,
-                    count_by_target=count_by_target,
-                    # poses=poses,
-                    num_reactant=num_reactant,
-                    num_reactions=num_reactions,
-                    bases=bases,
-                    elabs=elabs,
-                    tags=tags,
-                    **kwargs,
-                )
-                data.append(d)
+            if alias:
+                d["alias"] = row.pop(0)
 
-        if num_poses:
-            lookup = self.id_num_poses_dict
-            for d in data:
-                comp_id = d["id"]
-                d["num_poses"] = lookup.get(comp_id, 0)
+            if mol:
+                d["mol"] = Mol(row.pop(0))
 
-        if poses:
-            lookup = self.db.get_compound_id_pose_ids_dict(self)
-            for d in data:
-                comp_id = d["id"]
-                d["poses"] = lookup.get(comp_id, {})
+            if metadata and (meta_str := row.pop(0)):
+
+                meta_dict = loads(meta_str)
+
+                if expand_metadata:
+                    for k, v in meta_dict.items():
+                        d[k] = v
+
+                else:
+                    d["metadata"] = meta_dict
+
+            data.append(d)
 
         df = DataFrame(data)
 
-        if not alias:
-            df.drop(columns=["alias"], inplace=True)
+        if poses or num_poses:
+            from .pset import PoseSet
+
+            lookup = self.db.get_compound_id_pose_ids_dict(self)
+            if poses:
+                df["poses"] = df["id"].apply(lambda x: lookup.get(x, {}))
+            if num_poses:
+                df["num_poses"] = df["id"].apply(lambda x: len(lookup.get(x, {})))
+
+        if num_reactant or num_reactions:
+            tuples = self.db.get_reactant_product_tuples(self.ids, deduplicated=False)
+
+            if num_reactant:
+                lookup = {}
+                for r, p in tuples:
+                    lookup.setdefault(r, 0)
+                    lookup[r] += 1
+                df["num_reactant"] = df["id"].apply(lambda x: lookup.get(x, 0))
+
+            if num_reactions:
+                lookup = {}
+                for r, p in tuples:
+                    lookup.setdefault(p, 0)
+                    lookup[p] += 1
+                df["num_reactions"] = df["id"].apply(lambda x: lookup.get(x, 0))
+
+        if bases or elabs:
+            tuples = self.db.get_scaffold_tuples(self.ids)
+
+            if bases:
+                lookup = {}
+                for b, e in tuples:
+                    lookup.setdefault(e, set())
+                    lookup[e].add(b)
+                df["bases"] = df["id"].apply(lambda x: lookup.get(x, set()))
+
+            if elabs:
+                lookup = {}
+                for b, e in tuples:
+                    lookup.setdefault(b, set())
+                    lookup[b].add(e)
+                df["elabs"] = df["id"].apply(lambda x: lookup.get(x, set()))
+
+        if tags:
+            lookup = self.db.get_compound_tag_dict()
+            df["tags"] = df["id"].apply(lambda x: lookup.get(x, {}))
+
+        if routes:
+            lookup = self.db.get_product_id_routes_dict()
+            df["routes"] = df["id"].apply(lambda x: lookup.get(x, {}))
+
+        df = df.set_index("id")
 
         return df
 
@@ -2124,6 +2197,7 @@ class IngredientSet:
     @classmethod
     def from_compounds(
         cls,
+        *,
         compounds: "CompoundSet | None" = None,
         ids: list[int] | None = None,
         db: "Database | None" = None,
@@ -2540,6 +2614,16 @@ class IngredientSet:
             data=self.df.to_dict(orient=data_orient),
         )
 
+    def pop(self) -> Ingredient:
+        """Pop the last compound in this set"""
+        item = self[self.df.index[-1]]
+        self.df.drop(self.df.index[-1], inplace=True)
+        return item
+
+    def shuffle(self) -> None:
+        """Randomises the order of compounds in this set"""
+        self._data = self.df.sample(frac=1).reset_index(drop=True)
+
     ### DUNDERS
 
     def __len__(self):
@@ -2622,9 +2706,6 @@ class IngredientSet:
 
     def __getattr__(self, key: str):
         """For missing attributes try getting from associated :class:`.CompoundSet`"""
-        # if hasattr(self, key):
-        # return getattr(self, key)
-        # else:
         return getattr(self.compounds, key)
 
     def __contains__(self, other: Compound | Ingredient | int):
