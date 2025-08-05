@@ -1833,8 +1833,6 @@ def plot_compound_tsnee(
     with mrich.loading("Getting Compound fingerprints"):
         df["FP"] = df["mol"].map(get_cfps)
 
-<<<<<<< HEAD
-=======
     df["bases"] = df["bases"].map(lambda x: x if not isinstance(x, float) else None)
 
     def get_cluster(row):
@@ -1863,7 +1861,6 @@ def plot_compound_tsnee(
     if sort_by:
         df = df.sort_values(by=sort_by)
 
->>>>>>> 325bedd8ef361af8c7441d54c4ad2c97b241a8e3
     X = np.array([x.fp for x in df["FP"]])
 
     with mrich.loading("Computing PCA"):
