@@ -333,6 +333,7 @@ def plot_interaction_punchcard_by_tags(
     ignore_chains=True,
     backbone_only: bool = False,
     sidechain_only: bool = False,
+    return_plot_data: bool = False,
 ):
     """
 
@@ -489,6 +490,9 @@ def plot_interaction_punchcard_by_tags(
 
     fig.update_traces(textposition="middle right")
 
+    if return_plot_data:
+        data_snapshot1 = plot_data.copy()
+
     # fig.update_layout(title=title, title_automargin=False, title_yref="container")
 
     fig.update_layout(xaxis_title="Residue", yaxis_title=yaxis_title)
@@ -595,9 +599,15 @@ def plot_interaction_punchcard_by_tags(
             margin=dict(l=20, r=20, t=20, b=20),
         )
 
+        if return_plot_data:
+            return subplot_fig, [orig_data, plot_data, data_snapshot1]
+
         return subplot_fig
 
     # fig.update_layout(scattermode="group", scattergap=0.75)
+
+    if return_plot_data:
+        return fig, plot_data
 
     # return add_punchcard_logo(fig)
     return fig
@@ -1775,6 +1785,7 @@ def plot_pose_interactions(
 @hippo_graph
 def plot_compound_tsnee(
     compounds,
+    df: "pd.DataFrame | None" = None,
     title: str | None = None,
     subtitle: str | None = None,
     legend: bool = False,
@@ -1790,8 +1801,33 @@ def plot_compound_tsnee(
 
     mrich.var("#compounds", len(compounds))
 
-    with mrich.loading("Getting Compound DataFrame"):
-        df = compounds.get_df(mol=True, bases=True)
+    if df is None:
+        
+        with mrich.loading("Getting Compound DataFrame"):
+            df = compounds.get_df(mol=True, bases=True)
+    
+        def get_cluster(row):
+    
+            bases = row["bases"]
+    
+            if not bases:
+                return row["id"]
+    
+            if len(bases) == 1:
+                return list(bases)[0]
+    
+            return tuple(bases)
+    
+        def get_type(row):
+    
+            if row["bases"] is None:
+                return "base"
+    
+            return "elaboration"
+    
+        with mrich.loading("Adding columns"):
+            df["cluster"] = df.apply(get_cluster, axis=1)
+            df["type"] = df.apply(get_type, axis=1)
 
     with mrich.loading("Getting Compound fingerprints"):
         df["FP"] = df["mol"].map(get_cfps)

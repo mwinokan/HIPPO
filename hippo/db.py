@@ -2958,6 +2958,21 @@ class Database:
 
         return d
 
+    def get_compound_id_smiles_dict(
+        self, cset: "CompoundSet"
+    ) -> dict[int, set[str]]:
+        """Get a dictionary mapping :class:`.Compound` ID's to suppliers which stock it"""
+        records = self.execute(
+            f"SELECT compound_id, compound_smiles FROM compound WHERE compound_id IN {cset.str_ids}"
+        ).fetchall()
+
+        d = {}
+
+        for comp_id, comp_smiles in records:
+            d[comp_id] = comp_smiles
+
+        return d
+
     def get_compound_inchikey_id_dict(self, inchikeys: list[str]):
         """Get a dictionary mapping :class:`.Compound` inchikeys to their ID's"""
 
