@@ -2958,9 +2958,7 @@ class Database:
 
         return d
 
-    def get_compound_id_smiles_dict(
-        self, cset: "CompoundSet"
-    ) -> dict[int, set[str]]:
+    def get_compound_id_smiles_dict(self, cset: "CompoundSet") -> dict[int, set[str]]:
         """Get a dictionary mapping :class:`.Compound` ID's to suppliers which stock it"""
         records = self.execute(
             f"SELECT compound_id, compound_smiles FROM compound WHERE compound_id IN {cset.str_ids}"
@@ -3135,7 +3133,7 @@ class Database:
 
         query = "pose_id, pose_inchikey, pose_alias, pose_smiles, pose_reference, pose_path, pose_compound, pose_target, pose_mol, pose_fingerprint, pose_energy_score, pose_distance_score"
         records = self.select_where(
-            query=query, table="pose", key=f"id IN {pset.str_ids}", multiple=True
+            query=query, table="pose", key=f"pose_id IN {pset.str_ids}", multiple=True
         )
 
         d = {}
@@ -3216,7 +3214,10 @@ class Database:
 
         query = "compound_id, compound_inchikey, compound_alias, compound_smiles"
         records = self.select_where(
-            query=query, table="compound", key=f"id IN {cset.str_ids}", multiple=True
+            query=query,
+            table="compound",
+            key=f"compound_id IN {cset.str_ids}",
+            multiple=True,
         )
 
         d = {}
