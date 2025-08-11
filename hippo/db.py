@@ -3123,7 +3123,7 @@ class Database:
             ).fetchall()
 
         d = {}
-        for pose_alias, pose_id in records:
+        for pose_id, pose_alias in records:
             d[pose_alias] = pose_id
 
         return d
