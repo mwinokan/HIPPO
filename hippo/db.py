@@ -3092,6 +3092,70 @@ class Database:
             d[pose_id].add(interaction_id)
         return d
 
+    def get_pose_alias_id_dict(self, pset: "PoseSet | None" = None) -> dict[str, int]:
+        """Get a dictionary mapping :class:`.Pose` aliases to ID's"""
+
+        if pset:
+            records = self.execute(
+                f"""
+            SELECT pose_id, pose_alias FROM pose 
+            WHERE pose_alias IS NOT NULL
+            AND pose_id IN {pset.str_ids}"""
+            ).fetchall()
+
+        else:
+            records = self.execute(
+                """SELECT pose_id, pose_alias FROM pose 
+            WHERE pose_alias IS NOT NULL"""
+            ).fetchall()
+
+        d = {}
+        for pose_alias, pose_id in records:
+            d[pose_alias] = pose_id
+
+        return d
+
+    def get_pose_id_obj_dict(self, pset: "PoseSet") -> "dict[id, Pose]":
+        """Get a dictionary mapping :class:`.Pose` ID's to their objects"""
+
+        query = "pose_id, pose_inchikey, pose_alias, pose_smiles, pose_reference, pose_path, pose_compound, pose_target, pose_mol, pose_fingerprint, pose_energy_score, pose_distance_score"
+        records = self.select_where(
+            query=query, table="pose", key=f"id IN {pset.str_ids}", multiple=True
+        )
+
+        d = {}
+        for entry in records:
+            (
+                pose_id,
+                pose_inchikey,
+                pose_alias,
+                pose_smiles,
+                pose_reference,
+                pose_path,
+                pose_compound,
+                pose_target,
+                pose_mol,
+                pose_fingerprint,
+                pose_energy_score,
+                pose_distance_score,
+            ) = entry
+            d[pose_id] = Pose(
+                self,
+                pose_id,
+                pose_inchikey,
+                pose_alias,
+                pose_smiles,
+                pose_reference,
+                pose_path,
+                pose_compound,
+                pose_target,
+                pose_mol,
+                pose_fingerprint,
+                pose_energy_score,
+                pose_distance_score,
+            )
+        return d
+
     def get_pose_id_interaction_tuples_dict(self, pset: "PoseSet") -> dict[int, set]:
         """Get a dictionary mapping :class:`.Pose` ID's to lists of `(interaction_type, feature_id)` tuples describing their interactions"""
 
@@ -3130,6 +3194,29 @@ class Database:
             d[compound_id] = d.get(compound_id, set())
             d[compound_id].add(inspiration_id)
 
+        return d
+
+    def get_compound_id_obj_dict(self, cset: "CompoundSet") -> "dict[id, Compound]":
+        """Get a dictionary mapping :class:`.Compound` ID's to their objects"""
+
+        query = "compound_id, compound_inchikey, compound_alias, compound_smiles"
+        records = self.select_where(
+            query=query, table="compound", key=f"id IN {cset.str_ids}", multiple=True
+        )
+
+        d = {}
+        for entry in records:
+            compound_id, compound_inchikey, compound_alias, compound_smiles = entry
+            d[compound_id] = Compound(
+                self._animal,
+                self,
+                compound_id,
+                compound_inchikey,
+                compound_alias,
+                compound_smiles,
+                metadata=None,
+                mol=None,
+            )
         return d
 
     def get_interaction(self, *, id: int, table: str = "interaction") -> "Interaction":
