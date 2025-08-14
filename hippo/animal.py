@@ -291,7 +291,17 @@ class HIPPO:
             c
             for c in meta_df.columns
             if c
-            not in ["Code", "Long code", "Compound code", "Smiles", "Downloaded"]
+            not in [
+                "Code",
+                "Long code",
+                "Compound code",
+                "Smiles",
+                "Downloaded",
+                "Main status",
+                "GOOD count",
+                "MEDIOCRE count",
+                "BAD count",
+            ]
             + GENERATED_TAG_COLS
         ]
 
