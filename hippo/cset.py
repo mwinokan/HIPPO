@@ -470,6 +470,8 @@ class CompoundTable:
                 for i in key:
                     if isinstance(i, int) or isinstance(i, int64):
                         index = i
+                    elif isinstance(i, float):
+                        index = int(i)
                     elif isinstance(i, str):
                         index = self.db.get_compound_id(inchikey=i)
                     else:
