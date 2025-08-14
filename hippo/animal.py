@@ -557,8 +557,9 @@ class HIPPO:
         inchi_lookup = self.db.get_compound_inchikey_id_dict(
             inchikeys=smiles_lookup.values()
         )
-        df["inchikey"] = df["smiles"].apply(lambda x: smiles_lookup[x])
-        df["compound_id"] = df["inchikey"].apply(lambda x: inchi_lookup[x])
+
+        df["inchikey"] = df["smiles"].apply(lambda x: smiles_lookup.get(x))
+        df["compound_id"] = df["inchikey"].apply(lambda x: inchi_lookup.get(x))
 
         if n := len(df[df["compound_id"].isna()]):
             mrich.error(n, "invalid compound rows")
@@ -582,6 +583,9 @@ class HIPPO:
             inchikey = row["inchikey"]
             smiles = row["smiles"]
             compound_id = row["compound_id"]
+            if pd.isna(compound_id):
+                mrich.error("Skipping invalid compound", i)
+                continue
             path = (output_directory / f"{name}.fake.mol").resolve()
             energy_score = float(row[energy_score_col])
             distance_score = float(row[distance_score_col])
@@ -600,6 +604,9 @@ class HIPPO:
                 insp_str = insp_str.removesuffix("]")
                 insp_str = insp_str.replace("'", "")
                 generator = insp_str.split(",")
+
+            elif isinstance(insp_str, float):
+                generator = []
 
             else:
                 generator = insp_str
