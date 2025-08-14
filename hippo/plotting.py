@@ -1802,29 +1802,29 @@ def plot_compound_tsnee(
     mrich.var("#compounds", len(compounds))
 
     if df is None:
-        
+
         with mrich.loading("Getting Compound DataFrame"):
             df = compounds.get_df(mol=True, bases=True)
-    
+
         def get_cluster(row):
-    
+
             bases = row["bases"]
-    
+
             if not bases:
                 return row["id"]
-    
+
             if len(bases) == 1:
                 return list(bases)[0]
-    
+
             return tuple(bases)
-    
+
         def get_type(row):
-    
+
             if row["bases"] is None:
                 return "base"
-    
+
             return "elaboration"
-    
+
         with mrich.loading("Adding columns"):
             df["cluster"] = df.apply(get_cluster, axis=1)
             df["type"] = df.apply(get_type, axis=1)
