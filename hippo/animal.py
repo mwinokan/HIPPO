@@ -560,11 +560,12 @@ class HIPPO:
 
         df["inchikey"] = df["smiles"].apply(lambda x: smiles_lookup.get(x))
         df["compound_id"] = df["inchikey"].apply(lambda x: inchi_lookup.get(x))
+        df["compound_id"] = df["compound_id"].fillna(0).astype(int)
 
         if n := len(df[df["compound_id"].isna()]):
             mrich.error(n, "invalid compound rows")
 
-        cset = self.compounds[set(df["compound_id"].values)]
+        cset = self.compounds[set(i for i in df["compound_id"].values if i)]
         for tag in compound_tags:
             cset.add_tag(tag)
 
@@ -583,7 +584,7 @@ class HIPPO:
             inchikey = row["inchikey"]
             smiles = row["smiles"]
             compound_id = row["compound_id"]
-            if pd.isna(compound_id):
+            if not compound_id:
                 mrich.error("Skipping invalid compound", i)
                 continue
             path = (output_directory / f"{name}.fake.mol").resolve()
