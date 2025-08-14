@@ -523,11 +523,7 @@ class HIPPO:
             reference_col in df_columns or reference
         ), "Must specify valid reference or reference_col"
 
-        if not output_directory:
-            import os
-
-            output_directory = str(path.name).removesuffix(".sdf")
-
+        output_directory = str(path.name).removesuffix(".sdf")
         output_directory = Path(output_directory)
         if not output_directory.exists:
             mrich.writing(f"Creating output directory {output_directory}")
