@@ -449,81 +449,84 @@ class HIPPO:
         mrich.var("#compounds registered", count_compound_registered)
         mrich.var("#poses registered", self.num_poses - n_poses)
 
-    def add_compounds(
+    def load_sdf(
         self,
-        target: str,
-        sdf_path: str | Path,
         *,
+        target: str,
+        path: str | Path,
         reference: int | Pose | None = None,
-        tags: None | list[str] = None,
-        output_directory: str | Path | None = None,
+        compound_tags: None | list[str] = None,
+        pose_tags: None | list[str] = None,
         mol_col: str = "ROMol",
         name_col: str = "ID",
         inspiration_col: str = "ref_mols",
+        reference_col: str = "ref_pdb",
+        energy_score_col: str = "energy_score",
+        distance_score_col: str = "distance_score",
         inspiration_map: None | dict = None,
-        skip_first: bool = False,
         convert_floats: bool = True,
-        stop_after: int | None = None,
         skip_equal_dict: dict | None = None,
         skip_not_equal_dict: dict | None = None,
-        check_pose_RMSD: bool = False,
-        pose_RMSD_tolerance: float = 1.0,
     ) -> None:
         """Add posed virtual hits from an SDF into the database.
 
         :param target: Name of the protein :class:`.Target`
-        :param sdf_path: Path to the SDF
-        :param reference: Reference :class:`.Pose` to use as the protein conformation for all poses, defaults to ``None``
-        :param tags: Tags to assign to all created compounds and poses, defaults to ``None``
-        :param output_directory: Specify the path where individual ligand .mol files will be created, defaults to ``None`` where the name of the SDF is used.
+        :param path: Path to the SDF
+        :param reference: Optional single reference :class:`.Pose` to use as the protein conformation for all poses, defaults to ``None``
+        :param reference_col: Column that contains reference :class:`.Pose` aliases or ID's
+        :param compound_tags: List of string Tags to assign to all created compounds, defaults to ``None``
+        :param pose_tags: List of string Tags to assign to all created poses, defaults to ``None``
         :param mol_col: Name of the column containing the ``rdkit.ROMol`` ligands, defaults to ``"ROMol"``
         :param name_col: Name of the column containing the ligand name/alias, defaults to ``"ID"``
-        :param inspiration_col: Name of the column containing the list of inspiration pose names, defaults to ``"ref_mols"``
-        :param inspiration_map: Dictionary or callable mapping between inspiration strings found in ``inspiration_col`` and :class:`.Pose` ids, defaults to None
-        :param skip_first: Skip first row, defaults to ``False``
+        :param inspiration_col: Name of the column containing the list of inspiration :class:`.Pose` names or ID's, defaults to ``"ref_mols"``
+        :param inspiration_map: Optional dictionary or callable mapping between inspiration strings found in ``inspiration_col`` and :class:`.Pose` ids
+        :param energy_score_col: Name of the column containing the list of energy scores ``"energy_score"``
+        :param distance_score_col: Name of the column containing the list of distance scores, defaults to ``"distance_score"``
         :param convert_floats: Try to convert all values to ``float``, defaults to ``True``
-        :param stop_after: Stop after given number of rows, defaults to ``None``
         :param skip_equal_dict: Skip rows where ``any(row[key] == value for key, value in skip_equal_dict.items())``, defaults to ``None``
         :param skip_not_equal_dict: Skip rows where ``any(row[key] != value for key, value in skip_not_equal_dict.items())``, defaults to ``None``
-        :param check_pose_RMSD: Check :class:`.Pose` to previously registered poses and skip if below ``pose_RMSD_tolerance``, defaults to ``False``
-        :param pose_RMSD_tolerance: Tolerance for ``check_pose_RMSD`` in Angstrom, defaults to ``1.0``
 
-        All non-name columns added to the Pose metadata.
+        All non-name columns are added to the Pose metadata.
+        N.B. separate .mol files are not created. The molecule binary will only be stored in the .sqlite file and fake paths are added to the database.
         """
 
-        if not isinstance(sdf_path, Path):
-            sdf_path = Path(sdf_path)
+        if not isinstance(path, Path):
+            path = Path(path)
 
-        mrich.debug(f"{sdf_path=}")
+        skip_equal_dict = skip_equal_dict or {}
+        skip_not_equal_dict = skip_not_equal_dict or {}
 
-        tags = tags or []
+        mrich.debug(f"{path=}")
+
+        compound_tags = compound_tags or []
+        pose_tags = pose_tags or []
 
         from rdkit.Chem import PandasTools, MolToMolFile, MolFromMolFile
         from molparse.rdkit import mol_to_smiles, mol_to_pdb_block
         from numpy import isnan
         from pandas import read_pickle
+        from tempfile import NamedTemporaryFile
 
-        if sdf_path.name.endswith(".sdf"):
-            df = PandasTools.LoadSDF(str(sdf_path.resolve()))
+        if path.name.endswith(".sdf"):
+            df = PandasTools.LoadSDF(str(path.resolve()))
         else:
-            df = read_pickle(sdf_path)
+            df = read_pickle(path)
 
         df_columns = list(df.columns)
 
-        target = self.register_target(target).name
+        target = self.register_target(target)
 
         assert mol_col in df_columns, f"{mol_col=} not in {df_columns}"
         assert name_col in df_columns, f"{name_col=} not in {df_columns}"
         assert inspiration_col in df_columns, f"{inspiration_col=} not in {df_columns}"
-
-        df_columns.pop(df_columns.index(mol_col))
-        df_columns.pop(df_columns.index(name_col))
-        df_columns.pop(df_columns.index(inspiration_col))
+        assert (
+            reference_col in df_columns or reference
+        ), "Must specify valid reference or reference_col"
 
         if not output_directory:
             import os
 
-            output_directory = str(sdf_path.name).removesuffix(".sdf")
+            output_directory = str(path.name).removesuffix(".sdf")
 
         output_directory = Path(output_directory)
         if not output_directory.exists:
@@ -533,38 +536,62 @@ class HIPPO:
         n_poses = self.num_poses
         n_comps = self.num_compounds
 
+        ### FILTER DATAFRAME
+
+        mrich.var("SDF entries (pre-filter)", len(df))
+
+        df = df[df[name_col] != "ver_1.2"]
+
+        for k, v in skip_equal_dict.items():
+            df = df[df[k] == v]
+
+        for k, v in skip_not_equal_dict.items():
+            df = df[df[k] != v]
+
+        mrich.var("SDF entries (post-filter)", len(df))
+
+        ### COMPOUND REGISTRATION
+
+        df["smiles"] = df[mol_col].apply(mol_to_smiles)
+        smiles = list(set(df["smiles"].values))
+        mrich.debug("#smiles", len(smiles))
+        mrich.debug("Registering compounds...")
+        pairs = self.register_compounds(smiles=smiles, sanitisation_verbosity=False)
+        smiles_lookup = {s1: i for s1, (i, s2) in zip(smiles, pairs)}
+        inchi_lookup = self.db.get_compound_inchikey_id_dict(
+            inchikeys=smiles_lookup.values()
+        )
+        df["inchikey"] = df["smiles"].apply(lambda x: smiles_lookup[x])
+        df["compound_id"] = df["inchikey"].apply(lambda x: inchi_lookup[x])
+
+        if n := len(df[df["compound_id"].isna()]):
+            mrich.error(n, "invalid compound rows")
+
+        cset = self.compounds[set(df["compound_id"].values)]
+        for tag in compound_tags:
+            cset.add_tag(tag)
+
+        ### POSE REGISTRATION
+
+        if not inspiration_map:
+            inspiration_map = self.db.get_pose_alias_id_dict()
+
+        # dicts: (alias, compound, target, path, metadata, inspirations, tags, reference,)
+        data = []
+
         for i, row in mrich.track(df.iterrows(), prefix="Reading SDF rows..."):
 
             name = row[name_col].strip()
-
-            if name == "ver_1.2":
-                mrich.warning("Skipping Fragalysis header molecule")
-                continue
-
-            if skip_equal_dict and any(row[k] == v for k, v in skip_equal_dict.items()):
-                continue
-
-            if skip_not_equal_dict and any(
-                row[k] != v for k, v in skip_not_equal_dict.items()
-            ):
-                continue
-
             mol = row[mol_col]
+            inchikey = row["inchikey"]
+            smiles = row["smiles"]
+            compound_id = row["compound_id"]
+            path = (output_directory / f"{name}.fake.mol").resolve()
+            energy_score = float(row[energy_score_col])
+            distance_score = float(row[distance_score_col])
 
             if not name:
                 name = f"pose_{i}"
-
-            mol_path = output_directory / f"{name}.mol"
-
-            MolToMolFile(mol, str(mol_path.resolve()))
-
-            smiles = mol_to_smiles(mol)
-
-            comp = self.register_compound(smiles=smiles, tags=tags)
-
-            if not comp:
-                mrich.error(f"Could not register compound {i=}")
-                continue
 
             # inspirations
 
@@ -584,40 +611,56 @@ class HIPPO:
             for insp in generator:
                 insp = insp.strip()
 
-                if inspiration_map:
-                    if isinstance(inspiration_map, dict) and insp in inspiration_map:
-                        pose = inspiration_map[insp]
-                        if pose:
-                            inspirations.append(pose)
-                    elif hasattr(inspiration_map, "__call__"):
-                        pose = inspiration_map(insp)
-                        if pose:
-                            inspirations.append(pose)
-                    else:
-                        pose = self.poses[insp]
-                        if pose:
-                            inspirations.append(pose)
-                        else:
-                            mrich.error(f"Could not find inspiration pose {insp}")
-                            continue
+                try:
+                    pose_id = int(insp)
+                    inspirations.append(pose_id)
 
-                else:
-                    pose = self.poses[insp]
-                    if pose:
-                        inspirations.append(pose)
+                except ValueError:
+                    if isinstance(inspiration_map, dict) and insp in inspiration_map:
+                        pose_id = inspiration_map[insp]
+                        if pose_id:
+                            inspirations.append(pose_id)
+                    elif hasattr(inspiration_map, "__call__"):
+                        pose_id = inspiration_map(insp)
+                        if pose_id:
+                            inspirations.append(pose_id)
                     else:
-                        mrich.error(f"Could not find inspiration pose {insp}")
+                        mrich.error(
+                            f"Could not find inspiration pose with alias={insp}"
+                        )
                         continue
+
+            if not reference:
+                ref_str = row.get(reference_col)
+                if ref_str:
+                    try:
+                        reference = int(ref_str)
+                        inspirations.append(pose_id)
+                    except ValueError:
+                        reference = inspiration_map[ref_str]
+                else:
+                    reference = None
 
             # metadata
             metadata = {}
+            skip = {
+                "smiles",
+                "inchikey",
+                "compound_id",
+                inspiration_col,
+                name_col,
+                mol_col,
+                energy_score_col,
+                distance_score_col,
+                "target_id",
+                "reference_id",
+                "path",
+            }
 
             for col in df_columns:
                 value = row[col]
 
-                if not isinstance(col, str):
-                    if i == 0:
-                        mrich.warning(f"Skipping metadata from column={col}.")
+                if col in skip:
                     continue
 
                 if isinstance(value, float) and isnan(value):
@@ -638,37 +681,45 @@ class HIPPO:
 
                 metadata[col] = value
 
-            # print(metadata)
-
-            pose = self.register_pose(
-                alias=name,
-                compound=comp,
-                target=target,
-                path=mol_path,
-                metadata=metadata,
-                inspirations=inspirations,
-                tags=tags,
-                reference=reference,
-                check_RMSD=check_pose_RMSD,
-                RMSD_tolerance=pose_RMSD_tolerance,
+            data.append(
+                dict(
+                    alias=name,
+                    compound_id=compound_id,
+                    target_id=target.id,
+                    path=path,
+                    metadata=metadata,
+                    inspiration_ids=inspirations,
+                    reference_id=reference,
+                    mol=mol,
+                    inchikey=inchikey,
+                    smiles=smiles,
+                    energy_score=energy_score,
+                    distance_score=distance_score,
+                )
             )
 
-            if stop_after and i + 1 >= stop_after:
-                break
+        ### ACTUALLY DO THE BULK INSERTION
+
+        mrich.debug("Registering poses...")
+        ids = self.db.register_poses(data)
+        pset = self.poses[ids]
+        mrich.debug("Adding tags...")
+        for tag in pose_tags:
+            pset.add_tag(tag)
 
         if n := self.num_compounds - n_comps:
             f = mrich.success
         else:
-            f = mrich.error
+            f = mrich.warning
 
-        f(f"Loaded {n} compounds from {sdf_path}")
+        f(f"{n} new compounds from {path}")
 
         if n := self.num_poses - n_poses:
             f = mrich.success
         else:
-            f = mrich.error
+            f = mrich.warning
 
-        f(f"Loaded {n} poses from {sdf_path}")
+        f(f"{n} new poses from {path}")
 
     def add_syndirella_scaffolds(
         self,

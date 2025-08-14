@@ -2319,6 +2319,82 @@ class Database:
 
         return values
 
+    def register_poses(self, dicts: list[dict]) -> set[int]:
+        """Insert or ignore a bunch of poses, also returns a set of Pose IDs"""
+
+        from json import dumps
+
+        ### POSES
+
+        sql = """
+        INSERT OR IGNORE INTO pose(
+            pose_inchikey, 
+            pose_alias, 
+            pose_smiles, 
+            pose_reference, 
+            pose_path, 
+            pose_compound, 
+            pose_target, 
+            pose_mol, 
+            pose_energy_score, 
+            pose_distance_score, 
+            pose_metadata
+        )
+        VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+        """
+
+        values = []
+        for i, d in enumerate(dicts):
+
+            try:
+                values.append(
+                    (
+                        str(d["inchikey"]),
+                        str(d["smiles"]),
+                        str(d["alias"]),
+                        int(d["reference_id"]),
+                        str(d["path"]),
+                        int(d["compound_id"]),
+                        int(d["target_id"]),
+                        d["mol"].ToBinary(),
+                        float(d["energy_score"]),
+                        float(d["distance_score"]),
+                        dumps(d["metadata"]),
+                    )
+                )
+            except KeyError as e:
+                mrich.error("Skipping", i, str(e))
+
+        self.executemany(sql, values)
+        self.commit()
+
+        ### INSPIRATIONS
+
+        lookup = self.get_pose_path_id_dict()
+
+        values = []
+        pose_ids = set()
+
+        for i, d in enumerate(dicts):
+            if "inspiration_ids" not in d:
+                continue
+            derivative_id = lookup.get(str(d["path"]))
+            if not derivative_id:
+                continue
+            pose_ids.add(derivative_id)
+            for inspiration_id in d["inspiration_ids"]:
+                values.append((inspiration_id, derivative_id))
+
+        sql = """
+        INSERT OR IGNORE INTO inspiration(inspiration_original, inspiration_derivative)
+        VALUES(?1, ?2)
+        """
+
+        self.executemany(sql, values)
+        self.commit()
+
+        return pose_ids
+
     def calculate_all_murcko_scaffolds(self, generic: bool = True):
         """Determine Murcko and optionally generic Murcko scaffolds for all Compounds in the Database and add relevant records.
 
@@ -3125,6 +3201,29 @@ class Database:
         d = {}
         for pose_id, pose_alias in records:
             d[pose_alias] = pose_id
+
+        return d
+
+    def get_pose_path_id_dict(self, pset: "PoseSet | None" = None) -> dict[str, int]:
+        """Get a dictionary mapping :class:`.Pose` aliases to ID's"""
+
+        if pset:
+            records = self.execute(
+                f"""
+            SELECT pose_id, pose_path FROM pose 
+            WHERE pose_path IS NOT NULL
+            AND pose_id IN {pset.str_ids}"""
+            ).fetchall()
+
+        else:
+            records = self.execute(
+                """SELECT pose_id, pose_path FROM pose 
+            WHERE pose_path IS NOT NULL"""
+            ).fetchall()
+
+        d = {}
+        for pose_id, pose_path in records:
+            d[pose_path] = pose_id
 
         return d
 
