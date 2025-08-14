@@ -227,6 +227,21 @@ class Pose:
 
                 self.protein_system = sys.protein_system
 
+                sdf_path = list(
+                    Path(self.path).parent.glob("*_ligand.sdf")
+                )
+
+                if len(sdf_path) == 1:
+
+                    supplier = Chem.SDMolSupplier(sdf_path[0])
+                    mols = [mol for mol in supplier if mol is not None]
+
+                    if len(mols) > 1:
+                        mrich.warning(f"Multiple molecules in SDF {self}")
+
+                    self.mol = mols[0]
+                    return self._mol
+
                 # look for ligand mol from Fragalysis
                 mol_path = list(
                     Path(self.path).parent.glob("*_ligand.mol")
