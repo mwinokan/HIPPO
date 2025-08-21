@@ -227,9 +227,7 @@ class Pose:
 
                 self.protein_system = sys.protein_system
 
-                sdf_path = list(
-                    Path(self.path).parent.glob("*_ligand.sdf")
-                )
+                sdf_path = list(Path(self.path).parent.glob("*_ligand.sdf"))
 
                 if len(sdf_path) == 1:
 
@@ -1383,6 +1381,8 @@ class Pose:
         protein="cartoon",
         ligand="stick",
         protein_color="spectrum",
+        interactions: bool = True,
+        file: str | None = None,
     ) -> None:
         """Render this pose with the protein using py3Dmol
 
@@ -1394,14 +1394,75 @@ class Pose:
 
         from molparse.py3d import render
 
-        display(
-            render(
-                self.complex_system,
+        sys = self.complex_system
+
+        def make_view(width="640px", height="480px"):
+
+            view = render(
+                sys,
                 protein=protein,
                 ligand=ligand,
                 protein_color=protein_color,
+                width=width,
+                height=height,
             )
-        )
+
+            if interactions:
+                COLORS = {
+                    "Hydrophobic": "green",
+                    "Hydrogen Bond": "blue",
+                    "π-stacking": "purple",
+                    "π-cation": "pink",
+                    "Electrostatic": "red",
+                }
+
+                df = self.interactions.df
+
+                residues = set()
+
+                for i, row in df.iterrows():
+
+                    prot_coord = row["prot_coord"]
+                    lig_coord = row["lig_coord"]
+                    type = row["type"]
+                    color = COLORS.get(type, "black")
+
+                    view.addCylinder(
+                        {
+                            "start": {
+                                "x": prot_coord[0],
+                                "y": prot_coord[1],
+                                "z": prot_coord[2],
+                            },
+                            "end": {
+                                "x": lig_coord[0],
+                                "y": lig_coord[1],
+                                "z": lig_coord[2],
+                            },
+                            # 'radius': radius,
+                            "color": color,
+                        }
+                    )
+
+                    residues.add((row["residue_name"], row["residue_number"]))
+
+                for res_name, res_num in residues:
+                    res = sys.residues[f"{res_name} n{res_num}"]
+                    view.addModel(res.pdb_block, "pdb")
+                    view.setStyle({"model": -1}, {ligand: {}})
+
+            return view
+
+        if file:
+            view = make_view(width="100%", height="100%")
+            html = view._make_html()
+
+            mrich.writing(file)
+            with open(file, "w") as f:
+                f.write(html)
+
+        view = make_view()
+        return view._repr_html_()
 
     def grid(self) -> None:
         """Draw a grid of this pose with its inspirations"""
