@@ -67,6 +67,7 @@ class PoseTable:
     ) -> None:
 
         self._db = db
+        self._interactions = None
 
     ### FACTORIES
 
@@ -146,6 +147,16 @@ class PoseTable:
                 lookup[i] = inchikey
 
         return lookup
+
+    @property
+    def interactions(self) -> "InteractionSet":
+        """Get a :class:`.InteractionSet`"""
+        if self._interactions is None:
+            from .iset import InteractionSet
+
+            self._interactions = InteractionSet.all(self.db)
+
+        return self._interactions
 
     ### METHODS
 
@@ -850,7 +861,7 @@ class PoseSet:
     @property
     def interactions(self) -> "InteractionSet":
         """Get a :class:`.InteractionSet` for this :class:`.Pose`"""
-        if not self._interactions:
+        if self._interactions is None:
             from .iset import InteractionSet
 
             self._interactions = InteractionSet.from_pose(self)

@@ -147,6 +147,29 @@ class InteractionSet:
         return self
 
     @classmethod
+    def all(
+        cls,
+        db: "Database",
+        table: str = "interaction",
+    ) -> "InteractionSet":
+        """Construct a :class:`.InteractionSet` for all interactions in the table.
+
+        :returns: an :class:`.InteractionSet`
+
+        """
+
+        sql = f"SELECT interaction_id FROM {table}"
+
+        ids = db.execute(sql).fetchall()
+
+        ids = [i for i, in ids]
+
+        self = cls.__new__(cls)
+        self.__init__(db, ids, table=table)
+
+        return self
+
+    @classmethod
     def from_residue(
         cls,
         db: "Database",
