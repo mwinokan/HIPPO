@@ -1886,6 +1886,7 @@ class HIPPO:
     def register_target(
         self,
         name: str,
+        warn_duplicate: bool = True,
     ) -> Target:
         """
         Register a new protein :class:`` to the Database
@@ -1896,7 +1897,7 @@ class HIPPO:
         :raises keyError: raises an exception
         """
 
-        target_id = self.db.insert_target(name=name)
+        target_id = self.db.insert_target(name=name, warn_duplicate=warn_duplicate)
 
         if not target_id:
             target_id = self.db.get_target_id(name=name)

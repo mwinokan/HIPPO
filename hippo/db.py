@@ -1231,6 +1231,7 @@ class Database:
         self,
         *,
         name: str,
+        warn_duplicate: bool = True,
     ) -> int:
         """Insert an entry into the target table
 
@@ -1248,7 +1249,8 @@ class Database:
             self.execute(sql, (name,))
 
         except sqlite3.IntegrityError as e:
-            mrich.warning(f"Skipping existing target with {name=}")
+            if warn_duplicate:
+                mrich.warning(f"Skipping existing target with {name=}")
             return None
 
         except Exception as e:
