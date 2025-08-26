@@ -84,6 +84,8 @@ class TagTable:
         for tag, count in cursor.fetchall():
             df.loc[tag, "num_posed_compounds"] = count
 
+        df = df.astype(int)
+
         mrich.print(df)
 
         return df
