@@ -1,6 +1,7 @@
 # from .db import Database
 from collections.abc import MutableSet
 import mcol
+import mrich
 
 
 class TagTable:
@@ -44,6 +45,32 @@ class TagTable:
         return set(v for v, in values)
 
     ### METHODS
+
+    def summary(self) -> "pd.DataFrame":
+        """Print a summary table of tags with compound and pose counts"""
+
+        from pandas import DataFrame
+
+        sql = """
+        SELECT tag_name,
+        COUNT(DISTINCT tag_compound),
+        COUNT(DISTINCT tag_pose)
+        FROM tag
+        GROUP BY tag_name
+        ORDER BY tag_name;
+        """
+
+        cursor = self.db.execute(sql)
+
+        data = [
+            dict(tag=a, num_compounds=b, num_poses=c) for a, b, c in cursor.fetchall()
+        ]
+
+        df = DataFrame(data)
+
+        mrich.print(df)
+
+        return df
 
     def delete(self, tag: str) -> None:
         """Delete all assignments for the given tag"""

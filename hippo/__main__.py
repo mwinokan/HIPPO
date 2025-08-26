@@ -1,6 +1,7 @@
 from .animal import HIPPO
 import mrich
 from typer import Typer
+from pathlib import Path
 
 app = Typer()
 
@@ -108,6 +109,19 @@ def verify():
 
     if os.path.exists(file_path):
         os.remove(file_path)
+
+
+@app.command()
+def tag_summary(
+    database: str,
+):
+    mrich.h1("hippo.calculate_scaffolds")
+
+    mrich.h3("Params")
+    mrich.var("database", database)
+
+    animal = setup_animal(database=database, backup=False)
+    animal.tags.summary()
 
 
 def main():
