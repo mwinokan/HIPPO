@@ -17,6 +17,19 @@ def setup_animal(
 
 
 @app.command()
+def backup(database: str):
+    """Backup database file"""
+    mrich.h1("hippo.calculate_scaffolds")
+
+    mrich.h3("Params")
+    mrich.var("database", database)
+
+    animal = setup_animal(database=database, backup=True)
+
+    mrich.success("Successfully backed up")
+
+
+@app.command()
 def calculate_scaffolds(
     database: str,
     backup: bool = True,
