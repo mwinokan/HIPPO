@@ -67,7 +67,7 @@ class TagTable:
         ]
 
         df = DataFrame(data)
-        df.set_index("tag")
+        df = df.set_index("tag")
 
         # compounds with poses
 
