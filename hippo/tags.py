@@ -67,6 +67,22 @@ class TagTable:
         ]
 
         df = DataFrame(data)
+        df.set_index("tag")
+
+        # compounds with poses
+
+        sql = """
+        SELECT tag_name, COUNT(DISTINCT pose_compound) FROM tag
+        INNER JOIN pose
+        ON tag_pose = pose_id
+        GROUP BY tag_name
+        ORDER BY tag_name;
+        """
+
+        cursor = self.db.execute(sql)
+
+        for tag, count in cursor.fetchall():
+            df.loc[tag, "num_posed_compounds"] = count
 
         mrich.print(df)
 
