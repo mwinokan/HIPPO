@@ -115,6 +115,8 @@ def verify():
 def tag_summary(
     database: str,
 ):
+    """Print a table of statistics for all tags in the database"""
+
     mrich.h1("hippo.calculate_scaffolds")
 
     mrich.h3("Params")
