@@ -1330,6 +1330,21 @@ class PoseSet:
 
         return PoseSet(self.db, ids, name=name)
 
+    def get_best_placed_poses_per_compound(self):
+        """Choose the best placed pose (best distance_score) grouped by compound"""
+
+        sql = f"""
+        SELECT pose_id, MIN(pose_distance_score) FROM pose
+        WHERE pose_id IN {self.str_ids}
+        GROUP BY pose_compound
+        """
+
+        cursor = self.db.execute(sql)
+
+        ids = [i for i, _ in cursor]
+
+        return PoseSet(self.db, ids)
+
     def filter(
         self,
         function=None,
