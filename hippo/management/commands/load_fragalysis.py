@@ -8,7 +8,7 @@ from mrich import print
 from pathlib import Path
 
 from rdkit.Chem import PandasTools
-from fragalysis.requests import download_target
+from fragalysis.requests.download import download_target
 from hippo.tools import inchikey_from_smiles
 from hippo.models import *
 import pandas as pd
@@ -119,6 +119,12 @@ class Command(BaseCommand):
 
             df["Compound code"] = df["Compound code"].replace({nan: None})
 
+            missing = df[df["Smiles"] == "missing"]
+
+            if len(missing):
+                mrich.warning(len(df), "rows have 'missing' Smiles")
+                df = df[df["Smiles"] != "missing"]
+
             ## COMPOUNDS
 
             if debug:
@@ -133,8 +139,11 @@ class Command(BaseCommand):
                 c.smiles: c
                 for c in Compound.objects.filter(smiles__in=smiles_map.values())
             }
+
             compounds = {
-                s_old: compounds[smiles] for s_old, smiles in smiles_map.items()
+                s_old: compounds[smiles]
+                for s_old, smiles in smiles_map.items()
+                if smiles in compounds
             }
 
             ## FILES
@@ -334,6 +343,9 @@ class Command(BaseCommand):
                     if not value:
                         continue
 
+                    if i not in poses:
+                        continue
+
                     pose = poses[i]
                     pose_tags.append(
                         dict(
@@ -354,6 +366,9 @@ class Command(BaseCommand):
                     tag_type = "ZINC ID"
                 elif comp_alias.startswith("ASAP-"):
                     tag_type = "ASAP ID"
+
+                if smiles not in compounds:
+                    continue
 
                 comp_tags.append(
                     dict(

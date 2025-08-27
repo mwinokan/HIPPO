@@ -364,7 +364,7 @@ class Compound(AbstractModel):
     ) -> dict[str, str]:
 
         # from .compound import Compound
-        from .tools import inchikey_from_smiles, sanitise_smiles
+        from .tools import inchikey_from_smiles, sanitise_smiles, SanitisationError
         from .orm.formatters import dict_formatter
 
         if metadata is None:
@@ -375,7 +375,12 @@ class Compound(AbstractModel):
         smiles_map = {}
         for s, m in zip(smiles, metadata):
 
-            s_new = sanitise_smiles(s, verbosity=False, radical=radical)
+            try:
+                s_new = sanitise_smiles(s, verbosity=False, radical=radical)
+            except SanitisationError:
+                mrich.error("Could not sanitise", s)
+                continue
+
             i = inchikey_from_smiles(s_new)
             m = dict_formatter(m)
 
@@ -1340,7 +1345,7 @@ class File(AbstractModel):
 
 class FragalysisDownload(AbstractModel):
 
-    from fragalysis.requests import STACKS
+    from fragalysis.requests.urls import STACKS
 
     STATUSES = {
         0: "PENDING",
