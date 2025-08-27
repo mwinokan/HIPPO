@@ -1332,24 +1332,45 @@ class PoseSet:
 
     def filter(
         self,
-        function,
+        function=None,
+        *,
+        key: str = None,
+        value: str = None,
+        operator="=",
         inverse: bool = False,
     ):
-        """Filter this :class:`.PoseSet` by selecting members where ``function(pose)`` is truthy
+        """Filter this :class:`.PoseSet` by selecting members where ``function(pose)`` is truthy or pass a key, value, and optional operator to search by database values
 
         :param function: callable object
+        :param key: database field for 'pose' table ('pose_' prefix not needed)
+        :param value: value to compare to
+        :param operator: comparison operator (default = "=")
         :param inverse: invert the selection (Default value = False)
 
         """
 
-        ids = set()
-        for pose in self:
-            value = function(pose)
-            # mrich.debug(f'{pose=} {value=}')
-            if value and not inverse:
-                ids.add(pose.id)
-            elif not value and inverse:
-                ids.add(pose.id)
+        if function:
+
+            ids = set()
+            for pose in self:
+                value = function(pose)
+                # mrich.debug(f'{pose=} {value=}')
+                if value and not inverse:
+                    ids.add(pose.id)
+                elif not value and inverse:
+                    ids.add(pose.id)
+
+            return PoseSet(self.db, ids)
+
+        sql = f"""
+        SELECT pose_id FROM pose
+        WHERE pose_id IN {self.str_ids}
+        AND pose_{key} {operator} {value}
+        """
+
+        cursor = self.db.execute(sql)
+
+        ids = [i for i, in cursor]
 
         return PoseSet(self.db, ids)
 
