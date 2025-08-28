@@ -3170,6 +3170,34 @@ class Database:
 
         return data
 
+    def get_pose_tag_dict(
+        self,
+        pset: "PoseSet | None" = None,
+    ) -> dict[int, set[str]]:
+        """Get a dictionary mapping pose ID's to their tags"""
+
+        if pset:
+            raise NotImplementedError
+
+        records = self.select(query="tag_name, tag_pose", table="tag", multiple=True)
+
+        data = {}
+        for tag_name, pose_id in records:
+            if pose_id not in data:
+                data[pose_id] = set()
+            data[pose_id].add(tag_name)
+
+        # null IDS
+        pose_ids = self.select(table="pose", query="pose_id", multiple=True)
+        pose_ids = set(q for q, in pose_ids)
+
+        null_ids = pose_ids - set(data.keys())
+
+        for c_id in null_ids:
+            data[c_id] = set()
+
+        return data
+
     def get_pose_id_interaction_ids_dict(self, pset: "PoseSet") -> dict[int, set]:
         """Get a dictionary mapping :class:`.Pose` ID's to their associated :class:`.Interaction` ID's"""
         records = self.execute(
@@ -3309,6 +3337,11 @@ class Database:
             d[compound_id].add(inspiration_id)
 
         return d
+
+    def get_inspiration_tuples(self) -> list[int, int]:
+        """Get a dictionary mapping :class:`.Pose` ID's to a set of :class:`Pose` ID's for the inspirations for the whole database"""
+        sql = """SELECT inspiration_original, inspiration_derivative FROM inspiration"""
+        return self.execute(sql).fetchall()
 
     def get_compound_id_obj_dict(self, cset: "CompoundSet") -> "dict[id, Compound]":
         """Get a dictionary mapping :class:`.Compound` ID's to their objects"""
