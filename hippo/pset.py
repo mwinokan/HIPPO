@@ -1796,6 +1796,8 @@ class PoseSet:
             reference_id=True,
             metadata=metadata,
             tags=tags,
+            energy_score=True,
+            distance_score=True,
             # sanitise_null_metadata_values=True,
             # sanitise_tag_list_separator=";",
             # sanitise_metadata_list_separator=";",
@@ -1856,11 +1858,11 @@ class PoseSet:
             "smiles": "smiles",
             "ref_pdb": "protein reference",
             "ref_mols": "fragment inspirations",
-            "original ID": "alias",
-            "compound inchikey": "compound inchikey",
+            "alias": "alias",
+            # "compound inchikey": "compound inchikey",
             "distance_score": "distance_score",
             "energy_score": "energy_score",
-            "subsites": "subsites",
+            # "subsites": "subsites",
         }
 
         if extra_cols:

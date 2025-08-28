@@ -2331,8 +2331,8 @@ class Database:
         sql = """
         INSERT OR IGNORE INTO pose(
             pose_inchikey, 
-            pose_alias, 
             pose_smiles, 
+            pose_alias, 
             pose_reference, 
             pose_path, 
             pose_compound, 
@@ -2348,12 +2348,17 @@ class Database:
         values = []
         for i, d in enumerate(dicts):
 
+            alias = d["alias"]
+
+            if not alias:
+                alias = None
+
             try:
                 values.append(
                     (
                         str(d["inchikey"]),
                         str(d["smiles"]),
-                        str(d["alias"]),
+                        alias,
                         int(d["reference_id"]),
                         str(d["path"]),
                         int(d["compound_id"]),
