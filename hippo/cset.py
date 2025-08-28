@@ -1573,7 +1573,6 @@ class CompoundSet:
         if poses or num_poses:
             if debug:
                 mrich.debug("adding pose column")
-            from .pset import PoseSet
 
             lookup = self.db.get_compound_id_pose_ids_dict(self)
             if poses:
@@ -1583,7 +1582,7 @@ class CompoundSet:
 
         if num_reactant or num_reactions:
             if debug:
-                mrich.debug("adding reaction column(s)")
+                mrich.debug("adding reaction columns")
             tuples = self.db.get_reactant_product_tuples(self.ids, deduplicated=False)
 
             if num_reactant:
@@ -1602,7 +1601,7 @@ class CompoundSet:
 
         if bases or elabs:
             if debug:
-                mrich.debug("adding scaffold column(s)")
+                mrich.debug("adding scaffold columns")
             tuples = self.db.get_scaffold_tuples(self.ids)
 
             if bases:
@@ -1621,13 +1620,13 @@ class CompoundSet:
 
         if tags:
             if debug:
-                mrich.debug("adding tag column(s)")
+                mrich.debug("adding tag column")
             lookup = self.db.get_compound_tag_dict()
             df["tags"] = df["id"].apply(lambda x: lookup.get(x, {}))
 
         if routes:
             if debug:
-                mrich.debug("adding route column(s)")
+                mrich.debug("adding route column")
             lookup = self.db.get_product_id_routes_dict()
             df["routes"] = df["id"].apply(lambda x: lookup.get(x, {}))
 
