@@ -1283,6 +1283,7 @@ class PoseSet:
         """
 
         if debug:
+            # print(sql)
             mrich.debug("querying...")
         records = self.db.execute(sql).fetchall()
 
