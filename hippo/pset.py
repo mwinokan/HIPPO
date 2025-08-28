@@ -1804,7 +1804,7 @@ class PoseSet:
 
         pose_df = pose_df.reset_index()
 
-        # add inspirations column (comma separated aliases)
+        # fix inspirations and reference column (comma separated aliases)
 
         lookup = self.db.get_pose_id_alias_dict()
 
@@ -1819,11 +1819,11 @@ class PoseSet:
             inspiration_strs.append(",".join(strs))
 
         pose_df["ref_mols"] = inspiration_strs
+        pose_df["ref_pdb"] = pose_df["reference_id"].apply(lambda x: lookup[x])
 
-        # add reference column (alias)
         # add compound identifier column (inchikey?)
 
-        drops = ["inspiration_ids"]
+        drops = ["inspiration_ids", "reference_id"]
 
         # if ingredients:
         #     drops.pop(drops.index("compound"))
@@ -1844,7 +1844,6 @@ class PoseSet:
                 "id": "HIPPO Pose ID",
                 "compound_id": "HIPPO Compound ID",
                 "mol": mol_col,
-                "reference_id": "ref_pdb",
                 # "smiles": "original SMILES",
                 # "compound_id": "compound inchikey",
             },
