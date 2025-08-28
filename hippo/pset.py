@@ -1197,37 +1197,181 @@ class PoseSet:
         return PoseSet(self.db, ids)
 
     def get_df(
-        self, skip_no_mol=True, reference: str = "name", mol: bool = False, **kwargs
+        self,
+        smiles: bool = True,
+        inchikey: bool = True,
+        alias: bool = True,
+        compound_id: bool = False,
+        target_id: bool = False,
+        reference_id: bool = False,
+        path: bool = False,
+        mol: bool = False,
+        energy_score: bool = False,
+        distance_score: bool = False,
+        metadata: bool = False,
+        expand_metadata: bool = True,
+        debug: bool = True,
+        inspiration_ids: bool = False,
+        derivative_ids: bool = False,
+        tags: bool = False,
+        # skip_no_mol=True, reference: str = "name", mol: bool = False, **kwargs
     ) -> "pandas.DataFrame":
-        """Get a DataFrame of the poses in this set. Keyword arguments passed to :meth:`.Pose.get_dict`.
+        """Get a DataFrame of the poses in this set.
 
-        :param skip_no_mol: skip poses that have no mol (Default value = True)
-
+        :param smiles: include SMILES column (Default value = True)
+        :param inchikey: include InChIKey column (Default value = True)
+        :param alias: include alias column (Default value = True)
+        :param compound_id: include :class:`.Compound` ID column (Default value = False)
+        :param reference_id: include reference :class:`.Pose` ID column (Default value = False)
+        :param target_id: include reference :class:`.Target` ID column (Default value = False)
+        :param path: include path column (Default value = False)
+        :param mol: include ``rdkit.Chem.Mol`` in output (Default value = False)
+        :param energy_score: include energy_score column (Default value = False)
+        :param distance_score: include distance_score column (Default value = False)
+        :param metadata: include metadata in output (Default value = False)
+        :param expand_metadata: create separate column for each metadata key (Default value = True)
+        :param inspiration_ids: include inspiration :class:`.Pose` ID column
+        :param derivative_ids: include derivative :class:`.Pose` ID column
+        :param tags: include tags column
         """
 
+        from json import loads
+        from rdkit.Chem import Mol
         from pandas import DataFrame
 
+        query = ["pose_id"]
+
+        if smiles:
+            query.append("pose_smiles")
+
+        if inchikey:
+            query.append("pose_inchikey")
+
+        if alias:
+            query.append("pose_alias")
+
+        if reference_id:
+            query.append("pose_reference")
+
+        if path:
+            query.append("pose_path")
+
+        if compound_id:
+            query.append("pose_compound")
+
+        if target_id:
+            query.append("pose_target")
+
+        if mol:
+            query.append("pose_mol")
+
+        if energy_score:
+            query.append("pose_energy_score")
+
+        if distance_score:
+            query.append("pose_distance_score")
+
+        if metadata:
+            query.append("pose_metadata")
+
+        query = ", ".join(query)
+
+        sql = f"""
+        SELECT {query}
+        FROM pose
+        WHERE pose_id IN {self.str_ids}
+        """
+
+        if debug:
+            mrich.debug("querying...")
+        records = self.db.execute(sql).fetchall()
+
+        if debug:
+            generator = mrich.track(records)
+        else:
+            generator = records
+
         data = []
+        for row in generator:
 
-        # if len(self) > 100:
-        gen = mrich.track(enumerate(self), prefix="PoseSet --> DataFrame")
-        track = True
-        # else:
-        #     gen = enumerate(self)
-        #     track = False
+            row = list(row)
 
-        for i, pose in gen:
+            d = dict(id=row.pop(0))
 
-            d = pose.get_dict(reference=reference, mol=mol, **kwargs)
+            if smiles:
+                d["smiles"] = row.pop(0)
 
-            mrich.set_progress_field("progress", f"{i+1}/{len(self)}")
+            if inchikey:
+                d["inchikey"] = row.pop(0)
 
-            if skip_no_mol and not d["mol"]:
-                mrich.warning(f'Skipping pose with no mol: {d["id"]} {d["name"]}')
-                continue
+            if alias:
+                d["alias"] = row.pop(0)
+
+            if reference_id:
+                d["reference_id"] = row.pop(0)
+
+            if path:
+                d["path"] = row.pop(0)
+
+            if compound_id:
+                d["compound_id"] = row.pop(0)
+
+            if target_id:
+                d["target_id"] = row.pop(0)
+
+            if mol:
+                d["mol"] = Mol(row.pop(0))
+
+            if energy_score:
+                d["energy_score"] = row.pop(0)
+
+            if distance_score:
+                d["distance_score"] = row.pop(0)
+
+            if metadata and (meta_str := row.pop(0)):
+
+                meta_dict = loads(meta_str) or {}
+
+                if expand_metadata:
+                    for k, v in meta_dict.items():
+                        d[k] = v
+
+                else:
+                    d["metadata"] = meta_dict
+
             data.append(d)
 
-        return DataFrame(data)
+        df = DataFrame(data)
+
+        if inspiration_ids or derivative_ids:
+            if debug:
+                mrich.debug("adding inspiration column(s)")
+
+            tuples = self.db.get_inspiration_tuples()
+
+            if inspiration_ids:
+                lookup = {}
+                for inspiration, derivative in tuples:
+                    lookup.setdefault(derivative, set())
+                    lookup[derivative].add(inspiration)
+                df["inspiration_ids"] = df["id"].apply(lambda x: lookup.get(x, {}))
+
+            if derivative_ids:
+                lookup = {}
+                for inspiration, derivative in tuples:
+                    lookup.setdefault(inspiration, set())
+                    lookup[inspiration].add(derivative)
+                df["derivative_ids"] = df["id"].apply(lambda x: lookup.get(x, {}))
+
+        if tags:
+            if debug:
+                mrich.debug("adding tag column")
+            lookup = self.db.get_pose_tag_dict()
+            df["tags"] = df["id"].apply(lambda x: lookup.get(x, {}))
+
+        df = df.set_index("id")
+
+        return df
 
     def get_by_reference(
         self,
