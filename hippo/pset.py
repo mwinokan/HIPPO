@@ -1816,7 +1816,7 @@ class PoseSet:
                 if not alias:
                     continue
                 strs.append(alias)
-            ",".join(strs)
+            inspiration_strs.append(",".join(strs))
 
         pose_df["ref_mols"] = inspiration_strs
 
