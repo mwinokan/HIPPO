@@ -1699,13 +1699,13 @@ class PoseSet:
         sort_by: str | None = None,
         sort_reverse: bool = False,
         generate_pdbs: bool = False,
-        ingredients: IngredientSet = None,
+        # ingredients: IngredientSet = None,
         skip_no_reference: bool = True,
         skip_no_inspirations: bool = True,
         skip_metadata: list[str] | None = None,
         tags: bool = True,
         extra_cols: dict[str, list] = None,
-        name_col: str = "name",
+        # name_col: str = "name",
         **kwargs,
     ):
         """Prepare an SDF for upload to the RHS of Fragalysis.
@@ -1739,32 +1739,6 @@ class PoseSet:
 
         # make sure references are defined:
 
-        # values = self.db.select_where(
-        #     table="pose",
-        #     query="DISTINCT pose_id",
-        #     key=f"pose_reference IS NULL and pose_id in {self.str_ids}",
-        #     multiple=True,
-        #     none="quiet",
-        # )
-
-        # if values:
-        #     poses_missing_refs = set(v for v, in values)
-        #     added_refs = PoseSet(self.db)
-
-        #     for pose in PoseSet(self.db, poses_missing_refs):
-        #         if "hits" in pose.tags:
-        #             pose.reference = pose.id
-        #             added_refs._indices.append(pose.id)
-
-        #     poses_missing_refs -= set(added_refs.ids)
-        # else:
-        #     poses_missing_refs = None
-
-        # if poses_missing_refs:
-        #     mrich.warning(f"{len(poses_missing_refs)} Poses missing reference")
-        #     mrich.var("poses w/o reference", poses_missing_refs)
-        #     poses = PoseSet(self.db, set(self.ids) - poses_missing_refs)
-
         mrich.debug(len(self), "poses in set")
         poses = None
 
@@ -1777,6 +1751,9 @@ class PoseSet:
                 multiple=True,
                 none="error",
             )
+
+            if not values:
+                return
 
             poses = PoseSet(self.db, [i for i, in values])
 
@@ -1795,6 +1772,9 @@ class PoseSet:
                 none="error",
             )
 
+            if not values:
+                return
+
             poses = PoseSet(self.db, [i for i, in values])
 
             mrich.debug(len(poses), "remaining after skipping null inspirations")
@@ -1808,32 +1788,53 @@ class PoseSet:
 
         pose_df = poses.get_df(
             mol=True,
-            inspirations="names",
-            subsites="names",
-            duplicate_name="original ID",
-            reference="name",
+            inspiration_ids=True,
+            # subsites="names",
+            # duplicate_name="original ID",
+            compound_id=True,
+            reference_id=True,
             metadata=metadata,
             tags=tags,
-            sanitise_null_metadata_values=True,
-            sanitise_tag_list_separator=";",
-            sanitise_metadata_list_separator=";",
-            skip_metadata=skip_metadata,
-            **kwargs,
+            # sanitise_null_metadata_values=True,
+            # sanitise_tag_list_separator=";",
+            # sanitise_metadata_list_separator=";",
+            # skip_metadata=skip_metadata,
+            # **kwargs,
         )
 
-        drops = ["path", "compound", "target", "ref_pdb", "original SMILES"]
+        pose_df = pose_df.reset_index()
 
-        if ingredients:
-            drops.pop(drops.index("compound"))
+        # add inspirations column (comma separated aliases)
 
-        prev = len(pose_df)
-        pose_df = pose_df[pose_df["reference"].notna()]
-        if len(pose_df) < prev:
-            mrich.warning(f"Skipping {prev - len(pose_df)} Poses with no reference")
+        lookup = self.db.get_pose_id_alias_dict()
+
+        inspiration_strs = []
+        for i, row in pose_df.iterrows():
+            strs = []
+            for i in row["inspiration_ids"]:
+                alias = lookup.get(i)
+                if not alias:
+                    continue
+                strs.append(alias)
+            ",".join(strs)
+
+        # add reference column (alias)
+        # add compound identifier column (inchikey?)
+
+        drops = ["inspiration_ids"]
+
+        # if ingredients:
+        #     drops.pop(drops.index("compound"))
+
+        if skip_no_reference:
+            prev = len(pose_df)
+            pose_df = pose_df[pose_df["reference"].notna()]
+            if len(pose_df) < prev:
+                mrich.warning(f"Skipping {prev - len(pose_df)} Poses with no reference")
 
         pose_df = pose_df.drop(columns=drops, errors="ignore")
 
-        pose_df[_name_col] = pose_df[name_col]
+        pose_df[_name_col] = pose_df["alias"]
 
         pose_df.rename(
             inplace=True,
@@ -1841,10 +1842,10 @@ class PoseSet:
                 "id": "HIPPO Pose ID",
                 "compound_id": "HIPPO Compound ID",
                 "mol": mol_col,
-                "inspirations": "ref_mols",
-                "reference": "ref_pdb",
-                "smiles": "original SMILES",
-                "compound": "compound inchikey",
+                "inspiration": "ref_mols",
+                "reference_id": "ref_pdb",
+                # "smiles": "original SMILES",
+                # "compound_id": "compound inchikey",
             },
         )
 
@@ -1854,7 +1855,7 @@ class PoseSet:
             "smiles": "smiles",
             "ref_pdb": "protein reference",
             "ref_mols": "fragment inspirations",
-            "original ID": "original ID",
+            "original ID": "alias",
             "compound inchikey": "compound inchikey",
             "distance_score": "distance_score",
             "energy_score": "energy_score",
@@ -1865,47 +1866,47 @@ class PoseSet:
             for key, value in extra_cols.items():
                 extras[key] = value[0]
 
-        if ingredients:
+        # if ingredients:
 
-            q_entries = []
-            q_prices = []
-            q_lead_times = []
-            q_amounts = []
+        #     q_entries = []
+        #     q_prices = []
+        #     q_lead_times = []
+        #     q_amounts = []
 
-            currency = None
+        #     currency = None
 
-            for i, row in pose_df.iterrows():
+        #     for i, row in pose_df.iterrows():
 
-                compound_id = self.db.get_compound_id(inchikey=row["compound inchikey"])
+        #         compound_id = self.db.get_compound_id(inchikey=row["compound inchikey"])
 
-                ingredient = ingredients(compound_id=compound_id)
+        #         ingredient = ingredients(compound_id=compound_id)
 
-                if isinstance(ingredient, IngredientSet):
-                    ingredient = sorted(
-                        [i for i in ingredient], key=lambda x: x.quote.price
-                    )[0]
+        #         if isinstance(ingredient, IngredientSet):
+        #             ingredient = sorted(
+        #                 [i for i in ingredient], key=lambda x: x.quote.price
+        #             )[0]
 
-                quote = ingredient.quote
-                if not currency:
-                    currency = quote.currency
-                else:
-                    assert quote.currency == currency
+        #         quote = ingredient.quote
+        #         if not currency:
+        #             currency = quote.currency
+        #         else:
+        #             assert quote.currency == currency
 
-                q_entries.append(quote.entry_str)
-                q_prices.append(quote.price)
-                q_lead_times.append(quote.lead_time)
-                q_amounts.append(quote.amount)
+        #         q_entries.append(quote.entry_str)
+        #         q_prices.append(quote.price)
+        #         q_lead_times.append(quote.lead_time)
+        #         q_amounts.append(quote.amount)
 
-            pose_df["Supplier Catalogue Entry"] = q_entries
-            # pose_df['Supplier:Catalogue:Entry'] = q_entries
-            pose_df[f"Price ({currency})"] = q_prices
-            pose_df["Lead time (working days)"] = q_lead_times
-            pose_df["Amount (mg)"] = q_amounts
+        #     pose_df["Supplier Catalogue Entry"] = q_entries
+        #     # pose_df['Supplier:Catalogue:Entry'] = q_entries
+        #     pose_df[f"Price ({currency})"] = q_prices
+        #     pose_df["Lead time (working days)"] = q_lead_times
+        #     pose_df["Amount (mg)"] = q_amounts
 
-            extras["Supplier Catalogue Entry"] = "Supplier Catalogue Entry string"
-            extras[f"Price ({currency})"] = "Quoted price"
-            extras["Lead time (working days)"] = "Quoted lead-time"
-            extras["Amount (mg)"] = "Quoted amount"
+        #     extras["Supplier Catalogue Entry"] = "Supplier Catalogue Entry string"
+        #     extras[f"Price ({currency})"] = "Quoted price"
+        #     extras["Lead time (working days)"] = "Quoted lead-time"
+        #     extras["Amount (mg)"] = "Quoted amount"
 
         if generate_pdbs:
 
