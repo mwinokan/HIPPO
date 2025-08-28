@@ -1818,6 +1818,8 @@ class PoseSet:
                 strs.append(alias)
             ",".join(strs)
 
+        pose_df["ref_mols"] = inspiration_strs
+
         # add reference column (alias)
         # add compound identifier column (inchikey?)
 
@@ -1842,7 +1844,6 @@ class PoseSet:
                 "id": "HIPPO Pose ID",
                 "compound_id": "HIPPO Compound ID",
                 "mol": mol_col,
-                "inspiration": "ref_mols",
                 "reference_id": "ref_pdb",
                 # "smiles": "original SMILES",
                 # "compound_id": "compound inchikey",
