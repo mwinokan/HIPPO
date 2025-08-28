@@ -1416,7 +1416,12 @@ class Pose:
                     "Electrostatic": "red",
                 }
 
-                df = self.interactions.df
+                iset = self.interactions
+
+                if not iset:
+                    return view
+
+                df = iset.df
 
                 residues = set()
 
