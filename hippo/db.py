@@ -2331,8 +2331,8 @@ class Database:
         sql = """
         INSERT OR IGNORE INTO pose(
             pose_inchikey, 
-            pose_alias, 
             pose_smiles, 
+            pose_alias, 
             pose_reference, 
             pose_path, 
             pose_compound, 
