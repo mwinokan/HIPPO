@@ -1828,7 +1828,7 @@ class PoseSet:
 
         if skip_no_reference:
             prev = len(pose_df)
-            pose_df = pose_df[pose_df["reference"].notna()]
+            pose_df = pose_df[pose_df["reference_id"].notna()]
             if len(pose_df) < prev:
                 mrich.warning(f"Skipping {prev - len(pose_df)} Poses with no reference")
 
