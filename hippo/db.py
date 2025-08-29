@@ -2573,7 +2573,7 @@ class Database:
         else:
             return murcko_data
 
-    def set_derivative_subsites(self) -> None:
+    def set_derivative_subsites(self, commit: bool = True) -> None:
         """Propagate all subsite assignments from inspirations to their derivatives"""
 
         sql = """
@@ -2584,7 +2584,9 @@ class Database:
         """
 
         self.execute(sql)
-        self.commit()
+
+        if commit:
+            self.commit()
 
     ### GETTERS
 
