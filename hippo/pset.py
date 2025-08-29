@@ -1604,6 +1604,7 @@ class PoseSet:
         )
 
         subsites = set()
+        subsite_tags = set()
 
         for pose_id, pose_target, metadata in records:
 
@@ -1613,8 +1614,10 @@ class PoseSet:
 
             if not key:
                 mrich.warning(field, "not in metadata pose_id=", pose_id)
+                continue
 
             subsites.add((pose_target, key))
+            subsite_tags.add((key, pose_id))
 
         sql = """
         INSERT OR IGNORE INTO subsite(subsite_target, subsite_name)
@@ -1626,7 +1629,16 @@ class PoseSet:
         subsite_ids = [i for i, in records]
         subsite_lookup = {name: i for (t, name), i in zip(subsites, subsite_ids)}
 
-        print(subsite_lookup)
+        sql = """
+        INSERT OR IGNORE INTO subsite_tag(subsite_tag_ref, subsite_tag_pose)
+        VALUES(?1, ?2)
+        """
+
+        subsite_tags = [
+            (subsite_lookup[subsite], pose_id) for subsite, pose_id in subsite_tags
+        ]
+
+        self.db.executemany(sql, subsite_tags)
 
         self.db.commit()
 
