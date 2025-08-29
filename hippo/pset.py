@@ -1605,7 +1605,7 @@ class PoseSet:
 
         subsites = set()
 
-        for pose_id, pose_target, metadata in records.items():
+        for pose_id, pose_target, metadata in records:
 
             metadata = loads(metadata)
 
