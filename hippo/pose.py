@@ -427,6 +427,11 @@ class Pose:
         return self.get_inspirations()
 
     @property
+    def derivatives(self) -> "PoseSet":
+        """Returns the pose's derivatives"""
+        return self.get_derivatives()
+
+    @property
     def features(self) -> "list[molparse.rdkit.Feature]":
         """Returns the pose's features"""
         return mp.rdkit.features_from_mol(self.mol)
@@ -668,6 +673,20 @@ class Pose:
             return None
         return set([v for v, in inspirations])
 
+    def get_derivative_ids(self) -> list[int]:
+        """Get the :class:`.Pose` IDs of this pose's derivatives"""
+        derivatives = self.db.select_where(
+            query="inspiration_derivative",
+            table="inspiration",
+            key="original",
+            value=self.id,
+            multiple=True,
+            none="quiet",
+        )
+        if not derivatives:
+            return None
+        return set([v for v, in derivatives])
+
     def get_inspirations(self) -> "PoseSet":
         """Get a :class:`.PoseSet` of this pose's inspirations"""
         if not (inspirations := self.get_inspiration_ids()):
@@ -676,6 +695,15 @@ class Pose:
         from .pset import PoseSet
 
         return PoseSet(self.db, indices=inspirations)
+
+    def get_derivatives(self) -> "PoseSet":
+        """Get a :class:`.PoseSet` of this pose's derivatives"""
+        if not (derivatives := self.get_derivative_ids()):
+            return None
+
+        from .pset import PoseSet
+
+        return PoseSet(self.db, indices=derivatives)
 
     def get_dict(
         self,
