@@ -1629,6 +1629,16 @@ class PoseSet:
         subsite_ids = [i for i, in records]
         subsite_lookup = {name: i for (t, name), i in zip(subsites, subsite_ids)}
 
+        # supplement existing subsites
+        subsite_lookup.update(
+            {
+                n: i
+                for i, n in self.db.select(
+                    table="subsite", query="subsite_id, subsite_name", multiple=True
+                )
+            }
+        )
+
         sql = """
         INSERT OR IGNORE INTO subsite_tag(subsite_tag_ref, subsite_tag_pose)
         VALUES(?1, ?2)
