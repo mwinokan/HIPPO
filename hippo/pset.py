@@ -1607,7 +1607,7 @@ class PoseSet:
 
         subsites = {}
 
-        for pose_id, metadata in metadata:
+        for pose_id, metadata in metadata.items():
 
             key = metadata.get(field)
 
