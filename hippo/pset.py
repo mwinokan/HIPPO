@@ -2491,7 +2491,7 @@ class PoseSet:
         drawing = draw_grid(mols, labels=labels)
         display(drawing)
 
-    def subsite_summary(self) -> None:
+    def subsite_summary(self) -> "pd.DataFrame":
         """Print a table counting poses by subsite"""
 
         from pandas import DataFrame
@@ -2513,6 +2513,8 @@ class PoseSet:
         df = df.sort_values(by="num_poses", ascending=False)
 
         mrich.print(df)
+
+        return df
 
     ### PRIVATE
 
