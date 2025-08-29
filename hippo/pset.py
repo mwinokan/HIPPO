@@ -1598,27 +1598,37 @@ class PoseSet:
 
         records = self.db.select_where(
             table="pose",
-            query="pose_id, pose_metadata",
+            query="pose_id, pose_target, pose_metadata",
             key=f"pose_id IN {self.str_ids}",
             multiple=True,
         )
 
-        metadata = {k: loads(v) for k, v in records}
+        subsites = set()
 
-        subsites = {}
+        for pose_id, pose_target, metadata in records.items():
 
-        for pose_id, metadata in metadata.items():
+            metadata = loads(metadata)
 
             key = metadata.get(field)
 
             if not key:
                 mrich.warning(field, "not in metadata pose_id=", pose_id)
 
-            subsites.setdefault(key, set())
+            subsites.add((pose_target, key))
 
-            subsites[key].add(pose_id)
+        sql = """
+        INSERT OR IGNORE INTO subsite(subsite_target, subsite_name)
+        VALUES(?1, ?2)
+        RETURNING subsite_id
+        """
 
-        print(subsites.keys())
+        records = self.db.executemany(sql, list(subsites))
+        subsite_ids = [i for i, in records]
+        subsite_lookup = {name: i for (t, name), i in zip(subsites, subsite_ids)}
+
+        print(subsite_lookup)
+
+        self.db.commit()
 
     ### SPLITTING
 
