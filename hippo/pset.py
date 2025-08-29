@@ -2508,6 +2508,8 @@ class PoseSet:
 
         df = DataFrame([dict(subsite=name, num_poses=count) for name, count in cursor])
 
+        df = df.set_index("subsite")
+
         mrich.print(df)
 
     ### PRIVATE
