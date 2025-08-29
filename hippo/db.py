@@ -2573,6 +2573,18 @@ class Database:
         else:
             return murcko_data
 
+    def set_derivative_subsites(self) -> None:
+        """Propagate all subsite assignments from inspirations to their derivatives"""
+
+        sql = """
+        INSERT OR IGNORE INTO subsite_tag(subsite_tag_ref, subsite_tag_pose)
+        SELECT subsite_tag_ref, inspiration_derivative FROM subsite_tag
+        INNER JOIN inspiration
+        ON subsite_tag_pose = inspiration_original
+        """
+
+        self.execute(sql)
+
     ### GETTERS
 
     def get_compound(
