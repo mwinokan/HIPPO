@@ -2510,6 +2510,8 @@ class PoseSet:
 
         df = df.set_index("subsite")
 
+        df = df.sort_values(by="num_poses", ascending=False)
+
         mrich.print(df)
 
     ### PRIVATE
