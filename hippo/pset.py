@@ -2491,6 +2491,24 @@ class PoseSet:
         drawing = draw_grid(mols, labels=labels)
         display(drawing)
 
+    def subsite_summary(self) -> None:
+        """Print a table counting poses by subsite"""
+
+        from pandas import DataFrame
+
+        sql = f"""
+        SELECT subsite_name, COUNT(DISTINCT subsite_tag_pose) FROM subsite
+        INNER JOIN subsite_tag
+        ON subsite_id = subsite_tag_ref
+        WHERE subsite_tag_pose IN {self.str_ids}
+        """
+
+        cursor = self.db.exeucte(sql)
+
+        df = DataFrame([dict(subsite=name, num_poses=count) for name, count in cursor])
+
+        mrich.print(df)
+
     ### PRIVATE
 
     def _delete(self, *, force: bool = False) -> None:
