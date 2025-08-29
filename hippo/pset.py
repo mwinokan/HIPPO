@@ -2501,6 +2501,7 @@ class PoseSet:
         INNER JOIN subsite_tag
         ON subsite_id = subsite_tag_ref
         WHERE subsite_tag_pose IN {self.str_ids}
+        GROUP BY subsite_name
         """
 
         cursor = self.db.execute(sql)
