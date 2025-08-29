@@ -1941,6 +1941,12 @@ class Database:
 
         self.delete_where(table="feature", key="feature_id > 0")
 
+    def delete_subsites(self) -> None:
+        """Delete all protein subsites"""
+
+        self.delete_where(table="subsite", key="subsite_id > 0")
+        self.delete_where(table="subsite_tag", key="subsite_tag_id > 0")
+
     ### UPDATE
 
     def update(
