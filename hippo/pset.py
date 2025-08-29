@@ -2503,7 +2503,7 @@ class PoseSet:
         WHERE subsite_tag_pose IN {self.str_ids}
         """
 
-        cursor = self.db.exeucte(sql)
+        cursor = self.db.execute(sql)
 
         df = DataFrame([dict(subsite=name, num_poses=count) for name, count in cursor])
 
