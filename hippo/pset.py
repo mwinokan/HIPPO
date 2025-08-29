@@ -1778,6 +1778,7 @@ class PoseSet:
         skip_no_inspirations: bool = True,
         skip_metadata: list[str] | None = None,
         tags: bool = True,
+        subsites: bool = True,
         extra_cols: dict[str, list] = None,
         # name_col: str = "name",
         **kwargs,
@@ -1797,6 +1798,7 @@ class PoseSet:
         :param generate_pdbs: generate accompanying protein-ligand complex PDBs (Default value = False)
         :param ingredients: get procurement and amount information from this :class:`.IngredientSet` (Default value = None)
         :param tags: include a column for tags in the output (Default value = True)
+        :param subsites: include a column for subsites in the output (Default value = True)
         :param extra_cols: extra_cols should be a dictionary with a key for each column name, and list values where the first element is the field description, and all subsequent elements are values for each pose.
         :param name: How to determine the molecule name, see :meth:`.PoseSet.get_df`
 
@@ -1863,12 +1865,12 @@ class PoseSet:
         pose_df = poses.get_df(
             mol=True,
             inspiration_ids=True,
-            subsites=True,
             # duplicate_name="original ID",
             compound_id=True,
             reference_id=True,
             metadata=metadata,
             tags=tags,
+            subsites=subsites,
             energy_score=True,
             distance_score=True,
             # sanitise_null_metadata_values=True,
@@ -1895,7 +1897,11 @@ class PoseSet:
             inspiration_strs.append(",".join(strs))
 
         # comma separate subsites
-        pose_df["subsites"] = pose_df["subsites"].apply(lambda x: ",".join(x))
+        if subsites:
+            pose_df["subsites"] = pose_df["subsites"].apply(lambda x: ",".join(x))
+
+        if tags:
+            pose_df["tags"] = pose_df["tags"].apply(lambda x: ",".join(x))
 
         pose_df["ref_mols"] = inspiration_strs
         pose_df["ref_pdb"] = pose_df["reference_id"].apply(lambda x: lookup[x])
@@ -1938,8 +1944,13 @@ class PoseSet:
             # "compound inchikey": "compound inchikey",
             "distance_score": "distance_score",
             "energy_score": "energy_score",
-            "subsites": "subsites",
         }
+
+        if subsites:
+            extras["subsites"] = "subsites"
+
+        if tags:
+            extras["tags"] = "tags"
 
         if extra_cols:
             for key, value in extra_cols.items():
