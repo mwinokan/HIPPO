@@ -2584,6 +2584,7 @@ class Database:
         """
 
         self.execute(sql)
+        self.commit()
 
     ### GETTERS
 
