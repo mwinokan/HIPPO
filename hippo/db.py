@@ -3224,6 +3224,38 @@ class Database:
 
         return data
 
+    def get_pose_subsite_names_dict(self) -> dict[int, set[str]]:
+        """Get a dictionary mapping pose ID's to their subsite names"""
+
+        lookup = {
+            i: n
+            for i, n in self.select(
+                query="subsite_id, subsite_name", table="subsite", multiple=True
+            )
+        }
+
+        records = self.select(
+            query="subsite_tag_ref, subsite_tag_pose",
+            table="subsite_tag",
+            multiple=True,
+        )
+
+        data = {}
+        for subsite_id, pose_id in records:
+            data.setdefault(pose_id, set())
+            data[pose_id].add(lookup[subsite_id])
+
+        # null IDS
+        pose_ids = self.select(table="pose", query="pose_id", multiple=True)
+        pose_ids = set(q for q, in pose_ids)
+
+        null_ids = pose_ids - set(data.keys())
+
+        for c_id in null_ids:
+            data[c_id] = set()
+
+        return data
+
     def get_pose_id_interaction_ids_dict(self, pset: "PoseSet") -> dict[int, set]:
         """Get a dictionary mapping :class:`.Pose` ID's to their associated :class:`.Interaction` ID's"""
         records = self.execute(

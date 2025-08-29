@@ -1214,6 +1214,7 @@ class PoseSet:
         inspiration_ids: bool = False,
         derivative_ids: bool = False,
         tags: bool = False,
+        subsites: bool = False,
         # skip_no_mol=True, reference: str = "name", mol: bool = False, **kwargs
     ) -> "pandas.DataFrame":
         """Get a DataFrame of the poses in this set.
@@ -1233,6 +1234,7 @@ class PoseSet:
         :param inspiration_ids: include inspiration :class:`.Pose` ID column
         :param derivative_ids: include derivative :class:`.Pose` ID column
         :param tags: include tags column
+        :param subsites: include subsites column
         """
 
         from json import loads
@@ -1369,6 +1371,12 @@ class PoseSet:
                 mrich.debug("adding tag column")
             lookup = self.db.get_pose_tag_dict()
             df["tags"] = df["id"].apply(lambda x: lookup.get(x, {}))
+
+        if subsites:
+            if debug:
+                mrich.debug("adding subsite column")
+            lookup = self.db.get_pose_subsite_names_dict()
+            df["subsites"] = df["id"].apply(lambda x: lookup.get(x, set()))
 
         df = df.set_index("id")
 
@@ -1855,7 +1863,7 @@ class PoseSet:
         pose_df = poses.get_df(
             mol=True,
             inspiration_ids=True,
-            # subsites="names",
+            subsites=True,
             # duplicate_name="original ID",
             compound_id=True,
             reference_id=True,
@@ -1885,6 +1893,9 @@ class PoseSet:
                     continue
                 strs.append(alias)
             inspiration_strs.append(",".join(strs))
+
+        # comma separate subsites
+        pose_df["subsites"] = pose_df["subsites"].apply(lambda x: ",".join(x))
 
         pose_df["ref_mols"] = inspiration_strs
         pose_df["ref_pdb"] = pose_df["reference_id"].apply(lambda x: lookup[x])
@@ -1927,7 +1938,7 @@ class PoseSet:
             # "compound inchikey": "compound inchikey",
             "distance_score": "distance_score",
             "energy_score": "energy_score",
-            # "subsites": "subsites",
+            "subsites": "subsites",
         }
 
         if extra_cols:
