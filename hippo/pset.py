@@ -1622,7 +1622,7 @@ class PoseSet:
         RETURNING subsite_id
         """
 
-        records = self.db.executemany(sql, list(subsites))
+        records = self.db.executemany(sql, sorted(list(subsites)))
         subsite_ids = [i for i, in records]
         subsite_lookup = {name: i for (t, name), i in zip(subsites, subsite_ids)}
 
