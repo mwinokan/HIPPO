@@ -1587,6 +1587,39 @@ class PoseSet:
             metadata = self.db.get_metadata(table="pose", id=id)
             metadata.append(key, value)
 
+    def set_subsites_from_metadata_field(self, field="CanonSites alias") -> None:
+        """Create and assign subsite entries from a metadata field
+
+        :param field: the metadata field to use
+
+        """
+
+        from json import loads
+
+        records = self.db.select_where(
+            table="pose",
+            query="pose_id, pose_metadata",
+            key=f"pose_id IN {self.str_ids}",
+            multiple=True,
+        )
+
+        metadata = {k: loads(v) for k, v in records}
+
+        subsites = {}
+
+        for pose_id, metadata in metadata:
+
+            key = metadata.get(field)
+
+            if not key:
+                mrich.warning(field, "not in metadata pose_id=", pose_id)
+
+            subsites.setdefault(key, set())
+
+            subsites[key].add(pose_id)
+
+        print(subsites.keys())
+
     ### SPLITTING
 
     def split_by_reference(self) -> "dict[int,PoseSet]":
