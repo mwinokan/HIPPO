@@ -1734,23 +1734,30 @@ class PoseSet:
     def write_sdf(
         self,
         out_path: str,
-        name_col: str = "name",
-        inspirations: bool | str = "fragalysis",
+        name_col: str = "alias",
+        inspiration_ids: bool = False,
+        inspiration_aliases: bool = False,
         **kwargs,
     ) -> None:
         """Write an SDF
 
         :param out_path: filepath of the output
         :param name_col: pose property to use as the name column, can be ``["name", "alias", "inchikey", "id"]`` (Default value = 'name')
-        :param inspirations: Include inspirations? ``[True, False, 'fragalysis']`` Specify ``fragalysis`` to format as a comma-separated string (Default value = "fragalysis")
-
+        :param inspiration_ids: include inspiration :class:`.Pose` ID column
+        :param inspiration_aliases: include inspiration :class:`.Pose` alias column
+        :param fragalysis_inspirations: create inspirations column "ref_mols"
         """
 
         from pathlib import Path
         import json
 
-        if inspirations:
-            df = self.get_df(mol=True, inspiration_ids=True, **kwargs)
+        df = self.get_df(
+            mol=True,
+            inspiration_ids=inspiration_ids,
+            inspiration_aliases=inspiration_aliases,
+            name=name_col == "name",
+            **kwargs,
+        )
 
         if name_col not in ["name", "alias", "inchikey", "id"]:
             # try getting name from metadata
@@ -2333,7 +2340,6 @@ class PoseSet:
         sdf_name = out_dir / f"{out_key}_syndirella_inspiration_hits.sdf"
         inspirations.write_sdf(
             sdf_name,
-            inspirations=False,
             tags=False,
             metadata=False,
             name_col="name",
