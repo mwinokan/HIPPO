@@ -1134,7 +1134,7 @@ class HIPPO:
 
         df = pd.read_pickle(pickle_path)
 
-        for i, row in df.iterrows():
+        for i, row in mrich.track(df.iterrows()):
 
             d = row.to_dict()
 
