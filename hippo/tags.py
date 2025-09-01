@@ -94,7 +94,7 @@ class TagTable:
         """Rename all instances of a tag across the database"""
 
         sql = """
-        UPDATE tag
+        UPDATE OR IGNORE tag
         SET tag_name = ?2
         WHERE tag_name = ?1;
         """
