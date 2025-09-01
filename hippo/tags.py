@@ -100,6 +100,9 @@ class TagTable:
         """
 
         self.db.execute(sql, (str(old), str(new)))
+
+        self.delete(old)
+
         self.db.commit()
 
     def delete(self, tag: str) -> None:
