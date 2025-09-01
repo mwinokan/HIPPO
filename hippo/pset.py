@@ -1348,7 +1348,7 @@ class PoseSet:
 
         df = DataFrame(data)
 
-        if inspiration_ids or derivative_ids:
+        if inspiration_ids or derivative_ids or inspiration_aliases:
             if debug:
                 mrich.debug("adding inspiration column(s)")
 
@@ -1735,7 +1735,8 @@ class PoseSet:
         from pathlib import Path
         import json
 
-        df = self.get_df(mol=True, inspirations=inspirations, **kwargs)
+        if inspirations:
+            df = self.get_df(mol=True, inspiration_ids=True, **kwargs)
 
         if name_col not in ["name", "alias", "inchikey", "id"]:
             # try getting name from metadata
@@ -2321,7 +2322,6 @@ class PoseSet:
             inspirations=False,
             tags=False,
             metadata=False,
-            reference=False,
             name_col="name",
         )
 
