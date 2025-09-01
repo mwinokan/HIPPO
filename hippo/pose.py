@@ -1652,6 +1652,18 @@ class Pose:
 
         return self.id == other.id
 
+    def __add__(
+        self,
+        other: "Pose | PoseSet",
+    ) -> "PoseSet":
+        """Add a :class:`.PoseSet` to this pose"""
+        if isinstance(other, PoseSet):
+            return PoseSet(self.db, [self.id] + other.ids, sort=False)
+        elif isinstance(other, Pose):
+            return PoseSet(self.db, [self.id, other.id], sort=False)
+        else:
+            raise NotImplementedError
+
 
 class InvalidMolError(Exception):
     """Exception to be thrown when the molecule could not be parsed"""
