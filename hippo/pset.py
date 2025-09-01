@@ -1354,7 +1354,7 @@ class PoseSet:
 
             tuples = self.db.get_inspiration_tuples()
 
-            if inspiration_ids:
+            if inspiration_ids or inspiration_aliases:
                 lookup = {}
                 for inspiration, derivative in tuples:
                     lookup.setdefault(derivative, set())
