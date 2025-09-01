@@ -1944,14 +1944,10 @@ class Database:
     def delete_reactions(self) -> None:
         """Delete all reaction data"""
 
-        sql = """
-        DELETE FROM reaction;
-        DELETE FROM reactant;
-        DELETE FROM route;
-        DELETE FROM component;
-        """
+        tables = ["reaction", "reactant", "route", "component"]
 
-        self.execute(sql)
+        for table in tables:
+            self.execute(f"DELETE FROM {table};")
         self.commit()
 
     def delete_subsites(self) -> None:
