@@ -1251,6 +1251,10 @@ class Recipe:
         """
         import json
 
+        file = Path(file).resolve()
+
+        assert file.parent.exists()
+
         data = self.get_dict(serialise_price=True, **kwargs)
 
         if extra:
