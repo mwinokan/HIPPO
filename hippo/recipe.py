@@ -1250,6 +1250,7 @@ class Recipe:
 
         """
         import json
+        from pathlib import Path
 
         file = Path(file).resolve()
 
