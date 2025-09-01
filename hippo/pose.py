@@ -1657,6 +1657,8 @@ class Pose:
         other: "Pose | PoseSet",
     ) -> "PoseSet":
         """Add a :class:`.PoseSet` to this pose"""
+        from .pset import PoseSet
+
         if isinstance(other, PoseSet):
             return PoseSet(self.db, [self.id] + other.ids, sort=False)
         elif isinstance(other, Pose):
