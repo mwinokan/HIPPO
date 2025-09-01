@@ -90,6 +90,18 @@ class TagTable:
 
         return df
 
+    def rename(self, old: str, new: str) -> None:
+        """Rename all instances of a tag across the database"""
+
+        sql = """
+        UPDATE tag
+        SET tag_name = ?2
+        WHERE tag_name = ?1;
+        """
+
+        self.db.execute(sql, (str(old), str(new)))
+        self.db.commit()
+
     def delete(self, tag: str) -> None:
         """Delete all assignments for the given tag"""
         self.db.delete_where(table="tag", key="name", value=tag)
