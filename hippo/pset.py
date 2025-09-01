@@ -1201,6 +1201,7 @@ class PoseSet:
         smiles: bool = True,
         inchikey: bool = True,
         alias: bool = True,
+        name: bool = True,
         compound_id: bool = False,
         target_id: bool = False,
         reference_id: bool = False,
@@ -1223,6 +1224,7 @@ class PoseSet:
         :param smiles: include SMILES column (Default value = True)
         :param inchikey: include InChIKey column (Default value = True)
         :param alias: include alias column (Default value = True)
+        :param name: include name column (Default value = True)
         :param compound_id: include :class:`.Compound` ID column (Default value = False)
         :param reference_id: include reference :class:`.Pose` ID column (Default value = False)
         :param target_id: include reference :class:`.Target` ID column (Default value = False)
@@ -1242,6 +1244,11 @@ class PoseSet:
         from json import loads
         from rdkit.Chem import Mol
         from pandas import DataFrame
+
+        get_alias = alias
+
+        if name:
+            alias = True
 
         query = ["pose_id"]
 
@@ -1369,7 +1376,6 @@ class PoseSet:
                 df["derivative_ids"] = df["id"].apply(lambda x: lookup.get(x, {}))
 
         if inspiration_aliases:
-            ids = df["inspiration_ids"].values
             inspirations = PoseSet(
                 self.db, set.union(*list(df["inspiration_ids"].values))
             )
@@ -1394,6 +1400,11 @@ class PoseSet:
                 mrich.debug("adding subsite column")
             lookup = self.db.get_pose_subsite_names_dict()
             df["subsites"] = df["id"].apply(lambda x: lookup.get(x, set()))
+
+        if name:
+            df["name"] = df.apply(lambda row: row["alias"] or f'P{row["id"]}', axis=1)
+            if not get_alias:
+                df = df.drop(columns=["alias"])
 
         df = df.set_index("id")
 
