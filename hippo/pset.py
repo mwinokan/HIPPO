@@ -1212,6 +1212,7 @@ class PoseSet:
         expand_metadata: bool = True,
         debug: bool = True,
         inspiration_ids: bool = False,
+        inspiration_aliases: bool = False,
         derivative_ids: bool = False,
         tags: bool = False,
         subsites: bool = False,
@@ -1232,6 +1233,7 @@ class PoseSet:
         :param metadata: include metadata in output (Default value = False)
         :param expand_metadata: create separate column for each metadata key (Default value = True)
         :param inspiration_ids: include inspiration :class:`.Pose` ID column
+        :param inspiration_aliases: include inspiration :class:`.Pose` alias column
         :param derivative_ids: include derivative :class:`.Pose` ID column
         :param tags: include tags column
         :param subsites: include subsites column
@@ -1365,6 +1367,18 @@ class PoseSet:
                     lookup.setdefault(inspiration, set())
                     lookup[inspiration].add(derivative)
                 df["derivative_ids"] = df["id"].apply(lambda x: lookup.get(x, {}))
+
+        if inspiration_aliases:
+            inspirations = PoseSet(self.db, list(df["inspiration_ids"].values))
+            lookup = self.db.get_pose_id_alias_dict(pset=inspirations)
+            inspiration_aliases = []
+            for ids in df["inspiration_ids"].values:
+                aliases = {lookup[i] for i in ids}
+            df["inspiration_aliases"] = df["inspiration_ids"].apply(
+                lambda x: {lookup[i] for i in x}
+            )
+            if not inspiration_ids:
+                df = df.drop(columns=["inspiration_ids"])
 
         if tags:
             if debug:
