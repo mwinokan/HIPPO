@@ -2279,13 +2279,14 @@ class PoseSet:
 
             d = dict(
                 smiles=comp.smiles,
-                # template=ref.path,
                 template=ref.name,
                 compound_set=out_key,
             )
 
-            mrich.writing(template_dir / ref.apo_path.name)
-            shutil.copy(ref.apo_path, template_dir / ref.apo_path.name)
+            template = template_dir / ref.apo_path.name
+            if not template.exists():
+                mrich.writing(template)
+                shutil.copy(ref.apo_path, template)
 
             for i, p in enumerate(inspirations):
                 d[f"hit{i+1}"] = p.name
