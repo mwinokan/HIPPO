@@ -1941,6 +1941,15 @@ class Database:
 
         self.delete_where(table="feature", key="feature_id > 0")
 
+    def delete_reactions(self) -> None:
+        """Delete all reaction data"""
+
+        self.delete_where(table="reaction", key="reaction_id > 0")
+        self.delete_where(table="reactant", key="reactant_id > 0")
+        self.delete_where(table="route", key="route_id > 0")
+        self.delete_where(table="component", key="component_id > 0")
+        self.commit()
+
     def delete_subsites(self) -> None:
         """Delete all protein subsites"""
 
