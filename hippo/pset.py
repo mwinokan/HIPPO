@@ -2226,7 +2226,7 @@ class PoseSet:
 
         from pathlib import Path
 
-        out_key = Path(out_key)
+        out_key = Path(".") / out_key
 
         if separate:
             dfs = []
