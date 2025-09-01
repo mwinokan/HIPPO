@@ -1136,6 +1136,9 @@ class HIPPO:
 
         for i, row in mrich.track(df.iterrows()):
 
+            mrich.set_progress_field("i", i)
+            mrich.set_progress_field("n", len(df))
+
             d = row.to_dict()
 
             comp = self.compounds(smiles=d["smiles"])
