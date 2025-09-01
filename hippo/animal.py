@@ -1211,6 +1211,9 @@ class HIPPO:
                 except UnsupportedChemistryError:
                     mrich.warning("Skipping unsupported chemistry:", reaction_type)
                     continue
+                except Exception as e:
+                    mrich.error("Uncaught error with row", i, "route", j, "reaction", k)
+                    continue
 
                 products.add(product.as_ingredient(amount=1))
 
