@@ -1369,7 +1369,10 @@ class PoseSet:
                 df["derivative_ids"] = df["id"].apply(lambda x: lookup.get(x, {}))
 
         if inspiration_aliases:
-            inspirations = PoseSet(self.db, list(df["inspiration_ids"].values))
+            ids = df["inspiration_ids"].values
+            inspirations = PoseSet(
+                self.db, set.union(*list(df["inspiration_ids"].values))
+            )
             lookup = self.db.get_pose_id_alias_dict(pset=inspirations)
             inspiration_aliases = []
             for ids in df["inspiration_ids"].values:
