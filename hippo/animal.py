@@ -1134,7 +1134,7 @@ class HIPPO:
 
         df = pd.read_pickle(pickle_path)
 
-        for i, row in mrich.track(df.iterrows()):
+        for i, row in mrich.track(df.iterrows(), total=len(df)):
 
             mrich.set_progress_field("i", i)
             mrich.set_progress_field("n", len(df))
