@@ -1420,7 +1420,7 @@ class Recipe:
                         row[f"reactant-1-{i}"] = reaction.reactants[0].smiles
                         row[f"reactant-2-{i}"] = reaction.reactants[1].smiles
                     case _:
-                        mrich.warning(f"More than two reactants for {reaction=}")
+                        # mrich.warning(f"More than two reactants for {reaction=}")
                         for j, r in enumerate(reaction.reactants):
                             row[f"reactant-{j+1}-{i}"] = reaction.reactants[j].smiles
 
