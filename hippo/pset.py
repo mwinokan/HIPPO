@@ -1902,6 +1902,7 @@ class PoseSet:
             mol=True,
             inspiration_ids=True,
             # duplicate_name="original ID",
+            name=True,
             compound_id=True,
             reference_id=True,
             metadata=metadata,
@@ -1957,7 +1958,7 @@ class PoseSet:
 
         pose_df = pose_df.drop(columns=drops, errors="ignore")
 
-        pose_df[_name_col] = pose_df["alias"]
+        pose_df[_name_col] = pose_df["name"]
 
         pose_df.rename(
             inplace=True,
