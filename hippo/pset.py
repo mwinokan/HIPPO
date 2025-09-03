@@ -2104,8 +2104,10 @@ class PoseSet:
                         sys.write(apo_path, verbosity=0)
 
                     target_path = pdb_dir / f"{ref_alias}.pdb"
-                    mrich.writing(target_path)
-                    shutil.copy(apo_path, target_path)
+
+                    if not target_path.exists():
+                        mrich.writing(target_path)
+                        shutil.copy(apo_path, target_path)
 
             mrich.writing(f"{out_key}_refs.zip")
 
