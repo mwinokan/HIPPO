@@ -2092,7 +2092,7 @@ class PoseSet:
             # create the zip archive
             with ZipFile(str(zip_path.resolve()), "w") as z:
 
-                for ref_alias in df["ref_pdb"].values:
+                for ref_alias in pose_df["ref_pdb"].values:
                     source_path = Path(lookup[ref_alias])
 
                     apo_path = source_path.parent / source_path.name.replace(
