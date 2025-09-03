@@ -2089,25 +2089,30 @@ class PoseSet:
             references = self.references
             lookup = self.db.get_pose_alias_path_dict(references)
 
+            zips = set()
+            for ref_alias in pose_df["ref_pdb"].values:
+                source_path = Path(lookup[ref_alias])
+
+                apo_path = source_path.parent / source_path.name.replace(
+                    "_hippo.pdb", ".pdb"
+                ).replace(".pdb", "_apo-desolv.pdb")
+
+                if not apo_path.exists():
+                    sys = mp.parse(source_path).protein_system
+                    sys.write(apo_path, verbosity=0)
+
+                target_path = pdb_dir / f"{ref_alias}.pdb"
+
+                if not target_path.exists():
+                    mrich.writing(target_path)
+                    shutil.copy(apo_path, target_path)
+
+                zips.add(target_path)
+
             # create the zip archive
             with ZipFile(str(zip_path.resolve()), "w") as z:
-
-                for ref_alias in pose_df["ref_pdb"].values:
-                    source_path = Path(lookup[ref_alias])
-
-                    apo_path = source_path.parent / source_path.name.replace(
-                        "_hippo.pdb", ".pdb"
-                    ).replace(".pdb", "_apo-desolv.pdb")
-
-                    if not apo_path.exists():
-                        sys = mp.parse(source_path).protein_system
-                        sys.write(apo_path, verbosity=0)
-
-                    target_path = pdb_dir / f"{ref_alias}.pdb"
-
-                    if not target_path.exists():
-                        mrich.writing(target_path)
-                        shutil.copy(apo_path, target_path)
+                for path in zips:
+                    z.write(path)
 
             mrich.writing(f"{out_key}_refs.zip")
 
