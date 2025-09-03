@@ -753,6 +753,11 @@ class PoseSet:
         return self.get_df(mol=True)
 
     @property
+    def references(self) -> "PoseSet":
+        """Return a :class:`.PoseSet` of the all the distinct references in this :class:`.PoseSet`"""
+        return PoseSet(self.db, self.reference_ids)
+
+    @property
     def reference_ids(self) -> set[int]:
         """Return a set of :class:`.Pose` ID's of the all the distinct references in this :class:`.PoseSet`"""
         values = self.db.select_where(
