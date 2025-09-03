@@ -3308,7 +3308,7 @@ class Database:
             records = self.execute(
                 f"""
             SELECT pose_alias, pose_path FROM pose 
-            AND pose_id IN {pset.str_ids}"""
+            WHERE pose_id IN {pset.str_ids}"""
             ).fetchall()
 
         else:
