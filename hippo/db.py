@@ -3301,6 +3301,27 @@ class Database:
 
         return d
 
+    def get_pose_alias_path_dict(self, pset: "PoseSet | None" = None) -> dict[str, str]:
+        """Get a dictionary mapping :class:`.Pose` aliases to paths"""
+
+        if pset:
+            records = self.execute(
+                f"""
+            SELECT pose_alias, pose_path FROM pose 
+            AND pose_id IN {pset.str_ids}"""
+            ).fetchall()
+
+        else:
+            records = self.execute(
+                """SELECT pose_alias, pose_path FROM pose """
+            ).fetchall()
+
+        d = {}
+        for pose_alias, pose_path in records:
+            d[pose_alias] = pose_path
+
+        return d
+
     def get_pose_id_alias_dict(self, pset: "PoseSet | None" = None) -> dict[str, int]:
         """Get a dictionary mapping :class:`.Pose` aliases to ID's"""
 
