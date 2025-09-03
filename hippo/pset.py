@@ -1814,6 +1814,7 @@ class PoseSet:
         sort_by: str | None = None,
         sort_reverse: bool = False,
         generate_pdbs: bool = False,
+        copy_reference_pdbs: bool = False,
         # ingredients: IngredientSet = None,
         skip_no_reference: bool = True,
         skip_no_inspirations: bool = True,
@@ -2040,6 +2041,9 @@ class PoseSet:
         #     extras["Lead time (working days)"] = "Quoted lead-time"
         #     extras["Amount (mg)"] = "Quoted amount"
 
+        out_path = Path(out_path).resolve()
+        mrich.var("out_path", out_path)
+
         if generate_pdbs:
 
             from zipfile import ZipFile
@@ -2070,6 +2074,40 @@ class PoseSet:
                     z.write(pdb_path)
 
             mrich.writing(f"{out_key}_pdbs.zip")
+
+        if copy_reference_pdbs:
+
+            from zipfile import ZipFile
+            import shutil
+
+            # output subdirectory
+            out_key = Path(out_path).name.removesuffix(".sdf")
+            pdb_dir = Path(out_path).parent / Path(out_key)
+            pdb_dir.mkdir(exist_ok=True)
+            zip_path = Path(out_path).parent / f"{out_key}_refs.zip"
+
+            references = self.references
+            lookup = self.db.get_pose_alias_path_dict(references)
+
+            # create the zip archive
+            with ZipFile(str(zip_path.resolve()), "w") as z:
+
+                for ref_alias in df["ref_pdb"].values:
+                    source_path = Path(lookup[ref_alias])
+
+                    apo_path = source_path.parent / source_path.name.replace(
+                        "_hippo.pdb", ".pdb"
+                    ).replace(".pdb", "_apo-desolv.pdb")
+
+                    if not apo_path.exists():
+                        sys = mp.parse(source_path).protein_system
+                        sys.write(apo_path, verbosity=0)
+
+                    target_path = pdb_dir / f"{ref_alias}.pdb"
+                    mrich.writing(target_path)
+                    shutil.copy(apo_path, target_path)
+
+            mrich.writing(f"{out_key}_refs.zip")
 
         # create the header molecule
 
