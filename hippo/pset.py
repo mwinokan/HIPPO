@@ -2112,7 +2112,7 @@ class PoseSet:
             # create the zip archive
             with ZipFile(str(zip_path.resolve()), "w") as z:
                 for path in zips:
-                    z.write(path.relative_to(Path(out_path).parent))
+                    z.write(path, arcname=path.name)
 
             mrich.writing(f"{out_key}_refs.zip")
 
