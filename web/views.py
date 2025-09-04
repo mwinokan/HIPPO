@@ -237,6 +237,46 @@ def sdf_upload(request):
 
 
 @login_required
+def score_upload(request):
+
+    if request.method == "POST":
+        form = ScoreUploadForm(request.POST, request.FILES)
+
+        if form.is_valid():
+
+            uploaded_file = form.cleaned_data["input_file"]
+
+            upload = form.save()  # Save to the database
+
+            # Run the management command
+            subprocess.Popen(
+                ["python", "manage.py", "load_scores", str(upload.id)],
+            )
+
+        return HttpResponseRedirect(f"{reverse('score_upload')}?id={upload.id}")
+
+    else:
+
+        upload_id = int(request.GET.get("id", 0))
+
+        if not upload_id:
+            # use custom template
+            form = ScoreUploadForm()
+            return render(request, "score_upload.html", dict(form=form))
+
+        else:
+
+            # use model_detail template
+            upload = ScoreUpload.objects.get(id=upload_id)
+            context = get_base_detail_context(
+                dict(object=upload),
+                ScoreUpload,
+                upload,
+            )
+            return render(request, "model_detail.html", context)
+
+
+@login_required
 def pill_demo(request):
 
     file_path = finders.find("css/style.css")

@@ -35,6 +35,7 @@ urlpatterns = [
     path("pose_compare_3d/<str:pks>/", views.pose_compare_3d, name="pose_compare_3d"),
     path("fragalysis_download/", views.fragalysis_download, name="fragalysis_download"),
     path("sdf_upload/", views.sdf_upload, name="sdf_upload"),
+    path("score_upload/", views.score_upload, name="score_upload"),
 ]
 
 for model_name, model_views in views.GENERATED_VIEWS.items():

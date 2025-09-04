@@ -1257,6 +1257,55 @@ class Quote(AbstractModel):
         return s
 
 
+### SCORES
+
+
+class CompoundScore(AbstractModel):
+
+    compound = models.ForeignKey(
+        "Compound", on_delete=models.CASCADE, related_name="scores"
+    )
+    type = models.ForeignKey(
+        "ScoreType", on_delete=models.CASCADE, related_name="compound_scores"
+    )
+    target = models.ForeignKey(
+        "Target", on_delete=models.CASCADE, related_name="compound_scores"
+    )
+    value = models.FloatField()
+    unit = models.CharField(max_length=10)
+
+    _style = "annotation"
+
+
+class PoseScore(AbstractModel):
+
+    pose = models.ForeignKey("Pose", on_delete=models.CASCADE, related_name="scores")
+    type = models.ForeignKey(
+        "ScoreType", on_delete=models.CASCADE, related_name="pose_scores"
+    )
+    value = models.FloatField()
+    unit = models.CharField(max_length=10)
+
+    _style = "annotation"
+
+
+class ScoreType(AbstractModel):
+
+    SCORE_ORIGINS = {
+        "EXPERIMENT": "Experimental measurement",
+        "COMPUTED": "Virtual / computed measurement",
+        "MANUAL": "Human-assigned value",
+    }
+
+    name = models.CharField(max_length=60, unique=True)
+    type = models.CharField(max_length=10, choices=SCORE_ORIGINS)
+
+    _style = "annotation"
+
+    def __str__(self):
+        return f"ST{self.id} '{self.name}' [{self.type}]"
+
+
 ### RESOURCE MANAGEMENT
 
 
@@ -1505,6 +1554,90 @@ class SdfUpload(AbstractModel):
     )
 
 
+class ScoreUpload(AbstractModel):
+
+    STATUSES = {
+        0: "PENDING",
+        1: "LOADING",
+        2: "COMPLETE",
+        3: "FAILED",
+    }
+
+    SCORE_TYPE = {
+        0: "Compound",
+        1: "Pose",
+    }
+
+    target = models.ForeignKey("Target", on_delete=models.CASCADE, related_name="+")
+    score_type = models.ForeignKey(
+        "ScoreType", on_delete=models.CASCADE, related_name="+"
+    )
+
+    related_model = models.PositiveIntegerField(default=0, choices=SCORE_TYPE)
+    identifier_column_name = models.CharField(max_length=32)
+    separator = models.CharField(max_length=3, default=",")
+    fields = models.CharField(max_length=120, default="", blank=True, null=True)
+
+    input_file = models.FileField(upload_to="media/score_uploads/")
+
+    file = models.ForeignKey(
+        "File", on_delete=models.RESTRICT, related_name="+", null=True
+    )
+
+    time_start = models.DateTimeField(auto_now_add=True)
+    time_finished = models.DateTimeField(null=True)
+
+    status = models.PositiveIntegerField(default=0, choices=STATUSES)
+    message = models.TextField(null=True, blank=True)
+
+    _custom_detail_view = True
+    _custom_list_view = True
+    _exclude_from_index = True
+    _has_list_view = False
+
+    # _field_render_types = AbstractModel._field_render_types.copy()
+    # _field_render_types.update(
+    #     {
+    #         # "target_name": dict(
+    #         #     type=FieldRenderType.TABLE,
+    #         #     content=ContentRenderType.TEXT_MONOSPACE,
+    #         #     copyable=True,
+    #         # ),
+    #         # "target_access_string": dict(
+    #         #     type=FieldRenderType.TABLE,
+    #         #     content=ContentRenderType.TEXT_MONOSPACE,
+    #         #     copyable=True,
+    #         # ),
+    #         "input_file": dict(
+    #             type=FieldRenderType.TABLE,
+    #             content=ContentRenderType.TEXT_MONOSPACE,
+    #         ),
+    #         "protein_field_name": dict(
+    #             type=FieldRenderType.TABLE,
+    #             content=ContentRenderType.TEXT_MONOSPACE,
+    #         ),
+    #         "inspirations_field_name": dict(
+    #             type=FieldRenderType.TABLE,
+    #             content=ContentRenderType.TEXT_MONOSPACE,
+    #         ),
+    #         "status": dict(
+    #             type=FieldRenderType.TABLE,
+    #             content=ContentRenderType.TEXT_DISPLAY,
+    #         ),
+    #         "message": dict(
+    #             type=FieldRenderType.CARD,
+    #             content=ContentRenderType.TEXT_MONOSPACE,
+    #             split="\n",
+    #         ),
+    #         "pose_origins": dict(
+    #             type=FieldRenderType.TABLE,
+    #             content=ContentRenderType.TEXT_MONOSPACE,
+    #             copyable=False,
+    #         ),
+    #     }
+    # )
+
+
 MODELS = [
     Target,
     Compound,
@@ -1519,10 +1652,14 @@ MODELS = [
     PoseSetMember,
     FragalysisDownload,
     SdfUpload,
+    ScoreUpload,
     PoseTag,
     CompoundTag,
     PoseReview,
     PosePair,
     Supplier,
     Quote,
+    CompoundScore,
+    PoseScore,
+    ScoreType,
 ]

@@ -1,5 +1,5 @@
 from django import forms
-from hippo.models import FragalysisDownload, SdfUpload, PoseReview
+from hippo.models import FragalysisDownload, SdfUpload, PoseReview, ScoreUpload
 
 
 class FragalysisDownloadForm(forms.ModelForm):
@@ -25,6 +25,20 @@ class SdfUploadForm(forms.ModelForm):
             "compute_embedding",
             "binding_energy_field_name",
             "inspiration_distance_field_name",
+        ]
+
+
+class ScoreUploadForm(forms.ModelForm):
+    class Meta:
+        model = ScoreUpload
+        fields = [
+            "target",
+            "score_type",
+            "related_model",
+            "identifier_column_name",
+            "input_file",
+            "separator",
+            "fields",
         ]
 
 
