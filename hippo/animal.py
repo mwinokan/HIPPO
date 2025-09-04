@@ -548,7 +548,8 @@ class HIPPO:
 
         ### COMPOUND REGISTRATION
 
-        df["smiles"] = df[mol_col].apply(mol_to_smiles)
+        if "smiles" not in df.columns:
+            df["smiles"] = df[mol_col].apply(mol_to_smiles)
         smiles = list(set(df["smiles"].values))
         mrich.debug("#smiles", len(smiles))
         mrich.debug("Registering compounds...")
