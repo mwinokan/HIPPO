@@ -1755,9 +1755,11 @@ class PoseSet:
 
         tuples = df[f"mocassin_{score_type}({alpha},{beta})"].items()
 
-        sql = """UPDATE pose SET pose_inspiration_score = ?2 WHERE pose_id = ?2"""
+        sql = """UPDATE pose SET pose_inspiration_score = ?2 WHERE pose_id = ?1"""
 
+        mrich.debug("Updating pose_inspiration_score values")
         self.db.executemany(sql, tuples)
+        self.db.commit()
 
         return df
 
