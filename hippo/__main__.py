@@ -19,7 +19,7 @@ def setup_animal(
 @app.command()
 def backup(database: str):
     """Backup database file"""
-    mrich.h1("hippo.calculate_scaffolds")
+    mrich.h1("hippo.backup")
 
     mrich.h3("Params")
     mrich.var("database", database)
