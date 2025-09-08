@@ -3433,7 +3433,6 @@ class Database:
 
         sql = """
         SELECT compound_id, pose_id, inspiration_original FROM compound
-        INNER JOIN scaffold ON compound_id = scaffold_base
         INNER JOIN pose ON compound_id = pose_compound
         INNER JOIN inspiration ON pose_id = inspiration_derivative
         """
@@ -3446,6 +3445,37 @@ class Database:
         for compound_id, pose_id, inspiration_id in records:
             d[compound_id] = d.get(compound_id, set())
             d[compound_id].add(inspiration_id)
+
+        return d
+
+    def get_pose_id_inspiration_ids_dict(
+        self,
+        pset: "PoseSet" = None,
+    ) -> dict[int, set]:
+        """Get a dictionary mapping :class:`.Pose` ID's to a set of :class:`Pose` ID's for the inspirations for the whole database"""
+
+        if pset:
+            sql = f"""
+            SELECT pose_id, inspiration_original FROM pose
+            INNER JOIN inspiration ON pose_id = inspiration_derivative
+            WHERE pose_id IN {pset.str_ids}
+            """
+
+        else:
+
+            sql = """
+            SELECT pose_id, inspiration_original FROM pose
+            INNER JOIN inspiration ON pose_id = inspiration_derivative
+            """
+
+        with mrich.spinner("Database.get_pose_id_interaction_ids_dict()"):
+            records = self.execute(sql).fetchall()
+
+        d = {}
+
+        for pose_id, inspiration_id in records:
+            d[pose_id] = d.get(pose_id, set())
+            d[pose_id].add(inspiration_id)
 
         return d
 
