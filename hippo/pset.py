@@ -1719,20 +1719,21 @@ class PoseSet:
 
         sets = {}
 
-        for pose in self:
+        lookup = self.db.get_pose_id_inspiration_ids_dict(pset=self)
 
-            insp_ids = tuple(pose.get_inspiration_ids())
+        for pose_id, insp_ids in lookup:
+            sets.setdefault(insp_ids, set())
+            sets[insp_ids].add(pose_id)
 
-            if insp_ids not in sets:
-                sets[insp_ids] = PoseSet(self.db, [pose.id])
-            else:
-                sets[insp_ids]._indices.append(pose.id)
+        mrich.var("#unique inspiration combinations", len(sets))
 
         if single_set:
-            mrich.var("#unique inspiration combinations", len(sets))
-            sets = PoseSet(self.db, sum([s.ids for s in sets.values()], []), sort=False)
+            return PoseSet(self.db, sum([s.ids for s in sets.values()], []), sort=False)
 
-        return sets
+        return {
+            PoseSet(self.db, insp_ids): PoseSet(self.db, pose_ids)
+            for insp_ids, pose_ids in lookup.items()
+        }
 
     ### EXPORTING
 
