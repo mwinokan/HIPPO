@@ -1723,8 +1723,8 @@ class PoseSet:
 
         for pose_id, insp_ids in lookup.items():
             key = tuple(insp_ids)
-            sets.setdefault(insp_ids, set())
-            sets[insp_ids].add(pose_id)
+            sets.setdefault(key, set())
+            sets[key].add(pose_id)
 
         mrich.var("#unique inspiration combinations", len(sets))
 
