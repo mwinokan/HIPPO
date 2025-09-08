@@ -2730,19 +2730,19 @@ class Database:
             return None
 
         fields = [
-            pose_id,
-            pose_inchikey,
-            pose_alias,
-            pose_smiles,
-            pose_reference,
-            pose_path,
-            pose_compound,
-            pose_target,
-            pose_mol,
-            pose_fingerprint,
-            pose_energy_score,
-            pose_distance_score,
-            pose_inspiration_score,
+            "pose_id",
+            "pose_inchikey",
+            "pose_alias",
+            "pose_smiles",
+            "pose_reference",
+            "pose_path",
+            "pose_compound",
+            "pose_target",
+            "pose_mol",
+            "pose_fingerprint",
+            "pose_energy_score",
+            "pose_distance_score",
+            "pose_inspiration_score",
         ]
 
         query = ", ".join(fields)
