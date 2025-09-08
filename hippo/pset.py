@@ -1701,8 +1701,19 @@ class PoseSet:
 
         self.db.commit()
 
-    def calculate_inspiration_scores(self) -> "pd.DataFrame":
-        """Set inspiration_score values using MoCASSIn.calculate_mocassin_tversky"""
+    def calculate_inspiration_scores(
+        self,
+        alpha: float = 0.95,
+        beta: float = 0.05,
+        score_type: str = "combo",
+    ) -> "pd.DataFrame":
+        """Set inspiration_score values using MoCASSIn.calculate_mocassin_tversky
+
+        :param alpha: Tversky alpha parameter
+        :param beta: Tversky beta parameter
+        :param score_type: Score type to add to database, choose from "combo", "shape", "colour"
+        :returns: Pandas DataFrame with molecules and scores
+        """
 
         from mocassin.mocassin import calculate_mocassin_tversky
 
@@ -1736,11 +1747,17 @@ class PoseSet:
                     alpha=0.95,
                     beta=0.05,
                 )
-                df.loc[i, "mocassin_combo(0.95,0.05)"] = combo
-                df.loc[i, "mocassin_shape(0.95,0.05)"] = shape
-                df.loc[i, "mocassin_colour(0.95,0.05)"] = colour
+                df.loc[i, f"mocassin_combo({alpha},{beta})"] = combo
+                df.loc[i, f"mocassin_shape({alpha},{beta})"] = shape
+                df.loc[i, f"mocassin_colour({alpha},{beta})"] = colour
             except Exception as e:
                 mrich.error(e)
+
+        tuples = df[f"mocassin_{score_type}({alpha},{beta})"].items()
+
+        sql = """UPDATE pose SET pose_inspiration_score = ?2 WHERE pose_id = ?2"""
+
+        self.db.executemany(sql, tuples)
 
         return df
 
