@@ -1701,6 +1701,49 @@ class PoseSet:
 
         self.db.commit()
 
+    def calculate_inspiration_scores(self) -> "pd.DataFrame":
+        """Set inspiration_score values using MoCASSIn.calculate_mocassin_tversky"""
+
+        from mocassin.mocassin import calculate_mocassin_tversky
+
+        df = pset.get_df(
+            alias=False,
+            smiles=False,
+            inchikey=False,
+            inspiration_ids=True,
+            mol=True,
+        )
+
+        inspirations = {p.id: p for p in self.inspirations}
+
+        df["inspiration_mols"] = df["inspiration_ids"].apply(
+            lambda x: [inspirations[i].mol for i in x]
+        )
+
+        n = len(df)
+
+        for j, (i, row) in mrich.track(
+            enumerate(df.iterrows()), prefix="MoCASSIn", total=n
+        ):
+
+            mrich.set_progress_field("j", j)
+            mrich.set_progress_field("n", n)
+
+            try:
+                combo, shape, colour = calculate_mocassin_tversky(
+                    row["inspiration_mols"],
+                    row["mol"],
+                    alpha=0.95,
+                    beta=0.05,
+                )
+                df.loc[i, "mocassin_combo(0.95,0.05)"] = combo
+                df.loc[i, "mocassin_shape(0.95,0.05)"] = shape
+                df.loc[i, "mocassin_colour(0.95,0.05)"] = colour
+            except Exception as e:
+                mrich.error(e)
+
+        return df
+
     ### SPLITTING
 
     def split_by_reference(self) -> "dict[int,PoseSet]":
