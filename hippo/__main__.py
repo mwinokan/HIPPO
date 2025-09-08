@@ -150,7 +150,7 @@ def tag_summary(
 ):
     """Print a table of statistics for all tags in the database"""
 
-    mrich.h1("hippo.calculate_scaffolds")
+    mrich.h1("hippo.tag_summary")
 
     mrich.h3("Params")
     mrich.var("database", database)
