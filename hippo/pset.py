@@ -1214,6 +1214,7 @@ class PoseSet:
         mol: bool = False,
         energy_score: bool = False,
         distance_score: bool = False,
+        inspiration_score: bool = False,
         metadata: bool = False,
         expand_metadata: bool = True,
         debug: bool = True,
@@ -1237,6 +1238,7 @@ class PoseSet:
         :param mol: include ``rdkit.Chem.Mol`` in output (Default value = False)
         :param energy_score: include energy_score column (Default value = False)
         :param distance_score: include distance_score column (Default value = False)
+        :param inspiration_score: include inspiration_score column (Default value = False)
         :param metadata: include metadata in output (Default value = False)
         :param expand_metadata: create separate column for each metadata key (Default value = True)
         :param inspiration_ids: include inspiration :class:`.Pose` ID column
@@ -1286,6 +1288,9 @@ class PoseSet:
 
         if distance_score:
             query.append("pose_distance_score")
+
+        if inspiration_score:
+            query.append("pose_inspiration_score")
 
         if metadata:
             query.append("pose_metadata")
@@ -1344,6 +1349,9 @@ class PoseSet:
 
             if distance_score:
                 d["distance_score"] = row.pop(0)
+
+            if inspiration_score:
+                d["inspiration_score"] = row.pop(0)
 
             if metadata and (meta_str := row.pop(0)):
 
@@ -1918,6 +1926,7 @@ class PoseSet:
             subsites=subsites,
             energy_score=True,
             distance_score=True,
+            inspiration_score=True,
             # sanitise_null_metadata_values=True,
             # sanitise_tag_list_separator=";",
             # sanitise_metadata_list_separator=";",
@@ -1989,6 +1998,7 @@ class PoseSet:
             # "compound inchikey": "compound inchikey",
             "distance_score": "distance_score",
             "energy_score": "energy_score",
+            "inspiration_score": "inspiration_score",
         }
 
         if subsites:

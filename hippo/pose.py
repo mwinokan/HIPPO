@@ -59,6 +59,7 @@ class Pose:
         fingerprint: int,
         energy_score: float | None = None,
         distance_score: float | None = None,
+        inspiration_score: float | None = None,
         metadata: dict | None = None,
     ):
 
@@ -73,6 +74,7 @@ class Pose:
         self._protein_system = None
         self._energy_score = energy_score
         self._distance_score = distance_score
+        self._inspiration_score = inspiration_score
 
         self._base_ids = None
         self._num_heavy_atoms = None
@@ -524,6 +526,11 @@ class Pose:
         return self._distance_score
 
     @property
+    def inspiration_score(self) -> float | None:
+        """inspiration score of the Pose in range 0.00-1.00"""
+        return self._inspiration_score
+
+    @property
     def interactions(self) -> "InteractionSet":
         """Get a :class:`.InteractionSet` for this :class:`.Pose`"""
         if not self._interactions:
@@ -742,6 +749,7 @@ class Pose:
             "path",
             "distance_score",
             "energy_score",
+            "inspiration_score",
         ]
 
         data = {}
@@ -1536,6 +1544,7 @@ class Pose:
         mrich.var("num_heavy_atoms", self.num_heavy_atoms)
         mrich.var("distance_score", self.distance_score)
         mrich.var("energy_score", self.energy_score)
+        mrich.var("inspiration_score", self.inspiration_score)
         if inspirations := self.inspirations:
             mrich.var("inspirations", self.inspirations.names)
             mrich.var("num_atoms_added", self.num_atoms_added)

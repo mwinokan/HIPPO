@@ -119,6 +119,17 @@ class Database:
 
             self.update_legacy_reaction_metadata()
 
+        if "pose_inspiration_score" not in self.column_names("pose"):
+            if not update_legacy:
+                mrich.error("This is a legacy format database (hippo-db < 0.3.36)")
+                mrich.error("Re-initialise HIPPO object with update_legacy=True to fix")
+                raise LegacyDatabaseError("hippo-db < 0.3.36")
+            else:
+                mrich.warning("This is a legacy format database (hippo-db < 0.3.36)")
+                mrich.warning("Updating legacy reaction table...")
+
+            self.update_legacy_pose_inspiration_score()
+
     @classmethod
     def copy_from(
         cls,
@@ -456,6 +467,7 @@ class Database:
             pose_fingerprint BLOB,
             pose_energy_score REAL,
             pose_distance_score REAL,
+            pose_inspiration_score REAL,
             pose_metadata TEXT,
             FOREIGN KEY (pose_compound) REFERENCES compound(compound_id),
             CONSTRAINT UC_pose_alias UNIQUE (pose_alias)
@@ -2135,6 +2147,16 @@ class Database:
 
         self.execute(sql)
 
+    def update_legacy_pose_inspiration_score(self) -> None:
+        """Add pose_inspiration_score column"""
+
+        sql = """
+        ALTER TABLE pose
+        ADD pose_inspiration_score REAL;
+        """
+
+        self.execute(sql)
+
     def update_compound_pattern_bfp_table(self):
         """Update the compound pattern BFP table"""
         self.execute(
@@ -2707,7 +2729,24 @@ class Database:
             mrich.error(f"Invalid {id=}")
             return None
 
-        query = "pose_id, pose_inchikey, pose_alias, pose_smiles, pose_reference, pose_path, pose_compound, pose_target, pose_mol, pose_fingerprint, pose_energy_score, pose_distance_score"
+        fields = [
+            pose_id,
+            pose_inchikey,
+            pose_alias,
+            pose_smiles,
+            pose_reference,
+            pose_path,
+            pose_compound,
+            pose_target,
+            pose_mol,
+            pose_fingerprint,
+            pose_energy_score,
+            pose_distance_score,
+            pose_inspiration_score,
+        ]
+
+        query = ", ".join(fields)
+
         entry = self.select_where(query=query, table="pose", key="id", value=id)
         pose = Pose(self, *entry)
         return pose
