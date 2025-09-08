@@ -205,32 +205,12 @@ class Database:
         mout.success(f"Closed connection to {self.path}")
 
     def backup(
-        self, destination: Path | str | None = None, pages: int = 10_000
+        self,
+        destination: Path | str | None = None,
+        pages: int = 10_000,
     ) -> None:
         """Create a backup of the database"""
-
-        from .tools import dt_hash
-
-        if not destination:
-            destination = str(self.path.resolve()).replace(
-                ".sqlite", f"_{dt_hash()}.sqlite"
-            )
-
-        destination = Path(destination)
-
-        with mrich.spinner(f"Backing up {self.__rich__()}[reset]..."):
-
-            mrich.writing(destination)
-
-            def progress(status, remaining, total):
-                mrich.debug(f"Copied {total-remaining} of {total} pages...")
-
-            src = self.connection
-            dst = sqlite3.connect(destination)
-            with dst:
-                src.backup(dst, pages=pages, progress=progress)
-
-            dst.close()
+        return backup(self.path, destination, pages=pages)
 
     ### GENERAL SQL
 
@@ -4344,3 +4324,34 @@ class Database:
 
 
 class LegacyDatabaseError(Exception): ...
+
+
+def backup(
+    source: Path | str,
+    destination: Path | str | None = None,
+    pages: int = 10_000,
+) -> None:
+    """Create a backup of the database"""
+
+    from .tools import dt_hash
+
+    source = Path(source)
+
+    if not destination:
+        destination = str(source.resolve()).replace(".sqlite", f"_{dt_hash()}.sqlite")
+
+    destination = Path(destination)
+
+    with mrich.spinner(f"Backing up {source}..."):
+
+        mrich.writing(destination)
+
+        def progress(status, remaining, total):
+            mrich.debug(f"Copied {total-remaining} of {total} pages...")
+
+        src = sqlite3.connect(source)
+        dst = sqlite3.connect(destination)
+        with dst:
+            src.backup(dst, pages=pages, progress=progress)
+
+        dst.close()

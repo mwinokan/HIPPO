@@ -9,8 +9,9 @@ app = Typer()
 def setup_animal(
     database: str,
     backup: bool = True,
+    update_legacy: bool = False,
 ) -> HIPPO:
-    animal = HIPPO("CLI", database)
+    animal = HIPPO("CLI", database, update_legacy=update_legacy)
     if backup:
         animal.db.backup()
     return animal
@@ -24,9 +25,28 @@ def backup(database: str):
     mrich.h3("Params")
     mrich.var("database", database)
 
-    animal = setup_animal(database=database, backup=True)
+    from hippo.db import backup
 
+    backup(database)
     mrich.success("Successfully backed up")
+
+
+@app.command()
+def update_legacy(database: str, backup: bool = True):
+    """Update legacy database format"""
+
+    mrich.h1("hippo.update_legacy")
+
+    mrich.h3("Params")
+    mrich.var("database", database)
+
+    if backup:
+        from hippo.db import backup
+
+        backup(database)
+
+    animal = setup_animal(database, backup=False, update_legacy=True)
+    mrich.success("Successfully updated database format")
 
 
 @app.command()
