@@ -1722,6 +1722,7 @@ class PoseSet:
         lookup = self.db.get_pose_id_inspiration_ids_dict(pset=self)
 
         for pose_id, insp_ids in lookup.items():
+            key = tuple(insp_ids)
             sets.setdefault(insp_ids, set())
             sets[insp_ids].add(pose_id)
 
