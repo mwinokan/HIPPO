@@ -1706,7 +1706,7 @@ class PoseSet:
 
         from mocassin.mocassin import calculate_mocassin_tversky
 
-        df = pset.get_df(
+        df = self.get_df(
             alias=False,
             smiles=False,
             inchikey=False,
