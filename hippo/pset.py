@@ -1733,7 +1733,7 @@ class PoseSet:
 
         return {
             PoseSet(self.db, insp_ids): PoseSet(self.db, pose_ids)
-            for insp_ids, pose_ids in lookup.items()
+            for insp_ids, pose_ids in sets.items()
         }
 
     ### EXPORTING
