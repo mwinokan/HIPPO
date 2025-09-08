@@ -126,7 +126,7 @@ class Database:
                 raise LegacyDatabaseError("hippo-db < 0.3.36")
             else:
                 mrich.warning("This is a legacy format database (hippo-db < 0.3.36)")
-                mrich.warning("Updating legacy reaction table...")
+                mrich.warning("Updating legacy pose table...")
 
             self.update_legacy_pose_inspiration_score()
 
