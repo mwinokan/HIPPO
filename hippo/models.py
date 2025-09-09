@@ -1276,6 +1276,22 @@ class CompoundScore(AbstractModel):
 
     _style = "annotation"
 
+    _field_render_types = AbstractModel._field_render_types.copy()
+    _field_render_types.update(
+        {
+            "unit": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.TEXT_MONOSPACE,
+                copyable=False,
+            ),
+        }
+    )
+
+    _list_view_fields = ["compound", "type", "target", "value", "unit"]
+
+    def __str__(self):
+        return f"CS{self.id} ST{self.type_id} {self.value} {self.unit} [C{self.compound_id}]"
+
 
 class PoseScore(AbstractModel):
 
@@ -1287,6 +1303,24 @@ class PoseScore(AbstractModel):
     unit = models.CharField(max_length=10)
 
     _style = "annotation"
+
+    _field_render_types = AbstractModel._field_render_types.copy()
+    _field_render_types.update(
+        {
+            "unit": dict(
+                type=FieldRenderType.TABLE,
+                content=ContentRenderType.TEXT_MONOSPACE,
+                copyable=False,
+            ),
+        }
+    )
+
+    _list_view_fields = ["pose", "type", "value", "unit"]
+
+    def __str__(self):
+        return (
+            f"PS{self.id} ST{self.type_id} {self.value} {self.unit} [P{self.pose_id}]"
+        )
 
 
 class ScoreType(AbstractModel):
@@ -1332,6 +1366,8 @@ class File(AbstractModel):
         "PROTEIN": "Protein structure",
         "COMPLEX": "Protein-Ligand structure",
         "LIGAND": "Ligand file",
+        "META": "Metadata",
+        "PLOT": "Graph",
     }
 
     FILE_PURPOSES = {
@@ -1576,7 +1612,8 @@ class ScoreUpload(AbstractModel):
     related_model = models.PositiveIntegerField(default=0, choices=SCORE_TYPE)
     identifier_column_name = models.CharField(max_length=32)
     separator = models.CharField(max_length=3, default=",")
-    fields = models.CharField(max_length=120, default="", blank=True, null=True)
+    value_field = models.CharField(max_length=120, blank=False, null=False)
+    unit_field = models.CharField(max_length=120, blank=False, null=False)
 
     input_file = models.FileField(upload_to="media/score_uploads/")
 

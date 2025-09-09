@@ -32,15 +32,30 @@ class Command(BaseCommand):
 
         upload = ScoreUpload.objects.get(id=upload_id)
 
+        file_path = Path(upload.input_file.path)
+
+        mrich.var("file_path", file_path)
+        mrich.var("separator", upload.separator)
+        mrich.var("identifier_column_name", upload.identifier_column_name)
+        mrich.var("value_field", upload.value_field)
+        mrich.var("unit_field", upload.unit_field)
+        mrich.var("score_type", upload.score_type)
+        mrich.var("target", upload.target)
+
         upload.status = 1
         upload.time_finished = None
         upload.message = "Registering File"
+
+        file, _ = File.objects.get_or_create(
+            path=file_path,
+            format_type=".csv",
+            content_type="META",
+            purpose="INPUT",
+        )
+
+        upload.file = file
+        upload.message = f"file: {file}"
         upload.save()
-
-        file_path = Path(upload.input_file.path)
-
-        print(file_path)
-        print(upload)
 
         try:
 
@@ -48,130 +63,65 @@ class Command(BaseCommand):
 
             df = pd.read_csv(file_path, sep=upload.separator)
 
-            print(df.iloc[0])
-
-            data = []
+            identifiers = []
+            scores = []
+            units = []
 
             match upload.related_model:
                 case 0:
 
                     for i, row in df.iterrows():
 
-                        identifier = row[upload.identifier_column_name]
+                        identifiers.append(row[upload.identifier_column_name])
 
-                        print(identifier)
+                        try:
+                            scores.append(float(row[upload.value_field]))
+                        except Exception as e:
+                            mrich.warning(e)
+                            continue
 
-                        d = {"compound_identifier": identifier}
-
-                        if upload.fields:
-
-                            # iterate over given fields
-
-                            for field in upload.fields.split(","):
-                                d[field] = float(row[field])
-
-                        else:
-
-                            for key, value in row.to_dict().items():
-
-                                if key == upload.identifier_column_name:
-                                    continue
-
-                                print(key, value)
-
-                                raise NotImplementedError(
-                                    "Must provide comma-separated list of fields to parse"
-                                )
+                        units.append(row[upload.unit_field])
 
                 case _:
                     raise NotImplementedError("Pose score upload not yet supported")
 
-            print(data)
+            ### COMPOUNDS
 
-        #     if df.iloc[0]["ID"] == "ver_1.2":
-        #         header = df.iloc[0].copy()
-        #         df = df.iloc[1:].copy()
-        #     else:
-        #         header = None
+            smiles_map = Compound.bulk_register(smiles=identifiers)
 
-        #     upload.message += f"\nLoaded DataFrame, len={len(df)}"
-        #     upload.save()
+            upload.message += "\nCompounds registered"
+            upload.save()
 
-        #     if upload.protein_field_name not in df.columns:
-        #         upload.message += (
-        #             f"\nERROR: {upload.protein_field_name=} column required"
-        #         )
-        #         upload.status = 3
-        #         upload.time_finished = timezone.now()
-        #         upload.save()
-        #         return
+            compounds = {
+                c.smiles: c
+                for c in Compound.objects.filter(smiles__in=smiles_map.values())
+            }
+            compounds = {
+                s_old: compounds[smiles] for s_old, smiles in smiles_map.items()
+            }
 
-        #     if upload.inspirations_field_name not in df.columns:
-        #         upload.message += (
-        #             f"\nERROR: {upload.inspirations_field_name=} column required"
-        #         )
-        #         upload.status = 3
-        #         upload.time_finished = timezone.now()
-        #         upload.save()
-        #         return
+            ### SCORES
 
-        #     # register the File
+            objs = []
 
-        #     file, _ = File.objects.get_or_create(
-        #         path=file_path,
-        #         format_type=".sdf",
-        #         content_type="LIGAND",
-        #         purpose="INPUT",
-        #     )
+            for s_old, score, unit in zip(identifiers, scores, units):
 
-        #     # register the PoseSet
+                compound = compounds[s_old]
 
-        #     upload.message += "\nRegistering PoseSet"
-        #     upload.save()
+                data = dict(
+                    compound=compound,
+                    type=upload.score_type,
+                    target=upload.target,
+                    value=score,
+                    unit=unit,
+                )
 
-        #     if not (pset := upload.pose_set):
-        #         pset = PoseSet(name=file_path.name.removesuffix(".sdf"))
-        #         pset.full_clean()
-        #         pset.save()
+                objs.append(CompoundScore(**data))
 
-        #         upload.pose_set = pset
-        #         upload.save()
+            CompoundScore.objects.bulk_create(objs)
 
-        #     ### GET STRUCTURES
-
-        #     structures = {
-        #         s.alias: s for s in Structure.objects.filter(target=upload.target)
-        #     }
-
-        #     alias_tt = TagType.objects.get(name="Observation Code", origin="Fragalysis")
-
-        #     pose_query = PoseTag.objects.select_related(
-        #         "tag", "pose__placement__structure"
-        #     ).filter(
-        #         pose__placement__structure__target_id=upload.target_id,
-        #         tag__type=alias_tt,
-        #     )
-
-        #     structures.update(
-        #         {pt.tag.name: pt.pose.placement.structure for pt in pose_query}
-        #     )
-
-        #     ### COMPOUNDS
-
-        #     df["smiles"] = df["ROMol"].apply(MolToSmiles)
-
-        #     smiles_map = Compound.bulk_register(smiles=df["smiles"])
-
-        #     upload.message += "\nCompounds registered"
-        #     upload.save()
-
-        #     compounds = {
-        #         c.smiles: c
-        #         for c in Compound.objects.filter(smiles__in=smiles_map.values())
-        #     }
-        #     compounds = {
-        #         s_old: compounds[smiles] for s_old, smiles in smiles_map.items()
-        #     }
+            upload.message += "\nScores registered"
+            upload.save()
 
         #     with transaction.atomic():
 
@@ -193,16 +143,6 @@ class Command(BaseCommand):
         #             )
 
         #             poses[i] = pose
-
-        #         Pose.objects.bulk_create(
-        #             poses.values(),
-        #             update_conflicts=True,
-        #             unique_fields=["mol"],
-        #             update_fields=["origin", "inspiration_distance", "binding_energy"],
-        #         )
-
-        #         upload.message += "\nPoses registered"
-        #         upload.save()
 
         #         ### PLACEMENTS
 

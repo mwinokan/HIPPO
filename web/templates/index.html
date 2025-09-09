@@ -26,6 +26,8 @@
             <th>Target</th>
             <th>Structures</th>
             <th>Poses</th>
+            <th>Compound Scores</th>
+            <!-- <th>Pose Scores</th> -->
         </tr>
 
         {% for target in targets %}
@@ -37,6 +39,7 @@
 
             <td>{{target.structures.count}}</td>
             <td>{{target.poses.count}}</td>
+            <td>{{target.compound_scores.count}}</td>
         </tr>
 
         {% endfor %}

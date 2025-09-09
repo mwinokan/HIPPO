@@ -38,7 +38,8 @@ class ScoreUploadForm(forms.ModelForm):
             "identifier_column_name",
             "input_file",
             "separator",
-            "fields",
+            "value_field",
+            "unit_field",
         ]
 
 
