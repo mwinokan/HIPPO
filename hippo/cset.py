@@ -2281,7 +2281,9 @@ class IngredientSet:
     def price_df(self) -> "DataFrame":
         """DataFrame including prices"""
         df = self.df.copy()
-        df["price"] = [i.price for i in self]
+        tuples = [(i.price, i.lead_time) for i in self]
+        df["price"] = [t[0] for t in tuples]
+        df["lead_time"] = [t[1] for t in tuples]
         return df
 
     @property
