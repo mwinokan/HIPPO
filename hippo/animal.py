@@ -1527,6 +1527,7 @@ class HIPPO:
         path: "str | Path",
         smiles_col: str = "CompoundSMILES",
         alias_col: str = "CompoundCode",
+        update_aliases: bool = True,
         soak_count_to_metadata: bool = True,
         sanitisation_verbosity: bool = False,
         stop_after: int | None = None,
@@ -1589,14 +1590,16 @@ class HIPPO:
             for old_s, (inchikey, new_s) in zip(old_smiles, inchikey_new_smiles_tuples)
         ]
 
-        sql = """
-        UPDATE OR IGNORE compound
-        SET compound_alias = :compound_alias
-        WHERE compound_inchikey = :compound_inchikey;
-        """
+        if update_aliases:
 
-        mrich.debug("Updating aliases...")
-        self.db.executemany(sql, alias_dicts)
+            sql = """
+            UPDATE OR IGNORE compound
+            SET compound_alias = :compound_alias
+            WHERE compound_inchikey = :compound_inchikey;
+            """
+
+            mrich.debug("Updating aliases...")
+            self.db.executemany(sql, alias_dicts)
 
         inchikeys = [d["compound_inchikey"] for d in alias_dicts]
 
