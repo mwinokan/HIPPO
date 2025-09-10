@@ -1955,7 +1955,9 @@ class CompoundSet:
         supplier: str | list | None = None,
     ) -> "IngredientSet":
         """Get an :class:`.IngredientSet` for these compounds"""
-        return IngredientSet.from_compounds(self, amount=amount, supplier=supplier)
+        return IngredientSet.from_compounds(
+            compounds=self, amount=amount, supplier=supplier
+        )
 
     ### DUNDERS
 
