@@ -97,6 +97,7 @@ class Target:
         self,
         protein: "mp.System",
         reference_id: int | None = None,
+        force: bool = False,
     ) -> list["Feature"]:
         """Calculate features from a protein system
 
@@ -105,7 +106,7 @@ class Target:
 
         """
 
-        if reference_id and reference_id in self._feature_cache:
+        if not force and reference_id and reference_id in self._feature_cache:
             return self._feature_cache[reference_id]
 
         else:
