@@ -3119,6 +3119,19 @@ class Database:
             compound_inchikey: compound_id for compound_inchikey, compound_id in records
         }
 
+    def get_id_metadata_dict(self, *, table: str, ids: list[int]) -> dict[int, dict]:
+        """Get a dictionary mapping IDs to metadata dictionaries"""
+        from json import loads
+
+        str_ids = str(tuple(ids)).replace(",)", ")")
+        records = self.select_where(
+            query=f"{table}_id, {table}_metadata",
+            table=table,
+            key=f"{table}_id IN {str_ids}",
+            multiple=True,
+        )
+        return {i: (loads(m) if m is not None else {}) for i, m in records}
+
     def get_compound_cluster_dict(
         self,
         cset: "CompoundSet | None" = None,
