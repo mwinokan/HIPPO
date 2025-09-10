@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 [project]
 name = "hippo-db"
-version = "0.3.36"
+version = "0.3.37"
 authors = [
     { name = "Max Winokan", email = "max@winokan.com" },
 ]
@@ -17,8 +17,8 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "rdkit == 2023.9.1",
-    "molparse >= 0.0.28",
+    "rdkit >= 2024.9.6",
+    "molparse >= 0.0.40",
     "mpytools >= 0.0.21",
     "tqdm",
     "jupyterlab",
