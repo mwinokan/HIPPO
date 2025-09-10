@@ -1949,6 +1949,14 @@ class CompoundSet:
 
         return plot_compound_tsnee(self, **kwargs)
 
+    def as_ingredientset(
+        self,
+        amount: float | list[float] = 1,
+        supplier: str | list | None = None,
+    ) -> "IngredientSet":
+        """Get an :class:`.IngredientSet` for these compounds"""
+        return IngredientSet.from_compounds(self, amount=amount, supplier=supplier)
+
     ### DUNDERS
 
     def __len__(self) -> int:
