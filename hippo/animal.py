@@ -19,6 +19,7 @@ from .tools import inchikey_from_smiles, sanitise_smiles, SanitisationError
 
 import mcol
 import mrich
+from mrich import print
 
 from rdkit.Chem import Mol
 
@@ -1520,6 +1521,117 @@ class HIPPO:
         self.db.commit()
 
         return ingredients
+
+    def add_soakdb_compounds(
+        self,
+        path: "str | Path",
+        smiles_col: str = "CompoundSMILES",
+        alias_col: str = "CompoundCode",
+        soak_count_to_metadata: bool = True,
+        sanitisation_verbosity: bool = False,
+        stop_after: int | None = None,
+    ) -> "CompoundSet":
+        """Registers compounds with aliases and metadata from a SoakDB file
+
+        :param path: Path to SoakDB CSV or SQLite file
+        :returns: :class:`.CompoundSet` of registered/matched compounds
+        """
+
+        from json import dumps
+
+        path = Path(path)
+
+        match ext := path.name.split(".")[-1]:
+            case "csv":
+                df = pd.read_csv(path)
+            case "sqlite":
+                raise NotImplementedError
+            case _:
+                print(ext)
+                raise ValueError(
+                    f"Could not determine file type from extension, use '.csv' or '.sqlite' {path}"
+                )
+
+        smiles_alias_tuples = []
+
+        for i, row in df.iterrows():
+
+            smiles = row[smiles_col]
+            alias = row[alias_col]
+
+            if pd.isna(smiles):
+                continue
+
+            if pd.isna(alias):
+                continue
+
+            smiles_alias_tuples.append((smiles, alias))
+
+            if stop_after and i > stop_after:
+                break
+
+        smiles_alias_tuples = set(smiles_alias_tuples)
+
+        old_smiles = [s for s, a in smiles_alias_tuples]
+
+        mrich.debug("Registering compounds...")
+        inchikey_new_smiles_tuples = self.register_compounds(
+            smiles=old_smiles, sanitisation_verbosity=sanitisation_verbosity
+        )
+
+        inchikey_old_smiles_lookup = {
+            inchikey: old_s
+            for old_s, (inchikey, new_s) in zip(old_smiles, inchikey_new_smiles_tuples)
+        }
+        alias_lookup = {s: a for s, a in smiles_alias_tuples}
+        alias_dicts = [
+            dict(compound_inchikey=inchikey, compound_alias=alias_lookup[old_s])
+            for old_s, (inchikey, new_s) in zip(old_smiles, inchikey_new_smiles_tuples)
+        ]
+
+        sql = """
+        UPDATE OR IGNORE compound
+        SET compound_alias = :compound_alias
+        WHERE compound_inchikey = :compound_inchikey;
+        """
+
+        mrich.debug("Updating aliases...")
+        self.db.executemany(sql, alias_dicts)
+
+        inchikeys = [d["compound_inchikey"] for d in alias_dicts]
+
+        inchikey_id_lookup = self.db.get_compound_inchikey_id_dict(inchikeys)
+
+        cset = self.compounds[
+            [inchikey_id_lookup[d["compound_inchikey"]] for d in alias_dicts]
+        ]
+
+        metadata_lookup = self.db.get_id_metadata_dict(table="compound", ids=cset.ids)
+
+        if soak_count_to_metadata:
+
+            mrich.debug("Getting soak counts...")
+            for inchikey in inchikeys:
+                old_s = inchikey_old_smiles_lookup[inchikey]
+                c_id = inchikey_id_lookup[inchikey]
+                metadata_lookup[c_id]["SoakDB count"] = len(df[df[smiles_col] == old_s])
+
+            sql = """
+            UPDATE compound
+            SET compound_metadata = ?2
+            WHERE compound_id = ?1;
+            """
+
+            mrich.debug("Updating metadata...")
+            self.db.executemany(
+                sql, [(i, dumps(m)) for i, m in metadata_lookup.items()]
+            )
+
+        return cset
+
+        return alias_dicts
+
+        raise NotImplementedError
 
     ### REGISTRATION
 
