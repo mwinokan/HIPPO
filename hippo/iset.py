@@ -533,6 +533,19 @@ class InteractionSet:
         ids = [a for a, b in records]
         keep_list += ids
 
+        ### sulfur-sulfur (all)
+
+        sql = f"""
+        SELECT interaction_id
+        FROM {table}
+        WHERE interaction_id IN {self.str_ids}
+        AND interaction_type = "Sulfur-Sulfur"
+        """
+
+        records = self.db.execute(sql).fetchall()
+        ids = [a for a, in records]
+        keep_list += ids
+
         ### hydrophobic
 
         sql = f"""

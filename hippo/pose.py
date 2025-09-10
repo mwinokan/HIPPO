@@ -12,6 +12,7 @@ import pickle
 from pathlib import Path
 
 import mrich
+from mrich import print
 
 from molparse.rdkit.features import (
     FEATURE_FAMILIES,
@@ -25,6 +26,7 @@ INTERACTION_CUTOFF = {
     "Electrostatic": 4.5,
     "π-stacking": 6.0,
     "π-cation": 4.5,
+    "Sulfur-Sulfur": 4.0,  # https://pubs.acs.org/doi/full/10.1021/acs.cgd.5b01058
 }
 
 PI_STACK_MIN_CUTOFF = 3.8
@@ -862,6 +864,7 @@ class Pose:
         debug: bool = False,
         commit: bool = True,
         mutation_warnings: bool = True,
+        delete_temp_table: bool = True,
     ) -> None:
         """Enumerate all valid interactions between this ligand and the protein
 
@@ -872,6 +875,7 @@ class Pose:
         :param debug: Increase verbosity for debugging
         :param commit: commit the changes to the database (Default value = True)
         :param mutation_warnings: warn when there has been a mutation in the protein (Default value = True)
+        :param delete_temp_table: delete the temporary interaction table created during interaction resolution (Default value = True)
 
         """
 
@@ -954,6 +958,9 @@ class Pose:
             protein_features = self.target.calculate_features(
                 protein_system, reference_id=self.reference_id
             )
+
+            if debug:
+                print("ligand features", comp_features)
 
             ### organise ligand features by family
             comp_features_by_family = {}
@@ -1111,7 +1118,7 @@ class Pose:
                                 continue
 
                         if debug:
-                            print(prot_feature, lig_feature)
+                            print("Prot:", prot_feature, "Lig:", lig_feature)
 
                         # insert into the Database
                         self.db.insert_interaction(
@@ -1149,7 +1156,8 @@ class Pose:
 
             ### delete temporary table
 
-            self.db.execute("DROP TABLE temp_interaction")
+            if delete_temp_table:
+                self.db.execute("DROP TABLE temp_interaction")
 
         elif debug:
             mrich.warning(f"{self} is already fingerprinted, no new calculation")
@@ -1450,6 +1458,7 @@ class Pose:
                     "π-stacking": "purple",
                     "π-cation": "pink",
                     "Electrostatic": "red",
+                    "Sulfur-Sulfur": "yellow",
                 }
 
                 iset = self.interactions
