@@ -641,7 +641,6 @@ class HIPPO:
                 if ref_str:
                     try:
                         reference = int(ref_str)
-                        inspirations.append(pose_id)
                     except ValueError:
                         reference = inspiration_map[ref_str]
                 else:
