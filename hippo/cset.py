@@ -1370,6 +1370,32 @@ class CompoundSet:
 
             display(ui, out)
 
+    def tag_summary(self) -> "pd.DataFrame":
+        """Print a summary table of tags with compound counts"""
+
+        from pandas import DataFrame
+
+        sql = """
+        SELECT tag_name,
+        COUNT(DISTINCT tag_compound),
+        FROM tag
+        GROUP BY tag_name
+        ORDER BY tag_name;
+        """
+
+        cursor = self.db.execute(sql)
+
+        data = [dict(tag=a, num_compounds=b) for a, b in cursor.fetchall()]
+
+        df = DataFrame(data)
+        df = df.set_index("tag")
+
+        df = df.astype(int)
+
+        mrich.print(df)
+
+        return df
+
     ### OTHER METHODS
 
     def add(self, compound: Compound | int) -> None:
