@@ -1375,10 +1375,11 @@ class CompoundSet:
 
         from pandas import DataFrame
 
-        sql = """
+        sql = f"""
         SELECT tag_name,
-        COUNT(DISTINCT tag_compound),
+        COUNT(DISTINCT tag_compound)
         FROM tag
+        WHERE tag_compound IN {self.str_ids}
         GROUP BY tag_name
         ORDER BY tag_name;
         """
