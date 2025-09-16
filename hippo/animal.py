@@ -812,6 +812,7 @@ class HIPPO:
         max_distance_score: float | None = 2.0,
         require_intra_geometry_pass: bool = True,
         reject_flags: list[str] | None = ["one_of_multiple_products"],
+        register_reactions: bool = True,
         dry_run: bool = False,
     ) -> "pd.DataFrame":
         """
@@ -959,33 +960,34 @@ class HIPPO:
 
         # bulk register reactions
 
-        for step in range(num_steps):
+        if register_reactions:
+            for step in range(num_steps):
 
-            step += 1
+                step += 1
 
-            reactant_id_sets = []
-            for r1_id, r2_id in df[
-                [f"{step}_r1_compound_id", f"{step}_r2_compound_id"]
-            ].values:
+                reactant_id_sets = []
+                for r1_id, r2_id in df[
+                    [f"{step}_r1_compound_id", f"{step}_r2_compound_id"]
+                ].values:
 
-                id_set = set()
+                    id_set = set()
 
-                if r1_id := int(r1_id):
-                    assert isinstance(r1_id, int), type(r1_id)
-                    id_set.add(r1_id)
+                    if r1_id := int(r1_id):
+                        assert isinstance(r1_id, int), type(r1_id)
+                        id_set.add(r1_id)
 
-                if r2_id := int(r2_id):
-                    assert isinstance(r2_id, int), type(r2_id)
-                    id_set.add(r2_id)
+                    if r2_id := int(r2_id):
+                        assert isinstance(r2_id, int), type(r2_id)
+                        id_set.add(r2_id)
 
-                assert id_set
-                reactant_id_sets.append(id_set)
+                    assert id_set
+                    reactant_id_sets.append(id_set)
 
-            reaction_ids = self.register_reactions(
-                types=df[f"{step}_reaction"],
-                product_ids=df[f"{step}_product_compound_id"],
-                reactant_id_lists=reactant_id_sets,
-            )
+                reaction_ids = self.register_reactions(
+                    types=df[f"{step}_reaction"],
+                    product_ids=df[f"{step}_product_compound_id"],
+                    reactant_id_lists=reactant_id_sets,
+                )
 
         scaffold_df = df[df["is_scaffold"]]
         elab_df = df[~df["is_scaffold"]]
@@ -999,7 +1001,7 @@ class HIPPO:
                 key = f"{step}_{role}_compound_id"
 
                 scaffold_ids = set(scaffold_df[key].to_list())
-                assert len(scaffold_ids) == 1
+                assert len(scaffold_ids) == 1, f"{key} {scaffold_ids}"
                 (scaffold_id,) = scaffold_ids
 
                 superstructure_ids = set(elab_df[key].to_list())
