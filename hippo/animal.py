@@ -1608,6 +1608,8 @@ class HIPPO:
             [inchikey_id_lookup[d["compound_inchikey"]] for d in alias_dicts]
         ]
 
+        cset.add_tag("soaks")
+
         metadata_lookup = self.db.get_id_metadata_dict(table="compound", ids=cset.ids)
 
         if soak_count_to_metadata:
