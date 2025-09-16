@@ -1629,7 +1629,7 @@ class HIPPO:
                 sql, [(i, dumps(m)) for i, m in metadata_lookup.items()]
             )
 
-        animal.db.commit()
+        self.db.commit()
 
         return cset
 
