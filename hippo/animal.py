@@ -595,7 +595,7 @@ class HIPPO:
             if not compound_id:
                 mrich.error("Skipping invalid compound", i)
                 continue
-            path = (output_directory / f"{name}.fake.mol").resolve()
+            pose_path = (output_directory / f"{name}.fake.mol").resolve()
             energy_score = float(row[energy_score_col])
             distance_score = float(row[distance_score_col])
 
@@ -697,7 +697,7 @@ class HIPPO:
                     alias=alias,
                     compound_id=compound_id,
                     target_id=target.id,
-                    path=path,
+                    path=pose_path,
                     metadata=metadata,
                     inspiration_ids=inspirations,
                     reference_id=reference,
