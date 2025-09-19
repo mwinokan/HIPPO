@@ -459,7 +459,7 @@ class HIPPO:
         compound_tags: None | list[str] = None,
         pose_tags: None | list[str] = None,
         mol_col: str = "ROMol",
-        name_col: str = "ID",
+        name_col: str | None = "ID",
         inspiration_col: str = "ref_mols",
         reference_col: str = "ref_pdb",
         energy_score_col: str = "energy_score",
@@ -518,7 +518,8 @@ class HIPPO:
         target = self.register_target(target)
 
         assert mol_col in df_columns, f"{mol_col=} not in {df_columns}"
-        assert name_col in df_columns, f"{name_col=} not in {df_columns}"
+        if name_col:
+            assert name_col in df_columns, f"{name_col=} not in {df_columns}"
         assert inspiration_col in df_columns, f"{inspiration_col=} not in {df_columns}"
         assert (
             reference_col in df_columns or reference
@@ -537,7 +538,7 @@ class HIPPO:
 
         mrich.var("SDF entries (pre-filter)", len(df))
 
-        df = df[df[name_col] != "ver_1.2"]
+        df = df[df["ID"] != "ver_1.2"]
 
         for k, v in skip_equal_dict.items():
             df = df[df[k] == v]
@@ -581,7 +582,10 @@ class HIPPO:
 
         for i, row in mrich.track(df.iterrows(), prefix="Reading SDF rows..."):
 
-            name = row[name_col].strip()
+            if name_col:
+                name = row[name_col].strip()
+            else:
+                name = None
             mol = row[mol_col]
             inchikey = row["inchikey"]
             smiles = row["smiles"]
