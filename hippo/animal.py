@@ -584,8 +584,10 @@ class HIPPO:
 
             if name_col:
                 name = row[name_col].strip()
+                alias = name
             else:
-                name = None
+                name = row["ID"].strip()
+                alias = None
             mol = row[mol_col]
             inchikey = row["inchikey"]
             smiles = row["smiles"]
@@ -692,7 +694,7 @@ class HIPPO:
 
             data.append(
                 dict(
-                    alias=name,
+                    alias=alias,
                     compound_id=compound_id,
                     target_id=target.id,
                     path=path,
