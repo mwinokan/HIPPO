@@ -2404,6 +2404,7 @@ class Database:
                 continue
             derivative_id = lookup.get(str(d["path"]))
             if not derivative_id:
+                mrich.error("Could not get derivative by path:",str(d["path"]))
                 continue
             pose_ids.add(derivative_id)
             for inspiration_id in d["inspiration_ids"]:
