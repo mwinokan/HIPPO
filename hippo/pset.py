@@ -2670,7 +2670,7 @@ class PoseSet:
             [dict(id=i, subsite=name, num_poses=count) for i, name, count in cursor]
         )
 
-        df = df.set_index("subsite_id")
+        df = df.set_index("id")
 
         df = df.sort_values(by="num_poses", ascending=False)
 
