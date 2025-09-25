@@ -2666,7 +2666,9 @@ class PoseSet:
 
         cursor = self.db.execute(sql)
 
-        df = DataFrame([dict(subsite=name, num_poses=count) for name, count in cursor])
+        df = DataFrame(
+            [dict(id=i, subsite=name, num_poses=count) for i, name, count in cursor]
+        )
 
         df = df.set_index("subsite_id")
 
