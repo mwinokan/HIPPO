@@ -302,6 +302,7 @@ class HIPPO:
                 "GOOD count",
                 "MEDIOCRE count",
                 "BAD count",
+                "RefinementResolution",
             ]
             + GENERATED_TAG_COLS
         ]
