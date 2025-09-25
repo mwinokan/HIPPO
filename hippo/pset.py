@@ -2657,7 +2657,7 @@ class PoseSet:
         from pandas import DataFrame
 
         sql = f"""
-        SELECT subsite_name, COUNT(DISTINCT subsite_tag_pose) FROM subsite
+        SELECT subsite_id, subsite_name, COUNT(DISTINCT subsite_tag_pose) FROM subsite
         INNER JOIN subsite_tag
         ON subsite_id = subsite_tag_ref
         WHERE subsite_tag_pose IN {self.str_ids}
@@ -2668,7 +2668,7 @@ class PoseSet:
 
         df = DataFrame([dict(subsite=name, num_poses=count) for name, count in cursor])
 
-        df = df.set_index("subsite")
+        df = df.set_index("subsite_id")
 
         df = df.sort_values(by="num_poses", ascending=False)
 
