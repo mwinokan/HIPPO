@@ -2014,7 +2014,13 @@ class PoseSet:
 
         # comma separate subsites
         if subsites:
-            pose_df["subsites"] = pose_df["subsites"].apply(lambda x: ",".join(x))
+
+            def fix_subsites(subsite_list):
+                if not subsite_list:
+                    return "None"
+                return ",".join(subsite_list)
+
+            pose_df["subsites"] = pose_df["subsites"].apply(fix_subsites)
 
         if tags:
             pose_df["tags"] = pose_df["tags"].apply(lambda x: ",".join(x))
