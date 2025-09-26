@@ -3248,9 +3248,17 @@ class Database:
         """Get a dictionary mapping pose ID's to their tags"""
 
         if pset:
-            raise NotImplementedError
+            records = self.select_where(
+                query="tag_name, tag_pose",
+                table="tag",
+                key=f"tag_pose IN {pset.str_ids}",
+                multiple=True,
+            )
 
-        records = self.select(query="tag_name, tag_pose", table="tag", multiple=True)
+        else:
+            records = self.select(
+                query="tag_name, tag_pose", table="tag", multiple=True
+            )
 
         data = {}
         for tag_name, pose_id in records:
