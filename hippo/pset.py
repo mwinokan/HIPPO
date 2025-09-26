@@ -2694,21 +2694,29 @@ class PoseSet:
             return
 
         # delete the poses in this set
-        self.db.delete_where(table=self.table, key=f"pose_id IN {self.str_ids}")
+        self.db.delete_where(
+            table=self.table, key=f"pose_id IN {self.str_ids}", commit=False
+        )
 
         # check for other references to this pose
-        self.db.delete_where(table="tag", key=f"tag_pose IN {self.str_ids}")
         self.db.delete_where(
-            table="inspiration", key=f"inspiration_original IN {self.str_ids}"
+            table="tag", key=f"tag_pose IN {self.str_ids}", commit=False
         )
         self.db.delete_where(
-            table="inspiration", key=f"inspiration_derivative IN {self.str_ids}"
+            table="inspiration",
+            key=f"inspiration_original IN {self.str_ids}",
+            commit=False,
         )
         self.db.delete_where(
-            table="subsite_tag", key=f"subsite_tag_pose IN {self.str_ids}"
+            table="inspiration",
+            key=f"inspiration_derivative IN {self.str_ids}",
+            commit=False,
         )
         self.db.delete_where(
-            table="interaction", key=f"interaction_pose IN {self.str_ids}"
+            table="subsite_tag", key=f"subsite_tag_pose IN {self.str_ids}", commit=False
+        )
+        self.db.delete_where(
+            table="interaction", key=f"interaction_pose IN {self.str_ids}", commit=False
         )
 
         self.db.execute(
@@ -2718,6 +2726,8 @@ class PoseSet:
             WHERE pose_id IN {self.str_ids}
         """
         )
+
+        self.db.commit()
 
     ### DUNDERS
 
