@@ -3267,10 +3267,15 @@ class Database:
             data[pose_id].add(tag_name)
 
         # null IDS
-        pose_ids = self.select(table="pose", query="pose_id", multiple=True)
-        pose_ids = set(q for q, in pose_ids)
 
-        null_ids = pose_ids - set(data.keys())
+        if pset:
+            null_ids = set(pset.ids) - set(data.keys())
+
+        else:
+            pose_ids = self.select(table="pose", query="pose_id", multiple=True)
+            pose_ids = set(q for q, in pose_ids)
+
+            null_ids = pose_ids - set(data.keys())
 
         for c_id in null_ids:
             data[c_id] = set()
