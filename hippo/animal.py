@@ -461,7 +461,7 @@ class HIPPO:
         pose_tags: None | list[str] = None,
         mol_col: str = "ROMol",
         name_col: str | None = "ID",
-        inspiration_col: str = "ref_mols",
+        inspiration_col: str | None = "ref_mols",
         reference_col: str = "ref_pdb",
         energy_score_col: str = "energy_score",
         distance_score_col: str = "distance_score",
@@ -521,7 +521,10 @@ class HIPPO:
         assert mol_col in df_columns, f"{mol_col=} not in {df_columns}"
         if name_col:
             assert name_col in df_columns, f"{name_col=} not in {df_columns}"
-        assert inspiration_col in df_columns, f"{inspiration_col=} not in {df_columns}"
+        if inspiration_col:
+            assert (
+                inspiration_col in df_columns
+            ), f"{inspiration_col=} not in {df_columns}"
         assert (
             reference_col in df_columns or reference
         ), "Must specify valid reference or reference_col"
@@ -605,41 +608,46 @@ class HIPPO:
 
             inspirations = []
 
-            insp_str = row[inspiration_col]
+            if inspiration_col:
 
-            if isinstance(insp_str, str):
-                insp_str = insp_str.removeprefix("[")
-                insp_str = insp_str.removesuffix("]")
-                insp_str = insp_str.replace("'", "")
-                generator = insp_str.split(",")
+                insp_str = row[inspiration_col]
 
-            elif isinstance(insp_str, float):
-                generator = []
+                if isinstance(insp_str, str):
+                    insp_str = insp_str.removeprefix("[")
+                    insp_str = insp_str.removesuffix("]")
+                    insp_str = insp_str.replace("'", "")
+                    generator = insp_str.split(",")
 
-            else:
-                generator = insp_str
+                elif isinstance(insp_str, float):
+                    generator = []
 
-            for insp in generator:
-                insp = insp.strip()
+                else:
+                    generator = insp_str
 
-                try:
-                    pose_id = int(insp)
-                    inspirations.append(pose_id)
+                for insp in generator:
+                    insp = insp.strip()
 
-                except ValueError:
-                    if isinstance(inspiration_map, dict) and insp in inspiration_map:
-                        pose_id = inspiration_map[insp]
-                        if pose_id:
-                            inspirations.append(pose_id)
-                    elif hasattr(inspiration_map, "__call__"):
-                        pose_id = inspiration_map(insp)
-                        if pose_id:
-                            inspirations.append(pose_id)
-                    else:
-                        mrich.error(
-                            f"Could not find inspiration pose with alias={insp}"
-                        )
-                        continue
+                    try:
+                        pose_id = int(insp)
+                        inspirations.append(pose_id)
+
+                    except ValueError:
+                        if (
+                            isinstance(inspiration_map, dict)
+                            and insp in inspiration_map
+                        ):
+                            pose_id = inspiration_map[insp]
+                            if pose_id:
+                                inspirations.append(pose_id)
+                        elif hasattr(inspiration_map, "__call__"):
+                            pose_id = inspiration_map(insp)
+                            if pose_id:
+                                inspirations.append(pose_id)
+                        else:
+                            mrich.error(
+                                f"Could not find inspiration pose with alias={insp}"
+                            )
+                            continue
 
             if not reference:
                 ref_str = row.get(reference_col)
