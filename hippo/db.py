@@ -2366,6 +2366,9 @@ class Database:
         for i, d in enumerate(dicts):
 
             alias = d["alias"]
+            reference_id = d.get("reference_id")
+            if reference_id:
+                reference_id = int(reference_id)
 
             if not alias:
                 alias = None
@@ -2376,7 +2379,7 @@ class Database:
                         str(d["inchikey"]),
                         str(d["smiles"]),
                         alias,
-                        int(d["reference_id"]),
+                        reference_id,
                         str(d["path"]),
                         int(d["compound_id"]),
                         int(d["target_id"]),
@@ -2404,7 +2407,7 @@ class Database:
                 continue
             derivative_id = lookup.get(str(d["path"]))
             if not derivative_id:
-                mrich.error("Could not get derivative by path:",str(d["path"]))
+                mrich.error("Could not get derivative by path:", str(d["path"]))
                 continue
             pose_ids.add(derivative_id)
             for inspiration_id in d["inspiration_ids"]:
