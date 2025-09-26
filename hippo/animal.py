@@ -519,15 +519,17 @@ class HIPPO:
         target = self.register_target(target)
 
         assert mol_col in df_columns, f"{mol_col=} not in {df_columns}"
+
         if name_col:
             assert name_col in df_columns, f"{name_col=} not in {df_columns}"
+
         if inspiration_col:
             assert (
                 inspiration_col in df_columns
             ), f"{inspiration_col=} not in {df_columns}"
-        assert (
-            reference_col in df_columns or reference
-        ), "Must specify valid reference or reference_col"
+
+        if not reference and reference_col:
+            assert reference_col in df_columns, f"{reference_col=} not in {df_columns}"
 
         output_directory = str(path.name).removesuffix(".sdf")
         output_directory = Path(output_directory)
