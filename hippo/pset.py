@@ -2693,37 +2693,41 @@ class PoseSet:
             mrich.warning("Deleting Poses is risky! Set force=True to continue")
             return
 
+        str_ids = self.str_ids
+
         # delete the poses in this set
         self.db.delete_where(
-            table=self.table, key=f"pose_id IN {self.str_ids}", commit=False
+            table=self.table, key=f"pose_id IN {str_ids}", commit=False
         )
 
         # check for other references to this pose
-        self.db.delete_where(
-            table="tag", key=f"tag_pose IN {self.str_ids}", commit=False
-        )
+        self.db.delete_where(table="tag", key=f"tag_pose IN {str_ids}", commit=False)
         self.db.delete_where(
             table="inspiration",
-            key=f"inspiration_original IN {self.str_ids}",
+            key=f"inspiration_original IN {str_ids}",
             commit=False,
         )
         self.db.delete_where(
             table="inspiration",
-            key=f"inspiration_derivative IN {self.str_ids}",
+            key=f"inspiration_derivative IN {str_ids}",
             commit=False,
         )
         self.db.delete_where(
-            table="subsite_tag", key=f"subsite_tag_pose IN {self.str_ids}", commit=False
+            table="subsite_tag",
+            key=f"subsite_tag_pose IN {str_ids}",
+            commit=False,
         )
         self.db.delete_where(
-            table="interaction", key=f"interaction_pose IN {self.str_ids}", commit=False
+            table="interaction",
+            key=f"interaction_pose IN {str_ids}",
+            commit=False,
         )
 
         self.db.execute(
             f"""
             UPDATE pose
             SET pose_reference = NULL
-            WHERE pose_id IN {self.str_ids}
+            WHERE pose_id IN {str_ids}
         """
         )
 
