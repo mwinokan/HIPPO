@@ -584,11 +584,12 @@ class HIPPO:
         for i, row in mrich.track(df.iterrows(), prefix="Reading SDF rows..."):
 
             if name_col:
-                name = row[name_col].strip()
+                name = row[name_col].strip() or f"pose_{i}"
                 alias = name
             else:
-                name = row["ID"].strip()
+                name = f"pose_{i}"
                 alias = None
+
             mol = row[mol_col]
             inchikey = row["inchikey"]
             smiles = row["smiles"]
@@ -599,9 +600,6 @@ class HIPPO:
             pose_path = (output_directory / f"{name}.fake.mol").resolve()
             energy_score = float(row[energy_score_col])
             distance_score = float(row[distance_score_col])
-
-            if not name:
-                name = f"pose_{i}"
 
             # inspirations
 
