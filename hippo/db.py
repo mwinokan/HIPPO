@@ -3094,15 +3094,22 @@ class Database:
 
         return d
 
-    def get_compound_id_smiles_dict(self, cset: "CompoundSet") -> dict[int, set[str]]:
+    def get_compound_id_smiles_dict(
+        self,
+        cset: "CompoundSet | None" = None,
+    ) -> dict[int, set[str]]:
         """Get a dictionary mapping :class:`.Compound` ID's to suppliers which stock it"""
-        records = self.execute(
-            f"SELECT compound_id, compound_smiles FROM compound WHERE compound_id IN {cset.str_ids}"
-        ).fetchall()
+
+        if cset:
+            sql = f"SELECT compound_id, compound_smiles FROM compound WHERE compound_id IN {cset.str_ids}"
+
+        else:
+            sql = "SELECT compound_id, compound_smiles FROM compound"
+
+        c = self.execute(sql)
 
         d = {}
-
-        for comp_id, comp_smiles in records:
+        for comp_id, comp_smiles in c:
             d[comp_id] = comp_smiles
 
         return d
