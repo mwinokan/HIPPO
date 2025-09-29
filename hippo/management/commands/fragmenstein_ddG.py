@@ -22,7 +22,7 @@ from fragmenstein.laboratory.validator import place_input_validator
 
 
 class Command(BaseCommand):
-    help = "Import scores a CSV for a given target"
+    help = "Run Fragmenstein placement and insert PoseScores"
 
     def add_arguments(self, parser):
         parser.add_argument("target_id", type=int)

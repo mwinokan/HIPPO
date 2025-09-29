@@ -25,9 +25,9 @@ SECRET_KEY = "django-insecure-@tsn+$o+)-e_a2=$&d4@r%w@a%rvtf_&))#(1u8gh=@kc^bnqe
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["localhost", "hippo.winokan.com", "86.24.224.50"]
+ALLOWED_HOSTS = ["localhost"]
 
-CSRF_TRUSTED_ORIGINS = ["https://hippo.winokan.com"]
+CSRF_TRUSTED_ORIGINS = ["localhost"]
 
 # Application definition
 
