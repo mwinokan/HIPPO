@@ -9,6 +9,8 @@ HIPPO is still in beta development and feedback is appreciated.
 
 Please see the [documentation](https://hippo-docs.winokan.com) to get started
 
+An experimental branch implementing HIPPO as a Django web-app is available at [HIPPO/django_lean](https://github.com/mwinokan/HIPPO/tree/django_lean)
+
 ![GitHub Tag](https://img.shields.io/github/v/tag/mwinokan/hippo?include_prereleases&label=PyPI&link=https%3A%2F%2Fpypi.org%2Fproject%2Fhippo-db%2F)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/mwinokan/HIPPO/python-publish.yml?label=publish&link=https%3A%2F%2Fgithub.com%2Fmwinokan%2FHIPPO%2Factions%2Fworkflows%2Fpython-publish.yml)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/mwinokan/HIPPO/black.yml?label=lint&link=https%3A%2F%2Fgithub.com%2Fmwinokan%2FHIPPO%2Factions%2Fworkflows%2Fblack.yml)
