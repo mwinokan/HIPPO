@@ -303,6 +303,35 @@ class CompoundTable:
         cset._name = name
         return cset
 
+    def get_by_metadata_substring_match(
+        self,
+        substring: str,
+    ) -> "CompoundSet":
+        """Get :class:`.CompoundSet` of poses with metadata JSON containing substring"""
+
+        assert substring
+        assert isinstance(substring, str)
+
+        compound_ids = self.db.select_where(
+            table="compound",
+            query="compound_id",
+            key=f"""compound_metadata LIKE '%{substring}%'""",
+            multiple=True,
+        )
+
+        if not compound_ids:
+            mrich.error(f"No compounds with metadata substring: {substring}")
+            return None
+
+        compound_ids = [i for i, in compound_ids]
+
+        name = f"compounds with '{substring}' in metadata"
+
+        cset = self[compound_ids]
+        cset._name = name
+
+        return cset
+
     def get_by_base(
         self,
         base: Compound | int,
@@ -1013,6 +1042,35 @@ class CompoundSet:
             ]
         return CompoundSet(self.db, ids)
 
+    def get_by_metadata_substring_match(
+        self,
+        substring: str,
+    ) -> "CompoundSet":
+        """Get :class:`.CompoundSet` of poses with metadata JSON containing substring"""
+
+        assert substring
+        assert isinstance(substring, str)
+
+        compound_ids = self.db.select_where(
+            table="compound",
+            query="compound_id",
+            key=f"""compound_metadata LIKE '%{substring}%' AND compound_id IN {self.str_ids}""",
+            multiple=True,
+        )
+
+        if not compound_ids:
+            mrich.error(f"No compounds with metadata substring: {substring}")
+            return None
+
+        compound_ids = [i for i, in compound_ids]
+
+        name = f"compounds with '{substring}' in metadata"
+
+        cset = CompoundSet(self.db, compound_ids)
+        cset._name = name
+
+        return cset
+
     def get_by_base(
         self,
         base: Compound | int,
@@ -1311,6 +1369,33 @@ class CompoundSet:
             )
 
             display(ui, out)
+
+    def tag_summary(self) -> "pd.DataFrame":
+        """Print a summary table of tags with compound counts"""
+
+        from pandas import DataFrame
+
+        sql = f"""
+        SELECT tag_name,
+        COUNT(DISTINCT tag_compound)
+        FROM tag
+        WHERE tag_compound IN {self.str_ids}
+        GROUP BY tag_name
+        ORDER BY tag_name;
+        """
+
+        cursor = self.db.execute(sql)
+
+        data = [dict(tag=a, num_compounds=b) for a, b in cursor.fetchall()]
+
+        df = DataFrame(data)
+        df = df.set_index("tag")
+
+        df = df.astype(int)
+
+        mrich.print(df)
+
+        return df
 
     ### OTHER METHODS
 
@@ -2281,7 +2366,9 @@ class IngredientSet:
     def price_df(self) -> "DataFrame":
         """DataFrame including prices"""
         df = self.df.copy()
-        df["price"] = [i.price for i in self]
+        tuples = [(i.price, i.lead_time) for i in self]
+        df["price"] = [t[0] for t in tuples]
+        df["lead_time"] = [t[1] for t in tuples]
         return df
 
     @property

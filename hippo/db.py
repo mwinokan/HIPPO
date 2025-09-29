@@ -2366,6 +2366,9 @@ class Database:
         for i, d in enumerate(dicts):
 
             alias = d["alias"]
+            reference_id = d.get("reference_id")
+            if reference_id:
+                reference_id = int(reference_id)
 
             if not alias:
                 alias = None
@@ -2376,7 +2379,7 @@ class Database:
                         str(d["inchikey"]),
                         str(d["smiles"]),
                         alias,
-                        int(d["reference_id"]),
+                        reference_id,
                         str(d["path"]),
                         int(d["compound_id"]),
                         int(d["target_id"]),
@@ -2404,6 +2407,7 @@ class Database:
                 continue
             derivative_id = lookup.get(str(d["path"]))
             if not derivative_id:
+                mrich.error("Could not get derivative by path:", str(d["path"]))
                 continue
             pose_ids.add(derivative_id)
             for inspiration_id in d["inspiration_ids"]:
@@ -3090,15 +3094,22 @@ class Database:
 
         return d
 
-    def get_compound_id_smiles_dict(self, cset: "CompoundSet") -> dict[int, set[str]]:
+    def get_compound_id_smiles_dict(
+        self,
+        cset: "CompoundSet | None" = None,
+    ) -> dict[int, set[str]]:
         """Get a dictionary mapping :class:`.Compound` ID's to suppliers which stock it"""
-        records = self.execute(
-            f"SELECT compound_id, compound_smiles FROM compound WHERE compound_id IN {cset.str_ids}"
-        ).fetchall()
+
+        if cset:
+            sql = f"SELECT compound_id, compound_smiles FROM compound WHERE compound_id IN {cset.str_ids}"
+
+        else:
+            sql = "SELECT compound_id, compound_smiles FROM compound"
+
+        c = self.execute(sql)
 
         d = {}
-
-        for comp_id, comp_smiles in records:
+        for comp_id, comp_smiles in c:
             d[comp_id] = comp_smiles
 
         return d
@@ -3118,6 +3129,19 @@ class Database:
         return {
             compound_inchikey: compound_id for compound_inchikey, compound_id in records
         }
+
+    def get_id_metadata_dict(self, *, table: str, ids: list[int]) -> dict[int, dict]:
+        """Get a dictionary mapping IDs to metadata dictionaries"""
+        from json import loads
+
+        str_ids = str(tuple(ids)).replace(",)", ")")
+        records = self.select_where(
+            query=f"{table}_id, {table}_metadata",
+            table=table,
+            key=f"{table}_id IN {str_ids}",
+            multiple=True,
+        )
+        return {i: (loads(m) if m is not None else {}) for i, m in records}
 
     def get_compound_cluster_dict(
         self,
@@ -3231,9 +3255,17 @@ class Database:
         """Get a dictionary mapping pose ID's to their tags"""
 
         if pset:
-            raise NotImplementedError
+            records = self.select_where(
+                query="tag_name, tag_pose",
+                table="tag",
+                key=f"tag_pose IN {pset.str_ids}",
+                multiple=True,
+            )
 
-        records = self.select(query="tag_name, tag_pose", table="tag", multiple=True)
+        else:
+            records = self.select(
+                query="tag_name, tag_pose", table="tag", multiple=True
+            )
 
         data = {}
         for tag_name, pose_id in records:
@@ -3242,10 +3274,15 @@ class Database:
             data[pose_id].add(tag_name)
 
         # null IDS
-        pose_ids = self.select(table="pose", query="pose_id", multiple=True)
-        pose_ids = set(q for q, in pose_ids)
 
-        null_ids = pose_ids - set(data.keys())
+        if pset:
+            null_ids = set(pset.ids) - set(data.keys())
+
+        else:
+            pose_ids = self.select(table="pose", query="pose_id", multiple=True)
+            pose_ids = set(q for q, in pose_ids)
+
+            null_ids = pose_ids - set(data.keys())
 
         for c_id in null_ids:
             data[c_id] = set()

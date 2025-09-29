@@ -4,7 +4,6 @@ from molparse.rdkit import mol_from_smiles
 from rdkit.Chem.inchi import MolToInchiKey
 from rdkit.Chem import MolFromSmiles, MolToSmiles, AddHs, RemoveHs
 import mcol
-import mout
 from datetime import datetime
 from string import ascii_uppercase
 
@@ -142,7 +141,7 @@ def sanitise_smiles(s, verbosity=False, sanitisation_failed="error", radical="er
 
     # remove isotopic stuff
     if smiles_has_isotope(smiles):
-        mout.warning(f"Isotope(s) in SMILES: {smiles}")
+        mrich.warning(f"Isotope(s) in SMILES: {smiles}")
         smiles = remove_isotopes_from_smiles(smiles)
 
     # canonicalise
@@ -190,7 +189,7 @@ def sanitise_smiles(s, verbosity=False, sanitisation_failed="error", radical="er
                 "@", f"{mcol.error}{mcol.underline}@{mcol.clear}{mcol.warning}"
             )
 
-            mout.warning(f"SMILES was changed: {annotated_smiles_str} --> {smiles}")
+            mrich.warning(f"SMILES was changed: {annotated_smiles_str} --> {smiles}")
 
     return smiles
 

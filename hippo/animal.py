@@ -19,6 +19,7 @@ from .tools import inchikey_from_smiles, sanitise_smiles, SanitisationError
 
 import mcol
 import mrich
+from mrich import print
 
 from rdkit.Chem import Mol
 
@@ -301,6 +302,7 @@ class HIPPO:
                 "GOOD count",
                 "MEDIOCRE count",
                 "BAD count",
+                "RefinementResolution",
             ]
             + GENERATED_TAG_COLS
         ]
@@ -458,8 +460,8 @@ class HIPPO:
         compound_tags: None | list[str] = None,
         pose_tags: None | list[str] = None,
         mol_col: str = "ROMol",
-        name_col: str = "ID",
-        inspiration_col: str = "ref_mols",
+        name_col: str | None = "ID",
+        inspiration_col: str | None = "ref_mols",
         reference_col: str = "ref_pdb",
         energy_score_col: str = "energy_score",
         distance_score_col: str = "distance_score",
@@ -517,11 +519,17 @@ class HIPPO:
         target = self.register_target(target)
 
         assert mol_col in df_columns, f"{mol_col=} not in {df_columns}"
-        assert name_col in df_columns, f"{name_col=} not in {df_columns}"
-        assert inspiration_col in df_columns, f"{inspiration_col=} not in {df_columns}"
-        assert (
-            reference_col in df_columns or reference
-        ), "Must specify valid reference or reference_col"
+
+        if name_col:
+            assert name_col in df_columns, f"{name_col=} not in {df_columns}"
+
+        if inspiration_col:
+            assert (
+                inspiration_col in df_columns
+            ), f"{inspiration_col=} not in {df_columns}"
+
+        if not reference and reference_col:
+            assert reference_col in df_columns, f"{reference_col=} not in {df_columns}"
 
         output_directory = str(path.name).removesuffix(".sdf")
         output_directory = Path(output_directory)
@@ -536,7 +544,7 @@ class HIPPO:
 
         mrich.var("SDF entries (pre-filter)", len(df))
 
-        df = df[df[name_col] != "ver_1.2"]
+        df = df[df["ID"] != "ver_1.2"]
 
         for k, v in skip_equal_dict.items():
             df = df[df[k] == v]
@@ -580,7 +588,13 @@ class HIPPO:
 
         for i, row in mrich.track(df.iterrows(), prefix="Reading SDF rows..."):
 
-            name = row[name_col].strip()
+            if name_col:
+                name = row[name_col].strip() or f"pose_{i}"
+                alias = name
+            else:
+                name = f"pose_{i}"
+                alias = None
+
             mol = row[mol_col]
             inchikey = row["inchikey"]
             smiles = row["smiles"]
@@ -588,59 +602,60 @@ class HIPPO:
             if not compound_id:
                 mrich.error("Skipping invalid compound", i)
                 continue
-            path = (output_directory / f"{name}.fake.mol").resolve()
+            pose_path = (output_directory / f"{name}.fake.mol").resolve()
             energy_score = float(row[energy_score_col])
             distance_score = float(row[distance_score_col])
-
-            if not name:
-                name = f"pose_{i}"
 
             # inspirations
 
             inspirations = []
 
-            insp_str = row[inspiration_col]
+            if inspiration_col:
 
-            if isinstance(insp_str, str):
-                insp_str = insp_str.removeprefix("[")
-                insp_str = insp_str.removesuffix("]")
-                insp_str = insp_str.replace("'", "")
-                generator = insp_str.split(",")
+                insp_str = row[inspiration_col]
 
-            elif isinstance(insp_str, float):
-                generator = []
+                if isinstance(insp_str, str):
+                    insp_str = insp_str.removeprefix("[")
+                    insp_str = insp_str.removesuffix("]")
+                    insp_str = insp_str.replace("'", "")
+                    generator = insp_str.split(",")
 
-            else:
-                generator = insp_str
+                elif isinstance(insp_str, float):
+                    generator = []
 
-            for insp in generator:
-                insp = insp.strip()
+                else:
+                    generator = insp_str
 
-                try:
-                    pose_id = int(insp)
-                    inspirations.append(pose_id)
+                for insp in generator:
+                    insp = insp.strip()
 
-                except ValueError:
-                    if isinstance(inspiration_map, dict) and insp in inspiration_map:
-                        pose_id = inspiration_map[insp]
-                        if pose_id:
-                            inspirations.append(pose_id)
-                    elif hasattr(inspiration_map, "__call__"):
-                        pose_id = inspiration_map(insp)
-                        if pose_id:
-                            inspirations.append(pose_id)
-                    else:
-                        mrich.error(
-                            f"Could not find inspiration pose with alias={insp}"
-                        )
-                        continue
+                    try:
+                        pose_id = int(insp)
+                        inspirations.append(pose_id)
+
+                    except ValueError:
+                        if (
+                            isinstance(inspiration_map, dict)
+                            and insp in inspiration_map
+                        ):
+                            pose_id = inspiration_map[insp]
+                            if pose_id:
+                                inspirations.append(pose_id)
+                        elif hasattr(inspiration_map, "__call__"):
+                            pose_id = inspiration_map(insp)
+                            if pose_id:
+                                inspirations.append(pose_id)
+                        else:
+                            mrich.error(
+                                f"Could not find inspiration pose with alias={insp}"
+                            )
+                            continue
 
             if not reference:
                 ref_str = row.get(reference_col)
                 if ref_str:
                     try:
                         reference = int(ref_str)
-                        inspirations.append(pose_id)
                     except ValueError:
                         reference = inspiration_map[ref_str]
                 else:
@@ -688,10 +703,10 @@ class HIPPO:
 
             data.append(
                 dict(
-                    alias=name,
+                    alias=alias,
                     compound_id=compound_id,
                     target_id=target.id,
-                    path=path,
+                    path=pose_path,
                     metadata=metadata,
                     inspiration_ids=inspirations,
                     reference_id=reference,
@@ -812,6 +827,7 @@ class HIPPO:
         max_distance_score: float | None = 2.0,
         require_intra_geometry_pass: bool = True,
         reject_flags: list[str] | None = ["one_of_multiple_products"],
+        register_reactions: bool = True,
         dry_run: bool = False,
     ) -> "pd.DataFrame":
         """
@@ -959,33 +975,34 @@ class HIPPO:
 
         # bulk register reactions
 
-        for step in range(num_steps):
+        if register_reactions:
+            for step in range(num_steps):
 
-            step += 1
+                step += 1
 
-            reactant_id_sets = []
-            for r1_id, r2_id in df[
-                [f"{step}_r1_compound_id", f"{step}_r2_compound_id"]
-            ].values:
+                reactant_id_sets = []
+                for r1_id, r2_id in df[
+                    [f"{step}_r1_compound_id", f"{step}_r2_compound_id"]
+                ].values:
 
-                id_set = set()
+                    id_set = set()
 
-                if r1_id := int(r1_id):
-                    assert isinstance(r1_id, int), type(r1_id)
-                    id_set.add(r1_id)
+                    if r1_id := int(r1_id):
+                        assert isinstance(r1_id, int), type(r1_id)
+                        id_set.add(r1_id)
 
-                if r2_id := int(r2_id):
-                    assert isinstance(r2_id, int), type(r2_id)
-                    id_set.add(r2_id)
+                    if r2_id := int(r2_id):
+                        assert isinstance(r2_id, int), type(r2_id)
+                        id_set.add(r2_id)
 
-                assert id_set
-                reactant_id_sets.append(id_set)
+                    assert id_set
+                    reactant_id_sets.append(id_set)
 
-            reaction_ids = self.register_reactions(
-                types=df[f"{step}_reaction"],
-                product_ids=df[f"{step}_product_compound_id"],
-                reactant_id_lists=reactant_id_sets,
-            )
+                reaction_ids = self.register_reactions(
+                    types=df[f"{step}_reaction"],
+                    product_ids=df[f"{step}_product_compound_id"],
+                    reactant_id_lists=reactant_id_sets,
+                )
 
         scaffold_df = df[df["is_scaffold"]]
         elab_df = df[~df["is_scaffold"]]
@@ -999,7 +1016,7 @@ class HIPPO:
                 key = f"{step}_{role}_compound_id"
 
                 scaffold_ids = set(scaffold_df[key].to_list())
-                assert len(scaffold_ids) == 1
+                assert len(scaffold_ids) == 1, f"{key} {scaffold_ids}"
                 (scaffold_id,) = scaffold_ids
 
                 superstructure_ids = set(elab_df[key].to_list())
@@ -1520,6 +1537,120 @@ class HIPPO:
         self.db.commit()
 
         return ingredients
+
+    def add_soakdb_compounds(
+        self,
+        path: "str | Path",
+        smiles_col: str = "CompoundSMILES",
+        alias_col: str = "CompoundCode",
+        update_aliases: bool = True,
+        soak_count_to_metadata: bool = True,
+        sanitisation_verbosity: bool = False,
+        stop_after: int | None = None,
+    ) -> "CompoundSet":
+        """Registers compounds with aliases and metadata from a SoakDB file
+
+        :param path: Path to SoakDB CSV or SQLite file
+        :returns: :class:`.CompoundSet` of registered/matched compounds
+        """
+
+        from json import dumps
+
+        path = Path(path)
+
+        match ext := path.name.split(".")[-1]:
+            case "csv":
+                df = pd.read_csv(path)
+            case "sqlite":
+                raise NotImplementedError
+            case _:
+                print(ext)
+                raise ValueError(
+                    f"Could not determine file type from extension, use '.csv' or '.sqlite' {path}"
+                )
+
+        smiles_alias_tuples = []
+
+        for i, row in df.iterrows():
+
+            smiles = row[smiles_col]
+            alias = row[alias_col]
+
+            if pd.isna(smiles):
+                continue
+
+            if pd.isna(alias):
+                continue
+
+            smiles_alias_tuples.append((smiles, alias))
+
+            if stop_after and i > stop_after:
+                break
+
+        smiles_alias_tuples = set(smiles_alias_tuples)
+
+        old_smiles = [s for s, a in smiles_alias_tuples]
+
+        mrich.debug("Registering compounds...")
+        inchikey_new_smiles_tuples = self.register_compounds(
+            smiles=old_smiles, sanitisation_verbosity=sanitisation_verbosity
+        )
+
+        inchikey_old_smiles_lookup = {
+            inchikey: old_s
+            for old_s, (inchikey, new_s) in zip(old_smiles, inchikey_new_smiles_tuples)
+        }
+        alias_lookup = {s: a for s, a in smiles_alias_tuples}
+        alias_dicts = [
+            dict(compound_inchikey=inchikey, compound_alias=alias_lookup[old_s])
+            for old_s, (inchikey, new_s) in zip(old_smiles, inchikey_new_smiles_tuples)
+        ]
+
+        if update_aliases:
+
+            sql = """
+            UPDATE OR IGNORE compound
+            SET compound_alias = :compound_alias
+            WHERE compound_inchikey = :compound_inchikey;
+            """
+
+            mrich.debug("Updating aliases...")
+            self.db.executemany(sql, alias_dicts)
+
+        inchikeys = [d["compound_inchikey"] for d in alias_dicts]
+
+        inchikey_id_lookup = self.db.get_compound_inchikey_id_dict(inchikeys)
+
+        cset = self.compounds[
+            [inchikey_id_lookup[d["compound_inchikey"]] for d in alias_dicts]
+        ]
+
+        cset.add_tag("soaks")
+
+        metadata_lookup = self.db.get_id_metadata_dict(table="compound", ids=cset.ids)
+
+        if soak_count_to_metadata:
+
+            mrich.debug("Getting soak counts...")
+            for inchikey in inchikeys:
+                old_s = inchikey_old_smiles_lookup[inchikey]
+                c_id = inchikey_id_lookup[inchikey]
+                metadata_lookup[c_id]["SoakDB count"] = len(df[df[smiles_col] == old_s])
+
+            sql = """
+            UPDATE compound
+            SET compound_metadata = ?2
+            WHERE compound_id = ?1;
+            """
+
+            mrich.debug("Updating metadata...")
+            self.db.executemany(
+                sql, [(i, dumps(m)) for i, m in metadata_lookup.items()]
+            )
+
+        self.db.commit()
+
+        return cset
 
     ### REGISTRATION
 

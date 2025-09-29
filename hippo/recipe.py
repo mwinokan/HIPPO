@@ -776,6 +776,8 @@ class Recipe:
     def combined_compounds(self) -> "CompoundSet":
         """Combined product and no-chem compounds"""
         if self._combined_compounds is None:
+            from .cset import CompoundSet
+
             self._combined_compounds = CompoundSet(self.db, self.combined_compound_ids)
             self._combined_compounds._name = f"combined compounds of {self}"
         return self._combined_compounds

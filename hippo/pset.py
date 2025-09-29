@@ -2014,7 +2014,13 @@ class PoseSet:
 
         # comma separate subsites
         if subsites:
-            pose_df["subsites"] = pose_df["subsites"].apply(lambda x: ",".join(x))
+
+            def fix_subsites(subsite_list):
+                if not subsite_list:
+                    return "None"
+                return ",".join(subsite_list)
+
+            pose_df["subsites"] = pose_df["subsites"].apply(fix_subsites)
 
         if tags:
             pose_df["tags"] = pose_df["tags"].apply(lambda x: ",".join(x))
@@ -2657,7 +2663,7 @@ class PoseSet:
         from pandas import DataFrame
 
         sql = f"""
-        SELECT subsite_name, COUNT(DISTINCT subsite_tag_pose) FROM subsite
+        SELECT subsite_id, subsite_name, COUNT(DISTINCT subsite_tag_pose) FROM subsite
         INNER JOIN subsite_tag
         ON subsite_id = subsite_tag_ref
         WHERE subsite_tag_pose IN {self.str_ids}
@@ -2666,9 +2672,11 @@ class PoseSet:
 
         cursor = self.db.execute(sql)
 
-        df = DataFrame([dict(subsite=name, num_poses=count) for name, count in cursor])
+        df = DataFrame(
+            [dict(id=i, subsite=name, num_poses=count) for i, name, count in cursor]
+        )
 
-        df = df.set_index("subsite")
+        df = df.set_index("id")
 
         df = df.sort_values(by="num_poses", ascending=False)
 
@@ -2685,31 +2693,45 @@ class PoseSet:
             mrich.warning("Deleting Poses is risky! Set force=True to continue")
             return
 
+        str_ids = self.str_ids
+
         # delete the poses in this set
-        self.db.delete_where(table=self.table, key=f"pose_id IN {self.str_ids}")
+        self.db.delete_where(
+            table=self.table, key=f"pose_id IN {str_ids}", commit=False
+        )
 
         # check for other references to this pose
-        self.db.delete_where(table="tag", key=f"tag_pose IN {self.str_ids}")
+        self.db.delete_where(table="tag", key=f"tag_pose IN {str_ids}", commit=False)
         self.db.delete_where(
-            table="inspiration", key=f"inspiration_original IN {self.str_ids}"
+            table="inspiration",
+            key=f"inspiration_original IN {str_ids}",
+            commit=False,
         )
         self.db.delete_where(
-            table="inspiration", key=f"inspiration_derivative IN {self.str_ids}"
+            table="inspiration",
+            key=f"inspiration_derivative IN {str_ids}",
+            commit=False,
         )
         self.db.delete_where(
-            table="subsite_tag", key=f"subsite_tag_pose IN {self.str_ids}"
+            table="subsite_tag",
+            key=f"subsite_tag_pose IN {str_ids}",
+            commit=False,
         )
         self.db.delete_where(
-            table="interaction", key=f"interaction_pose IN {self.str_ids}"
+            table="interaction",
+            key=f"interaction_pose IN {str_ids}",
+            commit=False,
         )
 
         self.db.execute(
             f"""
             UPDATE pose
             SET pose_reference = NULL
-            WHERE pose_id IN {self.str_ids}
+            WHERE pose_id IN {str_ids}
         """
         )
+
+        self.db.commit()
 
     ### DUNDERS
 
