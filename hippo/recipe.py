@@ -1894,7 +1894,32 @@ class Recipe:
         """
 
         pose_compounds = poses.compounds
-        assert set(self.products.compound_ids) == set(pose_compounds.ids)
+        assert set(self.products.compound_ids) == set(
+            pose_compounds.ids
+        ), "supplied poses have different compounds to Recipe products"
+        assert len(poses) == len(
+            self.products
+        ), "some duplicate compounds in supplied poses"
+
+        df = pset.get_df(
+            inchikey=False,
+            alias=False,
+            name=False,
+            compound_id=True,
+            reference_id=True,
+            inspiration_aliases=True,
+        )
+
+        df = df.reset_index()
+        df = df.rename(columns={"id": "pose_id"})
+        df = df.set_index(["compound_id", "pose_id"])
+
+        no_refs = df[df["reference_id"].isna()]
+
+        if len(no_refs):
+            mrich.error(len(no_refs), "poses without reference!")
+            mrich.print(set(no_refs.index.get_level_values("pose_id")))
+            return None
 
         return None
 
