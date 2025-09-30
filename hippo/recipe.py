@@ -1912,7 +1912,10 @@ class Recipe:
 
         df = df.reset_index()
         df = df.rename(columns={"id": "pose_id"})
+        df["compound_set"] = df["compound_id"].apply(lambda x: f"C{x}")
         df = df.set_index(["compound_id", "pose_id"])
+
+        ## CHECKS
 
         no_refs = df[df["reference_id"].isna()]
 
@@ -1928,7 +1931,66 @@ class Recipe:
             mrich.error(len(no_refs), "poses without inspirations!")
             return None
 
-        return None
+        ## REFERENCE
+
+        ref_lookup = self.db.get_pose_id_alias_dict(poses.references)
+        df["template"] = df["reference_id"].apply(lambda x: ref_lookup[x])
+
+        ## INSPIRATIONS
+
+        for i, row in df.iterrows():
+            for j, alias in enumerate(row["inspiration_aliases"]):
+                df.loc[i, f"hit{j+1}"] = alias
+
+        ## ADD ROUTE INFO
+
+        routes = self.get_routes()
+
+        for sub_recipe in routes:
+
+            product = sub_recipe.product
+
+            product_id = product.compound_id
+
+            matches = df.xs(product_id, level="compound_id")
+
+            if len(matches) > 1:
+                mrich.warning("Multiple rows for compound", product_id)
+
+            for i, row in matches.iterrows():
+
+                key = (product_id, i)
+
+                for j, reaction in enumerate(sub_recipe.reactions):
+
+                    j = j + 1
+
+                    match len(reaction.reactants):
+                        case 1:
+                            df.loc[key, f"reactant_step{j}"] = reaction.reactants[
+                                0
+                            ].smiles
+                            df.loc[key, f"reactant2_step{j}"] = None
+                        case 2:
+                            df.loc[key, f"reactant_step{j}"] = reaction.reactants[
+                                0
+                            ].smiles
+                            df.loc[key, f"reactant2_step{j}"] = reaction.reactants[
+                                1
+                            ].smiles
+                        case _:
+                            raise NotImplementedError("Too many reactants")
+
+                    df.loc[key, f"product_step1{j}"] = reaction.product.smiles
+                    df.loc[key, f"reaction_name_step{j}"] = reaction.type
+
+                break
+
+        ## REMOVE UNECESSARY COLS
+
+        df = df.drop(columns=["reference_id", "inspiration_ids"])
+
+        return df
 
     def copy(self) -> "Recipe":
         """Copy this recipe"""
