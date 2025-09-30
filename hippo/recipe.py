@@ -1951,11 +1951,11 @@ class Recipe:
         for ref_pose in references:
             assert ref_pose.apo_path, f"Reference {ref_pose} has no apo_path"
 
-            template = template_dir / ref.apo_path.name
+            template = template_dir / ref_pose.apo_path.name
 
             if not template.exists():
                 mrich.writing(template)
-                shutil.copy(ref.apo_path, template)
+                shutil.copy(ref_pose.apo_path, template)
 
         ## INSPIRATIONS
 
