@@ -2058,9 +2058,16 @@ class Recipe:
         if not any([c not in cols for c in df.columns]):
             df = df[[c for c in cols if c in df.columns]]
 
-        out_path = out_dir / f"{out_key}_syndirella_input.csv"
-        mrich.writing(out_path)
-        df.to_csv(out_path)
+        if not separate:
+            out_path = out_dir / f"{out_key}_syndirella_input.csv"
+            mrich.writing(out_path)
+            df.to_csv(out_path)
+            return df
+
+        for idx, row in df.iterrows():
+            out_path = out_dir / f"{out_key}_{row['compound_set']}_syndirella_input.csv"
+            mrich.writing(out_path)
+            row.to_frame().T.to_csv(out_path, index=False)
 
         return df
 
