@@ -1859,6 +1859,43 @@ class Recipe:
 
         return None
 
+    def to_syndirella(
+        self,
+        out_key: "str | Path",
+        poses: "PoseSet",
+        *,
+        separate: bool = False,
+    ) -> "DataFrame":
+        """Generate inputs for running syndirella elaboration"""
+
+        from pathlib import Path
+
+        out_key = Path(".") / out_key
+
+        """
+
+        Need to create dataframe with columns:
+        - compound_id
+        - pose_id
+        - smiles
+        - reaction_name_step1
+        - reactant_step1
+        - reactant2_step1
+        - product_step1
+        ...
+        - hit1
+        - hit2
+        ...
+        - template
+        - compound_set
+
+        """
+
+        pose_compounds = poses.compounds
+        assert set(self.products.compound_ids) == set(pose_compounds.ids)
+
+        return None
+
     def copy(self) -> "Recipe":
         """Copy this recipe"""
 
