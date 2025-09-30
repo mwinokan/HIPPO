@@ -1901,7 +1901,7 @@ class Recipe:
             self.products
         ), "some duplicate compounds in supplied poses"
 
-        df = pset.get_df(
+        df = poses.get_df(
             inchikey=False,
             alias=False,
             name=False,
