@@ -4023,6 +4023,8 @@ class Database:
         if not result and none == "error":
             mrich.error(f"No compounds with substructure {query}")
             return None
+        elif not result:
+            return None
 
         from .cset import CompoundSet
 
