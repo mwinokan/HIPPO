@@ -2350,6 +2350,7 @@ class HIPPO:
         self,
         ref_animal: "HIPPO",
         compounds: CompoundSet | None = None,
+        *,
         debug: bool = False,
     ) -> "CompoundSet,CompoundSet":
         """Transfer quotes from another reference :class:`.HIPPO` animal object (e.g. the one from https://github.com/mwinokan/EnamineCatalogs)
@@ -2441,6 +2442,7 @@ class HIPPO:
         ref_animal: "HIPPO",
         *,
         unquoted_only: bool = False,
+        debug: bool = False,
     ) -> None:
         """Get batch quotes for all reactants in the database
 
@@ -2453,7 +2455,7 @@ class HIPPO:
         else:
             compounds = self.reactants
 
-        self.quote_compounds(quoter=quoter, compounds=compounds)
+        self.quote_compounds(ref_animal=ref_animal, compounds=compounds, debug=debug)
 
     def quote_intermediates(
         self,
