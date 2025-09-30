@@ -1918,8 +1918,11 @@ class Recipe:
 
         if len(no_refs):
             mrich.error(len(no_refs), "poses without reference!")
-            mrich.print(set(no_refs.index.get_level_values("pose_id")))
-            return None
+            ids = set(no_refs.index.get_level_values("pose_id"))
+            mrich.print(ids)
+            from .pset import PoseSet
+
+            return PoseSet(self.db, ids)
 
         return None
 
