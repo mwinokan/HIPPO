@@ -1872,7 +1872,18 @@ class Recipe:
 
         out_key = Path(".") / out_key
         out_key.mkdir(parents=True, exist_ok=True)
+
+        out_dir = out_key.parent
+        out_key = out_key.name
+
         mrich.var("out_key", out_key)
+        mrich.var("out_dir", out_dir)
+
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        template_dir = out_dir / "templates"
+        mrich.writing(template_dir)
+        template_dir.mkdir(parents=True, exist_ok=True)
 
         """
 
@@ -1931,10 +1942,20 @@ class Recipe:
             mrich.error(len(no_refs), "poses without inspirations!")
             return None
 
-        ## REFERENCE
+        ## TEMPLATES
 
-        ref_lookup = self.db.get_pose_id_alias_dict(poses.references)
+        references = poses.references
+        ref_lookup = self.db.get_pose_id_alias_dict(references)
         df["template"] = df["reference_id"].apply(lambda x: ref_lookup[x])
+
+        for ref_pose in references:
+            assert ref_pose.apo_path, f"Reference {ref_pose} has no apo_path"
+
+            template = template_dir / ref.apo_path.name
+
+            if not template.exists():
+                mrich.writing(template)
+                shutil.copy(ref.apo_path, template)
 
         ## INSPIRATIONS
 
@@ -1942,11 +1963,22 @@ class Recipe:
             for j, alias in enumerate(row["inspiration_aliases"]):
                 df.loc[i, f"hit{j+1}"] = alias
 
+        inspirations = poses.inspirations
+
+        sdf_name = out_dir / f"{out_key}_syndirella_inspiration_hits.sdf"
+
+        inspirations.write_sdf(
+            sdf_name,
+            tags=False,
+            metadata=False,
+            name_col="name",
+        )
+
         ## ADD ROUTE INFO
 
         routes = self.get_routes()
 
-        for sub_recipe in routes:
+        for sub_recipe in mrich.track(routes, prefix="Adding chemistry info..."):
 
             product = sub_recipe.product
 
