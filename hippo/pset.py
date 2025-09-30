@@ -1445,7 +1445,7 @@ class PoseSet:
     def get_by_compound(
         self,
         *,
-        compound: "int | Compound",
+        compound: "int | Compound | CompoundSet",
     ) -> "PoseSet | None":
         """Select a subset of this :class:`.PoseSet` by the associated :class:`.Compound`.
 
@@ -1454,17 +1454,30 @@ class PoseSet:
 
         """
         from .compound import Compound
+        from .cset import CompoundSet
 
-        if isinstance(compound, Compound):
-            compound = compound.id
+        if isinstance(compound, CompoundSet):
+            values = self.db.select_where(
+                query="pose_id",
+                table="pose",
+                key=f"pose_compound IN {compound.str_ids} AND pose_id in {self.str_ids}",
+                multiple=True,
+                none="quiet",
+            )
 
-        values = self.db.select_where(
-            query="pose_id",
-            table="pose",
-            key=f"pose_compound={compound} AND pose_id in {self.str_ids}",
-            multiple=True,
-            none="quiet",
-        )
+        else:
+
+            if isinstance(compound, Compound):
+                compound = compound.id
+
+            values = self.db.select_where(
+                query="pose_id",
+                table="pose",
+                key=f"pose_compound={compound} AND pose_id in {self.str_ids}",
+                multiple=True,
+                none="quiet",
+            )
+
         if not values:
             return None
         ids = [v for v, in values if v]
