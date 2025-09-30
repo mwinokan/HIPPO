@@ -1936,7 +1936,7 @@ class Recipe:
             mrich.print(ids)
             from .pset import PoseSet
 
-        no_insps = len([len(i) for i in df["inspiration_ids"].values])
+        no_insps = len([len(i) for i in df["inspiration_aliases"].values])
 
         if len(no_insps):
             mrich.error(len(no_refs), "poses without inspirations!")
