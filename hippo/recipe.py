@@ -2020,7 +2020,7 @@ class Recipe:
 
         ## REMOVE UNECESSARY COLS
 
-        df = df.drop(columns=["reference_id", "inspiration_ids"])
+        df = df.drop(columns=["reference_id", "inspiration_aliases"])
 
         return df
 
