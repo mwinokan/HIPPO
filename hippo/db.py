@@ -259,39 +259,33 @@ class Database:
 
     def execute(
         self, sql, payload=None, *, retry: float | None = 1, debug: bool = False
-    ) -> None:
-        """Execute arbitrary SQL
-
-        :param sql: SQL query
-        :param retry: If truthy, keep trying to execute every `retry` seconds if the Database is locked
-        :param payload: Payload for insertion, etc. (Default value = None)
-
-        """
-
+    ):
+        """Execute arbitrary SQL with retry if database is locked."""
         if debug:
             mrich.debug(sql)
 
-        try:
-            if payload:
-                return self.cursor.execute(sql, payload)
-            else:
-                return self.cursor.execute(sql)
-        except sqlite3.OperationalError as e:
-            if "database is locked" in str(e) and retry:
-                with mrich.clock(
-                    f"SQLite Database is locked, waiting {retry} second(s)..."
-                ):
-                    time.sleep(retry)
-                mrich.print("[debug]SQLite Database was locked, retrying...")
-                return self.execute(sql=sql, payload=payload, retry=retry)
-            if "syntax error" in str(e):
-                mrich.error(sql)
-                mrich.error(payload)
+        while True:
+            try:
+                if payload:
+                    return self.cursor.execute(sql, payload)
+                else:
+                    return self.cursor.execute(sql)
+            except sqlite3.OperationalError as e:
+                if "database is locked" in str(e) and retry:
+                    with mrich.clock(
+                        f"SQLite Database is locked, waiting {retry} second(s)..."
+                    ):
+                        time.sleep(retry)
+                    mrich.print("[debug]SQLite Database was locked, retrying...")
+                    continue  # retry without recursion
+                elif "syntax error" in str(e):
+                    mrich.error(sql)
+                    mrich.error(payload)
+                    raise
+                else:
+                    raise
+            except Exception as e:
                 raise
-            else:
-                raise
-        except Exception as e:
-            raise
 
     def executemany(self, sql, payload, *, retry: float | None = 1) -> None:
         """Execute arbitrary SQL
