@@ -1871,6 +1871,8 @@ class Recipe:
         from pathlib import Path
 
         out_key = Path(".") / out_key
+        out_key.mkdir(parents=True, exist_ok=True)
+        mrich.var("out_key", out_key)
 
         """
 
