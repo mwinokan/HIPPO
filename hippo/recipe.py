@@ -1868,6 +1868,7 @@ class Recipe:
     ) -> "DataFrame":
         """Generate inputs for running syndirella elaboration"""
 
+        import shutil
         from pathlib import Path
 
         out_key = Path(".") / out_key
