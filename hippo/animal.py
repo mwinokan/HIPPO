@@ -2442,6 +2442,7 @@ class HIPPO:
         ref_animal: "HIPPO",
         *,
         unquoted_only: bool = False,
+        supplier: str = "any",
         debug: bool = False,
     ) -> None:
         """Get batch quotes for all reactants in the database
@@ -2451,9 +2452,11 @@ class HIPPO:
         """
 
         if unquoted_only:
-            compounds = self.reactants.get_unquoted(supplier=quoter.supplier)
+            compounds = self.reactants.get_unquoted(supplier=supplier)
         else:
             compounds = self.reactants
+
+        mrich.var("#compounds", len(compounds))
 
         self.quote_compounds(ref_animal=ref_animal, compounds=compounds, debug=debug)
 
