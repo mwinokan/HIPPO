@@ -752,6 +752,12 @@ class Recipe:
         """Product :class:`.IngredientSet`"""
         return self._compounds
 
+    @compounds.setter
+    def compounds(self, a: "IngredientSet"):
+        """Set the compounds"""
+        self._compounds = a
+        self.__flag_modification()
+
     @property
     def poses(self) -> "PoseSet":
         """Product poses"""
