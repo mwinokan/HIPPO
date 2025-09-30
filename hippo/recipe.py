@@ -2033,6 +2033,35 @@ class Recipe:
 
         df = df.drop(columns=["reference_id", "inspiration_aliases"])
 
+        ## REORDER COLUMNS
+
+        cols = [
+            "smiles",
+            "reaction_name_step1",
+            "reactant_step1",
+            "reactant2_step1",
+            "reactant3_step1",
+            "product_step11",
+            "hit1",
+            "hit2",
+            "hit3",
+            "hit4",
+            "hit5",
+            "hit6",
+            "hit7",
+            "hit8",
+            "hit9",
+            "template",
+            "compound_set",
+        ]
+
+        if not any([c not in cols for c in df.columns]):
+            df = df[[c for c in cols if c in df.columns]]
+
+        out_path = out_dir / f"{out_key}_syndirella_input.csv"
+        mrich.writing(out_path)
+        df.to_csv(out_path)
+
         return df
 
     def copy(self) -> "Recipe":
