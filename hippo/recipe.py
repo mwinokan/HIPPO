@@ -2011,6 +2011,16 @@ class Recipe:
                             df.loc[key, f"reactant2_step{j}"] = reaction.reactants[
                                 1
                             ].smiles
+                        case 3:
+                            df.loc[key, f"reactant_step{j}"] = reaction.reactants[
+                                0
+                            ].smiles
+                            df.loc[key, f"reactant2_step{j}"] = reaction.reactants[
+                                1
+                            ].smiles
+                            df.loc[key, f"reactant3_step{j}"] = reaction.reactants[
+                                2
+                            ].smiles
                         case _:
                             raise NotImplementedError("Too many reactants")
 
