@@ -1872,19 +1872,20 @@ class Recipe:
         from pathlib import Path
 
         out_key = Path(".") / out_key
-        out_key.mkdir(parents=True, exist_ok=True)
-
         out_dir = out_key.parent
         out_key = out_key.name
 
         mrich.var("out_key", out_key)
         mrich.var("out_dir", out_dir)
 
-        out_dir.mkdir(parents=True, exist_ok=True)
+        if not out_dir.exists():
+            mrich.writing(out_dir)
+            out_dir.mkdir(parents=True, exist_ok=True)
 
         template_dir = out_dir / "templates"
-        mrich.writing(template_dir)
-        template_dir.mkdir(parents=True, exist_ok=True)
+        if not template_dir.exists():
+            mrich.writing(template_dir)
+            template_dir.mkdir(parents=True, exist_ok=True)
 
         """
 
@@ -2067,7 +2068,9 @@ class Recipe:
         for idx, row in df.iterrows():
             out_path = out_dir / f"{out_key}_{row['compound_set']}_syndirella_input.csv"
             mrich.writing(out_path)
-            row.to_frame().T.to_csv(out_path, index=False)
+            single_df = row.to_frame().T
+            single_df = single_df.dropna(axis=1, how="all")
+            single_df.to_csv(out_path, index=False)
 
         return df
 
