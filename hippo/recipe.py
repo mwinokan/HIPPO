@@ -1507,7 +1507,21 @@ class Recipe:
         ### Get lookup data
 
         route_ids = self.get_routes(return_ids=True)
+
+        sql = f"""
+        SELECT component_ref, route_product FROM component
+        INNER JOIN route ON route_id = component_route
+        WHERE component_type = 2
+        AND component_ref IN {self.reactants.compounds.str_ids}
+        AND component_route IN {str(tuple(route_ids)).replace(',)',')')}
+        """
+        product_lookup = {}
+        for reactant_id, product_id in self.db.execute(sql):
+            route_lookup.setdefault(reactant_id, set())
+            route_lookup[reactant_id].add(product_id)
+
         smiles_lookup = self.db.get_compound_id_smiles_dict(self.reactants.compounds)
+
         inchikey_lookup = self.db.get_compound_id_inchikey_dict(
             self.reactants.compounds
         )
@@ -1541,6 +1555,13 @@ class Recipe:
         )
         qdf = qdf.drop(columns=["compound"])
 
+        ### Downstream info
+
+        df["downstream_product_ids"] = df["compound_id"].apply(
+            lambda x: product_lookup[x]
+        )
+        df["num_downstream_products"] = df["downstream_product_ids"].apply(len)
+
         ### Join and reformat
 
         df = df.merge(qdf, on="quote_id", how="left")
@@ -1567,6 +1588,8 @@ class Recipe:
             "quoted_purity",
             "quoted_smiles",
             "quote_date",
+            "num_downstream_products",
+            "downstream_product_ids",
         ]
 
         df = df[[c for c in cols if c in df.columns]]
