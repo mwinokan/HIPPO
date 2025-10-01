@@ -2444,6 +2444,13 @@ class IngredientSet:
         """:class:`.CompoundSet` of all compounds in this set"""
         return CompoundSet(self.db, self.compound_ids)
 
+    @property
+    def quote_ids(self) -> list[int]:
+        """Get a list of quote ID's"""
+        from pandas import isna
+
+        return [q for q in self.df["quote_id"].values if not isna(q) and q is not None]
+
     ### METHODS
 
     def get_price(
