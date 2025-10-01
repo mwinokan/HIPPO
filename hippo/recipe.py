@@ -1520,6 +1520,29 @@ class Recipe:
             product_lookup.setdefault(reactant_id, set())
             product_lookup[reactant_id].add(product_id)
 
+        sql = f"""
+        WITH reactants AS (
+            SELECT component_ref AS reactant_id, component_route AS route_id FROM component
+            WHERE component_type = 2
+            AND component_ref IN {self.reactants.compounds.str_ids}
+        ),
+
+        reactions AS (
+            SELECT component_ref AS reaction_id, component_route AS route_id, reaction_type FROM component
+            INNER JOIN reaction ON component_ref = reaction_id
+            WHERE component_type = 1
+            AND component_ref IN {self.reactions.str_ids}
+        )
+
+        SELECT reactants.reactant_id, reactions.reaction_id, reactions.reaction_type FROM reactants
+        INNER JOIN reactions ON reactants.route_id = reactions.route_id
+        """
+        reaction_lookup = {}
+        for reactant_id, reaction_id, reaction_type in self.db.execute(sql):
+            reaction_lookup.setdefault(reactant_id, dict(ids=set(), types=set()))
+            reaction_lookup[reactant_id]["ids"].add(reaction_id)
+            reaction_lookup[reactant_id]["types"].add(reaction_type)
+
         smiles_lookup = self.db.get_compound_id_smiles_dict(self.reactants.compounds)
 
         inchikey_lookup = self.db.get_compound_id_inchikey_dict(
@@ -1560,6 +1583,16 @@ class Recipe:
         df["downstream_product_ids"] = df["compound_id"].apply(
             lambda x: product_lookup[x]
         )
+
+        df["downstream_reaction_ids"] = df["compound_id"].apply(
+            lambda x: reaction_lookup[x]["ids"]
+        )
+        df["downstream_reaction_types"] = df["compound_id"].apply(
+            lambda x: reaction_lookup[x]["types"]
+        )
+
+        df["num_downstream_reactions"] = df["downstream_reaction_ids"].apply(len)
+        df["num_downstream_reaction_types"] = df["downstream_reaction_types"].apply(len)
         df["num_downstream_products"] = df["downstream_product_ids"].apply(len)
 
         ### Join and reformat
@@ -1588,73 +1621,25 @@ class Recipe:
             "quoted_purity",
             "quoted_smiles",
             "quote_date",
+            "num_downstream_reaction_types",
+            "num_downstream_reactions",
             "num_downstream_products",
+            "downstream_reaction_types",
+            "downstream_reaction_ids",
             "downstream_product_ids",
         ]
 
         df = df[[c for c in cols if c in df.columns]]
 
-        # for i, row in mrich.track(
-        #     df.iterrows(),
-        #     total=len(df),
-        #     prefix="Adding downstream info",
-        # ):
+        ### N.B. scaffold series no longer output
 
-        #     downstream_routes = []
-        #     downstream_reactions = []
+        mrich.writing(file)
+        df.to_csv(file, index=False)
 
-        #     reactant_id = row["compound_id"]
+        if return_df:
+            return df
 
-        #     for route in routes:
-        #         if reactant_id in route.reactants.ids:
-        #             downstream_routes.append(route)
-        #         for reaction in route.reactions:
-        #             if reactant_id in reaction.reactants.ids:
-        #                 downstream_reactions.append(reaction)
-
-        return df
-
-        #     downstream_products = CompoundSet(
-        #         self.db, set(route.product.id for route in downstream_routes)
-        #     )
-        #     downstream_reactions = ReactionSet(
-        #         self.db, set(reaction.id for reaction in downstream_reactions)
-        #     )
-
-        #     if not downstream_products:
-        #         mrich.error("No downstream products for", reactant)
-        #         continue
-
-        #     if not downstream_reactions:
-        #         mrich.error("No downstream reactions for", reactant)
-        #         continue
-
-        #     def get_scaffold_series():
-
-        #         bases = downstream_products.bases
-
-        #         if not bases:
-        #             bases = downstream_products[0:]
-
-        #         return bases.ids
-
-        #     d["num_reaction_dependencies"] = len(downstream_reactions)
-        #     d["num_product_dependencies"] = len(downstream_products)
-        #     d["reaction_dependencies"] = downstream_reactions.ids
-        #     d["product_dependencies"] = downstream_products.ids
-        #     d["chemistry_types"] = ", ".join(set(downstream_reactions.types))
-        #     d["scaffold_series"] = get_scaffold_series()
-
-        #     data.append(d)
-
-        # df = DataFrame(data)
-        # mrich.writing(file)
-        # df.to_csv(file, index=False)
-
-        # if return_df:
-        #     return df
-
-        # return None
+        return None
 
     def write_product_csv(
         self, file: "str | Path", return_df: bool = False
