@@ -2850,6 +2850,42 @@ class Database:
             smiles=entry[10],
         )
 
+    def get_quote_df(self, ids: list[int]) -> "pd.DataFrame":
+        """Get a pandas DataFrame representing quotes with given IDs"""
+
+        from pandas import DataFrame
+
+        str_ids = str(tuple(ids)).replace(",)", ")")
+
+        query = "quote_compound, quote_supplier, quote_catalogue, quote_entry, quote_amount, quote_price, quote_currency, quote_lead_time, quote_purity, quote_date, quote_smiles, quote_id "
+        records = self.select_where(
+            query=query,
+            table="quote",
+            key=f"id IN {str_ids}",
+        )
+
+        data = []
+
+        for entry in records:
+            data.append(
+                dict(
+                    id=entry[11],
+                    compound=entry[0],
+                    supplier=entry[1],
+                    catalogue=entry[2],
+                    entry=entry[3],
+                    amount=entry[4],
+                    price=entry[5],
+                    currency=entry[6],
+                    lead_time=entry[7],
+                    purity=entry[8],
+                    date=entry[9],
+                    smiles=entry[10],
+                )
+            )
+
+        return DataFrame(data)
+
     def get_metadata(
         self,
         *,
