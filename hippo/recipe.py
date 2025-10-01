@@ -1504,84 +1504,142 @@ class Recipe:
 
         routes = self.get_routes()
 
-        for reactant in mrich.track(
-            self.reactants, prefix="Constructing reactant DataFrame"
-        ):
-            quote = reactant.quote
+        ### Reactant Dataframe
 
-            d = dict(
-                hippo_id=reactant.compound_id,
-                smiles=reactant.smiles,
-                inchikey=reactant.inchikey,
-                required_amount_mg=reactant.amount,
-            )
+        df = self.reactants.df
 
-            if quote:
-                d.update(
-                    dict(
-                        quoted_amount=quote.amount,
-                        quote_currency=quote.currency,
-                        quote_price=quote.price.amount,
-                        quote_lead_time_days=quote.lead_time,
-                        quote_supplier=quote.supplier,
-                        quote_catalogue=quote.catalogue,
-                        quote_entry=quote.entry,
-                        quoted_smiles=quote.smiles,
-                        quoted_purity=quote.purity,
-                    )
-                )
+        df["smiles"] = df["compound_id"].apply(lambda x: smiles_lookup[x])
+        df["inchikey"] = df["compound_id"].apply(lambda x: inchikey_lookup[x])
+        df = df.drop(columns=["supplier", "max_lead_time"])
 
-            downstream_routes = []
-            downstream_reactions = []
+        ### Quote DataFrame
 
-            for route in routes:
-                if reactant in route.reactants:
-                    downstream_routes.append(route)
-                for reaction in route.reactions:
-                    if reactant in reaction.reactants:
-                        downstream_reactions.append(reaction)
+        qdf = animal.db.get_quote_df(self.reactants.quote_ids)
 
-            downstream_products = CompoundSet(
-                self.db, set(route.product.id for route in downstream_routes)
-            )
-            downstream_reactions = ReactionSet(
-                self.db, set(reaction.id for reaction in downstream_reactions)
-            )
+        qdf = qdf.rename(
+            columns={
+                "id": "quote_id",
+                "smiles": "quoted_smiles",
+                "purity": "quoted_purity",
+                "date": "quote_date",
+                "lead_time": "quote_lead_time_days",
+                "price": "quote_price",
+                "currency": "quote_currency",
+                "catalogue": "quote_catalogue",
+                "supplier": "quote_supplier",
+                "entry": "quote_entry",
+                "amount": "quoted_amount",
+            }
+        )
+        qdf = qdf.drop(columns=["compound"])
 
-            if not downstream_products:
-                mrich.error("No downstream products for", reactant)
-                continue
+        ### Join and reformat
 
-            if not downstream_reactions:
-                mrich.error("No downstream reactions for", reactant)
-                continue
+        df = df.merge(qdf, on="quote_id", how="left")
 
-            def get_scaffold_series():
+        cols = [
+            "compound_id",
+            "amount",
+            "quote_id",
+            "supplier",
+            "max_lead_time",
+            "quoted_amount_x",
+            "smiles",
+            "inchikey",
+            "quote_supplier",
+            "quote_catalogue",
+            "quote_entry",
+            "quoted_amount_y",
+            "quote_price",
+            "quote_currency",
+            "quote_lead_time_days",
+            "quoted_purity",
+            "quote_date",
+            "quoted_smiles",
+        ]
 
-                bases = downstream_products.bases
+        df = df[[c for c in cols if c in df.columns]]
 
-                if not bases:
-                    bases = downstream_products[0:]
+        return df
 
-                return bases.ids
+        # for reactant in mrich.track(
+        #     self.reactants, prefix="Constructing reactant DataFrame"
+        # ):
+        #     quote = reactant.quote
 
-            d["num_reaction_dependencies"] = len(downstream_reactions)
-            d["num_product_dependencies"] = len(downstream_products)
-            d["reaction_dependencies"] = downstream_reactions.ids
-            d["product_dependencies"] = downstream_products.ids
-            d["chemistry_types"] = ", ".join(set(downstream_reactions.types))
-            d["scaffold_series"] = get_scaffold_series()
+        #     d = dict(
+        #         hippo_id=reactant.compound_id,
+        #         smiles=reactant.smiles,
+        #         inchikey=reactant.inchikey,
+        #         required_amount_mg=reactant.amount,
+        #     )
 
-            data.append(d)
+        #     if quote:
+        #         d.update(
+        #             dict(
+        #                 quoted_amount=quote.amount,
+        #                 quote_currency=quote.currency,
+        #                 quote_price=quote.price.amount,
+        #                 quote_lead_time_days=quote.lead_time,
+        #                 quote_supplier=quote.supplier,
+        #                 quote_catalogue=quote.catalogue,
+        #                 quote_entry=quote.entry,
+        #                 quoted_smiles=quote.smiles,
+        #                 quoted_purity=quote.purity,
+        #             )
+        #         )
 
-        df = DataFrame(data)
-        mrich.writing(file)
-        df.to_csv(file, index=False)
+        #     downstream_routes = []
+        #     downstream_reactions = []
 
-        if return_df:
-            return df
+        #     for route in routes:
+        #         if reactant in route.reactants:
+        #             downstream_routes.append(route)
+        #         for reaction in route.reactions:
+        #             if reactant in reaction.reactants:
+        #                 downstream_reactions.append(reaction)
 
-        return None
+        #     downstream_products = CompoundSet(
+        #         self.db, set(route.product.id for route in downstream_routes)
+        #     )
+        #     downstream_reactions = ReactionSet(
+        #         self.db, set(reaction.id for reaction in downstream_reactions)
+        #     )
+
+        #     if not downstream_products:
+        #         mrich.error("No downstream products for", reactant)
+        #         continue
+
+        #     if not downstream_reactions:
+        #         mrich.error("No downstream reactions for", reactant)
+        #         continue
+
+        #     def get_scaffold_series():
+
+        #         bases = downstream_products.bases
+
+        #         if not bases:
+        #             bases = downstream_products[0:]
+
+        #         return bases.ids
+
+        #     d["num_reaction_dependencies"] = len(downstream_reactions)
+        #     d["num_product_dependencies"] = len(downstream_products)
+        #     d["reaction_dependencies"] = downstream_reactions.ids
+        #     d["product_dependencies"] = downstream_products.ids
+        #     d["chemistry_types"] = ", ".join(set(downstream_reactions.types))
+        #     d["scaffold_series"] = get_scaffold_series()
+
+        #     data.append(d)
+
+        # df = DataFrame(data)
+        # mrich.writing(file)
+        # df.to_csv(file, index=False)
+
+        # if return_df:
+        #     return df
+
+        # return None
 
     def write_product_csv(
         self, file: "str | Path", return_df: bool = False
