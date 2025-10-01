@@ -2862,6 +2862,7 @@ class Database:
             query=query,
             table="quote",
             key=f"quote_id IN {str_ids}",
+            multiple=True,
         )
 
         data = []
