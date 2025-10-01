@@ -1517,8 +1517,8 @@ class Recipe:
         """
         product_lookup = {}
         for reactant_id, product_id in self.db.execute(sql):
-            route_lookup.setdefault(reactant_id, set())
-            route_lookup[reactant_id].add(product_id)
+            product_lookup.setdefault(reactant_id, set())
+            product_lookup[reactant_id].add(product_id)
 
         smiles_lookup = self.db.get_compound_id_smiles_dict(self.reactants.compounds)
 
