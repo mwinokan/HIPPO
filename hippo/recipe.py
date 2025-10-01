@@ -1569,44 +1569,25 @@ class Recipe:
 
         df = df[[c for c in cols if c in df.columns]]
 
+        for i, row in mrich.track(
+            df.iterrows(),
+            total=len(df),
+            prefix="Adding downstream info",
+        ):
+
+            downstream_routes = []
+            downstream_reactions = []
+
+            reactant_id = row["compound_id"]
+
+            for route in routes:
+                if reactant_id in route.reactants.ids:
+                    downstream_routes.append(route)
+                for reaction in route.reactions:
+                    if reactant_id in reaction.reactants.ids:
+                        downstream_reactions.append(reaction)
+
         return df
-
-        # for reactant in mrich.track(
-        #     self.reactants, prefix="Constructing reactant DataFrame"
-        # ):
-        #     quote = reactant.quote
-
-        #     d = dict(
-        #         hippo_id=reactant.compound_id,
-        #         smiles=reactant.smiles,
-        #         inchikey=reactant.inchikey,
-        #         required_amount_mg=reactant.amount,
-        #     )
-
-        #     if quote:
-        #         d.update(
-        #             dict(
-        #                 quoted_amount=quote.amount,
-        #                 quote_currency=quote.currency,
-        #                 quote_price=quote.price.amount,
-        #                 quote_lead_time_days=quote.lead_time,
-        #                 quote_supplier=quote.supplier,
-        #                 quote_catalogue=quote.catalogue,
-        #                 quote_entry=quote.entry,
-        #                 quoted_smiles=quote.smiles,
-        #                 quoted_purity=quote.purity,
-        #             )
-        #         )
-
-        #     downstream_routes = []
-        #     downstream_reactions = []
-
-        #     for route in routes:
-        #         if reactant in route.reactants:
-        #             downstream_routes.append(route)
-        #         for reaction in route.reactions:
-        #             if reactant in reaction.reactants:
-        #                 downstream_reactions.append(reaction)
 
         #     downstream_products = CompoundSet(
         #         self.db, set(route.product.id for route in downstream_routes)
