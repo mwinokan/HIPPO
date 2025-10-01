@@ -3108,7 +3108,7 @@ class Database:
 
         return d
 
-    def get_compound_inchikey_id_dict(self, inchikeys: list[str]):
+    def get_compound_inchikey_id_dict(self, inchikeys: list[str]) -> dict[str, int]:
         """Get a dictionary mapping :class:`.Compound` inchikeys to their ID's"""
 
         inchikey_str = str(tuple(inchikeys)).replace(",)", ")")
@@ -3122,6 +3122,32 @@ class Database:
 
         return {
             compound_inchikey: compound_id for compound_inchikey, compound_id in records
+        }
+
+    def get_compound_id_inchikey_dict(
+        self, cset: "CompoundSet | None" = None
+    ) -> dict[int, str]:
+        """Get a dictionary mapping :class:`.Compound` IDs to their inchikeys"""
+
+        if cset:
+
+            records = self.select_where(
+                table="compound",
+                multiple=True,
+                query="compound_id, compound_inchikey",
+                key=f"compound_id IN {cset.str_ids}",
+            )
+
+        else:
+
+            records = self.select(
+                table="compound",
+                multiple=True,
+                query="compound_id, compound_inchikey",
+            )
+
+        return {
+            compound_id: compound_inchikey for compound_id, compound_inchikey in records
         }
 
     def get_id_metadata_dict(self, *, table: str, ids: list[int]) -> dict[int, dict]:
