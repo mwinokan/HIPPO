@@ -1355,9 +1355,11 @@ class Recipe:
 
         return data
 
-    def get_routes(self) -> "RouteSet":
+    def get_routes(self, return_ids: bool = False) -> "RouteSet":
         """Get routes"""
-        return self.products.get_routes(permitted_reactions=self.reactions)
+        return self.products.get_routes(
+            permitted_reactions=self.reactions, return_ids=return_ids
+        )
 
     def write_CAR_csv(
         self, file: "str | Path", return_df: bool = False
@@ -1504,7 +1506,7 @@ class Recipe:
 
         ### Get lookup data
 
-        routes = self.get_routes()
+        route_ids = self.get_routes(return_ids=True)
         smiles_lookup = self.db.get_compound_id_smiles_dict(self.reactants.compounds)
         inchikey_lookup = self.db.get_compound_id_inchikey_dict(
             self.reactants.compounds
@@ -1569,23 +1571,23 @@ class Recipe:
 
         df = df[[c for c in cols if c in df.columns]]
 
-        for i, row in mrich.track(
-            df.iterrows(),
-            total=len(df),
-            prefix="Adding downstream info",
-        ):
+        # for i, row in mrich.track(
+        #     df.iterrows(),
+        #     total=len(df),
+        #     prefix="Adding downstream info",
+        # ):
 
-            downstream_routes = []
-            downstream_reactions = []
+        #     downstream_routes = []
+        #     downstream_reactions = []
 
-            reactant_id = row["compound_id"]
+        #     reactant_id = row["compound_id"]
 
-            for route in routes:
-                if reactant_id in route.reactants.ids:
-                    downstream_routes.append(route)
-                for reaction in route.reactions:
-                    if reactant_id in reaction.reactants.ids:
-                        downstream_reactions.append(reaction)
+        #     for route in routes:
+        #         if reactant_id in route.reactants.ids:
+        #             downstream_routes.append(route)
+        #         for reaction in route.reactions:
+        #             if reactant_id in reaction.reactants.ids:
+        #                 downstream_reactions.append(reaction)
 
         return df
 

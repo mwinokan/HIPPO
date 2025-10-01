@@ -1444,6 +1444,7 @@ class CompoundSet:
     def get_routes(
         self,
         permitted_reactions: "None | ReactionSet" = None,
+        return_ids: bool = False,
         debug: bool = True,
     ) -> "RouteSet":
         """Get a RoutSet to products in this set.
@@ -1497,6 +1498,9 @@ class CompoundSet:
                 for route_id in mrich.track(available_routes, prefix="Getting routes")
             ]
 
+            if return_ids:
+                return [i for i, in records]
+
         else:
 
             sql = f"""
@@ -1507,6 +1511,9 @@ class CompoundSet:
             if debug:
                 mrich.debug("Querying database for routes")
             records = self.db.execute(sql).fetchall()
+
+            if return_ids:
+                return [i for i, in records]
 
             routes = [
                 self.db.get_route(id=route_id)
