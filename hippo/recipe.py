@@ -1502,7 +1502,13 @@ class Recipe:
 
         data = []
 
+        ### Get lookup data
+
         routes = self.get_routes()
+        smiles_lookup = self.db.get_compound_id_smiles_dict(self.reactants.compounds)
+        inchikey_lookup = self.db.get_compound_id_inchikey_dict(
+            self.reactants.compounds
+        )
 
         ### Reactant Dataframe
 
