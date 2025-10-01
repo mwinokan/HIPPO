@@ -1520,7 +1520,7 @@ class Recipe:
 
         ### Quote DataFrame
 
-        qdf = animal.db.get_quote_df(self.reactants.quote_ids)
+        qdf = self.db.get_quote_df(self.reactants.quote_ids)
 
         qdf = qdf.rename(
             columns={
