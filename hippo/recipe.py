@@ -1510,7 +1510,7 @@ class Recipe:
 
         df["smiles"] = df["compound_id"].apply(lambda x: smiles_lookup[x])
         df["inchikey"] = df["compound_id"].apply(lambda x: inchikey_lookup[x])
-        df = df.drop(columns=["supplier", "max_lead_time"])
+        df = df.drop(columns=["supplier", "max_lead_time", "quoted_amount"])
 
         ### Quote DataFrame
 
@@ -1528,7 +1528,7 @@ class Recipe:
                 "catalogue": "quote_catalogue",
                 "supplier": "quote_supplier",
                 "entry": "quote_entry",
-                "amount": "quoted_amount",
+                "amount": "quoted_amount_mg",
             }
         )
         qdf = qdf.drop(columns=["compound"])
@@ -1537,25 +1537,28 @@ class Recipe:
 
         df = df.merge(qdf, on="quote_id", how="left")
 
+        df = df.rename(
+            columns={
+                "amount": "required_amount_mg",
+            }
+        )
+
         cols = [
             "compound_id",
-            "amount",
-            "quote_id",
-            "supplier",
-            "max_lead_time",
-            "quoted_amount_x",
             "smiles",
             "inchikey",
+            "required_amount_mg",
+            "quoted_amount_mg",
+            "quote_id",
             "quote_supplier",
             "quote_catalogue",
             "quote_entry",
-            "quoted_amount_y",
             "quote_price",
             "quote_currency",
             "quote_lead_time_days",
             "quoted_purity",
-            "quote_date",
             "quoted_smiles",
+            "quote_date",
         ]
 
         df = df[[c for c in cols if c in df.columns]]
