@@ -1493,13 +1493,13 @@ class CompoundSet:
                 if all(r in permitted_reactions for r in reactions):
                     available_routes.add(route_id)
 
+            if return_ids:
+                return list(available_routes)
+
             routes = [
                 self.db.get_route(id=route_id)
                 for route_id in mrich.track(available_routes, prefix="Getting routes")
             ]
-
-            if return_ids:
-                return [i for i, in records]
 
         else:
 
