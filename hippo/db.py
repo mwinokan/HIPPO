@@ -2861,7 +2861,7 @@ class Database:
         records = self.select_where(
             query=query,
             table="quote",
-            key=f"id IN {str_ids}",
+            key=f"quote_id IN {str_ids}",
         )
 
         data = []
