@@ -34,7 +34,7 @@ A :class:`.Compound` represents a ligand/small molecule with stereochemistry rem
 Scaffolds / Elaborations
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-Scaffold / superstructure relationships can also be encoded for :class:`.Compound` objects. Namely, the :attr:`.Compound.bases` property can be used to access other :class:`.Compound` objects that have been labelled as scaffolds/bases/substructures, and :attr:`.Compound.elabs` is used to access the inverse relationship.
+Scaffold / superstructure relationships can also be encoded for :class:`.Compound` objects. Namely, the :attr:`.Compound.scaffolds` property can be used to access other :class:`.Compound` objects that have been labelled as scaffolds/substructures, and :attr:`.Compound.elabs` is used to access the inverse relationship.
 
 :: 
 
