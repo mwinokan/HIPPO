@@ -1696,8 +1696,8 @@ class Recipe:
 
             def get_scaffold_series():
 
-                if bases := product.bases:
-                    return bases.ids, False
+                if scaffolds := product.scaffolds:
+                    return scaffolds.ids, False
 
                 else:
                     return [product.id], True
@@ -1717,22 +1717,22 @@ class Recipe:
             )
             d["route_ids"] = [route.id for route in upstream_routes]
             d["chemistry_types"] = ", ".join(set(upstream_reactions.types))
-            series, is_base = get_scaffold_series()
-            d["is_scaffold"] = is_base
+            series, is_scaffold = get_scaffold_series()
+            d["is_scaffold"] = is_scaffold
             d["scaffold_series"] = series
 
             inspirations = inspiration_map.get(product.id, None)
 
-            if not inspirations and not is_base:
-                base = product.bases[0]
-                inspirations = inspiration_map.get(base.id, None)
+            if not inspirations and not is_scaffold:
+                scaffold = product.scaffolds[0]
+                inspirations = inspiration_map.get(scaffold.id, None)
 
-                if not inspirations and "inspiration_pose_ids" in base.metadata:
-                    inspirations = base.metadata["inspiration_pose_ids"]
+                if not inspirations and "inspiration_pose_ids" in scaffold.metadata:
+                    inspirations = scaffold.metadata["inspiration_pose_ids"]
 
             if (
                 not inspirations
-                and is_base
+                and is_scaffold
                 and "inspiration_pose_ids" in product.metadata
             ):
                 inspirations = product.metadata["inspiration_pose_ids"]
@@ -1773,8 +1773,8 @@ class Recipe:
 
         for product in self.products:
 
-            if bases := product.bases:
-                scaffolds += bases
+            if scaffolds := product.scaffolds:
+                scaffolds += scaffolds
             else:
                 scaffolds.add(product.compound)
 
@@ -1785,7 +1785,8 @@ class Recipe:
         for compound in scaffolds:
 
             elabs = (
-                self.products.compounds.get_by_base(base=compound, none="quiet") or []
+                self.products.compounds.get_by_scaffold(scaffold=compound, none="quiet")
+                or []
             )
 
             d = dict(
@@ -1830,7 +1831,7 @@ class Recipe:
 
             data.append(d)
 
-        missing_bases = {}
+        missing_scaffolds = {}
 
         for compound in self.products.compounds:
 
@@ -1842,12 +1843,12 @@ class Recipe:
                 if compound in route.products:
                     upstream_routes.append(route)
 
-            bases = compound.bases
+            scaffolds = compound.scaffolds
 
-            for base in bases:
+            for scaffold in scaffolds:
 
-                if base.id not in route_types:
-                    group = missing_bases.setdefault(base.id, [])
+                if scaffold.id not in route_types:
+                    group = missing_scaffolds.setdefault(scaffold.id, [])
                     group.append(compound.id)
                     continue
 
@@ -1856,18 +1857,18 @@ class Recipe:
                         chem_types = tuple([r.type for r in route.reactions])
 
                         if chem_types not in route_types[base.id]:
-                            mrich.success(base)
+                            mrich.success(scaffold)
                             mrich.success(chem_types)
                             raise ValueError(
                                 "Scaffold has route not present in dataframe"
                             )
 
-        for base_id, elab_ids in missing_bases.items():
+        for scaffold_id, elab_ids in missing_scaffolds.items():
 
             compound = self.db.get_compound(id=sorted(elab_ids)[0])
 
             d = dict(
-                scaffold_id=base_id,
+                scaffold_id=scaffold_id,
                 product_id=compound.id,
                 smiles=compound.smiles,
                 inchikey=compound.inchikey,

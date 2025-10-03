@@ -43,15 +43,15 @@ def get_scaffold_network(
 
         nodes.add(compound.id)
 
-    def add_edge(base, compound):
+    def add_edge(scaffold, compound):
 
-        key = (base.id, compound.id)
+        key = (scaffold.id, compound.id)
 
         if key in edges:
             return
 
         net.add_edge(
-            base.id,
+            scaffold.id,
             compound.id,
             arrows=arrows,
             # label="PDE5",
@@ -136,26 +136,26 @@ def get_scaffold_network(
     mrich.var("#edges", len(records))
 
     if records:
-        for base_id, compound_id in mrich.track(
+        for scaffold_id, compound_id in mrich.track(
             records, prefix="Adding nodes and edges"
         ):
 
-            base = animal.db.get_compound(id=base_id)
+            scaffold = animal.db.get_compound(id=scaffold_id)
 
-            base_tags = base.tags
+            scaffold_tags = scaffold.tags
 
-            if scaffold_tag and scaffold_tag not in base_tags:
+            if scaffold_tag and scaffold_tag not in scaffold_tags:
                 continue
 
             compound = animal.db.get_compound(id=compound_id)
 
             if exclude_tag and (
-                exclude_tag in base_tags or exclude_tag in compound.tags
+                exclude_tag in scaffold_tags or exclude_tag in compound.tags
             ):
                 continue
 
-            add_node(base)
+            add_node(scaffold)
             add_node(compound)
-            add_edge(base, compound)
+            add_edge(scaffold, compound)
 
     return net

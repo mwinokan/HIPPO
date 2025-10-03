@@ -925,8 +925,8 @@ def plot_numbers(animal, subtitle=None):
             - x-categories
                     * hits
                     * hit poses
-                    * bases
-                    * base poses
+                    * scaffolds
+                    * scaffold poses
                     * elabs
                     * elab poses
                     * BBs (total)
@@ -942,8 +942,10 @@ def plot_numbers(animal, subtitle=None):
     plot_data = [
         dict(category="Experimental Hits", number=len(animal.hits), type="compound"),
         dict(category="Experimental Hits", number=len(animal.hits.poses), type="poses"),
-        dict(category="Base compounds", number=len(animal.bases), type="compound"),
-        dict(category="Base compounds", number=len(animal.bases.poses), type="poses"),
+        dict(category="Base compounds", number=len(animal.scaffolds), type="compound"),
+        dict(
+            category="Base compounds", number=len(animal.scaffolds.poses), type="poses"
+        ),
         dict(
             category="Syndirella Elaborations",
             number=len(animal.elabs),
@@ -1804,24 +1806,24 @@ def plot_compound_tsnee(
     if df is None:
 
         with mrich.loading("Getting Compound DataFrame"):
-            df = compounds.get_df(mol=True, bases=True)
+            df = compounds.get_df(mol=True, scaffolds=True)
 
         def get_cluster(row):
 
-            bases = row["bases"]
+            scaffolds = row["scaffolds"]
 
-            if not bases:
+            if not scaffolds:
                 return row["id"]
 
-            if len(bases) == 1:
-                return list(bases)[0]
+            if len(scaffolds) == 1:
+                return list(scaffolds)[0]
 
-            return tuple(bases)
+            return tuple(scaffolds)
 
         def get_type(row):
 
-            if row["bases"] is None:
-                return "base"
+            if row["scaffolds"] is None:
+                return "scaffold"
 
             return "elaboration"
 
@@ -1832,23 +1834,25 @@ def plot_compound_tsnee(
     with mrich.loading("Getting Compound fingerprints"):
         df["FP"] = df["mol"].map(get_cfps)
 
-    df["bases"] = df["bases"].map(lambda x: x if not isinstance(x, float) else None)
+    df["scaffolds"] = df["scaffolds"].map(
+        lambda x: x if not isinstance(x, float) else None
+    )
 
     def get_cluster(row):
 
-        bases = row["bases"]
+        scaffolds = row["scaffolds"]
 
-        if not bases:
+        if not scaffolds:
             return row["id"]
 
-        if len(bases) == 1:
-            return list(bases)[0]
+        if len(scaffolds) == 1:
+            return list(scaffolds)[0]
 
-        return tuple(bases)
+        return tuple(scaffolds)
 
     def get_type(row):
 
-        if row["bases"] is None:
+        if row["scaffolds"] is None:
             return "scaffold"
 
         return "elaboration"
@@ -1876,12 +1880,12 @@ def plot_compound_tsnee(
         "inchikey",
         "PC1",
         "PC2",
-        "bases",
+        "scaffolds",
         "cluster",
         "type",
     ]
 
-    df["bases"] = df["bases"].astype(str)
+    df["scaffolds"] = df["scaffolds"].astype(str)
     df["cluster"] = df["cluster"].astype(str)
 
     # return df

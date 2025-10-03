@@ -91,7 +91,7 @@ class Database:
                 mrich.warning("This is a legacy format database (hippo-db < 0.3.25)")
                 mrich.warning("Migrating compound_base values to scaffold table...")
                 self.create_table_scaffold()
-                self.migrate_legacy_bases()
+                self.migrate_legacy_scaffolds()
 
         if "route" not in self.table_names:
             self.create_table_route()
@@ -968,14 +968,14 @@ class Database:
     def insert_scaffold(
         self,
         *,
-        base: Compound | int,
+        scaffold: Compound | int,
         superstructure: Compound | int,
         warn_duplicate: bool = True,
         commit: bool = True,
     ) -> int:
         """Insert an entry into the scaffold table
 
-        :param base: :class:`.Compound` object or ID of the base hit
+        :param scaffold: :class:`.Compound` object or ID of the scaffold hit
         :param superstructure: :class:`.Compound` object or ID of the superstructure hit
         :param warn_duplicate: print a warning if the pose already exists (Default value = True)
         :param commit: commit the changes to the database (Default value = True)
@@ -983,20 +983,20 @@ class Database:
 
         """
 
-        if isinstance(base, Compound):
-            base = base.id
+        if isinstance(scaffold, Compound):
+            scaffold = scaffold.id
         if isinstance(superstructure, Compound):
             superstructure = superstructure.id
 
         assert isinstance(
-            base, int
-        ), f"Must pass an integer ID or Compound object (base) {base=} {type(base)}"
+            scaffold, int
+        ), f"Must pass an integer ID or Compound object (scaffold) {scaffold=} {type(scaffold)}"
         assert isinstance(
             superstructure, int
         ), f"Must pass an integer ID or Compound object (superstructure) {superstructure=} {type(superstructure)}"
 
-        if base == superstructure:
-            # mrich.warning(f"Skipped self-referential scaffold assignment (C{base})")
+        if scaffold == superstructure:
+            # mrich.warning(f"Skipped self-referential scaffold assignment (C{scaffold})")
             return None
 
         sql = """
@@ -1005,11 +1005,13 @@ class Database:
         """
 
         try:
-            self.execute(sql, (base, superstructure))
+            self.execute(sql, (scaffold, superstructure))
 
         except sqlite3.IntegrityError as e:
             if warn_duplicate:
-                mrich.warning(f"Skipping existing scaffold: {base=} {superstructure=}")
+                mrich.warning(
+                    f"Skipping existing scaffold: {scaffold=} {superstructure=}"
+                )
             return None
 
         except Exception as e:
@@ -2087,13 +2089,13 @@ class Database:
 
         return cursor.lastrowid
 
-    def migrate_legacy_bases(self) -> int:
-        """Migrate legacy compound_base records from the 'compound' table to the 'scaffold' table
+    def migrate_legacy_scaffolds(self) -> int:
+        """Migrate legacy compound_scaffold records from the 'compound' table to the 'scaffold' table
 
         :returns: ID of the last inserted scaffold record
         """
 
-        mrich.debug("HIPPO.Database.migrate_legacy_bases()")
+        mrich.debug("HIPPO.Database.migrate_legacy_scaffolds()")
 
         cursor = self.execute(
             """
@@ -3205,14 +3207,14 @@ class Database:
         cset: "CompoundSet | None" = None,
         *,
         fractions: bool = False,
-        max_bases: int | None = None,
+        max_scaffolds: int | None = None,
         fraction_reference: "CompoundSet | None" = None,
     ) -> dict[tuple, set]:
         """Create a dictionary grouping compounds by their scaffold/base cluster.
 
         :param cset: :class:`.CompoundSet` subset to query, defaults to all compounds
         :param fractions: Calculate fractional populations for each cluster
-        :param max_bases: Define the maximum number of compounds to use as cluster keys
+        :param max_scaffolds: Define the maximum number of compounds to use as cluster keys
         :param fraction_reference: Use cset to build the cluster map and use fraction_reference to determine the fractional populations
         :returns: A dictionary mapping a tuple of scaffold :class:`.Compound` IDs to a set of superstructure :class:`.Compound` ID's.
         """
@@ -3233,15 +3235,15 @@ class Database:
         records = self.execute(sql).fetchall()
 
         lookup = {}
-        for superstructure, base in records:
+        for superstructure, scaffold in records:
             group = lookup.setdefault(superstructure, set())
-            group.add(base)
+            group.add(scaffold)
 
         clustered = {}
-        for superstructure, bases in lookup.items():
-            if max_bases and len(bases) > max_bases:
+        for superstructure, scaffolds in lookup.items():
+            if max_scaffolds and len(scaffolds) > max_scaffolds:
                 continue
-            cluster = tuple(bases)
+            cluster = tuple(scaffolds)
             group = clustered.setdefault(cluster, set())
             group.add(superstructure)
 
@@ -3268,8 +3270,8 @@ class Database:
         )
 
         data = {}
-        for base, elab in records:
-            if base not in data:
+        for scaffold, elab in records:
+            if scaffold not in data:
                 data[base] = set()
             data[base].add(elab)
 
@@ -3982,7 +3984,7 @@ class Database:
 
         data = []
         for a, b, s in mrich.track(records):
-            data.append(dict(base_id=a, superstructure_id=b, similarity=s))
+            data.append(dict(scaffold_id=a, superstructure_id=b, similarity=s))
 
         return data
 

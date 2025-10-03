@@ -122,8 +122,8 @@ class Scorer:
 
         if not db.count("scaffold"):
             mrich.warning("No scaffold entries in DB, skipping related metrics")
-            skip.append("num_bases")
-            skip.append("num_bases_elaborated")
+            skip.append("num_scaffolds")
+            skip.append("num_scaffolds_elaborated")
             skip.append("elaboration_balance")
 
         # custom attributes
@@ -908,28 +908,28 @@ class CustomAttribute(Attribute):
 
 
 # DEFAULT_ATTRIBUTES = {
-#     "num_bases": dict(
+#     "num_scaffolds": dict(
 #         type="custom",
 #         weight=1.0,
-#         function=lambda r: r.product_compounds.count_by_tag(tag="Syndirella base"),
-#         description="The number of Syndirella base compounds in this selection",
+#         function=lambda r: r.product_compounds.count_by_tag(tag="Syndirella scaffold"),
+#         description="The number of Syndirella scaffold compounds in this selection",
 #     ),
 #     "num_products": dict(
 #         type="standard",
 #         weight=1.0,
 #         description="The number of product compounds in this selection",
 #     ),
-#     "num_bases_elaborated": dict(
+#     "num_scaffolds_elaborated": dict(
 #         type="custom",
 #         weight=1.0,
-#         function=lambda r: r.product_compounds.num_bases_elaborated,
-#         description="The number of Syndirella base compounds that have at least one elaboration in this selection",
+#         function=lambda r: r.product_compounds.num_scaffolds_elaborated,
+#         description="The number of Syndirella scaffold compounds that have at least one elaboration in this selection",
 #     ),
 #     "elaboration_balance": dict(
 #         type="custom",
 #         weight=1.0,
 #         function=lambda r: r.product_compounds.elaboration_balance,
-#         description="A measure for how evenly base compounds have been elaborated",
+#         description="A measure for how evenly scaffold compounds have been elaborated",
 #     ),  ### REALLY UNPERFORMANT?
 #     "num_inspirations": dict(
 #         type="custom",
@@ -947,7 +947,7 @@ class CustomAttribute(Attribute):
 #         type="custom",
 #         weight=0.0,
 #         function=lambda r: r.product_compounds.risk_diversity,
-#         description="A measure of how evenly spread the risk of elaborations are for each base compound. Risk in this case refers to the number of atoms added",
+#         description="A measure of how evenly spread the risk of elaborations are for each scaffold compound. Risk in this case refers to the number of atoms added",
 #     ),
 #     "interaction_count": dict(
 #         type="custom",
@@ -992,28 +992,28 @@ class CustomAttribute(Attribute):
 # }
 
 DEFAULT_ATTRIBUTES = {
-    "num_bases": dict(
+    "num_scaffolds": dict(
         type="custom",
         weight=1.0,
-        function=lambda r: r.combined_compounds.count_by_tag(tag="Syndirella base"),
-        description="The number of Syndirella base compounds in this selection. Higher is better.",
+        function=lambda r: r.combined_compounds.count_by_tag(tag="Syndirella scaffold"),
+        description="The number of Syndirella scaffold compounds in this selection. Higher is better.",
     ),
     "num_compounds": dict(
         type="standard",
         weight=1.0,
         description="The number of product compounds in this selection. Higher is better.",
     ),
-    "num_bases_elaborated": dict(
+    "num_scaffolds_elaborated": dict(
         type="custom",
         weight=1.0,
-        function=lambda r: r.combined_compounds.num_bases_elaborated,
-        description="The number of Syndirella base compounds that have at least one elaboration in this selection. Higher is better.",
+        function=lambda r: r.combined_compounds.num_scaffolds_elaborated,
+        description="The number of Syndirella scaffold compounds that have at least one elaboration in this selection. Higher is better.",
     ),
     "elaboration_balance": dict(
         type="custom",
         weight=1.0,
         function=lambda r: r.combined_compounds.elaboration_balance,
-        description="A measure for how evenly base compounds have been elaborated using an h-index. Higher is better.",
+        description="A measure for how evenly scaffold compounds have been elaborated using an h-index. Higher is better.",
     ),  ### REALLY UNPERFORMANT?
     "num_inspirations": dict(
         type="custom",
@@ -1031,7 +1031,7 @@ DEFAULT_ATTRIBUTES = {
     #     type="custom",
     #     weight=0.0,
     #     function=lambda r: r.combined_compounds.risk_diversity,
-    #     description="A measure of how evenly spread the risk of elaborations are for each base compound. Risk in this case refers to the number of atoms added. Higher is better",
+    #     description="A measure of how evenly spread the risk of elaborations are for each scaffold compound. Risk in this case refers to the number of atoms added. Higher is better",
     # ), # REMOVED BECAUSE IT DOES NOT NECESSARILY IMPROVE AS PRODUCTS ARE ADDED
     "interaction_count": dict(
         type="custom",

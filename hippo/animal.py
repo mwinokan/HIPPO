@@ -85,7 +85,7 @@ class HIPPO:
         self._reactants = None
         self._products = None
         self._intermediates = None
-        self._bases = None
+        self._scaffolds = None
         self._elabs = None
 
         mrich.success("Initialised animal", f"[var_name]{self}")
@@ -227,23 +227,26 @@ class HIPPO:
         return self._elabs["set"]
 
     @property
-    def bases(self) -> CompoundSet:
+    def scaffolds(self) -> CompoundSet:
         """Returns compounds that are the basis for one or more elaborations"""
-        if self._bases is None or self._bases["total_changes"] != self.db.total_changes:
-            self._bases = dict(
-                set=self.compounds.bases, total_changes=self.db.total_changes
+        if (
+            self._scaffolds is None
+            or self._scaffolds["total_changes"] != self.db.total_changes
+        ):
+            self._scaffolds = dict(
+                set=self.compounds.scaffolds, total_changes=self.db.total_changes
             )
-        return self._bases["set"]
+        return self._scaffolds["set"]
 
     @property
     def num_elabs(self) -> int:
-        """Number of compounds that are an elaboration of an existing base"""
+        """Number of compounds that are an elaboration of an existing scaffold"""
         return len(self.elabs)
 
     @property
-    def num_bases(self) -> int:
+    def num_scaffolds(self) -> int:
         """Number of compounds that are the basis for elaborations"""
-        return len(self.bases)
+        return len(self.scaffolds)
 
     ### BULK INSERTION
 
@@ -1658,14 +1661,14 @@ class HIPPO:
         self,
         *,
         smiles: str,
-        bases: list[Compound] | list[int] | None = None,
+        scaffolds: list[Compound] | list[int] | None = None,
         tags: None | list = None,
         metadata: None | dict = None,
         return_compound: bool = True,
         commit: bool = True,
         alias: str | None = None,
         return_duplicate: bool = False,
-        register_base_if_duplicate: bool = True,
+        register_scaffold_if_duplicate: bool = True,
         radical: str = "warning",
         debug: bool = False,
     ) -> Compound:
@@ -1679,7 +1682,7 @@ class HIPPO:
         :param commit: Commit the changes to the :class:`.Database`, defaults to ``True``
         :param alias: The string alias of this compound, defaults to ``None``
         :param return_duplicate: If ``True`` returns a boolean indicating if this compound previously existed, defaults to ``False``
-        :param register_base_if_duplicate: If this compound exists in the :class:`.Database` modify it's ``base`` property, defaults to ``True``
+        :param register_scaffold_if_duplicate: If this compound exists in the :class:`.Database` modify it's ``base`` property, defaults to ``True``
         :param radical: Define the behaviour for dealing with radical atoms in the SMILES. See :class:`.sanitise_smiles`. Defaults to ``'warning'``
         :param debug: Increase verbosity of output, defaults to ``False``
         :returns: The registered/existing :class:`.Compound` object or its ID (depending on ``return_compound``), and optionally a boolean to indicate duplication see ``return_duplicate``
@@ -1700,8 +1703,8 @@ class HIPPO:
             mrich.error(f"Could not sanitise {smiles=}")
             return None
 
-        if bases:
-            bases = [b.id if isinstance(b, Compound) else b for b in bases]
+        if scaffolds:
+            scaffolds = [b.id if isinstance(b, Compound) else b for b in scaffolds]
 
         inchikey = inchikey_from_smiles(smiles)
 
@@ -1741,11 +1744,11 @@ class HIPPO:
                     f"SMILES changed during compound registration: {smiles} --> {db_smiles}"
                 )
 
-        def insert_bases(bases, compound_id):
-            bases = [b for b in bases if b is not None] or []
-            for base in bases:
+        def insert_scaffolds(scaffolds, compound_id):
+            scaffolds = [b for b in scaffolds if b is not None] or []
+            for scaffold in scaffolds:
                 self.db.insert_scaffold(
-                    base=base,
+                    scaffold=scaffold,
                     superstructure=compound_id,
                     warn_duplicate=False,
                     commit=False,
@@ -1770,8 +1773,8 @@ class HIPPO:
                 for tag in tags:
                     compound.tags.add(tag, commit=False)
 
-            if bases and not (not register_base_if_duplicate and duplicate):
-                insert_bases(bases, compound.id)
+            if scaffolds and not (not register_scaffold_if_duplicate and duplicate):
+                insert_scaffolds(scaffolds, compound.id)
 
             return _return(compound, duplicate, return_compound, return_duplicate)
 
@@ -1784,8 +1787,8 @@ class HIPPO:
 
                 check_smiles(compound_id, smiles)
 
-            if bases and not (not register_base_if_duplicate and duplicate):
-                insert_bases(bases, compound_id)
+            if scaffolds and not (not register_scaffold_if_duplicate and duplicate):
+                insert_scaffolds(scaffolds, compound_id)
 
             return _return(compound_id, duplicate, return_compound, return_duplicate)
 

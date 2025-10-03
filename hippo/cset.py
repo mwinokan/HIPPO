@@ -50,12 +50,12 @@ class CompoundTable:
             cset = ctable[set(13,15,18)] # using IDs (set)
             cset = ctable[13:18]         # using a slice
 
-    Tags and base compounds can also be used to filter:
+    Tags and scaffold compounds can also be used to filter:
 
     ::
 
             cset = animal.compounds(tag='hits') # select compounds tagged with 'hits'
-            cset = animal.compounds(base=comp)  # select elaborations of comp
+            cset = animal.compounds(scaffold=comp)  # select elaborations of comp
 
     """
 
@@ -182,7 +182,7 @@ class CompoundTable:
 
     @property
     def elabs(self) -> "CompoundSet":
-        """Returns a :class:`.CompoundSet` of all compounds that are a an elaboration of an existing base"""
+        """Returns a :class:`.CompoundSet` of all compounds that are a an elaboration of an existing scaffold"""
         ids = self.db.select_where(
             query="scaffold_superstructure",
             table="scaffold",
@@ -202,7 +202,7 @@ class CompoundTable:
         return cset
 
     @property
-    def bases(self) -> "CompoundSet":
+    def scaffolds(self) -> "CompoundSet":
         """Returns a :class:`.CompoundSet` of all compounds that are the basis for a set of elaborations"""
         ids = self.db.select_where(
             query="DISTINCT scaffold_base",
@@ -215,18 +215,18 @@ class CompoundTable:
         from .cset import CompoundSet
 
         cset = CompoundSet(self.db, ids)
-        cset._name = "all bases"
+        cset._name = "all scaffolds"
         return cset
 
     @property
     def num_elabs(self) -> int:
-        """Returns the number of compounds that are a an elaboration of an existing base"""
+        """Returns the number of compounds that are a an elaboration of an existing scaffold"""
         return len(self.elabs)
 
     @property
-    def num_bases(self) -> int:
+    def num_scaffolds(self) -> int:
         """Returns the number of compounds that are the basis for a set of elaborations"""
-        return len(self.bases)
+        return len(self.scaffolds)
 
     ### METHODS
 
@@ -332,30 +332,30 @@ class CompoundTable:
 
         return cset
 
-    def get_by_base(
+    def get_by_scaffold(
         self,
-        base: Compound | int,
+        scaffold: Compound | int,
     ) -> "CompoundSet":
-        """Get all compounds that elaborate the given base compound
+        """Get all compounds that elaborate the given scaffold compound
 
-        :param base: :class:`.Compound` object or ID to search by
+        :param scaffold: :class:`.Compound` object or ID to search by
 
         """
 
-        if not isinstance(base, int):
-            assert base._table == "compound"
-            base = base.id
+        if not isinstance(scaffold, int):
+            assert scaffold._table == "compound"
+            scaffold = scaffold.id
 
         values = self.db.select_where(
             query="scaffold_superstructure",
             table="scaffold",
-            key="base",
-            value=base,
+            key="scaffold",
+            value=scaffold,
             multiple=True,
         )
         ids = [v for v, in values if v]
         cset = self[ids]
-        cset._name = f"elaborations of C{base}"
+        cset._name = f"elaborations of C{scaffold}"
         return cset
 
     def get_by_smiles(self, smiles: str, **kwargs) -> "Compound | None":
@@ -383,7 +383,7 @@ class CompoundTable:
         mrich.var("#compounds", len(self))
         # mrich.var('#poses', self.num_poses)
         mrich.var("tags", self.tags)
-        mrich.var("#bases", self.num_bases)
+        mrich.var("#bases", self.num_scaffolds)
         mrich.var("#elabs", self.num_elabs)
         mrich.var("#reactants", self.num_reactants)
         mrich.var("#intermediates", self.num_intermediates)
@@ -437,27 +437,27 @@ class CompoundTable:
         self,
         *,
         tag: str = None,
-        base: int | Compound = None,
+        scaffold: int | Compound = None,
         smiles: str | None = None,
         **kwargs,
     ) -> "CompoundSet | Compound | None":
-        """Filter compounds by a given tag, base, or it's SMILES string. See :meth:`.CompoundTable.get_by_tag` and :meth:`.CompoundTable.get_by_base`
+        """Filter compounds by a given tag, scaffold, or it's SMILES string. See :meth:`.CompoundTable.get_by_tag` and :meth:`.CompoundTable.get_by_scaffold`
 
         :param tag: optional tag to filter by
-        :param base: optional :class:`.Compound` ID or object to filter by
-        :param base: optional SMILES string to filter by
-        :returns: :class:`.CompoundSet` if searching by tag or base, else :class:`.Compound` object
+        :param scaffold: optional :class:`.Compound` ID or object to filter by
+        :param scaffold: optional SMILES string to filter by
+        :returns: :class:`.CompoundSet` if searching by tag or scaffold, else :class:`.Compound` object
 
         """
 
         if tag:
             return self.get_by_tag(tag, **kwargs)
-        elif base:
-            return self.get_by_base(base, **kwargs)
+        elif scaffold:
+            return self.get_by_scaffold(scaffold, **kwargs)
         elif smiles:
             return self.get_by_smiles(smiles, **kwargs)
         else:
-            mrich.error("Must provide one of tag, base, or smiles arguments")
+            mrich.error("Must provide one of tag, scaffold, or smiles arguments")
             return None
 
     def __getitem__(
@@ -598,12 +598,12 @@ class CompoundSet:
             # getting a subset of compounds using a slice
             cset2 = cset[13:18] # using a slice
 
-    Tags and base compounds can also be used to filter:
+    Tags and scaffold compounds can also be used to filter:
 
     ::
 
             cset = animal.compounds(tag='hits') # select compounds tagged with 'hits'
-            cset = animal.compounds(base=comp)  # select elaborations of comp
+            cset = animal.compounds(scaffold=comp)  # select elaborations of comp
 
     """
 
@@ -792,7 +792,7 @@ class CompoundSet:
 
     @property
     def num_atoms_added(self) -> list[int]:
-        """Calculate the number of atoms added w.r.t the base
+        """Calculate the number of atoms added w.r.t the scaffold
 
         :returns: list of number of atoms added values
 
@@ -821,9 +821,9 @@ class CompoundSet:
 
     @property
     def avg_num_atoms_added(self) -> float:
-        """Calculate the average number of atoms added w.r.t the base
+        """Calculate the average number of atoms added w.r.t the scaffold
 
-        :returns: average number of atoms added values for compounds which have a base
+        :returns: average number of atoms added values for compounds which have a scaffold
 
         """
 
@@ -848,9 +848,9 @@ class CompoundSet:
 
     @property
     def risk_diversity(self) -> float:
-        """Calculate the average spread of risk (#atoms added) for each base in this set
+        """Calculate the average spread of risk (#atoms added) for each scaffold in this set
 
-        :returns: average of the standard deviations of number of atoms added for each base
+        :returns: average of the standard deviations of number of atoms added for each scaffold
 
         """
 
@@ -858,7 +858,7 @@ class CompoundSet:
 
     @property
     def elaboration_balance(self) -> float:
-        """Measure of how evenly elaborations are distributed across bases in this set"""
+        """Measure of how evenly elaborations are distributed across scaffolds in this set"""
 
         sql = f"""
         SELECT COUNT(1) FROM scaffold
@@ -877,10 +877,10 @@ class CompoundSet:
         # return -std(counts)
 
     @property
-    def num_bases_elaborated(self) -> int:
-        """Count the number of base compounds that have at least one elaboration in this set
+    def num_scaffolds_elaborated(self) -> int:
+        """Count the number of scaffold compounds that have at least one elaboration in this set
 
-        :returns: number of base compounds
+        :returns: number of scaffold compounds
 
         """
 
@@ -894,26 +894,26 @@ class CompoundSet:
         return count
 
     @property
-    def bases(self) -> "CompoundSet":
-        """Get the base compounds that have at least one elaboration in this set
+    def scaffolds(self) -> "CompoundSet":
+        """Get the scaffold compounds that have at least one elaboration in this set
 
         :returns: :class:`.CompoundSet`
 
         """
 
-        base_ids = self.db.execute(
+        scaffold_ids = self.db.execute(
             f"""
                 SELECT DISTINCT scaffold_base FROM scaffold
                 WHERE scaffold_superstructure IN {self.str_ids}  
             """
         ).fetchall()
 
-        base_ids = [i for i, in base_ids]
-        return CompoundSet(self.db, base_ids)
+        scaffold_ids = [i for i, in scaffold_ids]
+        return CompoundSet(self.db, scaffold_ids)
 
     @property
     def elabs(self) -> "CompoundSet":
-        """Returns a :class:`.CompoundSet` of all compounds that are a an elaboration of an existing base"""
+        """Returns a :class:`.CompoundSet` of all compounds that are a an elaboration of an existing scaffold"""
 
         ids = self.db.select_where(
             query="scaffold_superstructure",
@@ -936,7 +936,7 @@ class CompoundSet:
         """Get a DataFrame summarising the elaborations in this CompoundSet"""
         from pandas import DataFrame
 
-        cluster_dict = self.db.get_compound_cluster_dict(max_bases=1)
+        cluster_dict = self.db.get_compound_cluster_dict(max_scaffolds=1)
 
         data = []
         for scaffold, elabs in cluster_dict.items():
@@ -1071,25 +1071,25 @@ class CompoundSet:
 
         return cset
 
-    def get_by_base(
+    def get_by_scaffold(
         self,
-        base: Compound | int,
+        scaffold: Compound | int,
         none: str = "error",
     ) -> "CompoundSet":
-        """Get all compounds that elaborate the given base compound
+        """Get all compounds that elaborate the given scaffold compound
 
-        :param base: :class:`.Compound` object or ID to search by
+        :param scaffold: :class:`.Compound` object or ID to search by
 
         """
 
-        if not isinstance(base, int):
-            assert base._table == "compound"
-            base = base.id
+        if not isinstance(scaffold, int):
+            assert scaffold._table == "compound"
+            scaffold = scaffold.id
 
         values = self.db.select_where(
             query="scaffold_superstructure",
             table="scaffold",
-            key=f"scaffold_base = {base} AND scaffold_superstructure IN {self.str_ids}",
+            key=f"scaffold_base = {scaffold} AND scaffold_superstructure IN {self.str_ids}",
             multiple=True,
             none=none,
         )
@@ -1128,9 +1128,9 @@ class CompoundSet:
         return all_reactions
 
     def get_risk_diversity(self, debug: bool = False) -> float:
-        """Calculate the average spread of risk (#atoms added) for each base in this set
+        """Calculate the average spread of risk (#atoms added) for each scaffold in this set
 
-        :returns: average of the standard deviations of number of atoms added for each base
+        :returns: average of the standard deviations of number of atoms added for each scaffold
 
         """
 
@@ -1562,7 +1562,7 @@ class CompoundSet:
         num_reactions: bool = False,
         num_poses: bool = False,
         tags: bool = False,
-        bases: bool = False,
+        scaffolds: bool = False,
         elabs: bool = False,
         routes: bool = False,
         debug: bool = False,
@@ -1582,7 +1582,7 @@ class CompoundSet:
         :param num_reactant: include num_reactant column (number of reactions where compound is a reactant)
         :param num_reactions: include num_reactions column (number of reactions where compound is a product)
         :param tags: include tags column
-        :param bases: include bases column
+        :param scaffolds: include scaffolds column
         :param elabs: include elabs column
 
         # :param count_by_target: count poses by target (Default value = False)
@@ -1691,17 +1691,17 @@ class CompoundSet:
                     lookup[p] += 1
                 df["num_reactions"] = df["id"].apply(lambda x: lookup.get(x, 0))
 
-        if bases or elabs:
+        if scaffolds or elabs:
             if debug:
                 mrich.debug("adding scaffold columns")
             tuples = self.db.get_scaffold_tuples(self.ids)
 
-            if bases:
+            if scaffolds:
                 lookup = {}
                 for b, e in tuples:
                     lookup.setdefault(e, set())
                     lookup[e].add(b)
-                df["bases"] = df["id"].apply(lambda x: lookup.get(x, set()))
+                df["scaffolds"] = df["id"].apply(lambda x: lookup.get(x, set()))
 
             if elabs:
                 lookup = {}
@@ -1842,7 +1842,7 @@ class CompoundSet:
             tags = c.tags
             metadata = c.metadata
             poses = c.poses
-            base = c.base
+            scaffold = c.scaffold
 
             # method
             assert len(tags) == 1, c
@@ -1860,8 +1860,8 @@ class CompoundSet:
                     pose = poses[0]
                 case 0:
                     mrich.warning(f"{c} has no poses")
-                    assert base
-                    pose = base.poses[0]
+                    assert scaffold
+                    pose = scaffold.poses[0]
                 case _:
                     mrich.warning(f"{c} has multiple poses")
                     pose = poses[0]
