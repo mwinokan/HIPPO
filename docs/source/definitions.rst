@@ -16,7 +16,7 @@ A :class:`.Target` represents a certain protein / XCA-alignment as uploaded to F
 Compound
 --------
 
-A :class:`.Compound` represents a ligand/small molecule with stereochemistry removed and no atomic coordinates. I.e. it represents the chemical structure. It's default name is always an InChiKey. :class:`.Compound` objects can have an :attr:`.Compound.alias` which is a custom name which will supercede the InChiKey when representing the compound. :class:`.Compound` objects also have a shorthand prefixed with ``C``, for example: ``C1`` which refers to the compound with database id 7273.
+A :class:`.Compound` represents a ligand/small molecule with stereochemistry removed and no atomic coordinates. I.e. it represents the flattened chemical structure. It's default name is always an InChiKey. :class:`.Compound` objects can have an :attr:`.Compound.alias` which is a custom name which will supercede the InChiKey when representing the compound. :class:`.Compound` objects also have a shorthand prefixed with ``C``, for example: ``C1`` which refers to the compound with database id 7273.
 
 :: 
 
@@ -29,20 +29,17 @@ A :class:`.Compound` represents a ligand/small molecule with stereochemistry rem
   :alt: compound_output
 
 .. seealso::
-	- :attr:`.HIPPO.compounds`
-	- :class:`.Compound`
-	- :class:`.CompoundSet`
-	- :class:`.CompoundTable`
+	:doc:`compounds` API reference page
 
-Bases / Elaborations
-~~~~~~~~~~~~~~~~~~~~
+Scaffolds / Elaborations
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Scaffold / superstructure relationships can also be encoded for :class:`.Compound` objects. Namely, the :attr:`.Compound.bases` property can be used to access other :class:`.Compound` objects that have been labelled as scaffolds/bases/substructures, and :attr:`.Compound.elabs` is used to access the inverse relationship.
 
 :: 
 
 	c2 = animal.register_compound(smiles="OCc1ccc2c(c1F)CCO2")
-	c2.add_base(base=c1)
+	c2.add_scaffold(scaffold=c1)
 	print(c2)
 	c2.draw()
 
@@ -50,24 +47,10 @@ Scaffold / superstructure relationships can also be encoded for :class:`.Compoun
   :width: 403
   :alt: compound_elab
 
-.. seealso::
-	- :attr:`.HIPPO.bases`
-	- :attr:`.HIPPO.elabs`
-	- :attr:`.Compound.bases`
-	- :attr:`.Compound.elabs`
-	- :attr:`.CompoundSet.bases`
-	- :attr:`.CompoundSet.elabs`
-	- :attr:`.CompoundTable.bases`
-	- :attr:`.CompoundTable.elabs`
-
 Ingredient
 ----------
 
 An :class:`.Ingredient` is defined as a specific quantity (in ``mg``) of a :class:`.Compound` and is used when defining quotes and recipes.
-
-.. seealso::
-	- :class:`.Ingredient`
-	- :class:`.IngredientSet`
 
 Pose
 ----
@@ -84,6 +67,9 @@ A :class:`.Pose` is a particular conformer of a :class:`.Compound` within a prot
   :width: 364
   :alt: pose_output
 
+.. seealso::
+	:doc:`poses` API reference page
+
 Reference
 ~~~~~~~~~
 
@@ -94,23 +80,10 @@ Inspirations
 
 Poses can have :attr:`.Pose.inspirations` that can be used to link to other poses that have been referenced in the design of this pose, for example it can be used to link to experimental fragment hits referenced in the fragment-growing/merging compound design.
 
-.. seealso::
-	- :attr:`.HIPPO.poses`
-	- :class:`.Pose`
-	- :class:`.PoseSet`
-	- :class:`.PoseTable`
-
 Tag
 ---
 
 :class:`.Compound` and :class:`.Pose` objects can be tagged with arbitrary :class:`.Tag` strings to categorise them.
-
-.. seealso::
-	- :attr:`.HIPPO.tags`
-	- :attr:`.Compound.tags`
-	- :attr:`.Pose.tags`
-	- :class:`.TagSet`
-	- :class:`.TagTable`
 
 Quote
 -----
@@ -118,10 +91,7 @@ Quote
 Procurement and catalogue/inventory availability information for :class:`.Compound` entries can be added to the database and interfaced with :class:`.Quote` objects.
 
 .. seealso::
-	- :class:`.Quote`
-	- :attr:`.Ingredient.quote`
-	- :meth:`.Compound.get_quotes`
-	- :meth:`.Ingredient.get_quotes`
+	:doc:`quoting` API reference page
 
 Reaction
 --------
@@ -129,10 +99,7 @@ Reaction
 A :class:`.Reaction` is a simplified representation of a chemical reaction from the :attr:`.Reaction.reactants` (:class:`.CompoundSet`) to a single :attr:`.Reaction.product` (:class:`.Compound`).
 
 .. seealso::
-	- :attr:`.HIPPO.reactions`
-	- :class:`.Reaction`
-	- :class:`.ReactionSet`
-	- :class:`.ReactionTable`
+	:doc:`reactions` API reference page
 
 Recipe
 ------
@@ -140,28 +107,17 @@ Recipe
 A :class:`.Recipe` describes a synthetic pathway, potentially containing multiple :class:`.Reaction` steps to any number of :class:`.Compound` products (:attr:`Recipe.products`). Recipes are not stored in the database but can be serialized into ``JSON``.
 
 .. seealso::
-	- :class:`.Recipe`
-
-	- :class:`.RandomRecipeGenerator`
+	:doc:`recipes` API reference page
 
 Route
 -----
 
 A :class:`.Route` is a special case of the :class:`.Recipe` mechanism, with the distinction that it encodes the information needed to synthesise a single product :class:`.Compound`. Routes can be stored and retrieved from the database.
 
-.. seealso::
-	- :class:`.Route`
-	- :class:`.RouteSet`
-
 Subsite
 -------
 
 :class:`.Subsite` records are an additional annotation that can be applied to :class:`.Pose` entries, these should be used to indicate which subsites a pose occupies on a protein target.
-
-.. seealso::
-	- :attr:`.HIPPO.Subsites`
-	- :attr:`.Pose.Subsites`
-	- :class:`.Subsite`
 
 Feature
 -------
@@ -169,8 +125,7 @@ Feature
 A :class:`.Feature` is a pharmacophoric feature on a given protein :class:`.Target`
 
 .. seealso::
-	- :attr:`.Target.features`
-	- :class:`.Feature`
+	:doc:`interactions` API reference page
 
 Interaction
 -----------
@@ -178,14 +133,8 @@ Interaction
 The :class:`.Interaction` class can be used to store protein-ligand interactions between pharmacophores on the ligand and :class:`.Feature` records.
 
 .. seealso::
-	- :attr:`.HIPPO.interactions`
-	- :attr:`.Pose.interactions`
-	- :meth:`.Pose.calculate_interactions`
-	- :meth:`.Pose.calculate_prolif_interactions`
-	- :class:`.Interaction`
-	- :class:`.InteractionSet`
-	- :class:`.InteractionTable`
-
+	:doc:`interactions` API reference page
+	
 Units
 =====
 

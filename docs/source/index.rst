@@ -7,13 +7,7 @@
 HIPPO Documentation
 ===================
 
-.. image:: ../../logos/hippo_logo-05.png
-  :width: 400
-  :alt: HIPPO logo
-
-Hit Interaction Profiling for Procurement Optimisation is a chemical database and python toolkit to make informed sampling decisions for effective SAR exploration.
-
-N.B. HIPPO and this documentation are still in alpha-development.
+*Hit Interaction Profiling for Procurement Optimisation* (HIPPO) is a chemical database and python toolkit to expedite fragment-based drug discovery.
 
 Installation
 ============
