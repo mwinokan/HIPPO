@@ -2084,7 +2084,7 @@ class Recipe:
                         case _:
                             raise NotImplementedError("Too many reactants")
 
-                    df.loc[key, f"product_step1{j}"] = reaction.product.smiles
+                    df.loc[key, f"product_step{j}"] = reaction.product.smiles
                     df.loc[key, f"reaction_name_step{j}"] = reaction.type
 
                 break
