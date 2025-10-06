@@ -674,7 +674,7 @@ class Compound:
         """Get a list of :class:`.Compound` ID's that this object is a superstructure of"""
         ids = self.db.select_where(
             table="scaffold",
-            query="scaffold_scaffold",
+            query="scaffold_base",
             key="superstructure",
             value=self.id,
             none="quiet",
