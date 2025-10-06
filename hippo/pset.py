@@ -1210,6 +1210,7 @@ class PoseSet:
         compound_id: bool = False,
         target_id: bool = False,
         reference_id: bool = False,
+        reference_aliases: bool = False,
         path: bool = False,
         mol: bool = False,
         energy_score: bool = False,
@@ -1268,7 +1269,7 @@ class PoseSet:
         if alias:
             query.append("pose_alias")
 
-        if reference_id:
+        if reference_id or reference_alias:
             query.append("pose_reference")
 
         if path:
@@ -1329,7 +1330,7 @@ class PoseSet:
             if alias:
                 d["alias"] = row.pop(0)
 
-            if reference_id:
+            if reference_id or reference_alias:
                 d["reference_id"] = row.pop(0)
 
             if path:
@@ -1393,14 +1394,20 @@ class PoseSet:
                 self.db, set.union(*list(df["inspiration_ids"].values))
             )
             lookup = self.db.get_pose_id_alias_dict(pset=inspirations)
-            inspiration_aliases = []
-            for ids in df["inspiration_ids"].values:
-                aliases = {lookup[i] for i in ids}
             df["inspiration_aliases"] = df["inspiration_ids"].apply(
                 lambda x: {lookup[i] for i in x}
             )
             if not inspiration_ids:
                 df = df.drop(columns=["inspiration_ids"])
+
+        if reference_alias:
+            inspirations = PoseSet(self.db, set(df["reference_id"].values))
+            lookup = self.db.get_pose_id_alias_dict(pset=references)
+            reference_aliases = []
+            df["reference_alias"] = df["reference_id"].apply(lambda x: lookup[x])
+
+            if not reference_ids:
+                df = df.drop(columns=["reference_id"])
 
         if tags:
             if debug:
