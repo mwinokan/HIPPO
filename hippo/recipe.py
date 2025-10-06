@@ -1262,7 +1262,7 @@ class Recipe:
 
         file = Path(file).resolve()
 
-        assert file.parent.exists()
+        assert file.parent.exists(), f"Directory does not exist: {file.parent}"
 
         data = self.get_dict(serialise_price=True, **kwargs)
 
