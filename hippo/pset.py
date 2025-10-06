@@ -1401,7 +1401,9 @@ class PoseSet:
                 df = df.drop(columns=["inspiration_ids"])
 
         if reference_alias:
-            inspirations = PoseSet(self.db, set(df["reference_id"].values))
+            inspirations = PoseSet(
+                self.db, set([int(x) for x in df["reference_id"].values])
+            )
             lookup = self.db.get_pose_id_alias_dict(pset=references)
             reference_aliases = []
             df["reference_alias"] = df["reference_id"].apply(lambda x: lookup[x])
