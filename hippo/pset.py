@@ -1210,7 +1210,7 @@ class PoseSet:
         compound_id: bool = False,
         target_id: bool = False,
         reference_id: bool = False,
-        reference_aliases: bool = False,
+        reference_alias: bool = False,
         path: bool = False,
         mol: bool = False,
         energy_score: bool = False,
