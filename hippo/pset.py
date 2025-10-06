@@ -1405,10 +1405,9 @@ class PoseSet:
                 self.db, set([int(x) for x in df["reference_id"].values])
             )
             lookup = self.db.get_pose_id_alias_dict(pset=references)
-            reference_aliases = []
             df["reference_alias"] = df["reference_id"].apply(lambda x: lookup[x])
 
-            if not reference_ids:
+            if not reference_id:
                 df = df.drop(columns=["reference_id"])
 
         if tags:
