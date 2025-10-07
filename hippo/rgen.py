@@ -104,6 +104,10 @@ class RandomRecipeGenerator(RRGMixin):
         if not out_key:
             out_key = str(self.db_path.name).removesuffix(".sqlite")
 
+        parent_dir = Path(out_key).parent
+        if not parent_dir.exists():
+            parent_dir.mkdir(parents=True)
+
         # JSON I/O set up
         self._data_path = Path(f"{out_key}_rgen.json")
         if self.data_path.exists():
