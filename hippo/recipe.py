@@ -2694,8 +2694,8 @@ class RouteSet:
         )
 
         SELECT route_id FROM route_reactants
-        AND route_id IN {self.str_ids}
         WHERE count_unavailable = 0
+        AND route_id IN {self.str_ids}
         """
 
         route_ids = self.db.execute(sql).fetchall()
