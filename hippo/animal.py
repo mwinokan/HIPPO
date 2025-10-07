@@ -1276,6 +1276,7 @@ class HIPPO:
         allow_no_catalogue_col: bool = False,
         delete_unavailable: bool = True,
         overwrite_existing_quotes: bool = False,
+        supplier_name: str = "Enamine",
     ):
         """
         Load an Enamine quote provided as an excel file
@@ -1289,6 +1290,8 @@ class HIPPO:
         :param fixed_lead_time: Optionally use a fixed lead time for all quotes (in days)
         :param stop_after: Stop after given number of rows, defaults to ``None``
         :param orig_name_is_hippo_id: Set to ``True`` if ``orig_name_col`` is the original HIPPO :class:``hippo.compound.Compound`` ID, defaults to ``False``
+        :param delete_unavailable: Delete existing Enamine database quotes for compounds that are unavailable in the quote being loaded
+        :param overwrite_existing_quotes: Delete existing Enamine database quotes for compounds that are available in the quote being loaded
         :returns: An :class:`.IngredientSet` of the quoted molecules
         """
 
@@ -1380,11 +1383,11 @@ class HIPPO:
 
                 if delete_unavailable:
 
-                    mrich.warning("Deleting Enamine quotes for", compound)
+                    mrich.warning(f"Deleting '{supplier_name}' quotes for", compound)
 
                     self.db.delete_where(
                         table="quote",
-                        key=f"quote_supplier = 'Enamine' AND quote_compound = {compound.id}",
+                        key=f"quote_supplier = '{supplier_name}' AND quote_compound = {compound.id}",
                     )
 
                 continue
@@ -1415,12 +1418,12 @@ class HIPPO:
             if overwrite_existing_quotes:
                 self.db.delete_where(
                     table="quote",
-                    key=f"quote_supplier = 'Enamine' AND quote_compound = {compound.id}",
+                    key=f"quote_supplier = '{supplier_name}' AND quote_compound = {compound.id}",
                 )
 
             quote_data = dict(
                 compound=compound,
-                supplier="Enamine",
+                supplier=supplier_name,
                 catalogue=catalogue,
                 entry=row[entry_col],
                 amount=amount,
