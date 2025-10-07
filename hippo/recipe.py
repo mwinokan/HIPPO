@@ -2667,6 +2667,43 @@ class RouteSet:
 
         return data
 
+    def prune_unavailable(self, suppliers: list[str]):
+        """Remove routes that don't have all reactants available from given suppliers"""
+
+        suppliers_str = str(tuple(self.suppliers)).replace(",)", ")")
+
+        sql = f"""
+        WITH possible_reactants AS (
+            SELECT quote_compound, COUNT(CASE WHEN quote_supplier IN {suppliers_str} THEN 1 END) AS [count_valid] 
+            FROM quote
+            GROUP BY quote_compound
+        ),
+
+        route_reactants AS (
+            SELECT route_id, route_product, 
+            COUNT(
+                CASE 
+                    WHEN count_valid = 0 THEN 1 
+                    WHEN count_valid IS NULL THEN 1 
+                END) 
+            AS [count_unavailable] FROM route
+            INNER JOIN component ON component_route = route_id
+            LEFT JOIN possible_reactants ON quote_compound = component_ref
+            WHERE component_type = 2
+            AND route_id IN {self.str_ids}
+            GROUP BY route_id
+        )
+
+        SELECT route_id FROM route_reactants
+        WHERE count_unavailable = 0
+        """
+
+        route_ids = self.db.execute(sql).fetchall()
+
+        route_ids = [i for i, in route_ids]
+
+        return RouteSet.from_ids(self.db, route_ids)
+
     def pop_id(self) -> int:
         """Pop the last route from the set and return it's id"""
         route_id, route = self.data.popitem()
