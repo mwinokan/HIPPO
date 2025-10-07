@@ -79,6 +79,7 @@ class RandomRecipeGenerator(RRGMixin):
         # max_reactions = None,
         suppliers: list | None = None,
         start_with: Recipe | CompoundSet | IngredientSet = None,
+        route_pool: RouteSet | None = None,
     ):
 
         mrich.debug("RandomRecipeGenerator.__init__()")
@@ -108,8 +109,11 @@ class RandomRecipeGenerator(RRGMixin):
         self._recipe_dir = path
 
         # Route pool
-        mrich.debug("Solving route pool...")
-        self._route_pool = self.get_route_pool()
+        if route_pool:
+            self._route_pool = route_pool
+        else:
+            mrich.debug("Solving route pool...")
+            self._route_pool = self.get_route_pool()
 
         # dump data
         self.dump_data()
