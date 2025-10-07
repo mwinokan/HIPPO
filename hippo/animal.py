@@ -1344,7 +1344,9 @@ class HIPPO:
         ingredients = IngredientSet(self.db)
 
         if len(df) > 100:
-            generator = mrich.track(df.iterrows(), prefix="Loading quotes...")
+            generator = mrich.track(
+                df.iterrows(), prefix="Loading quotes...", total=len(df)
+            )
         else:
             generator = df.iterrows()
 
