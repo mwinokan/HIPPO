@@ -123,6 +123,7 @@ class RandomRecipeGenerator(RRGMixin):
 
         # Route pool
         if route_pool:
+            route_pool.prune_unavailable(suppliers=suppliers)
             self._route_pool = route_pool
         else:
             mrich.debug("Solving route pool...")
@@ -209,10 +210,10 @@ class RandomRecipeGenerator(RRGMixin):
 
         ### EXCLUDE PRODUCTS OF ROUTES IN STARTING RECIPE!!!
 
-        route_ids = self.db.execute(
-            f"""
+        sql = f"""
 		WITH possible_reactants AS (
-			SELECT quote_compound, COUNT(CASE WHEN quote_supplier IN {self.suppliers_str} THEN 1 END) AS [count_valid] FROM quote
+			SELECT quote_compound, COUNT(CASE WHEN quote_supplier IN {self.suppliers_str} THEN 1 END) AS [count_valid] 
+            FROM quote
 			GROUP BY quote_compound
 		),
 
@@ -233,7 +234,10 @@ class RandomRecipeGenerator(RRGMixin):
 		SELECT route_id FROM route_reactants
 		WHERE count_unavailable = 0
 		"""
-        ).fetchall()
+
+        route_ids = self.db.execute(sql).fetchall()
+
+        route_ids = [i for i, in route_ids]
 
         if mini_test:
             route_ids = route_ids[:100]
