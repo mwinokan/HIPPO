@@ -103,6 +103,7 @@ class RandomRecipeGenerator(RRGMixin):
 
         if not out_key:
             out_key = str(self.db_path.name).removesuffix(".sqlite")
+        mrich.var("out_key", out_key)
 
         parent_dir = Path(out_key).parent
         if not parent_dir.exists():
