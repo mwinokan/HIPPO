@@ -2674,7 +2674,10 @@ class RouteSet:
 
         sql = f"""
         WITH possible_reactants AS (
-            SELECT quote_compound, COUNT(CASE WHEN quote_supplier IN {suppliers_str} THEN 1 END) AS [count_valid] 
+            SELECT quote_compound, COUNT(
+                CASE 
+                    WHEN quote_supplier IN {suppliers_str} THEN 1 
+                END) AS [count_valid] 
             FROM quote
             GROUP BY quote_compound
         ),
