@@ -78,11 +78,14 @@ class RandomRecipeGenerator(RRGMixin):
         max_lead_time=None,
         # max_reactions = None,
         suppliers: list | None = None,
-        start_with: Recipe | CompoundSet | IngredientSet = None,
+        start_with: Recipe | CompoundSet | IngredientSet | None = None,
         route_pool: "RouteSet | None" = None,
     ):
 
         mrich.debug("RandomRecipeGenerator.__init__()")
+
+        if not start_with:
+            start_with = Recipe(db)
 
         # Static parameters
         self._db_path = db.path
