@@ -123,7 +123,7 @@ class RandomRecipeGenerator(RRGMixin):
 
         # Route pool
         if route_pool:
-            route_pool.prune_unavailable(suppliers=suppliers)
+            route_pool = route_pool.prune_unavailable(suppliers=suppliers)
             self._route_pool = route_pool
         else:
             mrich.debug("Solving route pool...")
