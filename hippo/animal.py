@@ -1275,6 +1275,7 @@ class HIPPO:
         orig_name_is_hippo_id: bool = False,
         allow_no_catalogue_col: bool = False,
         delete_unavailable: bool = True,
+        overwrite_existing_quotes: bool = False,
     ):
         """
         Load an Enamine quote provided as an excel file
@@ -1408,6 +1409,12 @@ class HIPPO:
                     raise NotImplementedError
             else:
                 lead_time = fixed_lead_time
+
+            if overwrite_existing_quotes:
+                self.db.delete_where(
+                    table="quote",
+                    key=f"quote_supplier = 'Enamine' AND quote_compound = {compound.id}",
+                )
 
             quote_data = dict(
                 compound=compound,
