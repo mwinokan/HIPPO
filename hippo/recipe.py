@@ -2656,16 +2656,16 @@ class RouteSet:
     #     for route in self.data.values():
     #         route._db = None
 
-    # def get_dict(self):
-    #     """Get serialisable dictionary"""
+    def get_dict(self):
+        """Get serialisable dictionary"""
 
-    #     data = dict(db=str(self.db), routes={})
+        data = dict(db=str(self.db), routes={})
 
-    #     # populate with routes
-    #     for route_id, route in self.data.items():
-    #         data["routes"][route_id] = route.get_dict()
+        # populate with routes
+        for route_id, route in self.data.items():
+            data["routes"][route_id] = route.get_dict()
 
-    #     return data
+        return data
 
     def pop_id(self) -> int:
         """Pop the last route from the set and return it's id"""
