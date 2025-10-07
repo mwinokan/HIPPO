@@ -80,6 +80,7 @@ class RandomRecipeGenerator(RRGMixin):
         suppliers: list | None = None,
         start_with: Recipe | CompoundSet | IngredientSet | None = None,
         route_pool: "RouteSet | None" = None,
+        out_key: str | None = None,
     ):
 
         mrich.debug("RandomRecipeGenerator.__init__()")
@@ -100,15 +101,19 @@ class RandomRecipeGenerator(RRGMixin):
         # Database set up
         self._db = db
 
+        if not out_key:
+            out_key = str(self.db_path.name).removesuffix(".sqlite")
+
         # JSON I/O set up
-        self._data_path = Path(str(self.db_path.name).replace(".sqlite", "_rgen.json"))
+        self._data_path = Path(f"{out_key}_rgen.json")
         if self.data_path.exists():
             mrich.warning(f"Will overwrite existing rgen data file: {self.data_path}")
 
         # Recipe I/O set up
-        path = Path(str(self.db_path.name).replace(".sqlite", "_recipes"))
+        path = Path(f"{out_key}_recipes")
         mrich.writing(f"{path}/")
-        path.mkdir(exist_ok=True)
+        if not path.exists:
+            path.mkdir()
         self._recipe_dir = path
 
         # Route pool
