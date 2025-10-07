@@ -2690,17 +2690,20 @@ class RouteSet:
             INNER JOIN component ON component_route = route_id
             LEFT JOIN possible_reactants ON quote_compound = component_ref
             WHERE component_type = 2
-            AND route_id IN {self.str_ids}
             GROUP BY route_id
         )
 
         SELECT route_id FROM route_reactants
+        AND route_id IN {self.str_ids}
         WHERE count_unavailable = 0
         """
 
         route_ids = self.db.execute(sql).fetchall()
 
         route_ids = [i for i, in route_ids]
+
+        mrich.var("#routes before pruning", len(self))
+        mrich.var("#routes after pruning", len(route_ids))
 
         return RouteSet.from_ids(self.db, route_ids)
 
