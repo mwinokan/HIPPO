@@ -117,7 +117,7 @@ class RandomRecipeGenerator(RRGMixin):
         # Recipe I/O set up
         path = Path(f"{out_key}_recipes")
         mrich.writing(f"{path}/")
-        if not path.exists:
+        if not path.exists():
             path.mkdir()
         self._recipe_dir = path
 
