@@ -129,6 +129,8 @@ class RandomRecipeGenerator(RRGMixin):
             mrich.debug("Solving route pool...")
             self._route_pool = self.get_route_pool()
 
+        assert len(self._route_pool), "Route pool is empty!"
+
         # dump data
         self.dump_data()
 
