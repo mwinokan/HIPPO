@@ -2670,7 +2670,7 @@ class RouteSet:
     def prune_unavailable(self, suppliers: list[str]):
         """Remove routes that don't have all reactants available from given suppliers"""
 
-        suppliers_str = str(tuple(self.suppliers)).replace(",)", ")")
+        suppliers_str = str(tuple(suppliers)).replace(",)", ")")
 
         sql = f"""
         WITH possible_reactants AS (
