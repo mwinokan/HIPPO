@@ -2493,7 +2493,7 @@ class RouteSet:
 
         routes = [
             db.get_route(id=route_id)
-            for route_id, in mrich.track(ids, prefix="Getting routes")
+            for route_id in mrich.track(ids, prefix="Getting routes")
         ]
 
         self = cls.__new__(cls)
