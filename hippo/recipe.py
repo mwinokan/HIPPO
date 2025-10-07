@@ -2484,6 +2484,43 @@ class RouteSet:
     ### FACTORIES
 
     @classmethod
+    def from_ids(cls, db: "Database", ids: list | set):
+        """Generate a routeset from a set of :class:`.Route` IDs
+
+        :param db: database to link
+        :param ids: :class:`.Route` database IDs
+        """
+
+        routes = [
+            db.get_route(id=route_id)
+            for route_id, in mrich.track(ids, prefix="Getting routes")
+        ]
+
+        self = cls.__new__(cls)
+        return RouteSet(db, routes)
+
+    @classmethod
+    def from_product_ids(cls, db: "Database", ids: list | set):
+        """Generate a routeset from a set of product :class:`.Compound` IDs
+
+        :param db: database to link
+        :param ids: :class:`.Compound` database IDs
+        """
+
+        str_ids = str(tuple(ids)).replace(",)", ")")
+
+        records = db.select_where(
+            table="route",
+            query="route_id",
+            key=f"route_product IN {str_ids}",
+            multiple=True,
+        )
+
+        route_ids = [i for i, in records]
+
+        return cls.from_ids(db, route_ids)
+
+    @classmethod
     def from_json(
         cls, db: "Database", path: "str | Path", data: dict = None
     ) -> "RouteSet":

@@ -221,14 +221,9 @@ class RandomRecipeGenerator(RRGMixin):
         if mini_test:
             route_ids = route_ids[:100]
 
-        routes = [
-            self.db.get_route(id=route_id)
-            for route_id, in mrich.track(route_ids, prefix="Getting routes")
-        ]
-
         from .recipe import RouteSet
 
-        return RouteSet(self.db, routes)
+        return RouteSet.from_ids(self.db, route_ids)
 
     ### FILE I/O METHODS
 
