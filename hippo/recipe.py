@@ -861,6 +861,11 @@ class Recipe:
         return len(self.reactions)
 
     @property
+    def num_reaction_types(self):
+        """Return the number of reactions"""
+        return self.reactions.num_types
+
+    @property
     def num_reactants(self):
         """Return the number of reactants"""
         return len(self.reactants)
