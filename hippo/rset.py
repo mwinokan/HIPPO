@@ -433,16 +433,15 @@ class ReactionSet:
         return self._indices
 
     @property
-    def reaction_id_type_dict(self) -> list[str]:
+    def types(self) -> list[str]:
         """Returns the types of reactions in this set"""
-        pairs = self.db.select_where(
+        records = self.db.select_where(
             table="reaction",
             key=f"reaction_id IN {self.str_ids}",
-            query="reaction_id, reaction_type",
+            query="DISTINCT reaction_type",
             multiple=True,
         )
-        lookup = {i: t for i, t in pairs}
-        return [lookup[i] for i in self.ids]
+        return [t for t, in records]
 
     @property
     def num_types(self) -> int:
