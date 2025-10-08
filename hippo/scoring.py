@@ -57,9 +57,9 @@ class Scorer:
 
         attributes = attributes or []
 
-        rset = RecipeSet(db, directory, pattern=pattern)
+        recipes = RecipeSet(db, directory, pattern=pattern)
 
-        self._recipes = rset
+        self._recipes = recipes
 
         self._attributes = {}
 
