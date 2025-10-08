@@ -1721,7 +1721,7 @@ class Recipe:
                 sum([route.reactants.ids for route in upstream_routes], [])
             )
             d["route_ids"] = [route.id for route in upstream_routes]
-            d["chemistry_types"] = ", ".join(set(upstream_reactions.types))
+            d["chemistry_types"] = ", ".join(upstream_reactions.types)
             series, is_scaffold = get_scaffold_series()
             d["is_scaffold"] = is_scaffold
             d["scaffold_series"] = series
