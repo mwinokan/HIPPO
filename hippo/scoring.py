@@ -44,18 +44,22 @@ class Scorer:
     def __init__(
         self,
         db: "Database",
-        recipes: "RecipeSet",
-        attributes: list[str],
+        directory: "Path | str",
+        pattern: str = "*.json",
+        attributes: list[str] = None,
         populate: bool = True,
         load_cache: bool = True,
     ) -> None:
 
         from .recipe import RecipeSet
 
-        assert isinstance(recipes, RecipeSet)
-
         self._db = db
-        self._recipes = recipes
+
+        attributes = attributes or []
+
+        rset = RecipeSet(db, directory, pattern=pattern)
+
+        self._recipes = rset
 
         self._attributes = {}
 
@@ -91,12 +95,10 @@ class Scorer:
         skip: list[str] | None = None,
         load_cache: bool = True,
         subsites: bool = True,
-        # **kwargs,
-    ):
+    ) -> "Scorer":
+        """Create a Scorer instance with Default attributes"""
 
         from .recipe import RecipeSet
-
-        rset = RecipeSet(db, directory, pattern=pattern)
 
         self = cls.__new__(cls)
 
@@ -104,7 +106,13 @@ class Scorer:
             k for k, v in DEFAULT_ATTRIBUTES.items() if v["type"] == "standard"
         ]
 
-        self.__init__(db=db, recipes=rset, attributes=attributes, populate=False)
+        self.__init__(
+            db=db,
+            directory=directory,
+            pattern=pattern,
+            attributes=attributes,
+            populate=False,
+        )
 
         skip = skip or []
 
