@@ -17,28 +17,15 @@ DATA_COLUMNS = [
 
 
 class Scorer:
-    """
+    """Create a scorer object to score sets of recipes
 
-    :param recipes: :class:`.RecipeSet`
-
-    inputs
-    ------
-
-    * building block set
-    * HIPPO object
-
-    parameters
-    ----------
-
-    * optimisation attributes
-    * weights
-
-    outputs
-    -------
-
-    * score for a given BBS
-    * BBSs sorted by score
-
+    :param db: :class:`.Database`
+    :param directory: path to directory containing recipe JSONs
+    :param pattern: glob pattern for :class:`.Recipe` JSON, default: "*.json"
+    :param attributes: attributes of :class:`.Recipe` objects to use for scoring
+    :param populate: Pre-populate query caches and child objects in memory (don't disable unless you have a good reason)
+    :param load_cache: Load cache from existing JSON
+    :param allowed_pose_ids: Restrict interaction and subsite calculations to these :class:`.Pose` IDs
     """
 
     def __init__(
@@ -49,11 +36,18 @@ class Scorer:
         attributes: list[str] = None,
         populate: bool = True,
         load_cache: bool = True,
+        allowed_poses: "PoseSet | list[int] | None" = None,
     ) -> None:
 
+        from .pset import PoseSet
         from .recipe import RecipeSet
 
         self._db = db
+
+        if isinstance(allowed_poses, PoseSet):
+            self._allowed_pose_ids = set(allowed_poses.ids)
+        else:
+            self._allowed_pose_ids = set(allowed_poses)
 
         attributes = attributes or []
 
@@ -95,6 +89,7 @@ class Scorer:
         skip: list[str] | None = None,
         load_cache: bool = True,
         subsites: bool = True,
+        allowed_poses: "PoseSet | list[int] | None" = None,
     ) -> "Scorer":
         """Create a Scorer instance with Default attributes"""
 
@@ -112,6 +107,7 @@ class Scorer:
             pattern=pattern,
             attributes=attributes,
             populate=False,
+            allowed_poses=allowed_poses,
         )
 
         skip = skip or []
@@ -557,6 +553,12 @@ class Scorer:
 
                 for comp_id in comp_ids:
                     pose_ids = pose_map.get(comp_id, set())
+
+                    if self._allowed_pose_ids:
+                        pose_ids = set(
+                            i for i in pose_ids if i in self._allowed_pose_ids
+                        )
+
                     all_pose_ids |= pose_ids
 
                 df.at[key, col] = all_pose_ids
