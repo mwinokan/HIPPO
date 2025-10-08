@@ -300,6 +300,8 @@ class RandomRecipeGenerator(RRGMixin):
         if not max_iter:
             max_iter = max_products + max_reactions
 
+        max_iter = min(max_iter, len(self.route_pool))
+
         budget = Price(budget, currency)
 
         recipe = self.starting_recipe.copy()

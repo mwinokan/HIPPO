@@ -13,6 +13,7 @@ DATA_COLUMNS = [
     "compound_ids",
     "pose_ids",
     "interaction_ids",
+    "pose_metadata",
 ]
 
 
@@ -510,7 +511,7 @@ class Scorer:
         for recipe in self.recipes:
             self._data.at[recipe.hash, "price"] = recipe.price.amount
 
-        ### Product Compound IDs
+        ### Compound IDs
 
         col = "compound_ids"
         null = df[col].isnull()
@@ -523,7 +524,7 @@ class Scorer:
                 recipe = self.recipes[key]
                 df.at[key, col] = recipe.combined_compound_ids
 
-        ### Product Pose IDs
+        ### Pose IDs
 
         col = "pose_ids"
         null = df[col].isnull()
@@ -547,8 +548,6 @@ class Scorer:
                 recipe = self.recipes[key]
                 comp_ids = df["compound_ids"][key]
 
-                row = df.loc[key]
-
                 all_pose_ids = set()
 
                 for comp_id in comp_ids:
@@ -563,7 +562,7 @@ class Scorer:
 
                 df.at[key, col] = all_pose_ids
 
-        ### Product Interaction IDs
+        ### Interaction IDs
 
         col = "interaction_ids"
         null = df[col].isnull()
@@ -587,8 +586,6 @@ class Scorer:
                 recipe = self.recipes[key]
                 pose_ids = df["pose_ids"][key]
 
-                row = df.loc[key]
-
                 all_interaction_ids = set()
 
                 for pose_id in pose_ids:
@@ -597,7 +594,37 @@ class Scorer:
 
                 df.at[key, col] = all_interaction_ids
 
-        # raise NotImplementedError
+        ### Metadata Dictionaries
+
+        col = "pose_metadata"
+        null = df[col].isnull()
+
+        # populate missing product interaction ids
+        if null.sum():
+
+            pose_ids = set()
+            for ids in df[null]["pose_ids"]:
+                for id in ids:
+                    pose_ids.add(id)
+
+            # pset = PoseSet(self.db, pose_ids, sort=False)
+
+            mrich.debug(f"Getting metadata for {len(pose_ids)} poses")
+            metadata_lookup = self.db.get_id_metadata_dict(table="pose", ids=pose_ids)
+
+            mrich.debug(f'Populating _data["{col}"]...')
+            for key in df[null].index.values:
+                assert len(df[null]) == null.sum()
+                recipe = self.recipes[key]
+                pose_ids = df["pose_ids"][key]
+
+                row = df.loc[key]
+
+                metadata = {}
+                for pose_id in pose_ids:
+                    metadata[pose_id] = metadata_lookup[pose_id]
+
+                df.at[key, col] = metadata
 
     def _populate_recipe_child_sets(self):
 
@@ -619,14 +646,18 @@ class Scorer:
             if recipe._poses is None:
                 ids = row["pose_ids"]
                 cache = PoseSet(self.db, ids)
-                cache._name = f"Recipe_{key} product poses"
-                recipe._product_poses = cache
+                cache._name = f"Recipe_{key} poses"
+                recipe._poses = cache
 
             if recipe._interactions is None:
                 ids = row["interaction_ids"]
                 cache = InteractionSet(self.db, ids)
                 cache._name = f"Recipe_{key} product interactions"
                 recipe._interactions = cache
+
+            if recipe._poses._metadata_dict is None:
+                cache = row["pose_metadata"]
+                recipe._poses._metadata_dict = cache
 
     def _dump_json(self):
         path = self.json_path

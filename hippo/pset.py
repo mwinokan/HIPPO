@@ -613,6 +613,7 @@ class PoseSet:
             self._indices = list(self._indices.keys())
 
         self._interactions = None
+        self._metadata_dict = None
 
         self._name = name
 
@@ -871,6 +872,17 @@ class PoseSet:
 
             self._interactions = InteractionSet.from_pose(self)
         return self._interactions
+
+    @property
+    def pose_id_metadata_dict(self) -> dict[int, dict]:
+        """Get a dictionary mapping pose_ids to metadata dicts"""
+        if self._metadata_dict is None:
+            metadata_lookup = self.db.get_id_metadata_dict(table="pose", ids=self.ids)
+            metadata = {}
+            for pose_id in self.ids:
+                metadata[pose_id] = metadata_lookup[pose_id]
+            self._metadata_dict = metadata
+        return self._metadata_dict
 
     @property
     def interaction_overlap_score(self) -> int:
