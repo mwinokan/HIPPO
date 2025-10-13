@@ -829,9 +829,10 @@ class HIPPO:
         max_energy_score: float | None = 0.0,
         max_distance_score: float | None = 2.0,
         require_intra_geometry_pass: bool = True,
-        reject_flags: list[str] | None = ["one_of_multiple_products"],
+        reject_flags: list[str] | None = None,
         register_reactions: bool = True,
         dry_run: bool = False,
+        scaffold_route: "Route | None" = None,
     ) -> "pd.DataFrame":
         """
         Load Syndirella elaboration compounds and poses from a pickled DataFrame
@@ -840,12 +841,15 @@ class HIPPO:
         :param max_energy_score: Filter out poses with `∆∆G` above this value
         :param max_distance_score: Filter out poses with `comRMSD` above this value
         :param require_intra_geometry_pass: Filter out poses with falsy `intra_geometry_pass` values
-        :param reject_flags: Filter out rows flagged with strings from this list
+        :param reject_flags: Filter out rows flagged with strings from this list (default = ["one_of_multiple_products", "selectivity_issue_contains_reaction_atoms_of_both_reactants"])
         :param dry_run: Don't insert new records into the database (for debugging/testing)
         :returns: annotated DataFrame
         """
 
-        reject_flags = reject_flags or []
+        reject_flags = reject_flags or [
+            "one_of_multiple_products",
+            "selectivity_issue_contains_reaction_atoms_of_both_reactants",
+        ]
 
         from .syndirella import reactions_from_row
 
@@ -942,6 +946,40 @@ class HIPPO:
         mrich.var("#scaffold entries", len(scaffold_df))
         mrich.var("#elab entries", len(elab_df))
 
+        if not len(scaffold_df) and not scaffold_route:
+            mrich.error("No valid scaffold rows")
+            return None
+
+        elif scaffold_route:
+
+            ### MAKE THE SCAFFOLD ROWS
+
+            assert scaffold_route.num_reactions == 1
+
+            product = scaffold_route.products[0].compound
+            reaction = scaffold_route.reactions[0]
+
+            assert len(reaction.reactants) == 2
+
+            scaffold_dict = {
+                "scaffold_smiles": product.smiles,
+                "1_reaction": reaction.type,
+                "1_r1_smiles": reaction.reactants[0].smiles,
+                "1_r2_smiles": reaction.reactants[1].smiles,
+                "1_product_smiles": product.smiles,
+                "1_product_name": "scaffold",
+                "1_single_reactant_elab": False,
+                "1_num_atom_diff": 0,
+                "is_scaffold": True,
+            }
+
+            scaffold_df = pd.DataFrame([scaffold_dict])
+
+            df = pd.concat([scaffold_df, df])
+
+            scaffold_df = df[df["is_scaffold"]]
+            elab_df = df[~df["is_scaffold"]]
+
         if dry_run:
             mrich.error("Not registering records (dry_run)")
             return df
@@ -972,9 +1010,9 @@ class HIPPO:
 
             # get associated IDs
             compound_inchikey_id_dict = self.db.get_compound_inchikey_id_dict(inchikeys)
-            df[compound_id_col] = [
-                compound_inchikey_id_dict[inchikey] for inchikey in inchikeys
-            ]
+            df[compound_id_col] = df[inchikey_col].apply(
+                lambda x: compound_inchikey_id_dict[x]
+            )
 
         # bulk register reactions
 
@@ -1003,6 +1041,10 @@ class HIPPO:
                     assert id_set
                     reactant_id_sets.append(id_set)
 
+                if any(len(ids) != len(id_set) for ids in reactant_id_sets):
+                    mrich.error("Non-uniform number of reactants in dataset")
+                    return df
+
                 reaction_ids = self.register_reactions(
                     types=df[f"{step}_reaction"],
                     product_ids=df[f"{step}_product_compound_id"],
@@ -1025,7 +1067,12 @@ class HIPPO:
                 key = f"{step}_{role}_compound_id"
 
                 scaffold_ids = set(scaffold_df[key].to_list())
-                assert len(scaffold_ids) == 1, f"{key} {scaffold_ids}"
+                if len(scaffold_ids) != 1:
+                    mrich.error(
+                        f"Wrong number of scaffold IDs for {key}: {scaffold_ids}"
+                    )
+                    return scaffold_df
+
                 (scaffold_id,) = scaffold_ids
 
                 superstructure_ids = set(elab_df[key].to_list())
@@ -1072,6 +1119,10 @@ class HIPPO:
 
         mrich.var("#acceptable poses", len(ok))
 
+        if not len(ok):
+            mrich.warning("No valid poses")
+            return None
+
         # bulk register poses
 
         payload = []
@@ -1094,6 +1145,10 @@ class HIPPO:
             )
 
             payload.append(pose_tuple)
+
+        if not payload:
+            mrich.warning("No valid poses")
+            return None
 
         mrich.debug(f"Registering {len(payload)} poses...")
 
@@ -2004,8 +2059,11 @@ class HIPPO:
         RETURNING reaction_id
         """
 
-        records = self.db.executemany(sql, list(non_duplicates.keys()))
+        payload = list(non_duplicates.keys())
+
+        records = self.db.executemany(sql, payload)
         reaction_ids = [r_id for r_id, in records]
+        self.db.commit()
 
         # insert reactant records
         sql = """
