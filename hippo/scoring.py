@@ -457,7 +457,7 @@ class Scorer:
         )
 
     def top_keys(self, n: int, budget: float | None = None):
-        keys = self.get_sorted_df(budget=budget)["hash"][:n]
+        keys = self.get_sorted_df(budget=budget).index[:n]
         return keys
 
     def top(self, n: int, budget: float | None = None):
