@@ -956,7 +956,7 @@ class HIPPO:
 
         for smiles_col in smiles_cols:
 
-            mrich.bold(f"Registering compounds from column: {smiles_col}")
+            mrich.debug(f"Registering compounds from column: {smiles_col}")
 
             inchikey_col = smiles_col.replace("_smiles", "_inchikey")
             compound_id_col = smiles_col.replace("_smiles", "_compound_id")
@@ -982,6 +982,8 @@ class HIPPO:
             for step in range(num_steps):
 
                 step += 1
+
+                mrich.debug(f"Registering reactions for step {step}")
 
                 reactant_id_sets = []
                 for r1_id, r2_id in df[
@@ -1013,7 +1015,11 @@ class HIPPO:
         # bulk register scaffold relationships
 
         for step in range(num_steps):
+
             step += 1
+
+            mrich.debug(f"Registering scaffold relatonships for step {step}")
+
             for role in ["r1", "r2", "product"]:
 
                 key = f"{step}_{role}_compound_id"
@@ -1088,6 +1094,8 @@ class HIPPO:
             )
 
             payload.append(pose_tuple)
+
+        mrich.debug(f"Registering {len(payload)} poses...")
 
         sql = """
         INSERT OR IGNORE INTO pose(
