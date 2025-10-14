@@ -349,7 +349,7 @@ class CompoundTable:
         values = self.db.select_where(
             query="scaffold_superstructure",
             table="scaffold",
-            key="scaffold",
+            key="base",
             value=scaffold,
             multiple=True,
         )

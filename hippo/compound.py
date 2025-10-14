@@ -286,7 +286,7 @@ class Compound:
             self.db.select_where(
                 query="1",
                 table="scaffold",
-                key="scaffold",
+                key="base",
                 value=self.id,
                 multiple=False,
                 none="quiet",
@@ -689,7 +689,7 @@ class Compound:
         ids = self.db.select_where(
             table="scaffold",
             query="scaffold_superstructure",
-            key="scaffold",
+            key="base",
             value=self.id,
             none="quiet",
             multiple=True,
