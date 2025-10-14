@@ -2165,6 +2165,8 @@ class Database:
         """
         )
 
+    ### BULK CLEANUP
+
     def prune_duplicate_routes(self) -> None:
         """Remove duplicate routes from the database"""
 
@@ -2218,51 +2220,6 @@ class Database:
 
         return delete
 
-    def calculate_all_scaffolds(self):
-        """Determine and insert records for all substructure/superstructure relationships in the Compound table"""
-
-        n_before = self.count("scaffold")
-
-        mrich.var("#compounds", self.count("compound"))
-        mrich.var("#scaffold defs", n_before)
-
-        sql = """
-        SELECT compound_id, compound_mol, compound_pattern_bfp 
-        FROM compound
-        """
-
-        with mrich.loading("Fetching compounds..."):
-            records = self.execute(sql).fetchall()
-
-        sql = """
-            INSERT OR IGNORE INTO scaffold
-            SELECT ?1, c.compound_id 
-            FROM compound AS c, compound_pattern_bfp AS fp
-            WHERE c.compound_id = fp.compound_id
-            AND c.compound_id <> ?1
-            AND mol_is_substruct(c.compound_mol, ?2)
-            AND fp.compound_id MATCH rdtree_subset(?3)
-        """
-
-        with mrich.loading("Calculating scaffolds..."):
-            t1 = time.time()
-            self.executemany(sql, records)
-            mrich.print("Took", f"{time.time() - t1:.1f}", "seconds")
-
-        with mrich.loading("Committing..."):
-            self.commit()
-
-        diff = self.count("scaffold") - n_before
-
-        if diff:
-            mrich.success(
-                "Found", diff, "new substructure-superstructure relationships"
-            )
-        else:
-            mrich.warning(
-                "Found", diff, "new substructure-superstructure relationships"
-            )
-
     def reinitialise_molecules(self):
         """In the case where the Mol binaries in a database are throwing unpickling errors, run this to reinitialise them all from their smiles."""
 
@@ -2277,6 +2234,46 @@ class Database:
             self.execute(sql)
 
         mrich.success("compound_mol records updated")
+
+    def fix_incorrect_pose_compound_assignments(self):
+        """Fix pose_compound values that reference incorrect chemical structures"""
+
+        sql = """
+        SELECT pose_id, pose_compound, mol_to_smiles(mol_from_binary_mol(pose_mol))
+        FROM pose
+        WHERE pose_mol IS NOT null
+        """
+
+        c = self.execute(sql)
+
+        fix = set()
+        for pose_id, pose_compound, smiles in c:
+            try:
+                flat_smiles = sanitise_smiles(smiles)
+            except Exception as e:
+                mrich.error("Could not sanitise", pose_id, smiles)
+
+            comp_id = lookup.get(flat_smiles)
+
+            if not comp_id:
+                mrich.error("No matching compound", pose_id, smiles)
+                continue
+
+            if comp_id != pose_compound:
+                fix.add((pose_id, comp_id))
+
+        mrich.var("#fix", len(fix))
+
+        sql = """
+        UPDATE pose
+        SET pose_compound = ?2
+        WHERE pose_id = ?1
+        """
+
+        self.executemany(sql, list(fix))
+        self.commit()
+
+    ### BULK REGISTRATION
 
     def register_compounds(
         self,
@@ -2418,6 +2415,51 @@ class Database:
         self.commit()
 
         return pose_ids
+
+    def calculate_all_scaffolds(self):
+        """Determine and insert records for all substructure/superstructure relationships in the Compound table"""
+
+        n_before = self.count("scaffold")
+
+        mrich.var("#compounds", self.count("compound"))
+        mrich.var("#scaffold defs", n_before)
+
+        sql = """
+        SELECT compound_id, compound_mol, compound_pattern_bfp 
+        FROM compound
+        """
+
+        with mrich.loading("Fetching compounds..."):
+            records = self.execute(sql).fetchall()
+
+        sql = """
+            INSERT OR IGNORE INTO scaffold
+            SELECT ?1, c.compound_id 
+            FROM compound AS c, compound_pattern_bfp AS fp
+            WHERE c.compound_id = fp.compound_id
+            AND c.compound_id <> ?1
+            AND mol_is_substruct(c.compound_mol, ?2)
+            AND fp.compound_id MATCH rdtree_subset(?3)
+        """
+
+        with mrich.loading("Calculating scaffolds..."):
+            t1 = time.time()
+            self.executemany(sql, records)
+            mrich.print("Took", f"{time.time() - t1:.1f}", "seconds")
+
+        with mrich.loading("Committing..."):
+            self.commit()
+
+        diff = self.count("scaffold") - n_before
+
+        if diff:
+            mrich.success(
+                "Found", diff, "new substructure-superstructure relationships"
+            )
+        else:
+            mrich.warning(
+                "Found", diff, "new substructure-superstructure relationships"
+            )
 
     def calculate_all_murcko_scaffolds(self, generic: bool = True):
         """Determine Murcko and optionally generic Murcko scaffolds for all Compounds in the Database and add relevant records.
