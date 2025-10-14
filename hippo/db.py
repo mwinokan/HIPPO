@@ -2328,9 +2328,9 @@ class Database:
             mrich.debug("Inserting...")
 
         self.executemany(sql, values)
-        self.commit()
-
         self.update_compound_pattern_bfp_table()
+
+        self.commit()
 
         return values
 

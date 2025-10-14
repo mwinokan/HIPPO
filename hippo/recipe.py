@@ -1216,7 +1216,7 @@ class Recipe:
                 for reaction in self.reactions:
                     mrich.var(str(reaction), reaction.reaction_str, reaction.type)
 
-        if self.compounds:
+        if hasattr(self, "_compounds") and self.compounds:
 
             mrich.h3(f"{len(self.compounds)} compounds")
 
