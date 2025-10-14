@@ -2252,6 +2252,7 @@ class Database:
         c = self.execute(sql)
 
         fix = set()
+        fix_count = 0
         for pose_id, pose_compound, smiles in mrich.track(c, total=count):
             try:
                 flat_smiles = sanitise_smiles(smiles)
@@ -2266,6 +2267,8 @@ class Database:
 
             if comp_id != pose_compound:
                 fix.add((pose_id, comp_id))
+                fix_count += 1
+                mrich.set_progress_field("#fix", fix_count)
 
         mrich.var("#fix", len(fix))
 
