@@ -2241,6 +2241,8 @@ class Database:
         lookup = self.get_compound_id_smiles_dict()
         lookup = {v: k for k, v in lookup.items()}
 
+        count = self.count_where(table="pose", key="mol", value="NOT null")
+
         sql = """
         SELECT pose_id, pose_compound, mol_to_smiles(mol_from_binary_mol(pose_mol))
         FROM pose
@@ -2250,7 +2252,7 @@ class Database:
         c = self.execute(sql)
 
         fix = set()
-        for pose_id, pose_compound, smiles in c:
+        for pose_id, pose_compound, smiles in mrich.track(c, total=count):
             try:
                 flat_smiles = sanitise_smiles(smiles)
             except Exception as e:
