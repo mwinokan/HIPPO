@@ -2238,6 +2238,9 @@ class Database:
     def fix_incorrect_pose_compound_assignments(self):
         """Fix pose_compound values that reference incorrect chemical structures"""
 
+        lookup = self.get_compound_id_smiles_dict()
+        lookup = {v: k for k, v in lookup.items()}
+
         sql = """
         SELECT pose_id, pose_compound, mol_to_smiles(mol_from_binary_mol(pose_mol))
         FROM pose
