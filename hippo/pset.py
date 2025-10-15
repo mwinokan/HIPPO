@@ -1458,6 +1458,7 @@ class PoseSet:
                 table="pose",
                 query="pose_id, pose_mol",
                 key=f"pose_id IN {empty_poses.str_ids}",
+                multiple=True,
             )
 
             for pose_id, pose_mol in records:
