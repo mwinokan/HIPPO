@@ -1357,7 +1357,7 @@ class PoseSet:
             if mol:
                 mol_bytes = row.pop(0)
                 if mol_bytes:
-                    d["mol"] = Mol(row.pop(0))
+                    d["mol"] = Mol(mol_bytes)
 
             if energy_score:
                 d["energy_score"] = row.pop(0)
