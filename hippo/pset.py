@@ -1355,7 +1355,9 @@ class PoseSet:
                 d["target_id"] = row.pop(0)
 
             if mol:
-                d["mol"] = Mol(row.pop(0))
+                mol_bytes = row.pop(0)
+                if mol_bytes:
+                    d["mol"] = Mol(row.pop(0))
 
             if energy_score:
                 d["energy_score"] = row.pop(0)
@@ -1440,6 +1442,26 @@ class PoseSet:
                 df = df.drop(columns=["alias"])
 
         df = df.set_index("id")
+
+        ### Fill missing molecule entries
+
+        empty = df[df["mol"].isna()]
+
+        if len(empty):
+            mrich.warning(len(empty), "rows have empty 'mol'")
+            empty_poses = PoseSet(self.db, set(empty.index))
+
+            for pose in mrich.track(empty_poses, "generating Mol"):
+                pose.mol
+
+            records = self.db.select_where(
+                table="pose",
+                query="pose_id, pose_mol",
+                key=f"pose_id IN {empty_poses.str_ids}",
+            )
+
+            for pose_id, pose_mol in records:
+                df.loc[pose_id, "mol"] = Mol(pose_mol)
 
         return df
 
@@ -1947,7 +1969,6 @@ class PoseSet:
         :param tags: include a column for tags in the output (Default value = True)
         :param subsites: include a column for subsites in the output (Default value = True)
         :param extra_cols: extra_cols should be a dictionary with a key for each column name, and list values where the first element is the field description, and all subsequent elements are values for each pose.
-        :param name: How to determine the molecule name, see :meth:`.PoseSet.get_df`
 
         """
 
