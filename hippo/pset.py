@@ -1451,7 +1451,7 @@ class PoseSet:
             mrich.warning(len(empty), "rows have empty 'mol'")
             empty_poses = PoseSet(self.db, set(empty.index))
 
-            for pose in mrich.track(empty_poses, "generating Mol"):
+            for pose in mrich.track(empty_poses, prefix="generating Mols"):
                 pose.mol
 
             records = self.db.select_where(
@@ -1462,6 +1462,8 @@ class PoseSet:
 
             for pose_id, pose_mol in records:
                 df.loc[pose_id, "mol"] = Mol(pose_mol)
+
+            assert not len(df[df["mol"].isna()])
 
         return df
 
