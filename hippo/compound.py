@@ -394,7 +394,7 @@ class Compound:
         )
 
         if return_quote:
-            self.db.get_quote(id=quote_id)
+            return self.db.get_quote(id=quote_id)
         else:
             return quote_id
 
