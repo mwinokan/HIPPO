@@ -629,7 +629,7 @@ class CompoundSet:
         if sort:
             self._indices = sorted(list(set(indices)))
         else:
-            self._indices = list(set(indices))
+            self._indices = list(indices)
 
         self._name = name
         self._total_changes = db.total_changes
@@ -1565,7 +1565,6 @@ class CompoundSet:
         elabs: bool = False,
         routes: bool = False,
         debug: bool = False,
-        # count_by_target: bool = False,
         **kwargs,
     ) -> "DataFrame":
         """Get a DataFrame representation of this set
@@ -1583,8 +1582,6 @@ class CompoundSet:
         :param tags: include tags column
         :param scaffolds: include scaffolds column
         :param elabs: include elabs column
-
-        # :param count_by_target: count poses by target (Default value = False)
 
         """
 
