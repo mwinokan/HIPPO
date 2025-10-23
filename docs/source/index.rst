@@ -118,6 +118,7 @@ If the above fails in your existing software environments, try this:
 ::
    
    mamba create --name py312 python=3.12
+   mamba activate py312
    pip install hippo-db syndirella typer neo4j black gemmi
    mamba install chemicalite=2024.05.1 pdbfixer
    python -c  "import mrich; mrich.patch_rich_jupyter_margins()"
