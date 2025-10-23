@@ -439,13 +439,17 @@ class CompoundTable:
         tag: str = None,
         scaffold: int | Compound = None,
         smiles: str | None = None,
+        ids: list | set | None = None,
+        sort: bool = True,
         **kwargs,
     ) -> "CompoundSet | Compound | None":
         """Filter compounds by a given tag, scaffold, or it's SMILES string. See :meth:`.CompoundTable.get_by_tag` and :meth:`.CompoundTable.get_by_scaffold`
 
         :param tag: optional tag to filter by
         :param scaffold: optional :class:`.Compound` ID or object to filter by
-        :param scaffold: optional SMILES string to filter by
+        :param smiles: optional SMILES string to filter by
+        :param ids: optional set of :class:`.Compound` ID's
+        :param sort: sort :class:`.Compound` ID's
         :returns: :class:`.CompoundSet` if searching by tag or scaffold, else :class:`.Compound` object
 
         """
@@ -456,6 +460,8 @@ class CompoundTable:
             return self.get_by_scaffold(scaffold, **kwargs)
         elif smiles:
             return self.get_by_smiles(smiles, **kwargs)
+        elif ids:
+            return CompoundSet(self.db, indices=list(ids), sort=sort)
         else:
             mrich.error("Must provide one of tag, scaffold, or smiles arguments")
             return None
@@ -469,6 +475,9 @@ class CompoundTable:
         :param key: Can be an integer ID, negative integer index, alias or inchikey string, list/set/tuple of IDs, or slice of IDs
 
         """
+
+        from numpy import ndarray
+        from pandas import Index, Series
 
         match key:
 
@@ -492,8 +501,19 @@ class CompoundTable:
                 return comp
 
             case key if (
-                isinstance(key, list) or isinstance(key, tuple) or isinstance(key, set)
+                isinstance(key, list)
+                or isinstance(key, tuple)
+                or isinstance(key, set)
+                or isinstance(key, ndarray)
+                or isinstance(key, Index)
+                or isinstance(key, Series)
             ):
+
+                if isinstance(key, Index):
+                    assert key.nlevels == 1
+
+                if isinstance(key, ndarray):
+                    assert len(key.shape) == 1
 
                 indices = []
                 for i in key:
