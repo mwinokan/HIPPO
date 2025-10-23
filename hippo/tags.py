@@ -42,7 +42,7 @@ class TagTable:
         values = self.db.select(
             table=self.table, query="DISTINCT tag_name", multiple=True
         )
-        return set(v for v, in values)
+        return list(sorted(set(v for v, in values)))
 
     ### METHODS
 
