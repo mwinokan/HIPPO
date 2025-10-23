@@ -1027,19 +1027,18 @@ class CompoundSet:
         :param value: metadata value (Default value = None)
         """
 
-        results = self.db.select(
-            query="compound_id, compound_metadata", table="compound", multiple=True
+        results = self.db.select_where(
+            query="compound_id, compound_metadata",
+            table="compound",
+            key=f"compound_id IN {self.str_ids}",
+            multiple=True,
         )
         if value is None:
-            ids = [i for i, d in results if d and f'"{key}":' in d and i in self.ids]
+            ids = [i for i, d in results if d and f'"{key}":' in d]
         else:
             if isinstance(value, str):
                 value = f'"{value}"'
-            ids = [
-                i
-                for i, d in results
-                if d and f'"{key}": {value}' in d and i in self.ids
-            ]
+            ids = [i for i, d in results if d and f'"{key}": {value}' in d]
         return CompoundSet(self.db, ids)
 
     def get_by_metadata_substring_match(
@@ -2113,10 +2112,14 @@ class CompoundSet:
         match other:
 
             case Compound():
-                return self.add(other)
+                ids = set(self.ids)
+                ids.add(other.id)
+                return CompoundSet(self.db, ids)
 
             case int():
-                return self.add(other)
+                ids = set(self.ids)
+                ids.add(other)
+                return CompoundSet(self.db, ids)
 
             case CompoundSet():
                 ids = set(self.ids) | set(other.ids)
@@ -2124,6 +2127,30 @@ class CompoundSet:
 
             case IngredientSet():
                 ids = set(self.ids) | set(other.compound_ids)
+                return CompoundSet(self.db, ids)
+
+            case _:
+                raise NotImplementedError
+
+    def __and__(self, other: "CompoundSet"):
+        """AND set operation, returns only compounds in both sets"""
+
+        match other:
+
+            case CompoundSet():
+                ids = set(self.ids) & set(other.ids)
+                return CompoundSet(self.db, ids)
+
+            case _:
+                raise NotImplementedError
+
+    def __or__(self, other: "CompoundSet"):
+        """OR set operation, returns union of both sets"""
+
+        match other:
+
+            case CompoundSet():
+                ids = set(self.ids) | set(other.ids)
                 return CompoundSet(self.db, ids)
 
             case _:

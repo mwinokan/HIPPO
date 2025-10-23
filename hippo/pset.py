@@ -2870,6 +2870,42 @@ class PoseSet:
                 # assert other in set(self.ids)
                 return PoseSet(self.db, [i for i in self.ids if i != other], sort=False)
 
+    def __and__(self, other: "PoseSet"):
+        """AND set operation, returns only poses in both sets"""
+
+        match other:
+
+            case PoseSet():
+                ids = set(self.ids) & set(other.ids)
+                return PoseSet(self.db, ids)
+
+            case _:
+                raise NotImplementedError
+
+    def __or__(self, other: "PoseSet"):
+        """OR set operation, returns union of both sets"""
+
+        match other:
+
+            case PoseSet():
+                ids = set(self.ids) | set(other.ids)
+                return PoseSet(self.db, ids)
+
+            case _:
+                raise NotImplementedError
+
+    def __xor__(self, other: "PoseSet"):
+        """Exclusive OR set operation, returns all poses in either set but not both"""
+
+        match other:
+
+            case PoseSet():
+                ids = set(self.ids) ^ set(other.ids)
+                return PoseSet(self.db, ids)
+
+            case _:
+                raise NotImplementedError
+
     def __call__(
         self,
         *,
