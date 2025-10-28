@@ -223,6 +223,7 @@ def plot_interaction_punchcard(
     poses=None,
     subtitle=None,
     opacity=1.0,
+    group: str = "pose_name",
     ignore_chains=False,
 ):
     """
@@ -648,7 +649,7 @@ def plot_residue_interactions(
 
     names = []
     for pose_id in plot_data["pose_id"].values:
-        names.append(name_lookup[pose_id])
+        names.append(name_lookup[int(pose_id)])
     plot_data["pose_name"] = names
 
     fig = px.histogram(plot_data, x="pose_name", color="type")
