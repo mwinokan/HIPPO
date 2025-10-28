@@ -383,7 +383,7 @@ class CompoundTable:
         mrich.var("#compounds", len(self))
         # mrich.var('#poses', self.num_poses)
         mrich.var("tags", self.tags)
-        mrich.var("#bases", self.num_scaffolds)
+        mrich.var("#scaffolds", self.num_scaffolds)
         mrich.var("#elabs", self.num_elabs)
         mrich.var("#reactants", self.num_reactants)
         mrich.var("#intermediates", self.num_intermediates)
@@ -920,16 +920,29 @@ class CompoundSet:
         :returns: :class:`.CompoundSet`
 
         """
+        return CompoundSet(self.db, self.scaffold_ids)
 
+    @property
+    def scaffold_ids(self) -> list[int]:
+        """Return a list of :class:`.Compound` ID's for scaffolds of this set"""
         scaffold_ids = self.db.execute(
             f"""
                 SELECT DISTINCT scaffold_base FROM scaffold
                 WHERE scaffold_superstructure IN {self.str_ids}  
             """
         ).fetchall()
+        return [i for i, in scaffold_ids]
 
-        scaffold_ids = [i for i, in scaffold_ids]
-        return CompoundSet(self.db, scaffold_ids)
+    @property
+    def num_scaffolds(self) -> int:
+        """Return a count of scaffolds of this set"""
+        (count,) = self.db.execute(
+            f"""
+                SELECT COUNT(DISTINCT scaffold_base) FROM scaffold
+                WHERE scaffold_superstructure IN {self.str_ids}  
+            """
+        ).fetchone()
+        return count
 
     @property
     def elabs(self) -> "CompoundSet":
@@ -950,6 +963,17 @@ class CompoundSet:
         from .cset import CompoundSet
 
         return CompoundSet(self.db, ids)
+
+    @property
+    def num_elabs(self) -> int:
+        """Return a count of elaborations of this set"""
+        (count,) = self.db.execute(
+            f"""
+                SELECT COUNT(DISTINCT scaffold_superstructure) FROM scaffold
+                WHERE scaffold_base IN {self.str_ids}  
+            """
+        ).fetchone()
+        return count
 
     @property
     def elab_df(self) -> "pd.DataFrame":
@@ -1234,12 +1258,74 @@ class CompoundSet:
 
         self.draw()
 
-    def summary(self) -> None:
+    def summary(self, return_df: bool = False) -> None:
         """Print a summary of this compound set"""
-        mrich.header("CompoundSet()")
-        mrich.var("#compounds", len(self))
-        mrich.var("#poses", self.num_poses)
-        mrich.var("tags", self.tags)
+
+        mrich.header(self)
+
+        from pandas import DataFrame
+
+        sql = f"""
+        SELECT tag_name,
+        COUNT(DISTINCT tag_compound)
+        FROM tag
+        WHERE tag_compound IN {self.str_ids}
+        GROUP BY tag_name
+        ORDER BY tag_name
+        """
+
+        cursor = self.db.execute(sql)
+
+        data = [dict(tag=a, num_compounds=b) for a, b in cursor.fetchall()]
+
+        df = DataFrame(data)
+        df = df.set_index("tag")
+
+        # poses
+
+        sql = f"""
+        SELECT tag_name,
+        COUNT(DISTINCT tag_pose)
+        FROM tag
+        INNER JOIN pose
+        ON pose_id = tag_pose
+        WHERE pose_compound IN {self.str_ids}
+        GROUP BY tag_name
+        ORDER BY tag_name
+        """
+
+        cursor = self.db.execute(sql)
+
+        for tag, count in cursor.fetchall():
+            df.loc[tag, "num_poses"] = count
+
+        # compounds with poses
+
+        sql = f"""
+        SELECT tag_name, COUNT(DISTINCT pose_compound) FROM tag
+        INNER JOIN pose
+        ON tag_pose = pose_id
+        WHERE pose_compound IN {self.str_ids}
+        GROUP BY tag_name
+        ORDER BY tag_name
+        """
+
+        cursor = self.db.execute(sql)
+
+        for tag, count in cursor.fetchall():
+            df.loc[tag, "num_posed_compounds"] = count
+
+        df.loc["TOTAL", "num_compounds"] = len(self)
+        df.loc["TOTAL", "num_poses"] = self.num_poses
+        df.loc["TOTAL", "num_posed_compounds"] = len(self.poses.compounds)
+
+        df = df.fillna(0)
+        df = df.astype(int)
+
+        if return_df:
+            return df
+        else:
+            mrich.print(df)
 
     def interactive(
         self,
