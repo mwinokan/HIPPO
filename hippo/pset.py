@@ -884,9 +884,10 @@ class PoseSet:
             self._metadata_dict = metadata
         return self._metadata_dict
 
-    @property
-    def interaction_overlap_score(self) -> int:
+    def get_interaction_overlaps(self, return_pairs: bool = False) -> int:
         """Count the number of member pose pairs which share at least one but not all interactions"""
+
+        from itertools import combinations
 
         sql = f"""
         SELECT DISTINCT interaction_pose, feature_id, interaction_type FROM interaction 
@@ -907,22 +908,24 @@ class PoseSet:
         ids = [i for i in self.ids if i in ISETS]
 
         count = 0
-        for pose_j in ids:
+
+        pairs = set()
+
+        for pose_j, pose_k in combinations(ids, 2):
+            
             iset_j = ISETS[pose_j]
-            for pose_k in ids:
-                iset_k = ISETS[pose_k]
+            iset_k = ISETS[pose_k]
+            
+            intersection = iset_j & iset_k
+            diff1 = iset_j - iset_k
+            diff2 = iset_k - iset_j
 
-                # try:
-                # except KeyError:
-                #     mrich.error("No interactions for pose with id", pose_k, "Has it been fingerprinted?")
-                #     continue
+            if intersection and diff1 and diff2:
+                count += 1
+                pairs.add((pose_j, pose_k))
 
-                intersection = iset_j & iset_k
-                diff1 = iset_j - iset_k
-                diff2 = iset_k - iset_j
-
-                if intersection and diff1 and diff2:
-                    count += 1
+        if return_pairs:
+            return [PoseSet(self.db, [a,b]) for a,b in pairs]
 
         return count
 
