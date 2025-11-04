@@ -912,10 +912,10 @@ class PoseSet:
         pairs = set()
 
         for pose_j, pose_k in combinations(ids, 2):
-            
+
             iset_j = ISETS[pose_j]
             iset_k = ISETS[pose_k]
-            
+
             intersection = iset_j & iset_k
             diff1 = iset_j - iset_k
             diff2 = iset_k - iset_j
@@ -925,7 +925,7 @@ class PoseSet:
                 pairs.add((pose_j, pose_k))
 
         if return_pairs:
-            return [PoseSet(self.db, [a,b]) for a,b in pairs]
+            return [PoseSet(self.db, [a, b]) for a, b in pairs]
 
         return count
 
