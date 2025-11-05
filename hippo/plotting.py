@@ -1799,6 +1799,7 @@ def plot_pose_interactions(
 
 @hippo_graph
 def plot_compound_tsnee(
+    animal: "HIPPO | None" = None,
     compounds: "CompoundSet | None" = None,
     df: "pd.DataFrame | None" = None,
     title: str | None = None,
@@ -1807,6 +1808,7 @@ def plot_compound_tsnee(
     symbol: str = "type",
     sort_by: str = "type",
     color: str = "cluster",
+    cluster_by: str = "scaffolds",
     **kwargs,
 ) -> "plotly.graph_objects.Figure":
     """Plot a compound tanimoto similarity plot with principal components determined by pattern binary fingerprint similarity.
@@ -1831,47 +1833,38 @@ def plot_compound_tsnee(
         mrich.var("#compounds", len(compounds))
 
     if df is None:
-
         with mrich.loading("Getting Compound DataFrame"):
             df = compounds.get_df(mol=True, scaffolds=True, inchikey=True, alias=True)
             df = df.reset_index()
+    
+        df["scaffolds"] = df["scaffolds"].map(
+            lambda x: x if not isinstance(x, float) else None
+        )
 
-        def get_cluster(row):
+    else:
 
-            scaffolds = row["scaffolds"]
+        # check dataframe columns
+        if "mol" not in df.columns:
+            mrich.error("'mol' column not in dataframe")
+            return None
 
-            if not scaffolds:
-                return row["id"]
-
-            if len(scaffolds) == 1:
-                return list(scaffolds)[0]
-
-            return tuple(scaffolds)
-
-        def get_type(row):
-
-            if row["scaffolds"] is None:
-                return "scaffold"
-
-            return "elaboration"
-
-        with mrich.loading("Adding columns"):
-            df["cluster"] = df.apply(get_cluster, axis=1)
-            df["type"] = df.apply(get_type, axis=1)
+        if cluster_by not in df.columns:
+            mrich.error(f"{cluster_by=} column not in dataframe")
+            return None
 
     with mrich.loading("Getting Compound fingerprints"):
         df["FP"] = df["mol"].map(get_cfps)
 
-    df["scaffolds"] = df["scaffolds"].map(
-        lambda x: x if not isinstance(x, float) else None
-    )
-
     def get_cluster(row):
 
-        scaffolds = row["scaffolds"]
+        scaffolds = row[cluster_by]
 
         if not scaffolds:
             return row["id"]
+
+        if scaffolds is None:
+            mrich.error(row)
+            return
 
         if len(scaffolds) == 1:
             return list(scaffolds)[0]
@@ -1880,12 +1873,13 @@ def plot_compound_tsnee(
 
     def get_type(row):
 
-        if row["scaffolds"] is None:
+        if row[cluster_by] is None:
             return "scaffold"
 
         return "elaboration"
 
     with mrich.loading("Adding columns"):
+        df[cluster_by] = df[cluster_by].apply(tuple)
         df["cluster"] = df.apply(get_cluster, axis=1)
         df["type"] = df.apply(get_type, axis=1)
 
@@ -1908,12 +1902,12 @@ def plot_compound_tsnee(
         "inchikey",
         "PC1",
         "PC2",
-        "scaffolds",
+        cluster_by,
         "cluster",
         "type",
     ]
 
-    df["scaffolds"] = df["scaffolds"].astype(str)
+    df["scaffolds"] = df[cluster_by].astype(str)
     df["cluster"] = df["cluster"].astype(str)
 
     with mrich.loading("Creating figure"):
@@ -1928,7 +1922,7 @@ def plot_compound_tsnee(
             **kwargs,
         )
 
-    subtitle = subtitle or f"#compounds={len(compounds)}"
+    subtitle = subtitle or f"#compounds={len(df)}"
 
     title = title or f"{compounds} PCA<br>"
 
