@@ -616,7 +616,7 @@ def plot_interaction_punchcard_by_tags(
 
 @hippo_graph
 def plot_residue_interactions(
-    animal, poses, residue_number, subtitle=None, chain=None, target=1
+    animal, residue_number, poses: str | None = None, subtitle: str | None = None, chain: str | None = None, target: int = 1,
 ):
     """
 
@@ -627,6 +627,9 @@ def plot_residue_interactions(
     :param chain:  (Default value = None)
 
     """
+
+    if not poses:
+        poses = animal.poses
 
     mrich.var("#poses", len(poses))
 
@@ -657,6 +660,10 @@ def plot_residue_interactions(
     # return plot_data[plot_data['pose_name'] == ' x1762b']
 
     fig.update_xaxes(categoryorder="total descending")
+
+    # set customdata from x-axis labels
+    for trace in fig.data:
+        trace["customdata"] = trace["x"]
 
     if not subtitle:
         subtitle = f"#Poses={len(poses)}"

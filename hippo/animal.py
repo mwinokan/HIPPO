@@ -2596,7 +2596,7 @@ class HIPPO:
         return plot_interaction_punchcard_by_tags(self, tags=tags, **kwargs)
 
     def plot_residue_interactions(
-        self, poses, residue_number, **kwargs
+        self, residue_number: int, poses: str | None = None, **kwargs
     ) -> "plotly.graph_objects.Figure":
         """Plot an interaction punchcard for a set of poses, see :func:`hippo.plotting.plot_residue_interactions`"""
         from .plotting import plot_residue_interactions
