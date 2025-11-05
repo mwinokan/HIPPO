@@ -1841,11 +1841,11 @@ class PoseSet:
     def split_by_inspirations(
         self,
         single_set: bool = False,
-    ) -> "dict[int,PoseSet] | PoseSet":
+    ) -> "dict[PoseSet,PoseSet] | PoseSet":
         """Split this :class:`.PoseSet` into subsets grouped by inspirations
 
         :param single_set: Return a single :class:`.PoseSet` with members sorted by inspirations (Default value = False)
-        :returns: a dictionary with tuples of inspiration :class:`.Pose` IDs as keys and :class:`.PoseSet` subsets as values
+        :returns: a dictionary with tuples of inspiration :class:`.PoseSet` as keys and :class:`.PoseSet` derivative subsets as values
 
         """
 
