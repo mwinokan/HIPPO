@@ -1448,26 +1448,27 @@ class PoseSet:
 
         ### Fill missing molecule entries
 
-        empty = df[df["mol"].isna()]
+        if mol:
+            empty = df[df["mol"].isna()]
 
-        if len(empty):
-            mrich.warning(len(empty), "rows have empty 'mol'")
-            empty_poses = PoseSet(self.db, set(empty.index))
+            if len(empty):
+                mrich.warning(len(empty), "rows have empty 'mol'")
+                empty_poses = PoseSet(self.db, set(empty.index))
 
-            for pose in mrich.track(empty_poses, prefix="generating Mols"):
-                pose.mol
+                for pose in mrich.track(empty_poses, prefix="generating Mols"):
+                    pose.mol
 
-            records = self.db.select_where(
-                table="pose",
-                query="pose_id, pose_mol",
-                key=f"pose_id IN {empty_poses.str_ids}",
-                multiple=True,
-            )
+                records = self.db.select_where(
+                    table="pose",
+                    query="pose_id, pose_mol",
+                    key=f"pose_id IN {empty_poses.str_ids}",
+                    multiple=True,
+                )
 
-            for pose_id, pose_mol in records:
-                df.loc[pose_id, "mol"] = Mol(pose_mol)
+                for pose_id, pose_mol in records:
+                    df.loc[pose_id, "mol"] = Mol(pose_mol)
 
-            assert not len(df[df["mol"].isna()])
+                assert not len(df[df["mol"].isna()])
 
         return df
 
@@ -1840,11 +1841,11 @@ class PoseSet:
     def split_by_inspirations(
         self,
         single_set: bool = False,
-    ) -> "dict[int,PoseSet] | PoseSet":
+    ) -> "dict[PoseSet,PoseSet] | PoseSet":
         """Split this :class:`.PoseSet` into subsets grouped by inspirations
 
         :param single_set: Return a single :class:`.PoseSet` with members sorted by inspirations (Default value = False)
-        :returns: a dictionary with tuples of inspiration :class:`.Pose` IDs as keys and :class:`.PoseSet` subsets as values
+        :returns: a dictionary with tuples of inspiration :class:`.PoseSet` as keys and :class:`.PoseSet` derivative subsets as values
 
         """
 
