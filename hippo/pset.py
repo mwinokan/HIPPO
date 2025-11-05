@@ -1448,26 +1448,27 @@ class PoseSet:
 
         ### Fill missing molecule entries
 
-        empty = df[df["mol"].isna()]
+        if mol:
+            empty = df[df["mol"].isna()]
 
-        if len(empty):
-            mrich.warning(len(empty), "rows have empty 'mol'")
-            empty_poses = PoseSet(self.db, set(empty.index))
+            if len(empty):
+                mrich.warning(len(empty), "rows have empty 'mol'")
+                empty_poses = PoseSet(self.db, set(empty.index))
 
-            for pose in mrich.track(empty_poses, prefix="generating Mols"):
-                pose.mol
+                for pose in mrich.track(empty_poses, prefix="generating Mols"):
+                    pose.mol
 
-            records = self.db.select_where(
-                table="pose",
-                query="pose_id, pose_mol",
-                key=f"pose_id IN {empty_poses.str_ids}",
-                multiple=True,
-            )
+                records = self.db.select_where(
+                    table="pose",
+                    query="pose_id, pose_mol",
+                    key=f"pose_id IN {empty_poses.str_ids}",
+                    multiple=True,
+                )
 
-            for pose_id, pose_mol in records:
-                df.loc[pose_id, "mol"] = Mol(pose_mol)
+                for pose_id, pose_mol in records:
+                    df.loc[pose_id, "mol"] = Mol(pose_mol)
 
-            assert not len(df[df["mol"].isna()])
+                assert not len(df[df["mol"].isna()])
 
         return df
 
