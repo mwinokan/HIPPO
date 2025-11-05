@@ -410,7 +410,7 @@ class CompoundTable:
         self[self.ids].interactive()
 
     def plot_tsnee(self, **kwargs) -> "go.Figure":
-        """Plot a tanimoto similarity plot of these compounds"""
+        """Plot a tanimoto similarity plot of these compounds. See :func:`hippo.plotting.plot_compound_tsnee`"""
         return self[:].plot_tsnee(**kwargs)
 
     def write_smiles_csv(self, file: str) -> None:

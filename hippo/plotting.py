@@ -1797,6 +1797,19 @@ def plot_compound_tsnee(
     color: str = "cluster",
     **kwargs,
 ) -> "plotly.graph_objects.Figure":
+    """Plot a compound tanimoto similarity plot with principal components determined by pattern binary fingerprint similarity.
+
+    :param compounds: compounds to plot
+    :param df: optional pre-computed DataFrame
+    :param title: plot title
+    :param subtitle: plot subtitle
+    :param legend: show the plot legend
+    :param symbol: property used to determine symbol
+    :param sort_by: property used to sort dataframe
+    :param color: property used to determine marker color
+    :returns: `plotly.graph_objects.Figure`
+
+    """
 
     from .pca import get_cfps
     from sklearn.decomposition import PCA
@@ -1877,7 +1890,6 @@ def plot_compound_tsnee(
     hover_data = [
         "id",
         "smiles",
-        # "alias",
         "inchikey",
         "PC1",
         "PC2",
@@ -1888,10 +1900,6 @@ def plot_compound_tsnee(
 
     df["scaffolds"] = df["scaffolds"].astype(str)
     df["cluster"] = df["cluster"].astype(str)
-
-    # return df
-
-    # mrich.debug(df.columns)
 
     with mrich.loading("Creating figure"):
         fig = px.scatter(
