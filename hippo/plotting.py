@@ -616,7 +616,12 @@ def plot_interaction_punchcard_by_tags(
 
 @hippo_graph
 def plot_residue_interactions(
-    animal, residue_number, poses: str | None = None, subtitle: str | None = None, chain: str | None = None, target: int = 1,
+    animal,
+    residue_number,
+    poses: str | None = None,
+    subtitle: str | None = None,
+    chain: str | None = None,
+    target: int = 1,
 ):
     """
 
@@ -1814,7 +1819,8 @@ def plot_compound_tsnee(
     if df is None:
 
         with mrich.loading("Getting Compound DataFrame"):
-            df = compounds.get_df(mol=True, scaffolds=True)
+            df = compounds.get_df(mol=True, scaffolds=True, inchikey=True, alias=True)
+            df = df.reset_index()
 
         def get_cluster(row):
 
@@ -1884,7 +1890,7 @@ def plot_compound_tsnee(
     hover_data = [
         "id",
         "smiles",
-        # "alias",
+        "alias",
         "inchikey",
         "PC1",
         "PC2",
@@ -1908,6 +1914,7 @@ def plot_compound_tsnee(
             hover_data=hover_data,
             color=color,
             symbol=symbol,
+            # custom_data="alias",
             **kwargs,
         )
 

@@ -2642,11 +2642,11 @@ class HIPPO:
 
         return plot_reaction_funnel(self, **kwargs)
 
-    def plot_pose_interactions(self, pose: "Pose") -> "plotly.graph_objects.Figure":
+    def plot_pose_interactions(self, pose: "Pose", **kwargs) -> "plotly.graph_objects.Figure":
         """3d figure showing the interactions between a :class:`.Pose` and the protein. see :func:`hippo.plotting.plot_pose_interactions`"""
         from .plotting import plot_pose_interactions
 
-        return plot_pose_interactions(self, **kwargs)
+        return plot_pose_interactions(self, pose=pose, **kwargs)
 
     def get_scaffold_network(
         self,
