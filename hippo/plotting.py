@@ -1799,7 +1799,7 @@ def plot_pose_interactions(
 
 @hippo_graph
 def plot_compound_tsnee(
-    compounds,
+    compounds: "CompoundSet | None" = None,
     df: "pd.DataFrame | None" = None,
     title: str | None = None,
     subtitle: str | None = None,
@@ -1827,7 +1827,8 @@ def plot_compound_tsnee(
     from sklearn.decomposition import PCA
     import numpy as np
 
-    mrich.var("#compounds", len(compounds))
+    if compounds:
+        mrich.var("#compounds", len(compounds))
 
     if df is None:
 
