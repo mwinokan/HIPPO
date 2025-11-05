@@ -678,6 +678,7 @@ class HIPPO:
                 "target_id",
                 "reference_id",
                 "path",
+                "exports",
             }
 
             for col in df_columns:
