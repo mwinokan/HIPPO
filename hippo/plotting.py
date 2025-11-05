@@ -1833,7 +1833,8 @@ def plot_compound_tsnee(
     if df is None:
 
         with mrich.loading("Getting Compound DataFrame"):
-            df = compounds.get_df(mol=True, scaffolds=True)
+            df = compounds.get_df(mol=True, scaffolds=True, inchikey=True, alias=True)
+            df = df.reset_index()
 
         def get_cluster(row):
 
@@ -1903,6 +1904,7 @@ def plot_compound_tsnee(
     hover_data = [
         "id",
         "smiles",
+        "alias",
         "inchikey",
         "PC1",
         "PC2",
@@ -1922,6 +1924,7 @@ def plot_compound_tsnee(
             hover_data=hover_data,
             color=color,
             symbol=symbol,
+            # custom_data="alias",
             **kwargs,
         )
 
