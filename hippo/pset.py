@@ -1696,7 +1696,10 @@ class PoseSet:
         """
         for id in self.indices:
             metadata = self.db.get_metadata(table="pose", id=id)
-            metadata.append(key, value)
+            try:
+                metadata.append(key, value)
+            except AttributeError:
+                mrich.error(f"Could not append to metadata {key=}. Not a list?")
 
     def set_subsites_from_metadata_field(self, field="CanonSites alias") -> None:
         """Create and assign subsite entries from a metadata field
