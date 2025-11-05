@@ -616,7 +616,12 @@ def plot_interaction_punchcard_by_tags(
 
 @hippo_graph
 def plot_residue_interactions(
-    animal, residue_number, poses: str | None = None, subtitle: str | None = None, chain: str | None = None, target: int = 1,
+    animal,
+    residue_number,
+    poses: str | None = None,
+    subtitle: str | None = None,
+    chain: str | None = None,
+    target: int = 1,
 ):
     """
 
