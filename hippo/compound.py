@@ -768,7 +768,7 @@ class Compound:
             max_lead_time=max_lead_time,
         )
 
-    def draw(self, align_substructure: bool = False) -> None:
+    def draw(self, scaffolds: bool = True, align_substructure: bool = False) -> None:
         """Display this compound (and its scaffold if it has one)
 
         .. attention::
@@ -778,30 +778,32 @@ class Compound:
         :param align_substructure: Align the two drawing by their common substructure, defaults to ``False``
         """
 
-        if scaffolds := self.scaffolds:
+        if scaffolds:
 
-            from molparse.rdkit import draw_mcs
+            if scaffolds := self.scaffolds:
 
-            data = {}
-            for scaffold in scaffolds:
-                data[scaffold.smiles] = f"{scaffold} (scaffold)"
-            data[self.smiles] = str(self)
+                from molparse.rdkit import draw_mcs
 
-            if len(data) > 1:
+                data = {}
+                for scaffold in scaffolds:
+                    data[scaffold.smiles] = f"{scaffold} (scaffold)"
+                data[self.smiles] = str(self)
 
-                drawing = draw_mcs(
-                    data,
-                    align_substructure=align_substructure,
-                    show_mcs=False,
-                    highlight=False,
-                )
-                display(drawing)
+                if len(data) > 1:
 
-            else:
-                mrich.error(
-                    f"Problem drawing {scaffold.id=} vs {self.id=}, self referential?"
-                )
-                display(self.mol)
+                    drawing = draw_mcs(
+                        data,
+                        align_substructure=align_substructure,
+                        show_mcs=False,
+                        highlight=False,
+                    )
+                    display(drawing)
+
+                else:
+                    mrich.error(
+                        f"Problem drawing {scaffold.id=} vs {self.id=}, self referential?"
+                    )
+                    display(self.mol)
 
         else:
             display(self.mol)
