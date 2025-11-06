@@ -460,6 +460,7 @@ class HIPPO:
         target: str,
         path: str | Path,
         reference: int | Pose | None = None,
+        inspirations: list[int] | PoseSet | None = None,
         compound_tags: None | list[str] = None,
         pose_tags: None | list[str] = None,
         mol_col: str = "ROMol",
@@ -483,6 +484,7 @@ class HIPPO:
         :param pose_tags: List of string Tags to assign to all created poses, defaults to ``None``
         :param mol_col: Name of the column containing the ``rdkit.ROMol`` ligands, defaults to ``"ROMol"``
         :param name_col: Name of the column containing the ligand name/alias, defaults to ``"ID"``
+        :param inspirations: Optional single set of inspirations :class:`.PoseSet` object or list of IDs to assign as inspirations to all inserted poses, defaults to ``None``
         :param inspiration_col: Name of the column containing the list of inspiration :class:`.Pose` names or ID's, defaults to ``"ref_mols"``
         :param inspiration_map: Optional dictionary or callable mapping between inspiration strings found in ``inspiration_col`` and :class:`.Pose` ids
         :param energy_score_col: Name of the column containing the list of energy scores ``"energy_score"``
@@ -526,7 +528,7 @@ class HIPPO:
         if name_col:
             assert name_col in df_columns, f"{name_col=} not in {df_columns}"
 
-        if inspiration_col:
+        if inspiration_col and not inspirations:
             assert (
                 inspiration_col in df_columns
             ), f"{inspiration_col=} not in {df_columns}"
@@ -611,7 +613,7 @@ class HIPPO:
 
             # inspirations
 
-            inspirations = []
+            inspiration_list = []
 
             if inspiration_col:
 
@@ -643,16 +645,21 @@ class HIPPO:
                         ):
                             pose_id = inspiration_map[insp]
                             if pose_id:
-                                inspirations.append(pose_id)
+                                inspiration_list.append(pose_id)
                         elif hasattr(inspiration_map, "__call__"):
                             pose_id = inspiration_map(insp)
                             if pose_id:
-                                inspirations.append(pose_id)
+                                inspiration_list.append(pose_id)
                         else:
                             mrich.error(
                                 f"Could not find inspiration pose with alias={insp}"
                             )
                             continue
+
+            elif isinstance(inspirations, PoseSet):
+                inspiration_list = list(inspirations.ids)
+            elif isinstance(inspirations, list):
+                inspiration_list = [int(i) for i in inspirations]
 
             if not reference:
                 ref_str = row.get(reference_col)
@@ -663,6 +670,9 @@ class HIPPO:
                         reference = inspiration_map[ref_str]
                 else:
                     reference = None
+
+            elif isinstance(reference, Pose):
+                reference = reference.id
 
             # metadata
             metadata = {}
@@ -678,6 +688,7 @@ class HIPPO:
                 "target_id",
                 "reference_id",
                 "path",
+                "exports",
             }
 
             for col in df_columns:
@@ -2642,7 +2653,9 @@ class HIPPO:
 
         return plot_reaction_funnel(self, **kwargs)
 
-    def plot_pose_interactions(self, pose: "Pose", **kwargs) -> "plotly.graph_objects.Figure":
+    def plot_pose_interactions(
+        self, pose: "Pose", **kwargs
+    ) -> "plotly.graph_objects.Figure":
         """3d figure showing the interactions between a :class:`.Pose` and the protein. see :func:`hippo.plotting.plot_pose_interactions`"""
         from .plotting import plot_pose_interactions
 
