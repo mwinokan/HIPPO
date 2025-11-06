@@ -615,9 +615,15 @@ class HIPPO:
 
             inspiration_list = []
 
-            if inspiration_col:
+            if isinstance(inspirations, PoseSet):
+                inspiration_list = list(inspirations.ids)
 
-                insp_str = row[inspiration_col]
+            elif inspirations or inspiration_col:
+
+                if inspirations:
+                    insp_str = inspirations
+                else:
+                    insp_str = row[inspiration_col]
 
                 if isinstance(insp_str, str):
                     insp_str = insp_str.removeprefix("[")
@@ -655,11 +661,6 @@ class HIPPO:
                                 f"Could not find inspiration pose with alias={insp}"
                             )
                             continue
-
-            elif isinstance(inspirations, PoseSet):
-                inspiration_list = list(inspirations.ids)
-            elif isinstance(inspirations, list):
-                inspiration_list = [int(i) for i in inspirations]
 
             if not reference:
                 ref_str = row.get(reference_col)
@@ -722,7 +723,7 @@ class HIPPO:
                     target_id=target.id,
                     path=pose_path,
                     metadata=metadata,
-                    inspiration_ids=inspirations,
+                    inspiration_ids=inspiration_list,
                     reference_id=reference,
                     mol=mol,
                     inchikey=inchikey,
