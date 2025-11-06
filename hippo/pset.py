@@ -1446,29 +1446,56 @@ class PoseSet:
 
         df = df.set_index("id")
 
+        ### Fill missing smiles entries
+
+        if (smiles or inchikey) and (
+            df["smiles"].isna().any() or df["inchikey"].isna().any()
+        ):
+
+            mrich.error("None in smiles/inchikey column")
+
+            empty = df[df["smiles"].isna()]
+            empty_poses = PoseSet(self.db, set(empty.index))
+
+            for pose in mrich.track(empty_poses, prefix="generating smiles/inchikeys"):
+                pose.smiles
+
+            records = self.db.select_where(
+                table="pose",
+                query="pose_id, pose_smiles, pose_inchikey",
+                key=f"pose_id IN {empty_poses.str_ids}",
+                multiple=True,
+            )
+
+            for pose_id, pose_smiles, pose_inchikey in records:
+                df.loc[pose_id, "smiles"] = pose_smiles
+                df.loc[pose_id, "inchikey"] = pose_inchikey
+
+            assert not df["smiles"].isna().any()
+            assert not df["inchikey"].isna().any()
+
         ### Fill missing molecule entries
 
-        if mol:
+        if mol and df["mol"].isna().any():
             empty = df[df["mol"].isna()]
 
-            if len(empty):
-                mrich.warning(len(empty), "rows have empty 'mol'")
-                empty_poses = PoseSet(self.db, set(empty.index))
+            mrich.warning(len(empty), "rows have empty 'mol'")
+            empty_poses = PoseSet(self.db, set(empty.index))
 
-                for pose in mrich.track(empty_poses, prefix="generating Mols"):
-                    pose.mol
+            for pose in mrich.track(empty_poses, prefix="generating Mols"):
+                pose.mol
 
-                records = self.db.select_where(
-                    table="pose",
-                    query="pose_id, pose_mol",
-                    key=f"pose_id IN {empty_poses.str_ids}",
-                    multiple=True,
-                )
+            records = self.db.select_where(
+                table="pose",
+                query="pose_id, pose_mol",
+                key=f"pose_id IN {empty_poses.str_ids}",
+                multiple=True,
+            )
 
-                for pose_id, pose_mol in records:
-                    df.loc[pose_id, "mol"] = Mol(pose_mol)
+            for pose_id, pose_mol in records:
+                df.loc[pose_id, "mol"] = Mol(pose_mol)
 
-                assert not len(df[df["mol"].isna()])
+            assert not len(df[df["mol"].isna()])
 
         return df
 
