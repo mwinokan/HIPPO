@@ -1836,7 +1836,7 @@ def plot_compound_tsnee(
         with mrich.loading("Getting Compound DataFrame"):
             df = compounds.get_df(mol=True, scaffolds=True, inchikey=True, alias=True)
             df = df.reset_index()
-    
+
         df["scaffolds"] = df["scaffolds"].map(
             lambda x: x if not isinstance(x, float) else None
         )
