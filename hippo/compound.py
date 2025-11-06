@@ -784,7 +784,7 @@ class Compound:
 
             data = {}
             for scaffold in scaffolds:
-                data[base.smiles] = f"{scaffold} (scaffold)"
+                data[scaffold.smiles] = f"{scaffold} (scaffold)"
             data[self.smiles] = str(self)
 
             if len(data) > 1:
@@ -793,7 +793,7 @@ class Compound:
                     data,
                     align_substructure=align_substructure,
                     show_mcs=False,
-                    highlight_common=False,
+                    highlight=False,
                 )
                 display(drawing)
 
