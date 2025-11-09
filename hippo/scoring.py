@@ -45,7 +45,9 @@ class Scorer:
 
         self._db = db
 
-        if isinstance(allowed_poses, PoseSet):
+        if allowed_poses is None:
+            self._allowed_pose_ids = None
+        elif isinstance(allowed_poses, PoseSet):
             self._allowed_pose_ids = set(allowed_poses.ids)
         else:
             self._allowed_pose_ids = set(allowed_poses)
@@ -193,7 +195,7 @@ class Scorer:
 
         self._flag_weight_modification()
 
-        if isinstance(ws, float):
+        if isinstance(ws, float) or isinstance(ws, int):
             ws = [ws] * self.num_attributes
 
         ws = [w for w in ws]
@@ -237,6 +239,14 @@ class Scorer:
         from pathlib import Path
 
         return Path(self.db.path.name.replace(".sqlite", "_scorer.json"))
+
+    @property
+    def poses(self) -> "PoseSet":
+        """Return all associated poses"""
+        from .pset import PoseSet
+
+        ids = set().union(*self._data["pose_ids"])
+        return PoseSet(self.db, ids)
 
     ### METHODS
 
@@ -323,19 +333,42 @@ class Scorer:
                 print_data.append(
                     dict(
                         key=attribute.key,
-                        weight=attribute.weight,
-                        value=attribute.get_value(recipe),
-                        unweighted=attribute.unweighted(recipe),
-                        weighted=attribute(recipe),
+                        weight=f"{attribute.weight:.2f}",
+                        value=f"{attribute.get_value(recipe):.2f}",
+                        unweighted=f"{attribute.unweighted(recipe):.2%}",
+                        weighted=f"{attribute(recipe):.2%}",
                     )
                 )
 
-            print(pd.DataFrame(print_data))
+            df = pd.DataFrame(print_data).set_index("key")
+            mrich.print(df)
             mrich.var("score", score)
 
         recipe._score = score
 
         return score
+
+    def compare(self, recipes: list[Recipe] | list[str]):
+        """Compare attribute values and scores for recipes"""
+
+        recipes = [
+            self.recipes[recipe] if isinstance(recipe, str) else recipe
+            for recipe in recipes
+        ]
+
+        print_data = []
+
+        for attribute in self.attributes:
+            d = {"attribute (weight)": f"{attribute.key} ({attribute.weight:.2%})"}
+            for recipe in recipes:
+                # d = dict(hash=recipe.hash)
+                d[recipe.hash] = (
+                    f"{attribute.get_value(recipe):.2f} ({attribute.unweighted(recipe):.2%})"
+                )
+            print_data.append(d)
+
+        df = pd.DataFrame(print_data).set_index("attribute (weight)")
+        mrich.print(df)
 
     def get_df(
         self,
