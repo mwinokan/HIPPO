@@ -1586,7 +1586,7 @@ class Recipe:
         ### Downstream info
 
         df["downstream_product_ids"] = df["compound_id"].apply(
-            lambda x: product_lookup[x]
+            lambda x: product_lookup.get(x, set())
         )
 
         df["downstream_reaction_ids"] = df["compound_id"].apply(
