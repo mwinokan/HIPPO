@@ -419,6 +419,9 @@ class InteractionSet:
 
         from hirsch import hirsch
 
+        if not counts:
+            return 0
+
         return hirsch(counts)
 
     ### METHODS
