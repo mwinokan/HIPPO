@@ -314,7 +314,7 @@ class HIPPO:
         n_poses = self.num_poses
 
         for path in mrich.track(
-            list(aligned_directory.iterdir()), prefix="Adding hits..."
+            list(sorted(aligned_directory.iterdir())), prefix="Adding hits..."
         ):
 
             if not path.is_dir():
