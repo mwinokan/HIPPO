@@ -348,7 +348,7 @@ class Scorer:
 
         return score
 
-    def compare(self, recipes: list[Recipe] | list[str]):
+    def compare(self, recipes: "list[Recipe] | list[str]"):
         """Compare attribute values and scores for recipes"""
 
         recipes = [
