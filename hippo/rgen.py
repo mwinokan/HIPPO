@@ -466,12 +466,12 @@ class RandomSelectionGenerator(RRGMixin):
         mrich.var("starting recipe", self.starting_recipe)
 
         # JSON I/O set up
-        self._data_path = Path(str(self.db_path.name).replace(".sqlite", "_rgen.json"))
+        self._data_path = Path(str(self.db_path.name).replace(".sqlite", "_sgen.json"))
         if self.data_path.exists():
             mrich.warning(f"Will overwrite existing rgen data file: {self.data_path}")
 
         # Recipe I/O set up
-        path = Path(str(self.db_path.name).replace(".sqlite", "_recipes"))
+        path = Path(str(self.db_path.name).replace(".sqlite", "_selections"))
         mrich.writing(f"{path}/")
         path.mkdir(exist_ok=True)
         self._recipe_dir = path
