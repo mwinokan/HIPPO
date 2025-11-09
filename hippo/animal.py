@@ -2522,7 +2522,11 @@ class HIPPO:
         self.db.commit()
 
         quoted_compounds = self.compounds[quoted_compound_ids]
-        unquoted_compounds = compounds - quoted_compounds
+
+        if compounds:
+            unquoted_compounds = compounds - quoted_compounds
+        else:
+            unquoted_compounds = self.compounds[:] - quoted_compounds
 
         mrich.var("#new quotes", self.db.count("quote") - quote_count)
         mrich.var("#quoted_compounds", len(quoted_compounds))
