@@ -14,6 +14,7 @@ API Reference
    reactions
    quoting
    recipes
+   sampling
    metadata
    plotting
    fragalysis
