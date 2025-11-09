@@ -240,3 +240,9 @@ class Price:
             self.currency == other.currency
         ), f"Comparing different currencies: {self.currency} != {other.currency}"
         return self.amount > other.amount
+
+    def __hash__(self) -> int:
+        """Allow for Prices to be hashed for comparison"""
+        if self.is_null:
+            return hash("NULL")
+        return hash(f"{self.currency} {self.amount}")
