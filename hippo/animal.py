@@ -10,7 +10,6 @@ from .compound import Compound
 from .reaction import Reaction
 from .target import Target
 from .pose import Pose
-from .pycule import Quoter
 
 from .db import Database
 from pathlib import Path
