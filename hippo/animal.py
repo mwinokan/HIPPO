@@ -85,7 +85,7 @@ class HIPPO:
         self._reactants = None
         self._products = None
         self._intermediates = None
-        self._bases = None
+        self._scaffolds = None
         self._elabs = None
 
         mrich.success("Initialised animal", f"[var_name]{self}")
@@ -227,23 +227,26 @@ class HIPPO:
         return self._elabs["set"]
 
     @property
-    def bases(self) -> CompoundSet:
+    def scaffolds(self) -> CompoundSet:
         """Returns compounds that are the basis for one or more elaborations"""
-        if self._bases is None or self._bases["total_changes"] != self.db.total_changes:
-            self._bases = dict(
-                set=self.compounds.bases, total_changes=self.db.total_changes
+        if (
+            self._scaffolds is None
+            or self._scaffolds["total_changes"] != self.db.total_changes
+        ):
+            self._scaffolds = dict(
+                set=self.compounds.scaffolds, total_changes=self.db.total_changes
             )
-        return self._bases["set"]
+        return self._scaffolds["set"]
 
     @property
     def num_elabs(self) -> int:
-        """Number of compounds that are an elaboration of an existing base"""
+        """Number of compounds that are an elaboration of an existing scaffold"""
         return len(self.elabs)
 
     @property
-    def num_bases(self) -> int:
+    def num_scaffolds(self) -> int:
         """Number of compounds that are the basis for elaborations"""
-        return len(self.bases)
+        return len(self.scaffolds)
 
     ### BULK INSERTION
 
@@ -457,6 +460,7 @@ class HIPPO:
         target: str,
         path: str | Path,
         reference: int | Pose | None = None,
+        inspirations: list[int] | PoseSet | None = None,
         compound_tags: None | list[str] = None,
         pose_tags: None | list[str] = None,
         mol_col: str = "ROMol",
@@ -480,6 +484,7 @@ class HIPPO:
         :param pose_tags: List of string Tags to assign to all created poses, defaults to ``None``
         :param mol_col: Name of the column containing the ``rdkit.ROMol`` ligands, defaults to ``"ROMol"``
         :param name_col: Name of the column containing the ligand name/alias, defaults to ``"ID"``
+        :param inspirations: Optional single set of inspirations :class:`.PoseSet` object or list of IDs to assign as inspirations to all inserted poses, defaults to ``None``
         :param inspiration_col: Name of the column containing the list of inspiration :class:`.Pose` names or ID's, defaults to ``"ref_mols"``
         :param inspiration_map: Optional dictionary or callable mapping between inspiration strings found in ``inspiration_col`` and :class:`.Pose` ids
         :param energy_score_col: Name of the column containing the list of energy scores ``"energy_score"``
@@ -523,7 +528,7 @@ class HIPPO:
         if name_col:
             assert name_col in df_columns, f"{name_col=} not in {df_columns}"
 
-        if inspiration_col:
+        if inspiration_col and not inspirations:
             assert (
                 inspiration_col in df_columns
             ), f"{inspiration_col=} not in {df_columns}"
@@ -608,11 +613,17 @@ class HIPPO:
 
             # inspirations
 
-            inspirations = []
+            inspiration_list = []
 
-            if inspiration_col:
+            if isinstance(inspirations, PoseSet):
+                inspiration_list = list(inspirations.ids)
 
-                insp_str = row[inspiration_col]
+            elif inspirations or inspiration_col:
+
+                if inspirations:
+                    insp_str = inspirations
+                else:
+                    insp_str = row[inspiration_col]
 
                 if isinstance(insp_str, str):
                     insp_str = insp_str.removeprefix("[")
@@ -640,11 +651,11 @@ class HIPPO:
                         ):
                             pose_id = inspiration_map[insp]
                             if pose_id:
-                                inspirations.append(pose_id)
+                                inspiration_list.append(pose_id)
                         elif hasattr(inspiration_map, "__call__"):
                             pose_id = inspiration_map(insp)
                             if pose_id:
-                                inspirations.append(pose_id)
+                                inspiration_list.append(pose_id)
                         else:
                             mrich.error(
                                 f"Could not find inspiration pose with alias={insp}"
@@ -661,6 +672,9 @@ class HIPPO:
                 else:
                     reference = None
 
+            elif isinstance(reference, Pose):
+                reference = reference.id
+
             # metadata
             metadata = {}
             skip = {
@@ -675,6 +689,7 @@ class HIPPO:
                 "target_id",
                 "reference_id",
                 "path",
+                "exports",
             }
 
             for col in df_columns:
@@ -708,7 +723,7 @@ class HIPPO:
                     target_id=target.id,
                     path=pose_path,
                     metadata=metadata,
-                    inspiration_ids=inspirations,
+                    inspiration_ids=inspiration_list,
                     reference_id=reference,
                     mol=mol,
                     inchikey=inchikey,
@@ -826,9 +841,10 @@ class HIPPO:
         max_energy_score: float | None = 0.0,
         max_distance_score: float | None = 2.0,
         require_intra_geometry_pass: bool = True,
-        reject_flags: list[str] | None = ["one_of_multiple_products"],
+        reject_flags: list[str] | None = None,
         register_reactions: bool = True,
         dry_run: bool = False,
+        scaffold_route: "Route | None" = None,
     ) -> "pd.DataFrame":
         """
         Load Syndirella elaboration compounds and poses from a pickled DataFrame
@@ -837,12 +853,15 @@ class HIPPO:
         :param max_energy_score: Filter out poses with `∆∆G` above this value
         :param max_distance_score: Filter out poses with `comRMSD` above this value
         :param require_intra_geometry_pass: Filter out poses with falsy `intra_geometry_pass` values
-        :param reject_flags: Filter out rows flagged with strings from this list
+        :param reject_flags: Filter out rows flagged with strings from this list (default = ["one_of_multiple_products", "selectivity_issue_contains_reaction_atoms_of_both_reactants"])
         :param dry_run: Don't insert new records into the database (for debugging/testing)
         :returns: annotated DataFrame
         """
 
-        reject_flags = reject_flags or []
+        reject_flags = reject_flags or [
+            "one_of_multiple_products",
+            "selectivity_issue_contains_reaction_atoms_of_both_reactants",
+        ]
 
         from .syndirella import reactions_from_row
 
@@ -939,6 +958,40 @@ class HIPPO:
         mrich.var("#scaffold entries", len(scaffold_df))
         mrich.var("#elab entries", len(elab_df))
 
+        if not len(scaffold_df) and not scaffold_route:
+            mrich.error("No valid scaffold rows")
+            return None
+
+        elif scaffold_route:
+
+            ### MAKE THE SCAFFOLD ROWS
+
+            assert scaffold_route.num_reactions == 1
+
+            product = scaffold_route.products[0].compound
+            reaction = scaffold_route.reactions[0]
+
+            assert len(reaction.reactants) == 2
+
+            scaffold_dict = {
+                "scaffold_smiles": product.smiles,
+                "1_reaction": reaction.type,
+                "1_r1_smiles": reaction.reactants[0].smiles,
+                "1_r2_smiles": reaction.reactants[1].smiles,
+                "1_product_smiles": product.smiles,
+                "1_product_name": "scaffold",
+                "1_single_reactant_elab": False,
+                "1_num_atom_diff": 0,
+                "is_scaffold": True,
+            }
+
+            scaffold_df = pd.DataFrame([scaffold_dict])
+
+            df = pd.concat([scaffold_df, df])
+
+            scaffold_df = df[df["is_scaffold"]]
+            elab_df = df[~df["is_scaffold"]]
+
         if dry_run:
             mrich.error("Not registering records (dry_run)")
             return df
@@ -953,7 +1006,7 @@ class HIPPO:
 
         for smiles_col in smiles_cols:
 
-            mrich.bold(f"Registering compounds from column: {smiles_col}")
+            mrich.debug(f"Registering compounds from column: {smiles_col}")
 
             inchikey_col = smiles_col.replace("_smiles", "_inchikey")
             compound_id_col = smiles_col.replace("_smiles", "_compound_id")
@@ -969,9 +1022,9 @@ class HIPPO:
 
             # get associated IDs
             compound_inchikey_id_dict = self.db.get_compound_inchikey_id_dict(inchikeys)
-            df[compound_id_col] = [
-                compound_inchikey_id_dict[inchikey] for inchikey in inchikeys
-            ]
+            df[compound_id_col] = df[inchikey_col].apply(
+                lambda x: compound_inchikey_id_dict[x]
+            )
 
         # bulk register reactions
 
@@ -979,6 +1032,8 @@ class HIPPO:
             for step in range(num_steps):
 
                 step += 1
+
+                mrich.debug(f"Registering reactions for step {step}")
 
                 reactant_id_sets = []
                 for r1_id, r2_id in df[
@@ -998,6 +1053,10 @@ class HIPPO:
                     assert id_set
                     reactant_id_sets.append(id_set)
 
+                if any(len(ids) != len(id_set) for ids in reactant_id_sets):
+                    mrich.error("Non-uniform number of reactants in dataset")
+                    return df
+
                 reaction_ids = self.register_reactions(
                     types=df[f"{step}_reaction"],
                     product_ids=df[f"{step}_product_compound_id"],
@@ -1010,13 +1069,22 @@ class HIPPO:
         # bulk register scaffold relationships
 
         for step in range(num_steps):
+
             step += 1
+
+            mrich.debug(f"Registering scaffold relatonships for step {step}")
+
             for role in ["r1", "r2", "product"]:
 
                 key = f"{step}_{role}_compound_id"
 
                 scaffold_ids = set(scaffold_df[key].to_list())
-                assert len(scaffold_ids) == 1, f"{key} {scaffold_ids}"
+                if len(scaffold_ids) != 1:
+                    mrich.error(
+                        f"Wrong number of scaffold IDs for {key}: {scaffold_ids}"
+                    )
+                    return scaffold_df
+
                 (scaffold_id,) = scaffold_ids
 
                 superstructure_ids = set(elab_df[key].to_list())
@@ -1063,6 +1131,10 @@ class HIPPO:
 
         mrich.var("#acceptable poses", len(ok))
 
+        if not len(ok):
+            mrich.warning("No valid poses")
+            return None
+
         # bulk register poses
 
         payload = []
@@ -1085,6 +1157,12 @@ class HIPPO:
             )
 
             payload.append(pose_tuple)
+
+        if not payload:
+            mrich.warning("No valid poses")
+            return None
+
+        mrich.debug(f"Registering {len(payload)} poses...")
 
         sql = """
         INSERT OR IGNORE INTO pose(
@@ -1272,6 +1350,8 @@ class HIPPO:
         orig_name_is_hippo_id: bool = False,
         allow_no_catalogue_col: bool = False,
         delete_unavailable: bool = True,
+        overwrite_existing_quotes: bool = False,
+        supplier_name: str = "Enamine",
     ):
         """
         Load an Enamine quote provided as an excel file
@@ -1285,6 +1365,8 @@ class HIPPO:
         :param fixed_lead_time: Optionally use a fixed lead time for all quotes (in days)
         :param stop_after: Stop after given number of rows, defaults to ``None``
         :param orig_name_is_hippo_id: Set to ``True`` if ``orig_name_col`` is the original HIPPO :class:``hippo.compound.Compound`` ID, defaults to ``False``
+        :param delete_unavailable: Delete existing Enamine database quotes for compounds that are unavailable in the quote being loaded
+        :param overwrite_existing_quotes: Delete existing Enamine database quotes for compounds that are available in the quote being loaded
         :returns: An :class:`.IngredientSet` of the quoted molecules
         """
 
@@ -1340,7 +1422,9 @@ class HIPPO:
         ingredients = IngredientSet(self.db)
 
         if len(df) > 100:
-            generator = mrich.track(df.iterrows(), prefix="Loading quotes...")
+            generator = mrich.track(
+                df.iterrows(), prefix="Loading quotes...", total=len(df)
+            )
         else:
             generator = df.iterrows()
 
@@ -1374,11 +1458,11 @@ class HIPPO:
 
                 if delete_unavailable:
 
-                    mrich.warning("Deleting Enamine quotes for", compound)
+                    mrich.warning(f"Deleting '{supplier_name}' quotes for", compound)
 
                     self.db.delete_where(
                         table="quote",
-                        key=f"quote_supplier = 'Enamine' AND quote_compound = {compound.id}",
+                        key=f"quote_supplier = '{supplier_name}' AND quote_compound = {compound.id}",
                     )
 
                 continue
@@ -1406,9 +1490,15 @@ class HIPPO:
             else:
                 lead_time = fixed_lead_time
 
+            if overwrite_existing_quotes:
+                self.db.delete_where(
+                    table="quote",
+                    key=f"quote_supplier = '{supplier_name}' AND quote_compound = {compound.id}",
+                )
+
             quote_data = dict(
                 compound=compound,
-                supplier="Enamine",
+                supplier=supplier_name,
                 catalogue=catalogue,
                 entry=row[entry_col],
                 amount=amount,
@@ -1658,14 +1748,14 @@ class HIPPO:
         self,
         *,
         smiles: str,
-        bases: list[Compound] | list[int] | None = None,
+        scaffolds: list[Compound] | list[int] | None = None,
         tags: None | list = None,
         metadata: None | dict = None,
         return_compound: bool = True,
         commit: bool = True,
         alias: str | None = None,
         return_duplicate: bool = False,
-        register_base_if_duplicate: bool = True,
+        register_scaffold_if_duplicate: bool = True,
         radical: str = "warning",
         debug: bool = False,
     ) -> Compound:
@@ -1679,7 +1769,7 @@ class HIPPO:
         :param commit: Commit the changes to the :class:`.Database`, defaults to ``True``
         :param alias: The string alias of this compound, defaults to ``None``
         :param return_duplicate: If ``True`` returns a boolean indicating if this compound previously existed, defaults to ``False``
-        :param register_base_if_duplicate: If this compound exists in the :class:`.Database` modify it's ``base`` property, defaults to ``True``
+        :param register_scaffold_if_duplicate: If this compound exists in the :class:`.Database` modify it's ``base`` property, defaults to ``True``
         :param radical: Define the behaviour for dealing with radical atoms in the SMILES. See :class:`.sanitise_smiles`. Defaults to ``'warning'``
         :param debug: Increase verbosity of output, defaults to ``False``
         :returns: The registered/existing :class:`.Compound` object or its ID (depending on ``return_compound``), and optionally a boolean to indicate duplication see ``return_duplicate``
@@ -1700,8 +1790,8 @@ class HIPPO:
             mrich.error(f"Could not sanitise {smiles=}")
             return None
 
-        if bases:
-            bases = [b.id if isinstance(b, Compound) else b for b in bases]
+        if scaffolds:
+            scaffolds = [b.id if isinstance(b, Compound) else b for b in scaffolds]
 
         inchikey = inchikey_from_smiles(smiles)
 
@@ -1741,11 +1831,11 @@ class HIPPO:
                     f"SMILES changed during compound registration: {smiles} --> {db_smiles}"
                 )
 
-        def insert_bases(bases, compound_id):
-            bases = [b for b in bases if b is not None] or []
-            for base in bases:
+        def insert_scaffolds(scaffolds, compound_id):
+            scaffolds = [b for b in scaffolds if b is not None] or []
+            for scaffold in scaffolds:
                 self.db.insert_scaffold(
-                    base=base,
+                    scaffold=scaffold,
                     superstructure=compound_id,
                     warn_duplicate=False,
                     commit=False,
@@ -1770,8 +1860,8 @@ class HIPPO:
                 for tag in tags:
                     compound.tags.add(tag, commit=False)
 
-            if bases and not (not register_base_if_duplicate and duplicate):
-                insert_bases(bases, compound.id)
+            if scaffolds and not (not register_scaffold_if_duplicate and duplicate):
+                insert_scaffolds(scaffolds, compound.id)
 
             return _return(compound, duplicate, return_compound, return_duplicate)
 
@@ -1784,8 +1874,8 @@ class HIPPO:
 
                 check_smiles(compound_id, smiles)
 
-            if bases and not (not register_base_if_duplicate and duplicate):
-                insert_bases(bases, compound_id)
+            if scaffolds and not (not register_scaffold_if_duplicate and duplicate):
+                insert_scaffolds(scaffolds, compound_id)
 
             return _return(compound_id, duplicate, return_compound, return_duplicate)
 
@@ -1981,8 +2071,11 @@ class HIPPO:
         RETURNING reaction_id
         """
 
-        records = self.db.executemany(sql, list(non_duplicates.keys()))
+        payload = list(non_duplicates.keys())
+
+        records = self.db.executemany(sql, payload)
         reaction_ids = [r_id for r_id, in records]
+        self.db.commit()
 
         # insert reactant records
         sql = """
@@ -2350,6 +2443,7 @@ class HIPPO:
         self,
         ref_animal: "HIPPO",
         compounds: CompoundSet | None = None,
+        *,
         debug: bool = False,
     ) -> "CompoundSet,CompoundSet":
         """Transfer quotes from another reference :class:`.HIPPO` animal object (e.g. the one from https://github.com/mwinokan/EnamineCatalogs)
@@ -2428,7 +2522,11 @@ class HIPPO:
         self.db.commit()
 
         quoted_compounds = self.compounds[quoted_compound_ids]
-        unquoted_compounds = compounds - quoted_compounds
+
+        if compounds:
+            unquoted_compounds = compounds - quoted_compounds
+        else:
+            unquoted_compounds = self.compounds[:] - quoted_compounds
 
         mrich.var("#new quotes", self.db.count("quote") - quote_count)
         mrich.var("#quoted_compounds", len(quoted_compounds))
@@ -2441,6 +2539,8 @@ class HIPPO:
         ref_animal: "HIPPO",
         *,
         unquoted_only: bool = False,
+        supplier: str = "any",
+        debug: bool = False,
     ) -> None:
         """Get batch quotes for all reactants in the database
 
@@ -2449,11 +2549,13 @@ class HIPPO:
         """
 
         if unquoted_only:
-            compounds = self.reactants.get_unquoted(supplier=quoter.supplier)
+            compounds = self.reactants.get_unquoted(supplier=supplier)
         else:
             compounds = self.reactants
 
-        self.quote_compounds(quoter=quoter, compounds=compounds)
+        mrich.var("#compounds", len(compounds))
+
+        self.quote_compounds(ref_animal=ref_animal, compounds=compounds, debug=debug)
 
     def quote_intermediates(
         self,
@@ -2510,7 +2612,7 @@ class HIPPO:
         return plot_interaction_punchcard_by_tags(self, tags=tags, **kwargs)
 
     def plot_residue_interactions(
-        self, poses, residue_number, **kwargs
+        self, residue_number: int, poses: str | None = None, **kwargs
     ) -> "plotly.graph_objects.Figure":
         """Plot an interaction punchcard for a set of poses, see :func:`hippo.plotting.plot_residue_interactions`"""
         from .plotting import plot_residue_interactions
@@ -2556,11 +2658,13 @@ class HIPPO:
 
         return plot_reaction_funnel(self, **kwargs)
 
-    def plot_pose_interactions(self, pose: "Pose") -> "plotly.graph_objects.Figure":
+    def plot_pose_interactions(
+        self, pose: "Pose", **kwargs
+    ) -> "plotly.graph_objects.Figure":
         """3d figure showing the interactions between a :class:`.Pose` and the protein. see :func:`hippo.plotting.plot_pose_interactions`"""
         from .plotting import plot_pose_interactions
 
-        return plot_pose_interactions(self, **kwargs)
+        return plot_pose_interactions(self, pose=pose, **kwargs)
 
     def get_scaffold_network(
         self,

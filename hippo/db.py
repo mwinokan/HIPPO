@@ -91,7 +91,7 @@ class Database:
                 mrich.warning("This is a legacy format database (hippo-db < 0.3.25)")
                 mrich.warning("Migrating compound_base values to scaffold table...")
                 self.create_table_scaffold()
-                self.migrate_legacy_bases()
+                self.migrate_legacy_scaffolds()
 
         if "route" not in self.table_names:
             self.create_table_route()
@@ -259,39 +259,33 @@ class Database:
 
     def execute(
         self, sql, payload=None, *, retry: float | None = 1, debug: bool = False
-    ) -> None:
-        """Execute arbitrary SQL
-
-        :param sql: SQL query
-        :param retry: If truthy, keep trying to execute every `retry` seconds if the Database is locked
-        :param payload: Payload for insertion, etc. (Default value = None)
-
-        """
-
+    ):
+        """Execute arbitrary SQL with retry if database is locked."""
         if debug:
             mrich.debug(sql)
 
-        try:
-            if payload:
-                return self.cursor.execute(sql, payload)
-            else:
-                return self.cursor.execute(sql)
-        except sqlite3.OperationalError as e:
-            if "database is locked" in str(e) and retry:
-                with mrich.clock(
-                    f"SQLite Database is locked, waiting {retry} second(s)..."
-                ):
-                    time.sleep(retry)
-                mrich.print("[debug]SQLite Database was locked, retrying...")
-                return self.execute(sql=sql, payload=payload, retry=retry)
-            if "syntax error" in str(e):
-                mrich.error(sql)
-                mrich.error(payload)
+        while True:
+            try:
+                if payload:
+                    return self.cursor.execute(sql, payload)
+                else:
+                    return self.cursor.execute(sql)
+            except sqlite3.OperationalError as e:
+                if "database is locked" in str(e) and retry:
+                    with mrich.clock(
+                        f"SQLite Database is locked, waiting {retry} second(s)..."
+                    ):
+                        time.sleep(retry)
+                    mrich.print("[debug]SQLite Database was locked, retrying...")
+                    continue  # retry without recursion
+                elif "syntax error" in str(e):
+                    mrich.error(sql)
+                    mrich.error(payload)
+                    raise
+                else:
+                    raise
+            except Exception as e:
                 raise
-            else:
-                raise
-        except Exception as e:
-            raise
 
     def executemany(self, sql, payload, *, retry: float | None = 1) -> None:
         """Execute arbitrary SQL
@@ -974,14 +968,14 @@ class Database:
     def insert_scaffold(
         self,
         *,
-        base: Compound | int,
+        scaffold: Compound | int,
         superstructure: Compound | int,
         warn_duplicate: bool = True,
         commit: bool = True,
     ) -> int:
         """Insert an entry into the scaffold table
 
-        :param base: :class:`.Compound` object or ID of the base hit
+        :param scaffold: :class:`.Compound` object or ID of the scaffold hit
         :param superstructure: :class:`.Compound` object or ID of the superstructure hit
         :param warn_duplicate: print a warning if the pose already exists (Default value = True)
         :param commit: commit the changes to the database (Default value = True)
@@ -989,20 +983,20 @@ class Database:
 
         """
 
-        if isinstance(base, Compound):
-            base = base.id
+        if isinstance(scaffold, Compound):
+            scaffold = scaffold.id
         if isinstance(superstructure, Compound):
             superstructure = superstructure.id
 
         assert isinstance(
-            base, int
-        ), f"Must pass an integer ID or Compound object (base) {base=} {type(base)}"
+            scaffold, int
+        ), f"Must pass an integer ID or Compound object (scaffold) {scaffold=} {type(scaffold)}"
         assert isinstance(
             superstructure, int
         ), f"Must pass an integer ID or Compound object (superstructure) {superstructure=} {type(superstructure)}"
 
-        if base == superstructure:
-            # mrich.warning(f"Skipped self-referential scaffold assignment (C{base})")
+        if scaffold == superstructure:
+            # mrich.warning(f"Skipped self-referential scaffold assignment (C{scaffold})")
             return None
 
         sql = """
@@ -1011,11 +1005,13 @@ class Database:
         """
 
         try:
-            self.execute(sql, (base, superstructure))
+            self.execute(sql, (scaffold, superstructure))
 
         except sqlite3.IntegrityError as e:
             if warn_duplicate:
-                mrich.warning(f"Skipping existing scaffold: {base=} {superstructure=}")
+                mrich.warning(
+                    f"Skipping existing scaffold: {scaffold=} {superstructure=}"
+                )
             return None
 
         except Exception as e:
@@ -2093,13 +2089,13 @@ class Database:
 
         return cursor.lastrowid
 
-    def migrate_legacy_bases(self) -> int:
-        """Migrate legacy compound_base records from the 'compound' table to the 'scaffold' table
+    def migrate_legacy_scaffolds(self) -> int:
+        """Migrate legacy compound_scaffold records from the 'compound' table to the 'scaffold' table
 
         :returns: ID of the last inserted scaffold record
         """
 
-        mrich.debug("HIPPO.Database.migrate_legacy_bases()")
+        mrich.debug("HIPPO.Database.migrate_legacy_scaffolds()")
 
         cursor = self.execute(
             """
@@ -2169,6 +2165,8 @@ class Database:
         """
         )
 
+    ### BULK CLEANUP
+
     def prune_duplicate_routes(self) -> None:
         """Remove duplicate routes from the database"""
 
@@ -2222,51 +2220,6 @@ class Database:
 
         return delete
 
-    def calculate_all_scaffolds(self):
-        """Determine and insert records for all substructure/superstructure relationships in the Compound table"""
-
-        n_before = self.count("scaffold")
-
-        mrich.var("#compounds", self.count("compound"))
-        mrich.var("#scaffold defs", n_before)
-
-        sql = """
-        SELECT compound_id, compound_mol, compound_pattern_bfp 
-        FROM compound
-        """
-
-        with mrich.loading("Fetching compounds..."):
-            records = self.execute(sql).fetchall()
-
-        sql = """
-            INSERT OR IGNORE INTO scaffold
-            SELECT ?1, c.compound_id 
-            FROM compound AS c, compound_pattern_bfp AS fp
-            WHERE c.compound_id = fp.compound_id
-            AND c.compound_id <> ?1
-            AND mol_is_substruct(c.compound_mol, ?2)
-            AND fp.compound_id MATCH rdtree_subset(?3)
-        """
-
-        with mrich.loading("Calculating scaffolds..."):
-            t1 = time.time()
-            self.executemany(sql, records)
-            mrich.print("Took", f"{time.time() - t1:.1f}", "seconds")
-
-        with mrich.loading("Committing..."):
-            self.commit()
-
-        diff = self.count("scaffold") - n_before
-
-        if diff:
-            mrich.success(
-                "Found", diff, "new substructure-superstructure relationships"
-            )
-        else:
-            mrich.warning(
-                "Found", diff, "new substructure-superstructure relationships"
-            )
-
     def reinitialise_molecules(self):
         """In the case where the Mol binaries in a database are throwing unpickling errors, run this to reinitialise them all from their smiles."""
 
@@ -2281,6 +2234,54 @@ class Database:
             self.execute(sql)
 
         mrich.success("compound_mol records updated")
+
+    def fix_incorrect_pose_compound_assignments(self):
+        """Fix pose_compound values that reference incorrect chemical structures"""
+
+        lookup = self.get_compound_id_smiles_dict()
+        lookup = {v: k for k, v in lookup.items()}
+
+        count = self.count_where(table="pose", key="mol", value="NOT null")
+
+        sql = """
+        SELECT pose_id, pose_compound, mol_to_smiles(mol_from_binary_mol(pose_mol))
+        FROM pose
+        WHERE pose_mol IS NOT null
+        """
+
+        c = self.execute(sql)
+
+        fix = set()
+        fix_count = 0
+        for pose_id, pose_compound, smiles in mrich.track(c, total=count):
+            try:
+                flat_smiles = sanitise_smiles(smiles)
+            except Exception as e:
+                mrich.error("Could not sanitise", pose_id, smiles)
+
+            comp_id = lookup.get(flat_smiles)
+
+            if not comp_id:
+                mrich.error("No matching compound", pose_id, smiles)
+                continue
+
+            if comp_id != pose_compound:
+                fix.add((pose_id, comp_id))
+                fix_count += 1
+                mrich.set_progress_field("#fix", fix_count)
+
+        mrich.var("#fix", len(fix))
+
+        sql = """
+        UPDATE pose
+        SET pose_compound = ?2
+        WHERE pose_id = ?1
+        """
+
+        self.executemany(sql, list(fix))
+        self.commit()
+
+    ### BULK REGISTRATION
 
     def register_compounds(
         self,
@@ -2332,9 +2333,9 @@ class Database:
             mrich.debug("Inserting...")
 
         self.executemany(sql, values)
-        self.commit()
-
         self.update_compound_pattern_bfp_table()
+
+        self.commit()
 
         return values
 
@@ -2422,6 +2423,51 @@ class Database:
         self.commit()
 
         return pose_ids
+
+    def calculate_all_scaffolds(self):
+        """Determine and insert records for all substructure/superstructure relationships in the Compound table"""
+
+        n_before = self.count("scaffold")
+
+        mrich.var("#compounds", self.count("compound"))
+        mrich.var("#scaffold defs", n_before)
+
+        sql = """
+        SELECT compound_id, compound_mol, compound_pattern_bfp 
+        FROM compound
+        """
+
+        with mrich.loading("Fetching compounds..."):
+            records = self.execute(sql).fetchall()
+
+        sql = """
+            INSERT OR IGNORE INTO scaffold
+            SELECT ?1, c.compound_id 
+            FROM compound AS c, compound_pattern_bfp AS fp
+            WHERE c.compound_id = fp.compound_id
+            AND c.compound_id <> ?1
+            AND mol_is_substruct(c.compound_mol, ?2)
+            AND fp.compound_id MATCH rdtree_subset(?3)
+        """
+
+        with mrich.loading("Calculating scaffolds..."):
+            t1 = time.time()
+            self.executemany(sql, records)
+            mrich.print("Took", f"{time.time() - t1:.1f}", "seconds")
+
+        with mrich.loading("Committing..."):
+            self.commit()
+
+        diff = self.count("scaffold") - n_before
+
+        if diff:
+            mrich.success(
+                "Found", diff, "new substructure-superstructure relationships"
+            )
+        else:
+            mrich.warning(
+                "Found", diff, "new substructure-superstructure relationships"
+            )
 
     def calculate_all_murcko_scaffolds(self, generic: bool = True):
         """Determine Murcko and optionally generic Murcko scaffolds for all Compounds in the Database and add relevant records.
@@ -2856,6 +2902,43 @@ class Database:
             smiles=entry[10],
         )
 
+    def get_quote_df(self, ids: list[int]) -> "pd.DataFrame":
+        """Get a pandas DataFrame representing quotes with given IDs"""
+
+        from pandas import DataFrame
+
+        str_ids = str(tuple(ids)).replace(",)", ")")
+
+        query = "quote_compound, quote_supplier, quote_catalogue, quote_entry, quote_amount, quote_price, quote_currency, quote_lead_time, quote_purity, quote_date, quote_smiles, quote_id "
+        records = self.select_where(
+            query=query,
+            table="quote",
+            key=f"quote_id IN {str_ids}",
+            multiple=True,
+        )
+
+        data = []
+
+        for entry in records:
+            data.append(
+                dict(
+                    id=entry[11],
+                    compound=entry[0],
+                    supplier=entry[1],
+                    catalogue=entry[2],
+                    entry=entry[3],
+                    amount=entry[4],
+                    price=entry[5],
+                    currency=entry[6],
+                    lead_time=entry[7],
+                    purity=entry[8],
+                    date=entry[9],
+                    smiles=entry[10],
+                )
+            )
+
+        return DataFrame(data)
+
     def get_metadata(
         self,
         *,
@@ -3114,7 +3197,7 @@ class Database:
 
         return d
 
-    def get_compound_inchikey_id_dict(self, inchikeys: list[str]):
+    def get_compound_inchikey_id_dict(self, inchikeys: list[str]) -> dict[str, int]:
         """Get a dictionary mapping :class:`.Compound` inchikeys to their ID's"""
 
         inchikey_str = str(tuple(inchikeys)).replace(",)", ")")
@@ -3128,6 +3211,32 @@ class Database:
 
         return {
             compound_inchikey: compound_id for compound_inchikey, compound_id in records
+        }
+
+    def get_compound_id_inchikey_dict(
+        self, cset: "CompoundSet | None" = None
+    ) -> dict[int, str]:
+        """Get a dictionary mapping :class:`.Compound` IDs to their inchikeys"""
+
+        if cset:
+
+            records = self.select_where(
+                table="compound",
+                multiple=True,
+                query="compound_id, compound_inchikey",
+                key=f"compound_id IN {cset.str_ids}",
+            )
+
+        else:
+
+            records = self.select(
+                table="compound",
+                multiple=True,
+                query="compound_id, compound_inchikey",
+            )
+
+        return {
+            compound_id: compound_inchikey for compound_id, compound_inchikey in records
         }
 
     def get_id_metadata_dict(self, *, table: str, ids: list[int]) -> dict[int, dict]:
@@ -3148,14 +3257,14 @@ class Database:
         cset: "CompoundSet | None" = None,
         *,
         fractions: bool = False,
-        max_bases: int | None = None,
+        max_scaffolds: int | None = None,
         fraction_reference: "CompoundSet | None" = None,
     ) -> dict[tuple, set]:
         """Create a dictionary grouping compounds by their scaffold/base cluster.
 
         :param cset: :class:`.CompoundSet` subset to query, defaults to all compounds
         :param fractions: Calculate fractional populations for each cluster
-        :param max_bases: Define the maximum number of compounds to use as cluster keys
+        :param max_scaffolds: Define the maximum number of compounds to use as cluster keys
         :param fraction_reference: Use cset to build the cluster map and use fraction_reference to determine the fractional populations
         :returns: A dictionary mapping a tuple of scaffold :class:`.Compound` IDs to a set of superstructure :class:`.Compound` ID's.
         """
@@ -3176,15 +3285,15 @@ class Database:
         records = self.execute(sql).fetchall()
 
         lookup = {}
-        for superstructure, base in records:
+        for superstructure, scaffold in records:
             group = lookup.setdefault(superstructure, set())
-            group.add(base)
+            group.add(scaffold)
 
         clustered = {}
-        for superstructure, bases in lookup.items():
-            if max_bases and len(bases) > max_bases:
+        for superstructure, scaffolds in lookup.items():
+            if max_scaffolds and len(scaffolds) > max_scaffolds:
                 continue
-            cluster = tuple(bases)
+            cluster = tuple(scaffolds)
             group = clustered.setdefault(cluster, set())
             group.add(superstructure)
 
@@ -3211,8 +3320,8 @@ class Database:
         )
 
         data = {}
-        for base, elab in records:
-            if base not in data:
+        for scaffold, elab in records:
+            if scaffold not in data:
                 data[base] = set()
             data[base].add(elab)
 
@@ -3925,7 +4034,7 @@ class Database:
 
         data = []
         for a, b, s in mrich.track(records):
-            data.append(dict(base_id=a, superstructure_id=b, similarity=s))
+            data.append(dict(scaffold_id=a, superstructure_id=b, similarity=s))
 
         return data
 
@@ -4022,6 +4131,8 @@ class Database:
 
         if not result and none == "error":
             mrich.error(f"No compounds with substructure {query}")
+            return None
+        elif not result:
             return None
 
         from .cset import CompoundSet

@@ -18,13 +18,13 @@ The :meth:`.HIPPO.register_compound` method takes as a minimum a smiles string a
 
 In the case that a compound with this structure already exists, the compound is instead retrieved from the database (duplicates will never be created).
 
-Tags, bases, and metadata
+Tags, scaffolds, and metadata
 -------------------------
 
 Additional detail can be added to the compound upon registration:
 
 * You may wish to tag the compound with any number of strings.
-* You can assign a 'base' compound of which this compound is a superstructure.
+* You can assign a 'scaffold' compound of which this compound is a superstructure.
 * Any dictionary of additional metadata can be stored
 
 ::
@@ -140,7 +140,7 @@ In a large loop of registering compounds, reactions, and poses the above issues 
 			overwrite_metadata=True, # don't bother checking existing metadata
 		)
 
-		# add tags and bases:
+		# add tags and scaffolds:
 
 		animal.db.update(
 			table='compound', 

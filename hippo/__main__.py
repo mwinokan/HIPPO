@@ -66,14 +66,14 @@ def calculate_scaffolds(
     animal = setup_animal(database=database, backup=backup)
 
     mrich.h3("State Before")
-    mrich.var("bases", animal.bases)
+    mrich.var("scaffolds", animal.scaffolds)
     mrich.var("elabs", animal.elabs)
 
     mrich.h3("Calculation")
     animal.db.calculate_all_scaffolds()
 
     mrich.h3("State After")
-    mrich.var("bases", animal.bases)
+    mrich.var("scaffolds", animal.scaffolds)
     mrich.var("elabs", animal.elabs)
 
     mrich.success("Completed")

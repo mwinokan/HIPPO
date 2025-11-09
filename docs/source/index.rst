@@ -7,13 +7,7 @@
 HIPPO Documentation
 ===================
 
-.. image:: ../../logos/hippo_logo-05.png
-  :width: 400
-  :alt: HIPPO logo
-
-Hit Interaction Profiling for Procurement Optimisation is a chemical database and python toolkit to make informed sampling decisions for effective SAR exploration.
-
-N.B. HIPPO and this documentation are still in alpha-development.
+*Hit Interaction Profiling for Procurement Optimisation* (HIPPO) is a chemical database and python toolkit to expedite fragment-based drug discovery.
 
 Installation
 ============
@@ -80,7 +74,7 @@ HIPPO uses an sqlite database with several inter-connected tables (see :doc:`db`
 Compound
 --------
 
-A :class:`.Compound` represents a ligand/small molecule with stereochemistry removed and no atomic coordinates. I.e. it represents the chemical structure. It's name is always an InChiKey. If a compound is an elaboration it can have a :meth:`.Compound.base` property which is another :class:`.Compound`. :class:`.Compound` objects are target-agnostic and can be linked to any number of catalogue entries (:class:`.Quote`) or synthetic pathways (:class:`.Reaction`). 
+A :class:`.Compound` represents a ligand/small molecule with stereochemistry removed and no atomic coordinates. I.e. it represents the chemical structure. It's name is always an InChiKey. If a compound is an elaboration it can have a :meth:`.Compound.scaffold` property which is another :class:`.Compound`. :class:`.Compound` objects are target-agnostic and can be linked to any number of catalogue entries (:class:`.Quote`) or synthetic pathways (:class:`.Reaction`). 
 
 Pose
 ----
@@ -124,6 +118,7 @@ If the above fails in your existing software environments, try this:
 ::
    
    mamba create --name py312 python=3.12
+   mamba activate py312
    pip install hippo-db syndirella typer neo4j black gemmi
    mamba install chemicalite=2024.05.1 pdbfixer
    python -c  "import mrich; mrich.patch_rich_jupyter_margins()"

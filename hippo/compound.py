@@ -15,7 +15,7 @@ import mrich
 
 
 class Compound:
-    """A :class:`.Compound` represents a ligand/small molecule with stereochemistry removed and no atomic coordinates. I.e. it represents the chemical structure. It's name is always an InChiKey. If a compound is an elaboration it can have a :meth:`.Compound.bases` property which is another :class:`.Compound`. :class:`.Compound` objects are target-agnostic and can be linked to any number of catalogue entries (:class:`.Quote`) or synthetic pathways (:class:`.Reaction`).
+    """A :class:`.Compound` represents a ligand/small molecule with stereochemistry removed and no atomic coordinates. I.e. it represents the chemical structure. It's name is always an InChiKey. If a compound is an elaboration it can have a :meth:`.Compound.scaffolds` property which is another :class:`.Compound`. :class:`.Compound` objects are target-agnostic and can be linked to any number of catalogue entries (:class:`.Quote`) or synthetic pathways (:class:`.Reaction`).
 
     .. attention::
 
@@ -43,7 +43,7 @@ class Compound:
         self._alias = alias
         self._smiles = smiles
         self._animal = animal
-        self._bases = None
+        self._scaffolds = None
         self._elabs = None
         self._alias = alias
         self._tags = None
@@ -156,23 +156,23 @@ class Compound:
 
     @property
     def num_atoms_added(self) -> int | list[int] | None:
-        """Calculate the number of atoms added relative to the base compound"""
-        match self.num_bases:
+        """Calculate the number of atoms added relative to the scaffold compound"""
+        match self.num_scaffolds:
             case 0:
-                mrich.error(f"{self} has no base")
+                mrich.error(f"{self} has no scaffold")
                 return None
             case 1:
-                b_id = self.bases.ids[0]
+                b_id = self.scaffolds.ids[0]
                 n_e = self.num_heavy_atoms
                 n_b = self.db.get_compound_computed_property("num_heavy_atoms", b_id)
                 return n_e - n_b
             case _:
-                mrich.warning(f"{self} has multiple bases")
+                mrich.warning(f"{self} has multiple scaffolds")
                 n_e = self.num_heavy_atoms
                 return [
                     n_e
                     - self.db.get_compound_computed_property("num_heavy_atoms", b_id)
-                    for b_id in self.bases.ids
+                    for b_id in self.scaffolds.ids
                 ]
 
     @property
@@ -220,29 +220,29 @@ class Compound:
         return self.db.count_where(table="reactant", key="compound", value=self.id)
 
     @property
-    def bases(self) -> "CompoundSet | None":
-        """Returns the base compound for this elaboration"""
-        if self._bases is None or self._db_changed:
-            ids = self.get_base_ids()
+    def scaffolds(self) -> "CompoundSet | None":
+        """Returns the scaffold compound for this elaboration"""
+        if self._scaffolds is None or self._db_changed:
+            ids = self.get_scaffold_ids()
             if not ids:
-                self._bases = None
+                self._scaffolds = None
             else:
                 from .cset import CompoundSet
 
-                self._bases = CompoundSet(
-                    self.db, ids, name=f"base scaffolds of {self}"
+                self._scaffolds = CompoundSet(
+                    self.db, ids, name=f"scaffold scaffolds of {self}"
                 )
                 self._total_changes = self.db.total_changes
-        return self._bases
+        return self._scaffolds
 
     @property
-    def num_bases(self) -> int:
-        """Get the number of base compounds for this elaboration"""
-        return len(self.bases)
+    def num_scaffolds(self) -> int:
+        """Get the number of scaffold compounds for this elaboration"""
+        return len(self.scaffolds)
 
     @property
     def elabs(self):
-        """Returns the base compound for this elaboration"""
+        """Returns the scaffold compound for this elaboration"""
         if self._elabs is None or self._db_changed:
             ids = self.get_superstructure_ids()
             if not ids:
@@ -280,7 +280,7 @@ class Compound:
         return self.get_dict()
 
     @property
-    def is_base(self) -> bool:
+    def is_scaffold(self) -> bool:
         """Is this Compound the basis for any elaborations?"""
         return bool(
             self.db.select_where(
@@ -394,7 +394,7 @@ class Compound:
         )
 
         if return_quote:
-            self.db.get_quote(id=quote_id)
+            return self.db.get_quote(id=quote_id)
         else:
             return quote_id
 
@@ -566,7 +566,7 @@ class Compound:
         count_by_target: bool = False,
         num_reactant: bool = True,
         num_reactions: bool = True,
-        bases: bool = True,
+        scaffolds: bool = True,
         elabs: bool = True,
         tags: bool = True,
     ) -> "dict":
@@ -578,7 +578,7 @@ class Compound:
         :param count_by_target: Include counts by protein :class:`.Target`, defaults to ``False``. Only applicable when ``count_by_target = True``.
         :param num_reactant: include num_reactant column
         :param num_reactions: include num_reactions column
-        :param bases: include bases column
+        :param scaffolds: include scaffolds column
         :param elabs: include elabs column
         :param tags: include tags column
         :returns: A dictionary
@@ -608,11 +608,11 @@ class Compound:
             except InvalidMolError:
                 data["mol"] = None
 
-        if bases:
-            if self.bases:
-                data["bases"] = self.bases.ids
+        if scaffolds:
+            if self.scaffolds:
+                data["scaffolds"] = self.scaffolds.ids
             else:
-                data["bases"] = None
+                data["scaffolds"] = None
 
         if elabs:
             if self.elabs:
@@ -670,7 +670,7 @@ class Compound:
             **kwargs,
         )
 
-    def get_base_ids(self) -> list[int]:
+    def get_scaffold_ids(self) -> list[int]:
         """Get a list of :class:`.Compound` ID's that this object is a superstructure of"""
         ids = self.db.select_where(
             table="scaffold",
@@ -698,18 +698,18 @@ class Compound:
             return None
         return [i for i, in ids]
 
-    def add_base(self, base: "Compound | int", commit: bool = True) -> None:
+    def add_scaffold(self, scaffold: "Compound | int", commit: bool = True) -> None:
         """
-        Add a base :class:`.Compound` this molecule is derived from.
+        Add a scaffold :class:`.Compound` this molecule is derived from.
 
-        :param base: The base :class:`.Compound` or its ID.
+        :param scaffold: The scaffold :class:`.Compound` or its ID.
         :param commit: Commit the changes to the :class:`.Database`, defaults to ``True``
         """
 
-        if not isinstance(base, int):
-            assert base._table == "compound"
-            base = base.id
-        self.db.insert_scaffold(base=base, superstructure=self.id)
+        if not isinstance(scaffold, int):
+            assert scaffold._table == "compound"
+            scaffold = scaffold.id
+        self.db.insert_scaffold(scaffold=scaffold, superstructure=self.id)
 
     def set_alias(self, alias: str, commit=True) -> None:
         """
@@ -768,8 +768,8 @@ class Compound:
             max_lead_time=max_lead_time,
         )
 
-    def draw(self, align_substructure: bool = False) -> None:
-        """Display this compound (and its base if it has one)
+    def draw(self, scaffolds: bool = True, align_substructure: bool = False) -> None:
+        """Display this compound (and its scaffold if it has one)
 
         .. attention::
 
@@ -778,30 +778,32 @@ class Compound:
         :param align_substructure: Align the two drawing by their common substructure, defaults to ``False``
         """
 
-        if bases := self.bases:
+        if scaffolds:
 
-            from molparse.rdkit import draw_mcs
+            if scaffolds := self.scaffolds:
 
-            data = {}
-            for base in bases:
-                data[base.smiles] = f"{base} (base)"
-            data[self.smiles] = str(self)
+                from molparse.rdkit import draw_mcs
 
-            if len(data) > 1:
+                data = {}
+                for scaffold in scaffolds:
+                    data[scaffold.smiles] = f"{scaffold} (scaffold)"
+                data[self.smiles] = str(self)
 
-                drawing = draw_mcs(
-                    data,
-                    align_substructure=align_substructure,
-                    show_mcs=False,
-                    highlight_common=False,
-                )
-                display(drawing)
+                if len(data) > 1:
 
-            else:
-                mrich.error(
-                    f"Problem drawing {base.id=} vs {self.id=}, self referential?"
-                )
-                display(self.mol)
+                    drawing = draw_mcs(
+                        data,
+                        align_substructure=align_substructure,
+                        show_mcs=False,
+                        highlight=False,
+                    )
+                    display(drawing)
+
+                else:
+                    mrich.error(
+                        f"Problem drawing {scaffold.id=} vs {self.id=}, self referential?"
+                    )
+                    display(self.mol)
 
         else:
             display(self.mol)
@@ -896,10 +898,10 @@ class Compound:
         mrich.var("inchikey", self.inchikey)
         mrich.var("alias", self.alias)
         mrich.var("smiles", self.smiles)
-        mrich.var("bases", self.bases)
+        mrich.var("scaffolds", self.scaffolds)
         mrich.var("elabs", self.elabs)
 
-        mrich.var("is_base", self.is_base)
+        mrich.var("is_scaffold", self.is_scaffold)
         mrich.var("is_elab", self.is_elab)
         mrich.var("num_heavy_atoms", self.num_heavy_atoms)
         mrich.var("num_rings", self.num_rings)

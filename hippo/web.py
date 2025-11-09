@@ -26,7 +26,7 @@ class ProjectPage:
         scorer: "Scorer | None" = None,
         proposals: "list[Recipe] | None" = None,
         title: str | None = None,
-        scaffold_tag: str = "Syndirella base",
+        scaffold_tag: str = "Syndirella scaffold",
         extra_recipe_dir: str | Path = None,
         skip_existing: bool = True,
     ):

@@ -115,6 +115,11 @@ def smiles_has_isotope(smiles, regex=True):
         return any(atom.GetIsotope() for atom in mol.GetAtoms())
 
 
+REPLACE = {
+    "[STB]": "[S]",
+}
+
+
 def sanitise_smiles(s, verbosity=False, sanitisation_failed="error", radical="error"):
     """
 
@@ -143,6 +148,11 @@ def sanitise_smiles(s, verbosity=False, sanitisation_failed="error", radical="er
     if smiles_has_isotope(smiles):
         mrich.warning(f"Isotope(s) in SMILES: {smiles}")
         smiles = remove_isotopes_from_smiles(smiles)
+
+    # replace specific sequences
+    for key in REPLACE:
+        if key in smiles:
+            smiles = smiles.replace(key, REPLACE[key])
 
     # canonicalise
     mol = MolFromSmiles(smiles)

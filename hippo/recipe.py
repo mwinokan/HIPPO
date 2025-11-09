@@ -752,6 +752,12 @@ class Recipe:
         """Product :class:`.IngredientSet`"""
         return self._compounds
 
+    @compounds.setter
+    def compounds(self, a: "IngredientSet"):
+        """Set the compounds"""
+        self._compounds = a
+        self.__flag_modification()
+
     @property
     def poses(self) -> "PoseSet":
         """Product poses"""
@@ -853,6 +859,11 @@ class Recipe:
     def num_reactions(self):
         """Return the number of reactions"""
         return len(self.reactions)
+
+    @property
+    def num_reaction_types(self):
+        """Return the number of reactions"""
+        return self.reactions.num_types
 
     @property
     def num_reactants(self):
@@ -1205,7 +1216,7 @@ class Recipe:
                 for reaction in self.reactions:
                     mrich.var(str(reaction), reaction.reaction_str, reaction.type)
 
-        if self.compounds:
+        if hasattr(self, "_compounds") and self.compounds:
 
             mrich.h3(f"{len(self.compounds)} compounds")
 
@@ -1256,7 +1267,7 @@ class Recipe:
 
         file = Path(file).resolve()
 
-        assert file.parent.exists()
+        assert file.parent.exists(), f"Directory does not exist: {file.parent}"
 
         data = self.get_dict(serialise_price=True, **kwargs)
 
@@ -1349,9 +1360,11 @@ class Recipe:
 
         return data
 
-    def get_routes(self) -> "RouteSet":
+    def get_routes(self, return_ids: bool = False) -> "RouteSet":
         """Get routes"""
-        return self.products.get_routes(permitted_reactions=self.reactions)
+        return self.products.get_routes(
+            permitted_reactions=self.reactions, return_ids=return_ids
+        )
 
     def write_CAR_csv(
         self, file: "str | Path", return_df: bool = False
@@ -1496,79 +1509,135 @@ class Recipe:
 
         data = []
 
-        routes = self.get_routes()
+        ### Get lookup data
 
-        for reactant in mrich.track(
-            self.reactants, prefix="Constructing reactant DataFrame"
-        ):
-            quote = reactant.quote
+        route_ids = self.get_routes(return_ids=True)
 
-            d = dict(
-                hippo_id=reactant.compound_id,
-                smiles=reactant.smiles,
-                inchikey=reactant.inchikey,
-                required_amount_mg=reactant.amount,
-            )
+        sql = f"""
+        SELECT component_ref, route_product FROM component
+        INNER JOIN route ON route_id = component_route
+        WHERE component_type = 2
+        AND component_ref IN {self.reactants.compounds.str_ids}
+        AND component_route IN {str(tuple(route_ids)).replace(',)',')')}
+        """
+        product_lookup = {}
+        for reactant_id, product_id in self.db.execute(sql):
+            product_lookup.setdefault(reactant_id, set())
+            product_lookup[reactant_id].add(product_id)
 
-            if quote:
-                d.update(
-                    dict(
-                        quoted_amount=quote.amount,
-                        quote_currency=quote.currency,
-                        quote_price=quote.price.amount,
-                        quote_lead_time_days=quote.lead_time,
-                        quote_supplier=quote.supplier,
-                        quote_catalogue=quote.catalogue,
-                        quote_entry=quote.entry,
-                        quoted_smiles=quote.smiles,
-                        quoted_purity=quote.purity,
-                    )
-                )
+        sql = f"""
+        WITH reactants AS (
+            SELECT component_ref AS reactant_id, component_route AS route_id FROM component
+            WHERE component_type = 2
+            AND component_ref IN {self.reactants.compounds.str_ids}
+        ),
 
-            downstream_routes = []
-            downstream_reactions = []
+        reactions AS (
+            SELECT component_ref AS reaction_id, component_route AS route_id, reaction_type FROM component
+            INNER JOIN reaction ON component_ref = reaction_id
+            WHERE component_type = 1
+            AND component_ref IN {self.reactions.str_ids}
+        )
 
-            for route in routes:
-                if reactant in route.reactants:
-                    downstream_routes.append(route)
-                for reaction in route.reactions:
-                    if reactant in reaction.reactants:
-                        downstream_reactions.append(reaction)
+        SELECT reactants.reactant_id, reactions.reaction_id, reactions.reaction_type FROM reactants
+        INNER JOIN reactions ON reactants.route_id = reactions.route_id
+        """
+        reaction_lookup = {}
+        for reactant_id, reaction_id, reaction_type in self.db.execute(sql):
+            reaction_lookup.setdefault(reactant_id, dict(ids=set(), types=set()))
+            reaction_lookup[reactant_id]["ids"].add(reaction_id)
+            reaction_lookup[reactant_id]["types"].add(reaction_type)
 
-            downstream_products = CompoundSet(
-                self.db, set(route.product.id for route in downstream_routes)
-            )
-            downstream_reactions = ReactionSet(
-                self.db, set(reaction.id for reaction in downstream_reactions)
-            )
+        smiles_lookup = self.db.get_compound_id_smiles_dict(self.reactants.compounds)
 
-            if not downstream_products:
-                mrich.error("No downstream products for", reactant)
-                continue
+        inchikey_lookup = self.db.get_compound_id_inchikey_dict(
+            self.reactants.compounds
+        )
 
-            if not downstream_reactions:
-                mrich.error("No downstream reactions for", reactant)
-                continue
+        ### Reactant Dataframe
 
-            def get_scaffold_series():
+        df = self.reactants.df
 
-                bases = downstream_products.bases
+        df["smiles"] = df["compound_id"].apply(lambda x: smiles_lookup[x])
+        df["inchikey"] = df["compound_id"].apply(lambda x: inchikey_lookup[x])
+        df = df.drop(columns=["supplier", "max_lead_time", "quoted_amount"])
 
-                if not bases:
-                    bases = downstream_products[0:]
+        ### Quote DataFrame
 
-                return bases.ids
+        qdf = self.db.get_quote_df(self.reactants.quote_ids)
 
-            d["num_reaction_dependencies"] = len(downstream_reactions)
-            d["num_product_dependencies"] = len(downstream_products)
-            d["reaction_dependencies"] = downstream_reactions.ids
-            d["product_dependencies"] = downstream_products.ids
-            d["chemistry_types"] = ", ".join(set(downstream_reactions.types))
-            d["scaffold_series"] = get_scaffold_series()
+        qdf = qdf.rename(
+            columns={
+                "id": "quote_id",
+                "smiles": "quoted_smiles",
+                "purity": "quoted_purity",
+                "date": "quote_date",
+                "lead_time": "quote_lead_time_days",
+                "price": "quote_price",
+                "currency": "quote_currency",
+                "catalogue": "quote_catalogue",
+                "supplier": "quote_supplier",
+                "entry": "quote_entry",
+                "amount": "quoted_amount_mg",
+            }
+        )
+        qdf = qdf.drop(columns=["compound"])
 
-            data.append(d)
+        ### Downstream info
 
-        df = DataFrame(data)
+        df["downstream_product_ids"] = df["compound_id"].apply(
+            lambda x: product_lookup[x]
+        )
+
+        df["downstream_reaction_ids"] = df["compound_id"].apply(
+            lambda x: reaction_lookup[x]["ids"]
+        )
+        df["downstream_reaction_types"] = df["compound_id"].apply(
+            lambda x: reaction_lookup[x]["types"]
+        )
+
+        df["num_downstream_reactions"] = df["downstream_reaction_ids"].apply(len)
+        df["num_downstream_reaction_types"] = df["downstream_reaction_types"].apply(len)
+        df["num_downstream_products"] = df["downstream_product_ids"].apply(len)
+
+        ### Join and reformat
+
+        df = df.merge(qdf, on="quote_id", how="left")
+
+        df = df.rename(
+            columns={
+                "amount": "required_amount_mg",
+            }
+        )
+
+        cols = [
+            "compound_id",
+            "smiles",
+            "inchikey",
+            "required_amount_mg",
+            "quoted_amount_mg",
+            "quote_id",
+            "quote_supplier",
+            "quote_catalogue",
+            "quote_entry",
+            "quote_price",
+            "quote_currency",
+            "quote_lead_time_days",
+            "quoted_purity",
+            "quoted_smiles",
+            "quote_date",
+            "num_downstream_reaction_types",
+            "num_downstream_reactions",
+            "num_downstream_products",
+            "downstream_reaction_types",
+            "downstream_reaction_ids",
+            "downstream_product_ids",
+        ]
+
+        df = df[[c for c in cols if c in df.columns]]
+
+        ### N.B. scaffold series no longer output
+
         mrich.writing(file)
         df.to_csv(file, index=False)
 
@@ -1632,8 +1701,8 @@ class Recipe:
 
             def get_scaffold_series():
 
-                if bases := product.bases:
-                    return bases.ids, False
+                if scaffolds := product.scaffolds:
+                    return scaffolds.ids, False
 
                 else:
                     return [product.id], True
@@ -1652,23 +1721,23 @@ class Recipe:
                 sum([route.reactants.ids for route in upstream_routes], [])
             )
             d["route_ids"] = [route.id for route in upstream_routes]
-            d["chemistry_types"] = ", ".join(set(upstream_reactions.types))
-            series, is_base = get_scaffold_series()
-            d["is_scaffold"] = is_base
+            d["chemistry_types"] = ", ".join(upstream_reactions.types)
+            series, is_scaffold = get_scaffold_series()
+            d["is_scaffold"] = is_scaffold
             d["scaffold_series"] = series
 
             inspirations = inspiration_map.get(product.id, None)
 
-            if not inspirations and not is_base:
-                base = product.bases[0]
-                inspirations = inspiration_map.get(base.id, None)
+            if not inspirations and not is_scaffold:
+                scaffold = product.scaffolds[0]
+                inspirations = inspiration_map.get(scaffold.id, None)
 
-                if not inspirations and "inspiration_pose_ids" in base.metadata:
-                    inspirations = base.metadata["inspiration_pose_ids"]
+                if not inspirations and "inspiration_pose_ids" in scaffold.metadata:
+                    inspirations = scaffold.metadata["inspiration_pose_ids"]
 
             if (
                 not inspirations
-                and is_base
+                and is_scaffold
                 and "inspiration_pose_ids" in product.metadata
             ):
                 inspirations = product.metadata["inspiration_pose_ids"]
@@ -1709,8 +1778,8 @@ class Recipe:
 
         for product in self.products:
 
-            if bases := product.bases:
-                scaffolds += bases
+            if scaffolds := product.scaffolds:
+                scaffolds += scaffolds
             else:
                 scaffolds.add(product.compound)
 
@@ -1721,7 +1790,8 @@ class Recipe:
         for compound in scaffolds:
 
             elabs = (
-                self.products.compounds.get_by_base(base=compound, none="quiet") or []
+                self.products.compounds.get_by_scaffold(scaffold=compound, none="quiet")
+                or []
             )
 
             d = dict(
@@ -1766,7 +1836,7 @@ class Recipe:
 
             data.append(d)
 
-        missing_bases = {}
+        missing_scaffolds = {}
 
         for compound in self.products.compounds:
 
@@ -1778,12 +1848,12 @@ class Recipe:
                 if compound in route.products:
                     upstream_routes.append(route)
 
-            bases = compound.bases
+            scaffolds = compound.scaffolds
 
-            for base in bases:
+            for scaffold in scaffolds:
 
-                if base.id not in route_types:
-                    group = missing_bases.setdefault(base.id, [])
+                if scaffold.id not in route_types:
+                    group = missing_scaffolds.setdefault(scaffold.id, [])
                     group.append(compound.id)
                     continue
 
@@ -1792,18 +1862,18 @@ class Recipe:
                         chem_types = tuple([r.type for r in route.reactions])
 
                         if chem_types not in route_types[base.id]:
-                            mrich.success(base)
+                            mrich.success(scaffold)
                             mrich.success(chem_types)
                             raise ValueError(
                                 "Scaffold has route not present in dataframe"
                             )
 
-        for base_id, elab_ids in missing_bases.items():
+        for scaffold_id, elab_ids in missing_scaffolds.items():
 
             compound = self.db.get_compound(id=sorted(elab_ids)[0])
 
             d = dict(
-                scaffold_id=base_id,
+                scaffold_id=scaffold_id,
                 product_id=compound.id,
                 smiles=compound.smiles,
                 inchikey=compound.inchikey,
@@ -1852,6 +1922,221 @@ class Recipe:
             return df
 
         return None
+
+    def to_syndirella(
+        self,
+        out_key: "str | Path",
+        poses: "PoseSet",
+        *,
+        separate: bool = False,
+    ) -> "DataFrame":
+        """Generate inputs for running syndirella elaboration"""
+
+        import shutil
+        from pathlib import Path
+
+        out_key = Path(".") / out_key
+        out_dir = out_key.parent
+        out_key = out_key.name
+
+        mrich.var("out_key", out_key)
+        mrich.var("out_dir", out_dir)
+
+        if not out_dir.exists():
+            mrich.writing(out_dir)
+            out_dir.mkdir(parents=True, exist_ok=True)
+
+        template_dir = out_dir / "templates"
+        if not template_dir.exists():
+            mrich.writing(template_dir)
+            template_dir.mkdir(parents=True, exist_ok=True)
+
+        """
+
+        Need to create dataframe with columns:
+        - compound_id
+        - pose_id
+        - smiles
+        - reaction_name_step1
+        - reactant_step1
+        - reactant2_step1
+        - product_step1
+        ...
+        - hit1
+        - hit2
+        ...
+        - template
+        - compound_set
+
+        """
+
+        pose_compounds = poses.compounds
+        assert set(self.products.compound_ids) == set(
+            pose_compounds.ids
+        ), "supplied poses have different compounds to Recipe products"
+        assert len(poses) == len(
+            self.products
+        ), "some duplicate compounds in supplied poses"
+
+        df = poses.get_df(
+            inchikey=False,
+            alias=False,
+            name=False,
+            compound_id=True,
+            reference_id=True,
+            inspiration_aliases=True,
+        )
+
+        df = df.reset_index()
+        df = df.rename(columns={"id": "pose_id"})
+        df["compound_set"] = df["compound_id"].apply(lambda x: f"C{x}")
+        df = df.set_index(["compound_id", "pose_id"])
+
+        ## CHECKS
+
+        no_refs = df[df["reference_id"].isna()]
+
+        if len(no_refs):
+            mrich.error(len(no_refs), "poses without reference!")
+            ids = set(no_refs.index.get_level_values("pose_id"))
+            mrich.print(ids)
+            from .pset import PoseSet
+
+        no_insps = bool([1 for i in df["inspiration_aliases"].values if not len(i)])
+
+        if no_insps:
+            mrich.error(len(no_insps), "poses without inspirations!")
+            return None
+
+        ## TEMPLATES
+
+        references = poses.references
+        ref_lookup = self.db.get_pose_id_alias_dict(references)
+        df["template"] = df["reference_id"].apply(lambda x: ref_lookup[x])
+
+        for ref_pose in references:
+            assert ref_pose.apo_path, f"Reference {ref_pose} has no apo_path"
+
+            template = template_dir / ref_pose.apo_path.name
+
+            if not template.exists():
+                mrich.writing(template)
+                shutil.copy(ref_pose.apo_path, template)
+
+        ## INSPIRATIONS
+
+        for i, row in df.iterrows():
+            for j, alias in enumerate(row["inspiration_aliases"]):
+                df.loc[i, f"hit{j+1}"] = alias
+
+        inspirations = poses.inspirations
+
+        sdf_name = out_dir / f"{out_key}_syndirella_inspiration_hits.sdf"
+
+        inspirations.write_sdf(
+            sdf_name,
+            tags=False,
+            metadata=False,
+            name_col="name",
+        )
+
+        ## ADD ROUTE INFO
+
+        routes = self.get_routes()
+
+        for sub_recipe in mrich.track(routes, prefix="Adding chemistry info..."):
+
+            product = sub_recipe.product
+
+            product_id = product.compound_id
+
+            matches = df.xs(product_id, level="compound_id")
+
+            if len(matches) > 1:
+                mrich.warning("Multiple rows for compound", product_id)
+
+            for i, row in matches.iterrows():
+
+                key = (product_id, i)
+
+                for j, reaction in enumerate(sub_recipe.reactions):
+
+                    j = j + 1
+
+                    match len(reaction.reactants):
+                        case 1:
+                            df.loc[key, f"reactant_step{j}"] = reaction.reactants[
+                                0
+                            ].smiles
+                            df.loc[key, f"reactant2_step{j}"] = None
+                        case 2:
+                            df.loc[key, f"reactant_step{j}"] = reaction.reactants[
+                                0
+                            ].smiles
+                            df.loc[key, f"reactant2_step{j}"] = reaction.reactants[
+                                1
+                            ].smiles
+                        case 3:
+                            df.loc[key, f"reactant_step{j}"] = reaction.reactants[
+                                0
+                            ].smiles
+                            df.loc[key, f"reactant2_step{j}"] = reaction.reactants[
+                                1
+                            ].smiles
+                            df.loc[key, f"reactant3_step{j}"] = reaction.reactants[
+                                2
+                            ].smiles
+                        case _:
+                            raise NotImplementedError("Too many reactants")
+
+                    df.loc[key, f"product_step{j}"] = reaction.product.smiles
+                    df.loc[key, f"reaction_name_step{j}"] = reaction.type
+
+                break
+
+        ## REMOVE UNECESSARY COLS
+
+        df = df.drop(columns=["reference_id", "inspiration_aliases"])
+
+        ## REORDER COLUMNS
+
+        cols = [
+            "smiles",
+            "reaction_name_step1",
+            "reactant_step1",
+            "reactant2_step1",
+            "reactant3_step1",
+            "product_step11",
+            "hit1",
+            "hit2",
+            "hit3",
+            "hit4",
+            "hit5",
+            "hit6",
+            "hit7",
+            "hit8",
+            "hit9",
+            "template",
+            "compound_set",
+        ]
+
+        if not any([c not in cols for c in df.columns]):
+            df = df[[c for c in cols if c in df.columns]]
+
+        if not separate:
+            out_path = out_dir / f"{out_key}_syndirella_input.csv"
+            mrich.writing(out_path)
+            df.to_csv(out_path)
+            return df
+
+        for idx, row in df.iterrows():
+            out_path = out_dir / f"{out_key}_{row['compound_set']}_syndirella_input.csv"
+            mrich.writing(out_path)
+            single_df = row.to_frame().T
+            single_df = single_df.dropna(axis=1, how="all")
+            single_df.to_csv(out_path, index=False)
+
+        return df
 
     def copy(self) -> "Recipe":
         """Copy this recipe"""
@@ -2204,6 +2489,43 @@ class RouteSet:
     ### FACTORIES
 
     @classmethod
+    def from_ids(cls, db: "Database", ids: list | set):
+        """Generate a routeset from a set of :class:`.Route` IDs
+
+        :param db: database to link
+        :param ids: :class:`.Route` database IDs
+        """
+
+        routes = [
+            db.get_route(id=route_id)
+            for route_id in mrich.track(ids, prefix="Getting routes")
+        ]
+
+        self = cls.__new__(cls)
+        return RouteSet(db, routes)
+
+    @classmethod
+    def from_product_ids(cls, db: "Database", ids: list | set):
+        """Generate a routeset from a set of product :class:`.Compound` IDs
+
+        :param db: database to link
+        :param ids: :class:`.Compound` database IDs
+        """
+
+        str_ids = str(tuple(ids)).replace(",)", ")")
+
+        records = db.select_where(
+            table="route",
+            query="route_id",
+            key=f"route_product IN {str_ids}",
+            multiple=True,
+        )
+
+        route_ids = [i for i, in records]
+
+        return cls.from_ids(db, route_ids)
+
+    @classmethod
     def from_json(
         cls, db: "Database", path: "str | Path", data: dict = None
     ) -> "RouteSet":
@@ -2339,16 +2661,59 @@ class RouteSet:
     #     for route in self.data.values():
     #         route._db = None
 
-    # def get_dict(self):
-    #     """Get serialisable dictionary"""
+    def get_dict(self):
+        """Get serialisable dictionary"""
 
-    #     data = dict(db=str(self.db), routes={})
+        data = dict(db=str(self.db), routes={})
 
-    #     # populate with routes
-    #     for route_id, route in self.data.items():
-    #         data["routes"][route_id] = route.get_dict()
+        # populate with routes
+        for route_id, route in self.data.items():
+            data["routes"][route_id] = route.get_dict()
 
-    #     return data
+        return data
+
+    def prune_unavailable(self, suppliers: list[str]):
+        """Remove routes that don't have all reactants available from given suppliers"""
+
+        suppliers_str = str(tuple(suppliers)).replace(",)", ")")
+
+        sql = f"""
+        WITH possible_reactants AS (
+            SELECT quote_compound, COUNT(
+                CASE 
+                    WHEN quote_supplier IN {suppliers_str} THEN 1 
+                END) AS [count_valid] 
+            FROM quote
+            GROUP BY quote_compound
+        ),
+
+        route_reactants AS (
+            SELECT route_id, route_product, 
+            COUNT(
+                CASE 
+                    WHEN count_valid = 0 THEN 1 
+                    WHEN count_valid IS NULL THEN 1 
+                END) 
+            AS [count_unavailable] FROM route
+            INNER JOIN component ON component_route = route_id
+            LEFT JOIN possible_reactants ON quote_compound = component_ref
+            WHERE component_type = 2
+            GROUP BY route_id
+        )
+
+        SELECT route_id FROM route_reactants
+        WHERE count_unavailable = 0
+        AND route_id IN {self.str_ids}
+        """
+
+        route_ids = self.db.execute(sql).fetchall()
+
+        route_ids = [i for i, in route_ids]
+
+        mrich.var("#routes before pruning", len(self))
+        mrich.var("#routes after pruning", len(route_ids))
+
+        return RouteSet.from_ids(self.db, route_ids)
 
     def pop_id(self) -> int:
         """Pop the last route from the set and return it's id"""

@@ -78,10 +78,15 @@ class RandomRecipeGenerator(RRGMixin):
         max_lead_time=None,
         # max_reactions = None,
         suppliers: list | None = None,
-        start_with: Recipe | CompoundSet | IngredientSet = None,
+        start_with: Recipe | CompoundSet | IngredientSet | None = None,
+        route_pool: "RouteSet | None" = None,
+        out_key: str | None = None,
     ):
 
         mrich.debug("RandomRecipeGenerator.__init__()")
+
+        if not start_with:
+            start_with = Recipe(db)
 
         # Static parameters
         self._db_path = db.path
@@ -96,20 +101,35 @@ class RandomRecipeGenerator(RRGMixin):
         # Database set up
         self._db = db
 
+        if not out_key:
+            out_key = str(self.db_path.name).removesuffix(".sqlite")
+        mrich.var("out_key", out_key)
+
+        parent_dir = Path(out_key).parent
+        if not parent_dir.exists():
+            parent_dir.mkdir(parents=True)
+
         # JSON I/O set up
-        self._data_path = Path(str(self.db_path.name).replace(".sqlite", "_rgen.json"))
+        self._data_path = Path(f"{out_key}_rgen.json")
         if self.data_path.exists():
             mrich.warning(f"Will overwrite existing rgen data file: {self.data_path}")
 
         # Recipe I/O set up
-        path = Path(str(self.db_path.name).replace(".sqlite", "_recipes"))
-        mrich.writing(f"{path}/")
-        path.mkdir(exist_ok=True)
+        path = Path(f"{out_key}_recipes")
+        if not path.exists():
+            mrich.writing(f"{path}/")
+            path.mkdir()
         self._recipe_dir = path
 
         # Route pool
-        mrich.debug("Solving route pool...")
-        self._route_pool = self.get_route_pool()
+        if route_pool:
+            route_pool = route_pool.prune_unavailable(suppliers=suppliers)
+            self._route_pool = route_pool
+        else:
+            mrich.debug("Solving route pool...")
+            self._route_pool = self.get_route_pool()
+
+        assert len(self._route_pool), "Route pool is empty!"
 
         # dump data
         self.dump_data()
@@ -192,10 +212,10 @@ class RandomRecipeGenerator(RRGMixin):
 
         ### EXCLUDE PRODUCTS OF ROUTES IN STARTING RECIPE!!!
 
-        route_ids = self.db.execute(
-            f"""
+        sql = f"""
 		WITH possible_reactants AS (
-			SELECT quote_compound, COUNT(CASE WHEN quote_supplier IN {self.suppliers_str} THEN 1 END) AS [count_valid] FROM quote
+			SELECT quote_compound, COUNT(CASE WHEN quote_supplier IN {self.suppliers_str} THEN 1 END) AS [count_valid] 
+            FROM quote
 			GROUP BY quote_compound
 		),
 
@@ -216,19 +236,17 @@ class RandomRecipeGenerator(RRGMixin):
 		SELECT route_id FROM route_reactants
 		WHERE count_unavailable = 0
 		"""
-        ).fetchall()
+
+        route_ids = self.db.execute(sql).fetchall()
+
+        route_ids = [i for i, in route_ids]
 
         if mini_test:
             route_ids = route_ids[:100]
 
-        routes = [
-            self.db.get_route(id=route_id)
-            for route_id, in mrich.track(route_ids, prefix="Getting routes")
-        ]
-
         from .recipe import RouteSet
 
-        return RouteSet(self.db, routes)
+        return RouteSet.from_ids(self.db, route_ids)
 
     ### FILE I/O METHODS
 
@@ -281,6 +299,8 @@ class RandomRecipeGenerator(RRGMixin):
 
         if not max_iter:
             max_iter = max_products + max_reactions
+
+        max_iter = min(max_iter, len(self.route_pool))
 
         budget = Price(budget, currency)
 

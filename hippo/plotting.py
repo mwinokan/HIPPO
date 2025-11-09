@@ -223,6 +223,7 @@ def plot_interaction_punchcard(
     poses=None,
     subtitle=None,
     opacity=1.0,
+    group: str = "pose_name",
     ignore_chains=False,
 ):
     """
@@ -615,7 +616,12 @@ def plot_interaction_punchcard_by_tags(
 
 @hippo_graph
 def plot_residue_interactions(
-    animal, poses, residue_number, subtitle=None, chain=None, target=1
+    animal,
+    residue_number,
+    poses: str | None = None,
+    subtitle: str | None = None,
+    chain: str | None = None,
+    target: int = 1,
 ):
     """
 
@@ -626,6 +632,9 @@ def plot_residue_interactions(
     :param chain:  (Default value = None)
 
     """
+
+    if not poses:
+        poses = animal.poses
 
     mrich.var("#poses", len(poses))
 
@@ -648,7 +657,7 @@ def plot_residue_interactions(
 
     names = []
     for pose_id in plot_data["pose_id"].values:
-        names.append(name_lookup[pose_id])
+        names.append(name_lookup[int(pose_id)])
     plot_data["pose_name"] = names
 
     fig = px.histogram(plot_data, x="pose_name", color="type")
@@ -656,6 +665,10 @@ def plot_residue_interactions(
     # return plot_data[plot_data['pose_name'] == ' x1762b']
 
     fig.update_xaxes(categoryorder="total descending")
+
+    # set customdata from x-axis labels
+    for trace in fig.data:
+        trace["customdata"] = trace["x"]
 
     if not subtitle:
         subtitle = f"#Poses={len(poses)}"
@@ -925,8 +938,8 @@ def plot_numbers(animal, subtitle=None):
             - x-categories
                     * hits
                     * hit poses
-                    * bases
-                    * base poses
+                    * scaffolds
+                    * scaffold poses
                     * elabs
                     * elab poses
                     * BBs (total)
@@ -942,8 +955,10 @@ def plot_numbers(animal, subtitle=None):
     plot_data = [
         dict(category="Experimental Hits", number=len(animal.hits), type="compound"),
         dict(category="Experimental Hits", number=len(animal.hits.poses), type="poses"),
-        dict(category="Base compounds", number=len(animal.bases), type="compound"),
-        dict(category="Base compounds", number=len(animal.bases.poses), type="poses"),
+        dict(category="Base compounds", number=len(animal.scaffolds), type="compound"),
+        dict(
+            category="Base compounds", number=len(animal.scaffolds.poses), type="poses"
+        ),
         dict(
             category="Syndirella Elaborations",
             number=len(animal.elabs),
@@ -1784,7 +1799,8 @@ def plot_pose_interactions(
 
 @hippo_graph
 def plot_compound_tsnee(
-    compounds,
+    animal: "HIPPO | None" = None,
+    compounds: "CompoundSet | None" = None,
     df: "pd.DataFrame | None" = None,
     title: str | None = None,
     subtitle: str | None = None,
@@ -1792,68 +1808,78 @@ def plot_compound_tsnee(
     symbol: str = "type",
     sort_by: str = "type",
     color: str = "cluster",
+    cluster_by: str = "scaffolds",
     **kwargs,
 ) -> "plotly.graph_objects.Figure":
+    """Plot a compound tanimoto similarity plot with principal components determined by pattern binary fingerprint similarity.
+
+    :param compounds: compounds to plot
+    :param df: optional pre-computed DataFrame
+    :param title: plot title
+    :param subtitle: plot subtitle
+    :param legend: show the plot legend
+    :param symbol: property used to determine symbol
+    :param sort_by: property used to sort dataframe
+    :param color: property used to determine marker color
+    :returns: `plotly.graph_objects.Figure`
+
+    """
 
     from .pca import get_cfps
     from sklearn.decomposition import PCA
     import numpy as np
 
-    mrich.var("#compounds", len(compounds))
+    if compounds:
+        mrich.var("#compounds", len(compounds))
 
     if df is None:
-
         with mrich.loading("Getting Compound DataFrame"):
-            df = compounds.get_df(mol=True, bases=True)
+            df = compounds.get_df(mol=True, scaffolds=True, inchikey=True, alias=True)
+            df = df.reset_index()
 
-        def get_cluster(row):
+        df["scaffolds"] = df["scaffolds"].map(
+            lambda x: x if not isinstance(x, float) else None
+        )
 
-            bases = row["bases"]
+    else:
 
-            if not bases:
-                return row["id"]
+        # check dataframe columns
+        if "mol" not in df.columns:
+            mrich.error("'mol' column not in dataframe")
+            return None
 
-            if len(bases) == 1:
-                return list(bases)[0]
-
-            return tuple(bases)
-
-        def get_type(row):
-
-            if row["bases"] is None:
-                return "base"
-
-            return "elaboration"
-
-        with mrich.loading("Adding columns"):
-            df["cluster"] = df.apply(get_cluster, axis=1)
-            df["type"] = df.apply(get_type, axis=1)
+        if cluster_by not in df.columns:
+            mrich.error(f"{cluster_by=} column not in dataframe")
+            return None
 
     with mrich.loading("Getting Compound fingerprints"):
         df["FP"] = df["mol"].map(get_cfps)
 
-    df["bases"] = df["bases"].map(lambda x: x if not isinstance(x, float) else None)
-
     def get_cluster(row):
 
-        bases = row["bases"]
+        scaffolds = row[cluster_by]
 
-        if not bases:
+        if not scaffolds:
             return row["id"]
 
-        if len(bases) == 1:
-            return list(bases)[0]
+        if scaffolds is None:
+            mrich.error(row)
+            return
 
-        return tuple(bases)
+        if len(scaffolds) == 1:
+            return list(scaffolds)[0]
+
+        return tuple(scaffolds)
 
     def get_type(row):
 
-        if row["bases"] is None:
+        if row[cluster_by] is None:
             return "scaffold"
 
         return "elaboration"
 
     with mrich.loading("Adding columns"):
+        df[cluster_by] = df[cluster_by].apply(tuple)
         df["cluster"] = df.apply(get_cluster, axis=1)
         df["type"] = df.apply(get_type, axis=1)
 
@@ -1872,21 +1898,17 @@ def plot_compound_tsnee(
     hover_data = [
         "id",
         "smiles",
-        # "alias",
+        "alias",
         "inchikey",
         "PC1",
         "PC2",
-        "bases",
+        cluster_by,
         "cluster",
         "type",
     ]
 
-    df["bases"] = df["bases"].astype(str)
+    df["scaffolds"] = df[cluster_by].astype(str)
     df["cluster"] = df["cluster"].astype(str)
-
-    # return df
-
-    # mrich.debug(df.columns)
 
     with mrich.loading("Creating figure"):
         fig = px.scatter(
@@ -1896,10 +1918,11 @@ def plot_compound_tsnee(
             hover_data=hover_data,
             color=color,
             symbol=symbol,
+            # custom_data="alias",
             **kwargs,
         )
 
-    subtitle = subtitle or f"#compounds={len(compounds)}"
+    subtitle = subtitle or f"#compounds={len(df)}"
 
     title = title or f"{compounds} PCA<br>"
 

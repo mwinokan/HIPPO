@@ -613,6 +613,7 @@ class PoseSet:
             self._indices = list(self._indices.keys())
 
         self._interactions = None
+        self._metadata_dict = None
 
         self._name = name
 
@@ -873,8 +874,20 @@ class PoseSet:
         return self._interactions
 
     @property
-    def interaction_overlap_score(self) -> int:
+    def pose_id_metadata_dict(self) -> dict[int, dict]:
+        """Get a dictionary mapping pose_ids to metadata dicts"""
+        if self._metadata_dict is None:
+            metadata_lookup = self.db.get_id_metadata_dict(table="pose", ids=self.ids)
+            metadata = {}
+            for pose_id in self.ids:
+                metadata[pose_id] = metadata_lookup[pose_id]
+            self._metadata_dict = metadata
+        return self._metadata_dict
+
+    def get_interaction_overlaps(self, return_pairs: bool = False) -> int:
         """Count the number of member pose pairs which share at least one but not all interactions"""
+
+        from itertools import combinations
 
         sql = f"""
         SELECT DISTINCT interaction_pose, feature_id, interaction_type FROM interaction 
@@ -895,22 +908,24 @@ class PoseSet:
         ids = [i for i in self.ids if i in ISETS]
 
         count = 0
-        for pose_j in ids:
+
+        pairs = set()
+
+        for pose_j, pose_k in combinations(ids, 2):
+
             iset_j = ISETS[pose_j]
-            for pose_k in ids:
-                iset_k = ISETS[pose_k]
+            iset_k = ISETS[pose_k]
 
-                # try:
-                # except KeyError:
-                #     mrich.error("No interactions for pose with id", pose_k, "Has it been fingerprinted?")
-                #     continue
+            intersection = iset_j & iset_k
+            diff1 = iset_j - iset_k
+            diff2 = iset_k - iset_j
 
-                intersection = iset_j & iset_k
-                diff1 = iset_j - iset_k
-                diff2 = iset_k - iset_j
+            if intersection and diff1 and diff2:
+                count += 1
+                pairs.add((pose_j, pose_k))
 
-                if intersection and diff1 and diff2:
-                    count += 1
+        if return_pairs:
+            return [PoseSet(self.db, [a, b]) for a, b in pairs]
 
         return count
 
@@ -1210,6 +1225,7 @@ class PoseSet:
         compound_id: bool = False,
         target_id: bool = False,
         reference_id: bool = False,
+        reference_alias: bool = False,
         path: bool = False,
         mol: bool = False,
         energy_score: bool = False,
@@ -1268,7 +1284,7 @@ class PoseSet:
         if alias:
             query.append("pose_alias")
 
-        if reference_id:
+        if reference_id or reference_alias:
             query.append("pose_reference")
 
         if path:
@@ -1329,7 +1345,7 @@ class PoseSet:
             if alias:
                 d["alias"] = row.pop(0)
 
-            if reference_id:
+            if reference_id or reference_alias:
                 d["reference_id"] = row.pop(0)
 
             if path:
@@ -1342,7 +1358,9 @@ class PoseSet:
                 d["target_id"] = row.pop(0)
 
             if mol:
-                d["mol"] = Mol(row.pop(0))
+                mol_bytes = row.pop(0)
+                if mol_bytes:
+                    d["mol"] = Mol(mol_bytes)
 
             if energy_score:
                 d["energy_score"] = row.pop(0)
@@ -1393,14 +1411,21 @@ class PoseSet:
                 self.db, set.union(*list(df["inspiration_ids"].values))
             )
             lookup = self.db.get_pose_id_alias_dict(pset=inspirations)
-            inspiration_aliases = []
-            for ids in df["inspiration_ids"].values:
-                aliases = {lookup[i] for i in ids}
             df["inspiration_aliases"] = df["inspiration_ids"].apply(
                 lambda x: {lookup[i] for i in x}
             )
             if not inspiration_ids:
                 df = df.drop(columns=["inspiration_ids"])
+
+        if reference_alias:
+            references = PoseSet(
+                self.db, set([int(x) for x in df["reference_id"].values])
+            )
+            lookup = self.db.get_pose_id_alias_dict(pset=references)
+            df["reference_alias"] = df["reference_id"].apply(lambda x: lookup[x])
+
+            if not reference_id:
+                df = df.drop(columns=["reference_id"])
 
         if tags:
             if debug:
@@ -1420,6 +1445,57 @@ class PoseSet:
                 df = df.drop(columns=["alias"])
 
         df = df.set_index("id")
+
+        ### Fill missing smiles entries
+
+        if (smiles or inchikey) and (
+            df["smiles"].isna().any() or df["inchikey"].isna().any()
+        ):
+
+            mrich.error("None in smiles/inchikey column")
+
+            empty = df[df["smiles"].isna()]
+            empty_poses = PoseSet(self.db, set(empty.index))
+
+            for pose in mrich.track(empty_poses, prefix="generating smiles/inchikeys"):
+                pose.smiles
+
+            records = self.db.select_where(
+                table="pose",
+                query="pose_id, pose_smiles, pose_inchikey",
+                key=f"pose_id IN {empty_poses.str_ids}",
+                multiple=True,
+            )
+
+            for pose_id, pose_smiles, pose_inchikey in records:
+                df.loc[pose_id, "smiles"] = pose_smiles
+                df.loc[pose_id, "inchikey"] = pose_inchikey
+
+            assert not df["smiles"].isna().any()
+            assert not df["inchikey"].isna().any()
+
+        ### Fill missing molecule entries
+
+        if mol and df["mol"].isna().any():
+            empty = df[df["mol"].isna()]
+
+            mrich.warning(len(empty), "rows have empty 'mol'")
+            empty_poses = PoseSet(self.db, set(empty.index))
+
+            for pose in mrich.track(empty_poses, prefix="generating Mols"):
+                pose.mol
+
+            records = self.db.select_where(
+                table="pose",
+                query="pose_id, pose_mol",
+                key=f"pose_id IN {empty_poses.str_ids}",
+                multiple=True,
+            )
+
+            for pose_id, pose_mol in records:
+                df.loc[pose_id, "mol"] = Mol(pose_mol)
+
+            assert not len(df[df["mol"].isna()])
 
         return df
 
@@ -1445,7 +1521,7 @@ class PoseSet:
     def get_by_compound(
         self,
         *,
-        compound: "int | Compound",
+        compound: "int | Compound | CompoundSet",
     ) -> "PoseSet | None":
         """Select a subset of this :class:`.PoseSet` by the associated :class:`.Compound`.
 
@@ -1454,17 +1530,30 @@ class PoseSet:
 
         """
         from .compound import Compound
+        from .cset import CompoundSet
 
-        if isinstance(compound, Compound):
-            compound = compound.id
+        if isinstance(compound, CompoundSet):
+            values = self.db.select_where(
+                query="pose_id",
+                table="pose",
+                key=f"pose_compound IN {compound.str_ids} AND pose_id in {self.str_ids}",
+                multiple=True,
+                none="quiet",
+            )
 
-        values = self.db.select_where(
-            query="pose_id",
-            table="pose",
-            key=f"pose_compound={compound} AND pose_id in {self.str_ids}",
-            multiple=True,
-            none="quiet",
-        )
+        else:
+
+            if isinstance(compound, Compound):
+                compound = compound.id
+
+            values = self.db.select_where(
+                query="pose_id",
+                table="pose",
+                key=f"pose_compound={compound} AND pose_id in {self.str_ids}",
+                multiple=True,
+                none="quiet",
+            )
+
         if not values:
             return None
         ids = [v for v, in values if v]
@@ -1634,7 +1723,10 @@ class PoseSet:
         """
         for id in self.indices:
             metadata = self.db.get_metadata(table="pose", id=id)
-            metadata.append(key, value)
+            try:
+                metadata.append(key, value)
+            except AttributeError:
+                mrich.error(f"Could not append to metadata {key=}. Not a list?")
 
     def set_subsites_from_metadata_field(self, field="CanonSites alias") -> None:
         """Create and assign subsite entries from a metadata field
@@ -1779,11 +1871,11 @@ class PoseSet:
     def split_by_inspirations(
         self,
         single_set: bool = False,
-    ) -> "dict[int,PoseSet] | PoseSet":
+    ) -> "dict[PoseSet,PoseSet] | PoseSet":
         """Split this :class:`.PoseSet` into subsets grouped by inspirations
 
         :param single_set: Return a single :class:`.PoseSet` with members sorted by inspirations (Default value = False)
-        :returns: a dictionary with tuples of inspiration :class:`.Pose` IDs as keys and :class:`.PoseSet` subsets as values
+        :returns: a dictionary with tuples of inspiration :class:`.PoseSet` as keys and :class:`.PoseSet` derivative subsets as values
 
         """
 
@@ -1914,7 +2006,6 @@ class PoseSet:
         :param tags: include a column for tags in the output (Default value = True)
         :param subsites: include a column for subsites in the output (Default value = True)
         :param extra_cols: extra_cols should be a dictionary with a key for each column name, and list values where the first element is the field description, and all subsequent elements are values for each pose.
-        :param name: How to determine the molecule name, see :meth:`.PoseSet.get_df`
 
         """
 
@@ -2812,6 +2903,42 @@ class PoseSet:
             case int():
                 # assert other in set(self.ids)
                 return PoseSet(self.db, [i for i in self.ids if i != other], sort=False)
+
+    def __and__(self, other: "PoseSet"):
+        """AND set operation, returns only poses in both sets"""
+
+        match other:
+
+            case PoseSet():
+                ids = set(self.ids) & set(other.ids)
+                return PoseSet(self.db, ids)
+
+            case _:
+                raise NotImplementedError
+
+    def __or__(self, other: "PoseSet"):
+        """OR set operation, returns union of both sets"""
+
+        match other:
+
+            case PoseSet():
+                ids = set(self.ids) | set(other.ids)
+                return PoseSet(self.db, ids)
+
+            case _:
+                raise NotImplementedError
+
+    def __xor__(self, other: "PoseSet"):
+        """Exclusive OR set operation, returns all poses in either set but not both"""
+
+        match other:
+
+            case PoseSet():
+                ids = set(self.ids) ^ set(other.ids)
+                return PoseSet(self.db, ids)
+
+            case _:
+                raise NotImplementedError
 
     def __call__(
         self,

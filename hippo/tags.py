@@ -42,11 +42,11 @@ class TagTable:
         values = self.db.select(
             table=self.table, query="DISTINCT tag_name", multiple=True
         )
-        return set(v for v, in values)
+        return list(sorted(set(v for v, in values)))
 
     ### METHODS
 
-    def summary(self) -> "pd.DataFrame":
+    def summary(self, return_df: bool = False) -> "pd.DataFrame":
         """Print a summary table of tags with compound and pose counts"""
 
         from pandas import DataFrame
@@ -87,9 +87,10 @@ class TagTable:
         df = df.fillna(0)
         df = df.astype(int)
 
-        mrich.print(df)
-
-        return df
+        if return_df:
+            return df
+        else:
+            mrich.print(df)
 
     def rename(self, old: str, new: str) -> None:
         """Rename all instances of a tag across the database"""

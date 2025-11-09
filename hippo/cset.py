@@ -50,12 +50,12 @@ class CompoundTable:
             cset = ctable[set(13,15,18)] # using IDs (set)
             cset = ctable[13:18]         # using a slice
 
-    Tags and base compounds can also be used to filter:
+    Tags and scaffold compounds can also be used to filter:
 
     ::
 
             cset = animal.compounds(tag='hits') # select compounds tagged with 'hits'
-            cset = animal.compounds(base=comp)  # select elaborations of comp
+            cset = animal.compounds(scaffold=comp)  # select elaborations of comp
 
     """
 
@@ -182,7 +182,7 @@ class CompoundTable:
 
     @property
     def elabs(self) -> "CompoundSet":
-        """Returns a :class:`.CompoundSet` of all compounds that are a an elaboration of an existing base"""
+        """Returns a :class:`.CompoundSet` of all compounds that are a an elaboration of an existing scaffold"""
         ids = self.db.select_where(
             query="scaffold_superstructure",
             table="scaffold",
@@ -202,7 +202,7 @@ class CompoundTable:
         return cset
 
     @property
-    def bases(self) -> "CompoundSet":
+    def scaffolds(self) -> "CompoundSet":
         """Returns a :class:`.CompoundSet` of all compounds that are the basis for a set of elaborations"""
         ids = self.db.select_where(
             query="DISTINCT scaffold_base",
@@ -215,18 +215,18 @@ class CompoundTable:
         from .cset import CompoundSet
 
         cset = CompoundSet(self.db, ids)
-        cset._name = "all bases"
+        cset._name = "all scaffolds"
         return cset
 
     @property
     def num_elabs(self) -> int:
-        """Returns the number of compounds that are a an elaboration of an existing base"""
+        """Returns the number of compounds that are a an elaboration of an existing scaffold"""
         return len(self.elabs)
 
     @property
-    def num_bases(self) -> int:
+    def num_scaffolds(self) -> int:
         """Returns the number of compounds that are the basis for a set of elaborations"""
-        return len(self.bases)
+        return len(self.scaffolds)
 
     ### METHODS
 
@@ -332,30 +332,30 @@ class CompoundTable:
 
         return cset
 
-    def get_by_base(
+    def get_by_scaffold(
         self,
-        base: Compound | int,
+        scaffold: Compound | int,
     ) -> "CompoundSet":
-        """Get all compounds that elaborate the given base compound
+        """Get all compounds that elaborate the given scaffold compound
 
-        :param base: :class:`.Compound` object or ID to search by
+        :param scaffold: :class:`.Compound` object or ID to search by
 
         """
 
-        if not isinstance(base, int):
-            assert base._table == "compound"
-            base = base.id
+        if not isinstance(scaffold, int):
+            assert scaffold._table == "compound"
+            scaffold = scaffold.id
 
         values = self.db.select_where(
             query="scaffold_superstructure",
             table="scaffold",
             key="base",
-            value=base,
+            value=scaffold,
             multiple=True,
         )
         ids = [v for v, in values if v]
         cset = self[ids]
-        cset._name = f"elaborations of C{base}"
+        cset._name = f"elaborations of C{scaffold}"
         return cset
 
     def get_by_smiles(self, smiles: str, **kwargs) -> "Compound | None":
@@ -383,7 +383,7 @@ class CompoundTable:
         mrich.var("#compounds", len(self))
         # mrich.var('#poses', self.num_poses)
         mrich.var("tags", self.tags)
-        mrich.var("#bases", self.num_bases)
+        mrich.var("#scaffolds", self.num_scaffolds)
         mrich.var("#elabs", self.num_elabs)
         mrich.var("#reactants", self.num_reactants)
         mrich.var("#intermediates", self.num_intermediates)
@@ -410,7 +410,7 @@ class CompoundTable:
         self[self.ids].interactive()
 
     def plot_tsnee(self, **kwargs) -> "go.Figure":
-        """Plot a tanimoto similarity plot of these compounds"""
+        """Plot a tanimoto similarity plot of these compounds. See :func:`hippo.plotting.plot_compound_tsnee`"""
         return self[:].plot_tsnee(**kwargs)
 
     def write_smiles_csv(self, file: str) -> None:
@@ -437,27 +437,33 @@ class CompoundTable:
         self,
         *,
         tag: str = None,
-        base: int | Compound = None,
+        scaffold: int | Compound = None,
         smiles: str | None = None,
+        ids: list | set | None = None,
+        sort: bool = True,
         **kwargs,
     ) -> "CompoundSet | Compound | None":
-        """Filter compounds by a given tag, base, or it's SMILES string. See :meth:`.CompoundTable.get_by_tag` and :meth:`.CompoundTable.get_by_base`
+        """Filter compounds by a given tag, scaffold, or it's SMILES string. See :meth:`.CompoundTable.get_by_tag` and :meth:`.CompoundTable.get_by_scaffold`
 
         :param tag: optional tag to filter by
-        :param base: optional :class:`.Compound` ID or object to filter by
-        :param base: optional SMILES string to filter by
-        :returns: :class:`.CompoundSet` if searching by tag or base, else :class:`.Compound` object
+        :param scaffold: optional :class:`.Compound` ID or object to filter by
+        :param smiles: optional SMILES string to filter by
+        :param ids: optional set of :class:`.Compound` ID's
+        :param sort: sort :class:`.Compound` ID's
+        :returns: :class:`.CompoundSet` if searching by tag or scaffold, else :class:`.Compound` object
 
         """
 
         if tag:
             return self.get_by_tag(tag, **kwargs)
-        elif base:
-            return self.get_by_base(base, **kwargs)
+        elif scaffold:
+            return self.get_by_scaffold(scaffold, **kwargs)
         elif smiles:
             return self.get_by_smiles(smiles, **kwargs)
+        elif ids:
+            return CompoundSet(self.db, indices=list(ids), sort=sort)
         else:
-            mrich.error("Must provide one of tag, base, or smiles arguments")
+            mrich.error("Must provide one of tag, scaffold, or smiles arguments")
             return None
 
     def __getitem__(
@@ -469,6 +475,9 @@ class CompoundTable:
         :param key: Can be an integer ID, negative integer index, alias or inchikey string, list/set/tuple of IDs, or slice of IDs
 
         """
+
+        from numpy import ndarray
+        from pandas import Index, Series
 
         match key:
 
@@ -492,8 +501,19 @@ class CompoundTable:
                 return comp
 
             case key if (
-                isinstance(key, list) or isinstance(key, tuple) or isinstance(key, set)
+                isinstance(key, list)
+                or isinstance(key, tuple)
+                or isinstance(key, set)
+                or isinstance(key, ndarray)
+                or isinstance(key, Index)
+                or isinstance(key, Series)
             ):
+
+                if isinstance(key, Index):
+                    assert key.nlevels == 1
+
+                if isinstance(key, ndarray):
+                    assert len(key.shape) == 1
 
                 indices = []
                 for i in key:
@@ -598,12 +618,12 @@ class CompoundSet:
             # getting a subset of compounds using a slice
             cset2 = cset[13:18] # using a slice
 
-    Tags and base compounds can also be used to filter:
+    Tags and scaffold compounds can also be used to filter:
 
     ::
 
             cset = animal.compounds(tag='hits') # select compounds tagged with 'hits'
-            cset = animal.compounds(base=comp)  # select elaborations of comp
+            cset = animal.compounds(scaffold=comp)  # select elaborations of comp
 
     """
 
@@ -629,7 +649,7 @@ class CompoundSet:
         if sort:
             self._indices = sorted(list(set(indices)))
         else:
-            self._indices = list(set(indices))
+            self._indices = list(indices)
 
         self._name = name
         self._total_changes = db.total_changes
@@ -792,7 +812,7 @@ class CompoundSet:
 
     @property
     def num_atoms_added(self) -> list[int]:
-        """Calculate the number of atoms added w.r.t the base
+        """Calculate the number of atoms added w.r.t the scaffold
 
         :returns: list of number of atoms added values
 
@@ -821,9 +841,9 @@ class CompoundSet:
 
     @property
     def avg_num_atoms_added(self) -> float:
-        """Calculate the average number of atoms added w.r.t the base
+        """Calculate the average number of atoms added w.r.t the scaffold
 
-        :returns: average number of atoms added values for compounds which have a base
+        :returns: average number of atoms added values for compounds which have a scaffold
 
         """
 
@@ -848,9 +868,9 @@ class CompoundSet:
 
     @property
     def risk_diversity(self) -> float:
-        """Calculate the average spread of risk (#atoms added) for each base in this set
+        """Calculate the average spread of risk (#atoms added) for each scaffold in this set
 
-        :returns: average of the standard deviations of number of atoms added for each base
+        :returns: average of the standard deviations of number of atoms added for each scaffold
 
         """
 
@@ -858,7 +878,7 @@ class CompoundSet:
 
     @property
     def elaboration_balance(self) -> float:
-        """Measure of how evenly elaborations are distributed across bases in this set"""
+        """Measure of how evenly elaborations are distributed across scaffolds in this set"""
 
         sql = f"""
         SELECT COUNT(1) FROM scaffold
@@ -877,10 +897,10 @@ class CompoundSet:
         # return -std(counts)
 
     @property
-    def num_bases_elaborated(self) -> int:
-        """Count the number of base compounds that have at least one elaboration in this set
+    def num_scaffolds_elaborated(self) -> int:
+        """Count the number of scaffold compounds that have at least one elaboration in this set
 
-        :returns: number of base compounds
+        :returns: number of scaffold compounds
 
         """
 
@@ -894,26 +914,39 @@ class CompoundSet:
         return count
 
     @property
-    def bases(self) -> "CompoundSet":
-        """Get the base compounds that have at least one elaboration in this set
+    def scaffolds(self) -> "CompoundSet":
+        """Get the scaffold compounds that have at least one elaboration in this set
 
         :returns: :class:`.CompoundSet`
 
         """
+        return CompoundSet(self.db, self.scaffold_ids)
 
-        base_ids = self.db.execute(
+    @property
+    def scaffold_ids(self) -> list[int]:
+        """Return a list of :class:`.Compound` ID's for scaffolds of this set"""
+        scaffold_ids = self.db.execute(
             f"""
                 SELECT DISTINCT scaffold_base FROM scaffold
                 WHERE scaffold_superstructure IN {self.str_ids}  
             """
         ).fetchall()
+        return [i for i, in scaffold_ids]
 
-        base_ids = [i for i, in base_ids]
-        return CompoundSet(self.db, base_ids)
+    @property
+    def num_scaffolds(self) -> int:
+        """Return a count of scaffolds of this set"""
+        (count,) = self.db.execute(
+            f"""
+                SELECT COUNT(DISTINCT scaffold_base) FROM scaffold
+                WHERE scaffold_superstructure IN {self.str_ids}  
+            """
+        ).fetchone()
+        return count
 
     @property
     def elabs(self) -> "CompoundSet":
-        """Returns a :class:`.CompoundSet` of all compounds that are a an elaboration of an existing base"""
+        """Returns a :class:`.CompoundSet` of all compounds that are a an elaboration of an existing scaffold"""
 
         ids = self.db.select_where(
             query="scaffold_superstructure",
@@ -932,11 +965,22 @@ class CompoundSet:
         return CompoundSet(self.db, ids)
 
     @property
+    def num_elabs(self) -> int:
+        """Return a count of elaborations of this set"""
+        (count,) = self.db.execute(
+            f"""
+                SELECT COUNT(DISTINCT scaffold_superstructure) FROM scaffold
+                WHERE scaffold_base IN {self.str_ids}  
+            """
+        ).fetchone()
+        return count
+
+    @property
     def elab_df(self) -> "pd.DataFrame":
         """Get a DataFrame summarising the elaborations in this CompoundSet"""
         from pandas import DataFrame
 
-        cluster_dict = self.db.get_compound_cluster_dict(max_bases=1)
+        cluster_dict = self.db.get_compound_cluster_dict(max_scaffolds=1)
 
         data = []
         for scaffold, elabs in cluster_dict.items():
@@ -1027,19 +1071,18 @@ class CompoundSet:
         :param value: metadata value (Default value = None)
         """
 
-        results = self.db.select(
-            query="compound_id, compound_metadata", table="compound", multiple=True
+        results = self.db.select_where(
+            query="compound_id, compound_metadata",
+            table="compound",
+            key=f"compound_id IN {self.str_ids}",
+            multiple=True,
         )
         if value is None:
-            ids = [i for i, d in results if d and f'"{key}":' in d and i in self.ids]
+            ids = [i for i, d in results if d and f'"{key}":' in d]
         else:
             if isinstance(value, str):
                 value = f'"{value}"'
-            ids = [
-                i
-                for i, d in results
-                if d and f'"{key}": {value}' in d and i in self.ids
-            ]
+            ids = [i for i, d in results if d and f'"{key}": {value}' in d]
         return CompoundSet(self.db, ids)
 
     def get_by_metadata_substring_match(
@@ -1071,25 +1114,25 @@ class CompoundSet:
 
         return cset
 
-    def get_by_base(
+    def get_by_scaffold(
         self,
-        base: Compound | int,
+        scaffold: Compound | int,
         none: str = "error",
     ) -> "CompoundSet":
-        """Get all compounds that elaborate the given base compound
+        """Get all compounds that elaborate the given scaffold compound
 
-        :param base: :class:`.Compound` object or ID to search by
+        :param scaffold: :class:`.Compound` object or ID to search by
 
         """
 
-        if not isinstance(base, int):
-            assert base._table == "compound"
-            base = base.id
+        if not isinstance(scaffold, int):
+            assert scaffold._table == "compound"
+            scaffold = scaffold.id
 
         values = self.db.select_where(
             query="scaffold_superstructure",
             table="scaffold",
-            key=f"scaffold_base = {base} AND scaffold_superstructure IN {self.str_ids}",
+            key=f"scaffold_base = {scaffold} AND scaffold_superstructure IN {self.str_ids}",
             multiple=True,
             none=none,
         )
@@ -1128,9 +1171,9 @@ class CompoundSet:
         return all_reactions
 
     def get_risk_diversity(self, debug: bool = False) -> float:
-        """Calculate the average spread of risk (#atoms added) for each base in this set
+        """Calculate the average spread of risk (#atoms added) for each scaffold in this set
 
-        :returns: average of the standard deviations of number of atoms added for each base
+        :returns: average of the standard deviations of number of atoms added for each scaffold
 
         """
 
@@ -1215,12 +1258,74 @@ class CompoundSet:
 
         self.draw()
 
-    def summary(self) -> None:
+    def summary(self, return_df: bool = False) -> None:
         """Print a summary of this compound set"""
-        mrich.header("CompoundSet()")
-        mrich.var("#compounds", len(self))
-        mrich.var("#poses", self.num_poses)
-        mrich.var("tags", self.tags)
+
+        mrich.header(self)
+
+        from pandas import DataFrame
+
+        sql = f"""
+        SELECT tag_name,
+        COUNT(DISTINCT tag_compound)
+        FROM tag
+        WHERE tag_compound IN {self.str_ids}
+        GROUP BY tag_name
+        ORDER BY tag_name
+        """
+
+        cursor = self.db.execute(sql)
+
+        data = [dict(tag=a, num_compounds=b) for a, b in cursor.fetchall()]
+
+        df = DataFrame(data)
+        df = df.set_index("tag")
+
+        # poses
+
+        sql = f"""
+        SELECT tag_name,
+        COUNT(DISTINCT tag_pose)
+        FROM tag
+        INNER JOIN pose
+        ON pose_id = tag_pose
+        WHERE pose_compound IN {self.str_ids}
+        GROUP BY tag_name
+        ORDER BY tag_name
+        """
+
+        cursor = self.db.execute(sql)
+
+        for tag, count in cursor.fetchall():
+            df.loc[tag, "num_poses"] = count
+
+        # compounds with poses
+
+        sql = f"""
+        SELECT tag_name, COUNT(DISTINCT pose_compound) FROM tag
+        INNER JOIN pose
+        ON tag_pose = pose_id
+        WHERE pose_compound IN {self.str_ids}
+        GROUP BY tag_name
+        ORDER BY tag_name
+        """
+
+        cursor = self.db.execute(sql)
+
+        for tag, count in cursor.fetchall():
+            df.loc[tag, "num_posed_compounds"] = count
+
+        df.loc["TOTAL", "num_compounds"] = len(self)
+        df.loc["TOTAL", "num_poses"] = self.num_poses
+        df.loc["TOTAL", "num_posed_compounds"] = len(self.poses.compounds)
+
+        df = df.fillna(0)
+        df = df.astype(int)
+
+        if return_df:
+            return df
+        else:
+            mrich.print(df)
 
     def interactive(
         self,
@@ -1444,6 +1549,7 @@ class CompoundSet:
     def get_routes(
         self,
         permitted_reactions: "None | ReactionSet" = None,
+        return_ids: bool = False,
         debug: bool = True,
     ) -> "RouteSet":
         """Get a RoutSet to products in this set.
@@ -1492,6 +1598,9 @@ class CompoundSet:
                 if all(r in permitted_reactions for r in reactions):
                     available_routes.add(route_id)
 
+            if return_ids:
+                return list(available_routes)
+
             routes = [
                 self.db.get_route(id=route_id)
                 for route_id in mrich.track(available_routes, prefix="Getting routes")
@@ -1507,6 +1616,9 @@ class CompoundSet:
             if debug:
                 mrich.debug("Querying database for routes")
             records = self.db.execute(sql).fetchall()
+
+            if return_ids:
+                return [i for i, in records]
 
             routes = [
                 self.db.get_route(id=route_id)
@@ -1555,11 +1667,10 @@ class CompoundSet:
         num_reactions: bool = False,
         num_poses: bool = False,
         tags: bool = False,
-        bases: bool = False,
+        scaffolds: bool = False,
         elabs: bool = False,
         routes: bool = False,
         debug: bool = False,
-        # count_by_target: bool = False,
         **kwargs,
     ) -> "DataFrame":
         """Get a DataFrame representation of this set
@@ -1575,10 +1686,8 @@ class CompoundSet:
         :param num_reactant: include num_reactant column (number of reactions where compound is a reactant)
         :param num_reactions: include num_reactions column (number of reactions where compound is a product)
         :param tags: include tags column
-        :param bases: include bases column
+        :param scaffolds: include scaffolds column
         :param elabs: include elabs column
-
-        # :param count_by_target: count poses by target (Default value = False)
 
         """
 
@@ -1684,17 +1793,17 @@ class CompoundSet:
                     lookup[p] += 1
                 df["num_reactions"] = df["id"].apply(lambda x: lookup.get(x, 0))
 
-        if bases or elabs:
+        if scaffolds or elabs:
             if debug:
                 mrich.debug("adding scaffold columns")
             tuples = self.db.get_scaffold_tuples(self.ids)
 
-            if bases:
+            if scaffolds:
                 lookup = {}
                 for b, e in tuples:
                     lookup.setdefault(e, set())
                     lookup[e].add(b)
-                df["bases"] = df["id"].apply(lambda x: lookup.get(x, set()))
+                df["scaffolds"] = df["id"].apply(lambda x: lookup.get(x, set()))
 
             if elabs:
                 lookup = {}
@@ -1835,7 +1944,7 @@ class CompoundSet:
             tags = c.tags
             metadata = c.metadata
             poses = c.poses
-            base = c.base
+            scaffold = c.scaffold
 
             # method
             assert len(tags) == 1, c
@@ -1853,8 +1962,8 @@ class CompoundSet:
                     pose = poses[0]
                 case 0:
                     mrich.warning(f"{c} has no poses")
-                    assert base
-                    pose = base.poses[0]
+                    assert scaffold
+                    pose = scaffold.poses[0]
                 case _:
                     mrich.warning(f"{c} has multiple poses")
                     pose = poses[0]
@@ -2106,10 +2215,14 @@ class CompoundSet:
         match other:
 
             case Compound():
-                return self.add(other)
+                ids = set(self.ids)
+                ids.add(other.id)
+                return CompoundSet(self.db, ids)
 
             case int():
-                return self.add(other)
+                ids = set(self.ids)
+                ids.add(other)
+                return CompoundSet(self.db, ids)
 
             case CompoundSet():
                 ids = set(self.ids) | set(other.ids)
@@ -2117,6 +2230,30 @@ class CompoundSet:
 
             case IngredientSet():
                 ids = set(self.ids) | set(other.compound_ids)
+                return CompoundSet(self.db, ids)
+
+            case _:
+                raise NotImplementedError
+
+    def __and__(self, other: "CompoundSet"):
+        """AND set operation, returns only compounds in both sets"""
+
+        match other:
+
+            case CompoundSet():
+                ids = set(self.ids) & set(other.ids)
+                return CompoundSet(self.db, ids)
+
+            case _:
+                raise NotImplementedError
+
+    def __or__(self, other: "CompoundSet"):
+        """OR set operation, returns union of both sets"""
+
+        match other:
+
+            case CompoundSet():
+                ids = set(self.ids) | set(other.ids)
                 return CompoundSet(self.db, ids)
 
             case _:
@@ -2366,9 +2503,10 @@ class IngredientSet:
     def price_df(self) -> "DataFrame":
         """DataFrame including prices"""
         df = self.df.copy()
-        tuples = [(i.price, i.lead_time) for i in self]
+        tuples = [(i.price, i.lead_time, i.quote.supplier) for i in self]
         df["price"] = [t[0] for t in tuples]
         df["lead_time"] = [t[1] for t in tuples]
+        df["quote_supplier"] = [t[2] for t in tuples]
         return df
 
     @property
@@ -2443,6 +2581,13 @@ class IngredientSet:
     def compounds(self) -> "CompoundSet":
         """:class:`.CompoundSet` of all compounds in this set"""
         return CompoundSet(self.db, self.compound_ids)
+
+    @property
+    def quote_ids(self) -> list[int]:
+        """Get a list of quote ID's"""
+        from pandas import isna
+
+        return [q for q in self.df["quote_id"].values if not isna(q) and q is not None]
 
     ### METHODS
 

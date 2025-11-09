@@ -13,48 +13,47 @@ DATA_COLUMNS = [
     "compound_ids",
     "pose_ids",
     "interaction_ids",
+    "pose_metadata",
 ]
 
 
 class Scorer:
-    """
+    """Create a scorer object to score sets of recipes
 
-    :param recipes: :class:`.RecipeSet`
-
-    inputs
-    ------
-
-    * building block set
-    * HIPPO object
-
-    parameters
-    ----------
-
-    * optimisation attributes
-    * weights
-
-    outputs
-    -------
-
-    * score for a given BBS
-    * BBSs sorted by score
-
+    :param db: :class:`.Database`
+    :param directory: path to directory containing recipe JSONs
+    :param pattern: glob pattern for :class:`.Recipe` JSON, default: "*.json"
+    :param attributes: attributes of :class:`.Recipe` objects to use for scoring
+    :param populate: Pre-populate query caches and child objects in memory (don't disable unless you have a good reason)
+    :param load_cache: Load cache from existing JSON
+    :param allowed_pose_ids: Restrict interaction and subsite calculations to these :class:`.Pose` IDs
     """
 
     def __init__(
         self,
         db: "Database",
-        recipes: "RecipeSet",
-        attributes: list[str],
+        directory: "Path | str",
+        pattern: str = "*.json",
+        attributes: list[str] = None,
         populate: bool = True,
         load_cache: bool = True,
+        allowed_poses: "PoseSet | list[int] | None" = None,
     ) -> None:
 
+        from .pset import PoseSet
         from .recipe import RecipeSet
 
-        assert isinstance(recipes, RecipeSet)
-
         self._db = db
+
+        if isinstance(allowed_poses, PoseSet):
+            self._allowed_pose_ids = set(allowed_poses.ids)
+        else:
+            self._allowed_pose_ids = set(allowed_poses)
+
+        attributes = attributes or []
+
+        recipes = RecipeSet(db, directory, pattern=pattern)
+
         self._recipes = recipes
 
         self._attributes = {}
@@ -91,12 +90,11 @@ class Scorer:
         skip: list[str] | None = None,
         load_cache: bool = True,
         subsites: bool = True,
-        # **kwargs,
-    ):
+        allowed_poses: "PoseSet | list[int] | None" = None,
+    ) -> "Scorer":
+        """Create a Scorer instance with Default attributes"""
 
         from .recipe import RecipeSet
-
-        rset = RecipeSet(db, directory, pattern=pattern)
 
         self = cls.__new__(cls)
 
@@ -104,7 +102,14 @@ class Scorer:
             k for k, v in DEFAULT_ATTRIBUTES.items() if v["type"] == "standard"
         ]
 
-        self.__init__(db=db, recipes=rset, attributes=attributes, populate=False)
+        self.__init__(
+            db=db,
+            directory=directory,
+            pattern=pattern,
+            attributes=attributes,
+            populate=False,
+            allowed_poses=allowed_poses,
+        )
 
         skip = skip or []
 
@@ -122,8 +127,8 @@ class Scorer:
 
         if not db.count("scaffold"):
             mrich.warning("No scaffold entries in DB, skipping related metrics")
-            skip.append("num_bases")
-            skip.append("num_bases_elaborated")
+            skip.append("num_scaffolds")
+            skip.append("num_scaffolds_elaborated")
             skip.append("elaboration_balance")
 
         # custom attributes
@@ -452,7 +457,7 @@ class Scorer:
         )
 
     def top_keys(self, n: int, budget: float | None = None):
-        keys = self.get_sorted_df(budget=budget)["hash"][:n]
+        keys = self.get_sorted_df(budget=budget).index[:n]
         return keys
 
     def top(self, n: int, budget: float | None = None):
@@ -506,7 +511,7 @@ class Scorer:
         for recipe in self.recipes:
             self._data.at[recipe.hash, "price"] = recipe.price.amount
 
-        ### Product Compound IDs
+        ### Compound IDs
 
         col = "compound_ids"
         null = df[col].isnull()
@@ -519,7 +524,7 @@ class Scorer:
                 recipe = self.recipes[key]
                 df.at[key, col] = recipe.combined_compound_ids
 
-        ### Product Pose IDs
+        ### Pose IDs
 
         col = "pose_ids"
         null = df[col].isnull()
@@ -543,17 +548,21 @@ class Scorer:
                 recipe = self.recipes[key]
                 comp_ids = df["compound_ids"][key]
 
-                row = df.loc[key]
-
                 all_pose_ids = set()
 
                 for comp_id in comp_ids:
                     pose_ids = pose_map.get(comp_id, set())
+
+                    if self._allowed_pose_ids:
+                        pose_ids = set(
+                            i for i in pose_ids if i in self._allowed_pose_ids
+                        )
+
                     all_pose_ids |= pose_ids
 
                 df.at[key, col] = all_pose_ids
 
-        ### Product Interaction IDs
+        ### Interaction IDs
 
         col = "interaction_ids"
         null = df[col].isnull()
@@ -577,8 +586,6 @@ class Scorer:
                 recipe = self.recipes[key]
                 pose_ids = df["pose_ids"][key]
 
-                row = df.loc[key]
-
                 all_interaction_ids = set()
 
                 for pose_id in pose_ids:
@@ -587,7 +594,37 @@ class Scorer:
 
                 df.at[key, col] = all_interaction_ids
 
-        # raise NotImplementedError
+        ### Metadata Dictionaries
+
+        col = "pose_metadata"
+        null = df[col].isnull()
+
+        # populate missing product interaction ids
+        if null.sum():
+
+            pose_ids = set()
+            for ids in df[null]["pose_ids"]:
+                for id in ids:
+                    pose_ids.add(id)
+
+            # pset = PoseSet(self.db, pose_ids, sort=False)
+
+            mrich.debug(f"Getting metadata for {len(pose_ids)} poses")
+            metadata_lookup = self.db.get_id_metadata_dict(table="pose", ids=pose_ids)
+
+            mrich.debug(f'Populating _data["{col}"]...')
+            for key in df[null].index.values:
+                assert len(df[null]) == null.sum()
+                recipe = self.recipes[key]
+                pose_ids = df["pose_ids"][key]
+
+                row = df.loc[key]
+
+                metadata = {}
+                for pose_id in pose_ids:
+                    metadata[pose_id] = metadata_lookup[pose_id]
+
+                df.at[key, col] = metadata
 
     def _populate_recipe_child_sets(self):
 
@@ -609,14 +646,18 @@ class Scorer:
             if recipe._poses is None:
                 ids = row["pose_ids"]
                 cache = PoseSet(self.db, ids)
-                cache._name = f"Recipe_{key} product poses"
-                recipe._product_poses = cache
+                cache._name = f"Recipe_{key} poses"
+                recipe._poses = cache
 
             if recipe._interactions is None:
                 ids = row["interaction_ids"]
                 cache = InteractionSet(self.db, ids)
                 cache._name = f"Recipe_{key} product interactions"
                 recipe._interactions = cache
+
+            if recipe._poses._metadata_dict is None:
+                cache = row["pose_metadata"]
+                recipe._poses._metadata_dict = cache
 
     def _dump_json(self):
         path = self.json_path
@@ -908,28 +949,28 @@ class CustomAttribute(Attribute):
 
 
 # DEFAULT_ATTRIBUTES = {
-#     "num_bases": dict(
+#     "num_scaffolds": dict(
 #         type="custom",
 #         weight=1.0,
-#         function=lambda r: r.product_compounds.count_by_tag(tag="Syndirella base"),
-#         description="The number of Syndirella base compounds in this selection",
+#         function=lambda r: r.product_compounds.count_by_tag(tag="Syndirella scaffold"),
+#         description="The number of Syndirella scaffold compounds in this selection",
 #     ),
 #     "num_products": dict(
 #         type="standard",
 #         weight=1.0,
 #         description="The number of product compounds in this selection",
 #     ),
-#     "num_bases_elaborated": dict(
+#     "num_scaffolds_elaborated": dict(
 #         type="custom",
 #         weight=1.0,
-#         function=lambda r: r.product_compounds.num_bases_elaborated,
-#         description="The number of Syndirella base compounds that have at least one elaboration in this selection",
+#         function=lambda r: r.product_compounds.num_scaffolds_elaborated,
+#         description="The number of Syndirella scaffold compounds that have at least one elaboration in this selection",
 #     ),
 #     "elaboration_balance": dict(
 #         type="custom",
 #         weight=1.0,
 #         function=lambda r: r.product_compounds.elaboration_balance,
-#         description="A measure for how evenly base compounds have been elaborated",
+#         description="A measure for how evenly scaffold compounds have been elaborated",
 #     ),  ### REALLY UNPERFORMANT?
 #     "num_inspirations": dict(
 #         type="custom",
@@ -947,7 +988,7 @@ class CustomAttribute(Attribute):
 #         type="custom",
 #         weight=0.0,
 #         function=lambda r: r.product_compounds.risk_diversity,
-#         description="A measure of how evenly spread the risk of elaborations are for each base compound. Risk in this case refers to the number of atoms added",
+#         description="A measure of how evenly spread the risk of elaborations are for each scaffold compound. Risk in this case refers to the number of atoms added",
 #     ),
 #     "interaction_count": dict(
 #         type="custom",
@@ -992,28 +1033,28 @@ class CustomAttribute(Attribute):
 # }
 
 DEFAULT_ATTRIBUTES = {
-    "num_bases": dict(
+    "num_scaffolds": dict(
         type="custom",
         weight=1.0,
-        function=lambda r: r.combined_compounds.count_by_tag(tag="Syndirella base"),
-        description="The number of Syndirella base compounds in this selection. Higher is better.",
+        function=lambda r: r.combined_compounds.count_by_tag(tag="Syndirella scaffold"),
+        description="The number of Syndirella scaffold compounds in this selection. Higher is better.",
     ),
     "num_compounds": dict(
         type="standard",
         weight=1.0,
         description="The number of product compounds in this selection. Higher is better.",
     ),
-    "num_bases_elaborated": dict(
+    "num_scaffolds_elaborated": dict(
         type="custom",
         weight=1.0,
-        function=lambda r: r.combined_compounds.num_bases_elaborated,
-        description="The number of Syndirella base compounds that have at least one elaboration in this selection. Higher is better.",
+        function=lambda r: r.combined_compounds.num_scaffolds_elaborated,
+        description="The number of Syndirella scaffold compounds that have at least one elaboration in this selection. Higher is better.",
     ),
     "elaboration_balance": dict(
         type="custom",
         weight=1.0,
         function=lambda r: r.combined_compounds.elaboration_balance,
-        description="A measure for how evenly base compounds have been elaborated using an h-index. Higher is better.",
+        description="A measure for how evenly scaffold compounds have been elaborated using an h-index. Higher is better.",
     ),  ### REALLY UNPERFORMANT?
     "num_inspirations": dict(
         type="custom",
@@ -1031,7 +1072,7 @@ DEFAULT_ATTRIBUTES = {
     #     type="custom",
     #     weight=0.0,
     #     function=lambda r: r.combined_compounds.risk_diversity,
-    #     description="A measure of how evenly spread the risk of elaborations are for each base compound. Risk in this case refers to the number of atoms added. Higher is better",
+    #     description="A measure of how evenly spread the risk of elaborations are for each scaffold compound. Risk in this case refers to the number of atoms added. Higher is better",
     # ), # REMOVED BECAUSE IT DOES NOT NECESSARILY IMPROVE AS PRODUCTS ARE ADDED
     "interaction_count": dict(
         type="custom",

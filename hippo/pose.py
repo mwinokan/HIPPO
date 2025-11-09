@@ -78,7 +78,7 @@ class Pose:
         self._distance_score = distance_score
         self._inspiration_score = inspiration_score
 
-        self._base_ids = None
+        self._scaffold_ids = None
         self._num_heavy_atoms = None
 
         self._has_fingerprint = False
@@ -461,15 +461,15 @@ class Pose:
 
     @property
     def num_atoms_added(self) -> int:
-        """Calculate the number of atoms added relative to the base or inspirations"""
-        if self.num_bases == 1:
-            return self.num_atoms_added_wrt_bases
+        """Calculate the number of atoms added relative to the scaffold or inspirations"""
+        if self.num_scaffolds == 1:
+            return self.num_atoms_added_wrt_scaffolds
         else:
             return self.num_atoms_added_wrt_inspirations
 
     @property
-    def num_atoms_added_wrt_bases(self) -> int | list[int] | None:
-        """Calculate the number of atoms added relative to the base"""
+    def num_atoms_added_wrt_scaffolds(self) -> int | list[int] | None:
+        """Calculate the number of atoms added relative to the scaffold"""
         return self.compound.num_atoms_added
 
     @property
@@ -497,14 +497,14 @@ class Pose:
         return self._num_atoms_added_wrt_inspirations
 
     @property
-    def num_bases(self) -> int:
-        """Get the number of base scaffolds"""
-        return len(self.base_ids)
+    def num_scaffolds(self) -> int:
+        """Get the number of scaffold scaffolds"""
+        return len(self.scaffold_ids)
 
     @property
-    def base_ids(self) -> list[int] | None:
-        """Get the base :class:`.Compound` IDs"""
-        if self._base_ids is None:
+    def scaffold_ids(self) -> list[int] | None:
+        """Get the scaffold :class:`.Compound` IDs"""
+        if self._scaffold_ids is None:
             records = self.db.select_where(
                 table="scaffold",
                 query="scaffold_base",
@@ -514,8 +514,8 @@ class Pose:
                 none="quiet",
             )
             records = [i for i, in records]
-            self._base_ids = records
-        return self._base_ids
+            self._scaffold_ids = records
+        return self._scaffold_ids
 
     @property
     def energy_score(self) -> float | None:
@@ -925,7 +925,6 @@ class Pose:
             ### create temporary table
 
             if "temp_interaction" in self.db.table_names:
-                mrich.warning("Deleting existing temp_interaction table")
                 self.db.execute("DROP TABLE temp_interaction")
 
             self.db.create_table_interaction(table="temp_interaction", debug=False)

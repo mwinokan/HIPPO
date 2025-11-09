@@ -87,7 +87,7 @@ Once you have a compound you can access database properties using its properties
 	c.tags # assigned tags
 	c.metadata # metadata dictionary
 	
-	c.draw() # draw the molecule (and its base)
+	c.draw() # draw the molecule (and its scaffold)
 
 You can access a compounds poses, which have similar functionality
 

@@ -13,3 +13,6 @@ Recipes & Routes
 .. autoclass:: hippo.rgen.RandomRecipeGenerator
     :members:
 
+.. autoclass:: hippo.rgen.RandomSelectionGenerator
+    :members:
+
