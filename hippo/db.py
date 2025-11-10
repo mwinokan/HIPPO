@@ -4166,7 +4166,7 @@ class Database:
         return_similarity: bool = False,
         none="error",
     ) -> "CompoundSet | (CompoundSet, list[float])":
-        """Search compounds by tanimoto similarity
+        """Search compounds by tanimoto similarity of binary pattern fingerprints using the chemicalite function `mol_pattern_bfp`
 
         :param query: SMILES string
         :param threshold: similarity threshold to exceed
