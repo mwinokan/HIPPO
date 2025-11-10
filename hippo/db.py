@@ -2629,6 +2629,8 @@ class Database:
                 pairs,
             )
 
+        self.commit()
+
         if generic:
             return murcko_data, generic_data
         else:
