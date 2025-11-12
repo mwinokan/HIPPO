@@ -1,4 +1,3 @@
-from .animal import HIPPO
 import mrich
 from typer import Typer
 from pathlib import Path
@@ -10,7 +9,10 @@ def setup_animal(
     database: str,
     backup: bool = True,
     update_legacy: bool = False,
-) -> HIPPO:
+) -> "HIPPO":
+
+    from .animal import HIPPO
+
     animal = HIPPO("CLI", database, update_legacy=update_legacy)
     if backup:
         animal.db.backup()
@@ -157,6 +159,45 @@ def tag_summary(
 
     animal = setup_animal(database=database, backup=False)
     animal.tags.summary()
+
+
+@app.command()
+def add_hits(
+    database: str,
+    target_name: str,
+    aligned_directory: str,
+    metadata_csv: str = None,
+    tags: list[str] = None,
+    skip: list[str] = None,
+    debug: bool = False,
+    load_pose_mols: bool = False,
+    backup: bool = True,
+):
+    """Load hits from Fragalysis / XCA data package"""
+
+    mrich.h1("hippo.tag_summary")
+
+    mrich.h3("Params")
+    mrich.var("database", database)
+    mrich.var("target_name", target_name)
+    mrich.var("metadata_csv", metadata_csv)
+    mrich.var("aligned_directory", aligned_directory)
+    mrich.var("tags", tags)
+    mrich.var("skip", skip)
+    mrich.var("debug", debug)
+    mrich.var("load_pose_mols", load_pose_mols)
+
+    animal = setup_animal(database=database, backup=False)
+
+    animal.add_hits(
+        target_name=target_name,
+        metadata_csv=metadata_csv,
+        aligned_directory=aligned_directory,
+        tags=tags,
+        skip=skip,
+        debug=debug,
+        load_pose_mols=load_pose_mols,
+    )
 
 
 def main():
