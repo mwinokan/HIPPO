@@ -22,7 +22,6 @@ dependencies = [
     "mpytools >= 0.0.21",
     "tqdm",
     "jupyterlab",
-    "pycule",
     "chardet",
     "pandas",
     "yattag",
