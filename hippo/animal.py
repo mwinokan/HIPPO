@@ -259,7 +259,10 @@ class HIPPO:
         debug: bool = False,
         load_pose_mols: bool = False,
     ) -> pd.DataFrame:
-        """Load in crystallographic hits downloaded from Fragalysis.
+        """Load in crystallographic hits from a Fragalysis download or XChemAlign alignment.
+
+        For a Fragalysis download `aligned_directory` and `metadata_csv` should point to the `aligned_files` and `metadata.csv` at the root of the extracted download.
+        For an XChemAlign dataset the `aligned_directory` should point to the `aligned_files`.
 
         :param target_name: Name of this protein :class:`.Target`
         :param metadata_csv: Path to the metadata.csv from the Fragalysis download
@@ -270,102 +273,258 @@ class HIPPO:
 
         """
 
+        import re
+        from enum import Enum
         import molparse as mp
         from rdkit.Chem import PandasTools
         from .tools import remove_other_ligands
 
-        if not isinstance(aligned_directory, Path):
-            aligned_directory = Path(aligned_directory)
+        ### Process arguments
 
-        # create the target
-        target = self.register_target(name=target_name)
+        assert aligned_directory, "aligned_directory must be provided"
 
         skip = skip or []
         tags = tags or ["hits"]
 
+        if not isinstance(aligned_directory, Path):
+            aligned_directory = Path(aligned_directory)
+
         mrich.var("aligned_directory", aligned_directory)
+
+        ### Register Target
+
+        target = self.register_target(name=target_name)
+
+        ### Determine data format
+
+        class DataFormat(Enum):
+            Fragalysis_v2 = 1
+            XChemAlign_v2 = 2
+            # XChemAlign_v3 = 3
+
+            def __str__(self):
+                return self.name
+
+        subdirs = list(aligned_directory.glob("*[0-9][0-9][0-9][0-9]*"))
+
+        SUBDIR_PATTERN_FRAGALYSIS = re.compile(r"^.*\d{4}[a-z]$")
+        SUBDIR_PATTERN_XCA = re.compile(r"^.*-.\d{4}$")
+
+        fragalysis_subdirs_present = any(
+            SUBDIR_PATTERN_FRAGALYSIS.match(subdir.name) for subdir in subdirs
+        )
+        xca_subdirs_present = any(
+            SUBDIR_PATTERN_XCA.match(subdir.name) for subdir in subdirs
+        )
+        assert (
+            fragalysis_subdirs_present ^ xca_subdirs_present
+        ), "Unexpected mixed data format"
+
+        if fragalysis_subdirs_present:
+            data_format = DataFormat.Fragalysis_v2
+        else:
+            data_format = DataFormat.XChemAlign_v2
+
+        mrich.var("data_format", data_format)
+
+        ### Counters
 
         count_directories_tried = 0
         count_compound_registered = 0
         count_poses_registered = 0
 
-        meta_df = pd.read_csv(metadata_csv)
-        curated_tag_cols = [
-            c
-            for c in meta_df.columns
-            if c
-            not in [
-                "Code",
-                "Long code",
-                "Compound code",
-                "Smiles",
-                "Downloaded",
-                "Main status",
-                "GOOD count",
-                "MEDIOCRE count",
-                "BAD count",
-                "RefinementResolution",
-            ]
-            + GENERATED_TAG_COLS
-        ]
+        ### Read metadata
 
-        mrich.var("curated_tag_cols", curated_tag_cols)
+        if data_format is DataFormat.Fragalysis_v2:
+
+            assert metadata_csv, "metadata.csv required"
+
+            meta_df = pd.read_csv(metadata_csv)
+            curated_tag_cols = [
+                c
+                for c in meta_df.columns
+                if c
+                not in [
+                    "Code",
+                    "Long code",
+                    "Compound code",
+                    "Smiles",
+                    "Downloaded",
+                    "Main status",
+                    "GOOD count",
+                    "MEDIOCRE count",
+                    "BAD count",
+                    "RefinementResolution",
+                ]
+                + GENERATED_TAG_COLS
+            ]
+
+            mrich.var("curated_tag_cols", curated_tag_cols)
+
+        ### Parse subdirectories
+
+        match data_format:
+            case DataFormat.Fragalysis_v2:
+
+                from .fragalysis import parse_observation_longcode
+
+                sdf_pattern = re.compile(r"^.*\d{4}[a-z].sdf$")
+
+                observations = {}
+
+                for path in list(
+                    sorted(aligned_directory.glob(f"*[0-9][0-9][0-9][0-9][a-z]"))
+                ):
+
+                    name = path.name
+
+                    if name in skip:
+                        continue
+
+                    d = dict(
+                        name=name,
+                        path=path,
+                    )
+
+                    ### SDFs
+
+                    sdfs = []
+
+                    for sdf_path in path.glob("*.sdf"):
+
+                        sdf_name = sdf_path.name
+
+                        # fragalysis SDF
+                        if sdf_pattern.match(sdf_name):
+                            sdfs.append(sdf_path)
+
+                    if not sdfs:
+                        mrich.error(name, "has no compatible SDFs", path)
+                        continue
+
+                    elif len(sdfs) > 1:
+                        mrich.warning(name, "has multiple compatible SDFs", sdfs)
+
+                    d["sdf"] = sdfs[0]
+
+                    ### PDBs
+
+                    pdbs = [
+                        p
+                        for p in path.glob("*.pdb")
+                        if "_ligand" not in p.name
+                        and "_apo" not in p.name
+                        and "_hippo" not in p.name
+                    ]
+
+                    if not len(pdbs) == 1:
+                        mrich.error(name, "has invalid PDBs", pdbs)
+                        continue
+
+                    d["pdb"] = pdbs[0]
+
+                    observations[name] = d
+
+                    if debug:
+                        print(d)
+
+            case DataFormat.XChemAlign_v2:
+
+                from .xca import parse_observation_longcode
+
+                observations = {}
+
+                sdf_pattern = re.compile(
+                    r"^.*-.\d{4}_._\d*_\d_.*-.\d{4}\+.\+\d*\+\d_ligand.sdf$"
+                )
+
+                for path in list(
+                    sorted(aligned_directory.glob(f"*[0-9][0-9][0-9][0-9]"))
+                ):
+
+                    name = path.name
+
+                    if name in skip:
+                        continue
+
+                    ### Group by SDF
+
+                    sdfs = []
+
+                    for sdf_path in sorted(path.glob("*.sdf")):
+
+                        sdf_name = sdf_path.name
+
+                        if sdf_pattern.match(sdf_name):
+                            sdfs.append(sdf_path)
+
+                    if not sdfs:
+                        mrich.error(name, "has no compatible SDFs", path)
+                        continue
+
+                    for i, sdf in enumerate(sdfs):
+
+                        subname = name + chr(ord("a") + i)
+
+                        d = dict(
+                            name=subname,
+                            path=path,
+                            sdf=sdf,
+                        )
+
+                        pdb = path / sdf.name.replace("_ligand.sdf", ".pdb")
+
+                        if not pdb.exists():
+                            mrich.error(name, "is missing PDB", pdb)
+                            continue
+
+                        d["pdb"] = pdb
+
+                    observations[name] = d
+
+            case _:
+                raise ValueError(f"{data_format=}")
+
+        mrich.var("#valid observations", len(observations))
 
         n_poses = self.num_poses
 
-        for path in mrich.track(
-            list(sorted(aligned_directory.iterdir())), prefix="Adding hits..."
+        for observation_dict in mrich.track(
+            observations.values(), prefix="Adding hits..."
         ):
 
-            if not path.is_dir():
-                continue
+            path = observation_dict["path"]
+            name = observation_dict["name"]
+            sdf = observation_dict["sdf"]
+            pdb = observation_dict["pdb"]
 
-            if path.name in skip:
-                continue
+            if debug:
+                mrich.debug("Processing", path)
 
             count_directories_tried += 1
 
-            # standard xchem naming
-            sdfs = list(path.glob("*[0-9][0-9][0-9][0-9][a-z].sdf"))
-
-            # non-standard xchem naming
-            if not sdfs:
-                sdfs = [p for p in path.glob("*.sdf") if "_ligand" not in p.name]
-
-            if len(sdfs) == 0:
-                mrich.error("No SDFs in", path)
-                continue
-
-            elif len(sdfs) > 1:
-                mrich.warning("Multiple SDFs", path, sdfs)
-                sdfs = [sdfs[0]]
-
-            pdbs = [
-                p
-                for p in path.glob("*.pdb")
-                if "_ligand" not in p.name
-                and "_apo" not in p.name
-                and "_hippo" not in p.name
-            ]
-
-            assert len(pdbs) == 1, (path, pdbs, list(path.glob("*.pdb")))
-
             # load the SDF
             df = PandasTools.LoadSDF(
-                str(sdfs[0]), molColName="ROMol", idName="ID", strictParsing=True
+                str(sdf), molColName="ROMol", idName="ID", strictParsing=True
             )
 
             # extract fields
-            observation_shortname = path.name.replace(".sdf", "")
-            observation_longname = df.ID[0]
+            longcode = df.ID[0]
             mol = df.ROMol[0]
 
-            from .fragalysis import parse_observation_longcode
+            match data_format:
+                case DataFormat.Fragalysis_v2:
+                    obs_dict = parse_observation_longcode(longcode)
+                case DataFormat.XChemAlign_v2:
+                    obs_dict = parse_observation_longcode(longcode)
 
-            obs_dict = parse_observation_longcode(observation_longname)
+            if debug:
+                mrich.debug(name, longcode)
 
             # parse the PDB file
-            sys = mp.parse(pdbs[0], verbosity=debug)
+            if debug:
+                mrich.reading(pdb)
+            sys = mp.parse(pdb, verbosity=0)
 
             # create the single ligand bound pdb
             lig_residues = sys.residues["LIG"]
@@ -376,10 +535,10 @@ class HIPPO:
                     sys, obs_dict["residue_number"], obs_dict["chain"]
                 )
                 sys.prune_alternative_sites("A", verbosity=0)
-                pose_path = str(pdbs[0].resolve()).replace(".pdb", "_hippo.pdb")
+                pose_path = str(pdb.resolve()).replace(".pdb", "_hippo.pdb")
                 mp.write(pose_path, sys, shift_name=True, verbosity=debug)
             else:
-                pose_path = str(pdbs[0].resolve())
+                pose_path = str(pdb.resolve())
 
             # smiles
             smiles = mp.rdkit.mol_to_smiles(mol)
@@ -404,7 +563,7 @@ class HIPPO:
                     )
                     mrich.var("smiles", smiles)
                     mrich.var("inchikey", inchikey)
-                    mrich.var("observation_shortname", observation_shortname)
+                    mrich.var("observation_shortname", name)
                     raise Exception
 
             else:
@@ -413,28 +572,35 @@ class HIPPO:
 
             # metadata
 
-            meta_row = meta_df[meta_df["Code"] == observation_shortname]
-            if not len(meta_row):
-                assert observation_longname
-                meta_row = meta_df[meta_df["Long code"] == observation_longname]
+            match data_format:
+                case DataFormat.Fragalysis_v2:
 
-            assert len(meta_row)
+                    meta_row = meta_df[meta_df["Code"] == name]
+                    if not len(meta_row):
+                        assert longcode
+                        meta_row = meta_df[meta_df["Long code"] == longcode]
 
-            pose_tags = set(tags)
+                    assert len(meta_row)
 
-            for tag in curated_tag_cols:
-                if meta_row[tag].values[0]:
-                    pose_tags.add(tag)
+                    metadata = {"fragalysis_longcode": meta_row["Long code"].values[0]}
 
-            metadata = {"observation_longname": meta_row["Long code"].values[0]}
+                    for tag in GENERATED_TAG_COLS:
+                        if tag in meta_row.columns:
+                            metadata[tag] = meta_row[tag].values[0]
 
-            for tag in GENERATED_TAG_COLS:
-                if tag in meta_row.columns:
-                    metadata[tag] = meta_row[tag].values[0]
+                    pose_tags = set(tags)
+
+                    for tag in curated_tag_cols:
+                        if meta_row[tag].values[0]:
+                            pose_tags.add(tag)
+
+                case DataFormat.XChemAlign_v2:
+                    metadata = {"xca_longcode": longcode}
+                    pose_tags = set(tags)
 
             pose = self.register_pose(
                 compound=compound,
-                alias=observation_shortname,
+                alias=name,
                 target=target.id,
                 path=pose_path,
                 tags=pose_tags,
