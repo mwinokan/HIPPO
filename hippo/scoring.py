@@ -38,12 +38,14 @@ class Scorer:
         populate: bool = True,
         load_cache: bool = True,
         allowed_poses: "PoseSet | list[int] | None" = None,
+        out_key: str = "scorer",
     ) -> None:
 
         from .pset import PoseSet
         from .recipe import RecipeSet
 
         self._db = db
+        self._out_key = out_key
 
         if allowed_poses is None:
             self._allowed_pose_ids = None
@@ -238,7 +240,7 @@ class Scorer:
     def json_path(self):
         from pathlib import Path
 
-        return Path(self.db.path.name.replace(".sqlite", "_scorer.json"))
+        return Path(self.db.path.name.replace(".sqlite", f"_{self.outkey}.json"))
 
     @property
     def poses(self) -> "PoseSet":
