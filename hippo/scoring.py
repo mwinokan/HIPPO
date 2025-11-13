@@ -175,27 +175,33 @@ class Scorer:
         return len(self._recipes)
 
     @property
-    def attributes(self):
+    def attributes(self) -> "list[Attribute | CustomAttribute]":
+        """Return list of :class:`.Attribute` / :class:`.CustomAttribute` objects"""
         return list(self._attributes.values())
 
     @property
-    def attribute_keys(self):
+    def attribute_keys(self) -> list[str]:
+        """Return list of :class:`.Attribute` / :class:`.CustomAttribute` names/keys"""
         return list(self._attributes.keys())
 
     @property
-    def recipes(self):
+    def recipes(self) -> "RecipeSet":
+        """Return :class:`.RecipeSet` of recipes being scored"""
         return self._recipes
 
     @property
-    def num_attributes(self):
+    def num_attributes(self) -> int:
+        """Count of attributes"""
         return len(self.attributes)
 
     @property
-    def weights(self):
+    def weights(self) -> list[float]:
+        """List of attribute weights"""
         return [a.weight for a in self.attributes]
 
     @weights.setter
-    def weights(self, ws):
+    def weights(self, ws) -> None:
+        """Setter for weights list"""
 
         self._flag_weight_modification()
 
@@ -209,7 +215,8 @@ class Scorer:
             a.weight = w / wsum
 
     @property
-    def score_dict(self):
+    def score_dict(self) -> dict[str, float]:
+        """Dictionary of scores keyed by :meth:`.Recipe.hash`"""
 
         col = self._data["score"]
 
@@ -227,26 +234,30 @@ class Scorer:
         return col.to_dict()
 
     @property
-    def scores(self):
+    def scores(self) -> list[float]:
+        """List of :class:`.Recipe` scores"""
         return list(self.score_dict.values())
 
     @property
-    def best(self):
+    def best(self) -> "Recipe":
+        """Return highest scoring :class:`.Recipe`"""
         return self.top(1)
 
     @property
-    def db(self):
+    def db(self) -> "Database":
+        """:class:`.Database`"""
         return self._db
 
     @property
-    def json_path(self):
+    def json_path(self) -> "Path":
+        """Path where cache will be written"""
         from pathlib import Path
 
         return Path(self.db.path.name.replace(".sqlite", f"_{self._out_key}.json"))
 
     @property
     def poses(self) -> "PoseSet":
-        """Return all associated poses"""
+        """Return all associated poses as :class:`.PoseSet`"""
         from .pset import PoseSet
 
         ids = set().union(*self._data["pose_ids"])
@@ -256,10 +267,16 @@ class Scorer:
 
     def add_custom_attribute(
         self,
-        key,
-        function,
+        key: str,
+        function: "Callable",
         weight_reset_warning: bool = True,
     ) -> "CustomAttribute":
+        """Add a custom scoring attribute
+
+        :param key: name/key for the attribute
+        :param function: function call to get the attribute alue, will be passed :class:`.Recipe` object
+        :param weight_reset_warning: write a warning to indicate weights have been reset
+        """
 
         ca = CustomAttribute(self, key, function)
 
@@ -280,7 +297,12 @@ class Scorer:
 
         return self._attributes[key]
 
-    def add_recipes(self, json_paths: "list", debug: bool = False):
+    def add_recipes(self, json_paths: "list", debug: bool = False) -> None:
+        """Add more serialised :class:`.Recipe` objects to be scored
+
+        :param json_paths: list of JSON paths
+        :param debug: increase verbosity for debugging
+        """
 
         from pathlib import Path
         from .recipe import Recipe
@@ -323,6 +345,12 @@ class Scorer:
         *,
         debug: bool = False,
     ) -> float:
+        """Score a :class:`.Recipe` object
+
+        :param recipe: :class:`.Recipe` to be scored
+        :param debug: increase verbosity for debugging
+        :returns: float score from 0 to 1
+        """
 
         score = 0.0
 
@@ -352,8 +380,11 @@ class Scorer:
 
         return score
 
-    def compare(self, recipes: "list[Recipe] | list[str]"):
-        """Compare attribute values and scores for recipes"""
+    def compare(self, recipes: "list[Recipe] | list[str]") -> None:
+        """Compare attribute values and scores for recipes
+
+        :param recipes: list of :class:`.Recipe` objects or hashes
+        """
 
         recipes = [
             self.recipes[recipe] if isinstance(recipe, str) else recipe
@@ -374,81 +405,25 @@ class Scorer:
         df = pd.DataFrame(print_data).set_index("attribute (weight)")
         mrich.print(df)
 
-    def get_df(
-        self,
-        serialise_price: bool = True,
-        debug: bool = True,
-        **kwargs,
-    ) -> "pandas.DataFrame":
+    def get_sorted_df(self) -> "pd.DataFrame":
+        """Get DataFrame sorted by descending score"""
 
-        raise NotImplementedError
-
-        from pandas import DataFrame
-
-        params = dict(serialise_price=serialise_price, **kwargs)
-
-        if self._df is None or params != self._df_params:
-
-            if debug:
-                mrich.debug("Scorer.get_df()")
-
-            if debug:
-                mrich.debug("Scorer.recipes.get_df()")
-
-            data = []
-
-            for recipe in self.recipes:
-
-                key = recipe.hash
-
-                d = recipe.get_dict(
-                    # reactant_supplier=False,
-                    database=False,
-                    timestamp=False,
-                    **kwargs,
-                    # timestamp=False,
-                )
-
-                d["hash"] = key
-                d["score"] = self.scores[key]
-
-                data.append(d)
-
-            df = DataFrame(data)
-
-            for attribute in self.attributes:
-
-                if debug:
-                    mrich.debug(f"Getting {attribute.key=} values")
-
-                if isinstance(attribute, CustomAttribute):
-
-                    df[attribute.key] = attribute.values
-
-                else:
-
-                    df[attribute.key] = self.recipes.get_values(
-                        key=attribute.key, serialise_price=serialise_price
-                    )
-
-            if serialise_price:
-                df["price"] = df.apply(lambda x: x["price"].amount, axis=1)
-
-            self._df = df
-            self._df_params = params
-
-        return self._df
-
-    def get_sorted_df(self, budget: float | None = None):
+        # compute scores
         self.scores
+
         return self._data.sort_values(by="score", ascending=False)
 
     def plot(
         self,
-        keys: str | list[str],
+        keys: list[str],
         budget: float | None = None,
-        # **kwargs,
-    ):
+    ) -> "plotly.graph_objects.Figure":
+        """Plot any two attributes as a scatter plot
+
+        :param keys: list two attribute keys to plot
+        :param budget: limit :class:`.Recipe` objects to below this budget value
+        :returns: plotly Figure object containing a scatter trace
+        """
 
         import plotly.express as px
 
@@ -493,11 +468,23 @@ class Scorer:
             df, x=keys[0], y=keys[1], color="score", hover_data=hover_data
         )
 
-    def top_keys(self, n: int, budget: float | None = None):
-        keys = self.get_sorted_df(budget=budget).index[:n]
-        return keys
+    def top_keys(self, n: int, budget: float | None = None) -> list[str]:
+        """Return keys of top `n` scoring :class:`.Recipe`
 
-    def top(self, n: int, budget: float | None = None):
+        :param n: number of keys to return
+        :param budget: limit :class:`.Recipe` objects to below this budget value
+        :returns: list of :class:`.Recipe` hashes
+        """
+        keys = self.get_sorted_df(budget=budget).index[:n]
+        return list(keys)
+
+    def top(self, n: int, budget: float | None = None) -> "list[Recipe]":
+        """Return top `n` scoring :class:`.Recipe`
+
+        :param n: number of :class:`.Recipe` objects to return
+        :param budget: limit :class:`.Recipe` objects to below this budget value
+        :returns: list of :class:`.Recipe` objects
+        """
         keys = self.top_keys(n=n, budget=budget)
         if n == 1:
             return [self.recipes[key] for key in keys][0]
@@ -507,10 +494,10 @@ class Scorer:
     ### INTERNALS
 
     def _flag_weight_modification(self):
-
         self._data["score"] = None
 
-    def summary(self):
+    def summary(self) -> None:
+        """Print some summary statistics of the scorer's attributes"""
 
         mrich.header(self)
         for attribute in self.attributes:
@@ -758,6 +745,14 @@ class Scorer:
 
 
 class Attribute:
+    """Scoring Attribute to be used with a :class:`.Scorer` object
+
+    :param scorer: associated :class:`.Scorer`
+    :param key: key/name for the attribute
+    :param inverse: if true, lower values score higher
+    :param weight: adjust scores by this weight
+    :param bins: number of scoring bins
+    """
 
     _type = "Attribute"
 
@@ -788,31 +783,33 @@ class Attribute:
     ### PROPERTIES
 
     @property
-    def scorer(self):
+    def scorer(self) -> "Scorer":
+        """Get associated :class:`.Scorer`"""
         return self._scorer
 
     @property
-    def key(self):
+    def key(self) -> str:
+        """Get name/key"""
         return self._key
 
     @property
-    def inverse(self):
+    def inverse(self) -> bool:
+        """Is this attribute inverted, lower values will score higher if true"""
         return self._inverse
 
     @property
-    def bins(self):
+    def bins(self) -> int:
+        """Number of bins"""
         return self._bins
 
     @property
-    def value_dict(self):
+    def value_dict(self) -> dict[str, float]:
+        """Dictionary of attribute values keyed by :class:`.Recipe` hash"""
         df = self.scorer._data[self.key]
 
         null = df.isnull()
 
         if null.sum():
-            # for key in mrich.track(
-            # df[null].index.values, f"Constructing value dictionary for {self}"
-            # , total = len(df[null])):
             with mrich.loading(f"Constructing value dictionary for {self}"):
                 for key in df[null].index.values:
                     recipe = self.scorer.recipes[key]
@@ -822,37 +819,45 @@ class Attribute:
         return df.to_dict()
 
     @property
-    def values(self):
+    def values(self) -> list[float]:
+        """Return list of values"""
         return list(self.value_dict.values())
 
     @property
-    def mean(self):
+    def mean(self) -> float:
+        """Return mean of value"""
         return np.mean(self.values)
 
     @property
-    def std(self):
+    def std(self) -> float:
+        """Return standard deviation of values"""
         return np.std(self.values)
 
     @property
-    def max(self):
+    def max(self) -> float:
+        """Return maximum of values"""
         return max(self.values)
 
     @property
-    def min(self):
+    def min(self) -> float:
+        """Return minimum of values"""
         return min(self.values)
 
     @property
-    def weight(self):
+    def weight(self) -> float:
+        """Return weight"""
         return self._weight
 
     @weight.setter
     def weight(self, w):
+        """Set attribute weight"""
         self.scorer._flag_weight_modification()
         self._weight = abs(w)
         self._reverse = w < 0
 
     @property
     def percentile_interpolator(self):
+        """Interpolator function"""
         if self._percentile_interpolator is None:
 
             count, bins_count = np.histogram(self.values, bins=self.bins)
@@ -873,6 +878,11 @@ class Attribute:
         serialise_price: bool = True,
         force: bool = False,
     ) -> float:
+        """Get value for a :class:`.Recipe`
+
+        :param serialise_price: serialise :class:`.Price` objects to their amount
+        :param force: force calculation? (don't use cache)
+        """
 
         if not force:
             cached = self.scorer._data[self.key][recipe.hash]
@@ -887,17 +897,12 @@ class Attribute:
 
         return value
 
-    def histogram(
-        self,
-        progress: bool = False,
-    ) -> "plotly.graph_objects.Figure":
+    def histogram(self) -> "plotly.graph_objects.Figure":
+        """Plot histogram of attribute values"""
 
         import plotly.graph_objects as go
 
-        values = self.values
-
-        fig = go.Figure(go.Histogram(x=values))
-
+        fig = go.Figure(go.Histogram(x=self.values))
         fig.update_layout(xaxis_title=self.key, yaxis_title="count")
 
         return fig
@@ -906,6 +911,7 @@ class Attribute:
         self,
         recipe: "Recipe",
     ) -> float:
+        """Return unweighted percentile score for a given :class:`.Recipe`"""
 
         value = self.get_value(recipe)
 
@@ -922,15 +928,12 @@ class Attribute:
         self,
         recipe: "Recipe",
     ) -> float:
-        """return the score of a given value"""
+        """return the weighted score of a given :class:`.Recipe`"""
 
         if not self.weight:
             return 0.0
 
         value = self.unweighted(recipe)
-
-        # if value is None:
-        # return 0.5
 
         return self.weight * value
 
@@ -968,6 +971,11 @@ class CustomAttribute(Attribute):
         serialise_price: bool = True,
         force: bool = False,
     ) -> float:
+        """Compute custom attribute value for provided :class:`.Recipe`
+
+        :param serialise_price: serialise :class:`.Price` objects to their amount
+        :param force: force calculation? (don't use cache)
+        """
 
         if not force:
             cached = self.scorer._data[self.key][recipe.hash]
@@ -984,90 +992,6 @@ class CustomAttribute(Attribute):
 
         return value
 
-
-# DEFAULT_ATTRIBUTES = {
-#     "num_scaffolds": dict(
-#         type="custom",
-#         weight=1.0,
-#         function=lambda r: r.product_compounds.count_by_tag(tag="Syndirella scaffold"),
-#         description="The number of Syndirella scaffold compounds in this selection",
-#     ),
-#     "num_products": dict(
-#         type="standard",
-#         weight=1.0,
-#         description="The number of product compounds in this selection",
-#     ),
-#     "num_scaffolds_elaborated": dict(
-#         type="custom",
-#         weight=1.0,
-#         function=lambda r: r.product_compounds.num_scaffolds_elaborated,
-#         description="The number of Syndirella scaffold compounds that have at least one elaboration in this selection",
-#     ),
-#     "elaboration_balance": dict(
-#         type="custom",
-#         weight=1.0,
-#         function=lambda r: r.product_compounds.elaboration_balance,
-#         description="A measure for how evenly scaffold compounds have been elaborated",
-#     ),  ### REALLY UNPERFORMANT?
-#     "num_inspirations": dict(
-#         type="custom",
-#         weight=1.0,
-#         function=lambda r: r.product_poses.num_inspirations,
-#         description="The number of unique fragment compounds that inspired poses for product compounds in this selection",
-#     ),
-#     "num_inspiration_sets": dict(
-#         type="custom",
-#         weight=1.0,
-#         function=lambda r: r.product_poses.num_inspiration_sets,
-#         description="The number of unique fragment combinations that inspired poses for product compounds in this selection",
-#     ),
-#     "risk_diversity": dict(
-#         type="custom",
-#         weight=0.0,
-#         function=lambda r: r.product_compounds.risk_diversity,
-#         description="A measure of how evenly spread the risk of elaborations are for each scaffold compound. Risk in this case refers to the number of atoms added",
-#     ),
-#     "interaction_count": dict(
-#         type="custom",
-#         weight=1.0,
-#         function=lambda r: r.product_interactions.num_features,
-#         description="The number of protein features that are being interecated with in this selection",
-#     ),
-#     "interaction_balance": dict(
-#         type="custom",
-#         weight=0.0,
-#         function=lambda r: r.product_interactions.per_feature_count_std,
-#         description="A measure for how evenly protein features are being interacted with in this selection",
-#     ),
-#     "num_subsites": dict(
-#         type="custom",
-#         weight=1.0,
-#         function=lambda r: r.product_poses.num_subsites,
-#         description="Count the number of subsites that poses in this set come into contact with",
-#     ),
-#     "subsite_balance": dict(
-#         type="custom",
-#         weight=0.0,
-#         function=lambda r: r.product_poses.subsite_balance,
-#         description="Count the number of subsites that poses in this set come into contact with",
-#     ),
-#     "avg_distance_score": dict(
-#         type="custom",
-#         weight=-0.0,
-#         function=lambda r: r.product_poses.avg_distance_score,
-#         description="Average distance score (e.g. RMSD to fragment inspirations) for poses in this set",
-#     ),
-#     "avg_energy_score": dict(
-#         type="custom",
-#         weight=-0.0,
-#         function=lambda r: r.product_poses.avg_energy_score,
-#         description="Average energy score (e.g. binding ddG) for poses in this set",
-#     ),
-#     # "reaction_risk": dict(type='custom', weight=1.0, function=None),
-#     # "pockets?": dict(type='custom', weight=1.0, function=None),
-#     # "chemical_diversity": dict(type='custom', weight=1.0, function=None),
-#     # "DMS/sequence_variability": dict(type='custom', weight=1.0, function=None),
-# }
 
 DEFAULT_ATTRIBUTES = {
     "num_scaffolds": dict(
