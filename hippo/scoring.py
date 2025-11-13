@@ -95,6 +95,7 @@ class Scorer:
         load_cache: bool = True,
         subsites: bool = True,
         allowed_poses: "PoseSet | list[int] | None" = None,
+        out_key: str = "scorer",
     ) -> "Scorer":
         """Create a Scorer instance with Default attributes"""
 
@@ -113,6 +114,7 @@ class Scorer:
             attributes=attributes,
             populate=False,
             allowed_poses=allowed_poses,
+            out_key=out_key,
         )
 
         skip = skip or []
