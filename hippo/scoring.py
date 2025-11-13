@@ -242,7 +242,7 @@ class Scorer:
     def json_path(self):
         from pathlib import Path
 
-        return Path(self.db.path.name.replace(".sqlite", f"_{self.outkey}.json"))
+        return Path(self.db.path.name.replace(".sqlite", f"_{self._out_key}.json"))
 
     @property
     def poses(self) -> "PoseSet":
