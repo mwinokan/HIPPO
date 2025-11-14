@@ -1397,14 +1397,14 @@ class PoseSet:
                 for inspiration, derivative in tuples:
                     lookup.setdefault(derivative, set())
                     lookup[derivative].add(inspiration)
-                df["inspiration_ids"] = df["id"].apply(lambda x: lookup.get(x, {}))
+                df["inspiration_ids"] = df["id"].apply(lambda x: lookup.get(x, set()))
 
             if derivative_ids:
                 lookup = {}
                 for inspiration, derivative in tuples:
                     lookup.setdefault(inspiration, set())
                     lookup[inspiration].add(derivative)
-                df["derivative_ids"] = df["id"].apply(lambda x: lookup.get(x, {}))
+                df["derivative_ids"] = df["id"].apply(lambda x: lookup.get(x, set()))
 
         if inspiration_aliases:
             inspirations = PoseSet(
@@ -1419,10 +1419,15 @@ class PoseSet:
 
         if reference_alias:
             references = PoseSet(
-                self.db, set([int(x) for x in df["reference_id"].values])
+                self.db,
+                set([int(x) for x in df["reference_id"].values if x is not None]),
             )
-            lookup = self.db.get_pose_id_alias_dict(pset=references)
-            df["reference_alias"] = df["reference_id"].apply(lambda x: lookup[x])
+
+            if references:
+                lookup = self.db.get_pose_id_alias_dict(pset=references)
+                df["reference_alias"] = df["reference_id"].apply(lambda x: lookup[x])
+            else:
+                df["reference_alias"] = None
 
             if not reference_id:
                 df = df.drop(columns=["reference_id"])
@@ -1448,9 +1453,12 @@ class PoseSet:
 
         ### Fill missing smiles entries
 
-        if (smiles or inchikey) and (
-            df["smiles"].isna().any() or df["inchikey"].isna().any()
-        ):
+        smiles_missing = smiles and "smiles" in df.columns and df["smiles"].isna().any()
+        inchikey_missing = (
+            inchikey and "inchikey" in df.columns and df["inchikey"].isna().any()
+        )
+
+        if smiles_missing or inchikey_missing:
 
             mrich.error("None in smiles/inchikey column")
 
