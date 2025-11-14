@@ -323,7 +323,8 @@ class HIPPO:
         if fragalysis_subdirs_present:
             data_format = DataFormat.Fragalysis_v2
         else:
-            if any(subdir.glob("*_artefacts.pdb") for subdir in subdirs):
+
+            if any(list(subdir.glob("*_artefacts.pdb")) for subdir in subdirs):
                 data_format = DataFormat.XChemAlign_v3
             else:
                 data_format = DataFormat.XChemAlign_v2
