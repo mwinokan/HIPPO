@@ -300,7 +300,7 @@ class HIPPO:
         class DataFormat(Enum):
             Fragalysis_v2 = 1
             XChemAlign_v2 = 2
-            # XChemAlign_v3 = 3
+            XChemAlign_v3 = 3
 
             def __str__(self):
                 return self.name
@@ -323,7 +323,10 @@ class HIPPO:
         if fragalysis_subdirs_present:
             data_format = DataFormat.Fragalysis_v2
         else:
-            data_format = DataFormat.XChemAlign_v2
+            if any(subdir.glob("*_artefacts.pdb") for subdir in subdirs):
+                data_format = DataFormat.XChemAlign_v3
+            else:
+                data_format = DataFormat.XChemAlign_v2
 
         mrich.var("data_format", data_format)
 
@@ -428,15 +431,21 @@ class HIPPO:
                     if debug:
                         print(d)
 
-            case DataFormat.XChemAlign_v2:
+            case _:
 
                 from .xca import parse_observation_longcode
 
                 observations = {}
 
-                sdf_pattern = re.compile(
-                    r"^.*-.\d{4}_._\d*_\d_.*-.\d{4}\+.\+\d*\+\d_ligand.sdf$"
-                )
+                match data_format:
+                    case DataFormat.XChemAlign_v2:
+                        sdf_pattern = re.compile(
+                            r"^.*-.\d{4}_._\d*_\d_.*-.\d{4}\+.\+\d*\+\d_ligand\.sdf$"
+                        )
+                    case DataFormat.XChemAlign_v3:
+                        sdf_pattern = re.compile(
+                            r"^.*-.\d{4}_._\d*_._\d_.*-.\d{4}\+.\+\d*\+.\+\d_ligand\.sdf$"
+                        )
 
                 for path in list(
                     sorted(aligned_directory.glob(f"*[0-9][0-9][0-9][0-9]"))
@@ -481,9 +490,6 @@ class HIPPO:
                         d["pdb"] = pdb
 
                     observations[name] = d
-
-            case _:
-                raise ValueError(f"{data_format=}")
 
         mrich.var("#valid observations", len(observations))
 
