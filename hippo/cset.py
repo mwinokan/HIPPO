@@ -2186,11 +2186,15 @@ class CompoundSet:
 
     def __sub__(
         self,
-        other: "CompoundSet | IngredientSet",
+        other: "Compound | CompoundSet | IngredientSet",
     ) -> "CompoundSet":
-        """Subtract a :class:`.Compound` object or ID to this set, or subtract multiple at once when ``other`` is a :class:`.CompoundSet` or :class:`.IngredientSet`"""
+        """Subtract a :class:`.Compound` object or ID from this set, or subtract multiple at once when ``other`` is a :class:`.CompoundSet` or :class:`.IngredientSet`"""
 
         match other:
+
+            case Compound():
+                ids = set(self.ids) - set([other.id])
+                return CompoundSet(self.db, ids)
 
             case CompoundSet():
                 ids = set(self.ids) - set(other.ids)
