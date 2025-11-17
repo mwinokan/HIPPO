@@ -1017,6 +1017,9 @@ class HIPPO:
         register_reactions: bool = True,
         dry_run: bool = False,
         scaffold_route: "Route | None" = None,
+        scaffold_compound: "Compound | None" = None,
+        pose_tags: list[str] | None = None,
+        product_tags: list[str] | None = None,
     ) -> "pd.DataFrame":
         """
         Load Syndirella elaboration compounds and poses from a pickled DataFrame
@@ -1026,7 +1029,11 @@ class HIPPO:
         :param max_distance_score: Filter out poses with `comRMSD` above this value
         :param require_intra_geometry_pass: Filter out poses with falsy `intra_geometry_pass` values
         :param reject_flags: Filter out rows flagged with strings from this list (default = ["one_of_multiple_products", "selectivity_issue_contains_reaction_atoms_of_both_reactants"])
+        :param scaffold_route: Supply a known single-step route to the scaffold product to use if scaffold placements are missing
+        :param scaffold_compound: Supply a :class:`.Compound` for the scaffold product to use if scaffold placements are missing
         :param dry_run: Don't insert new records into the database (for debugging/testing)
+        :param pose_tags: Add these tags to all inserted poses, defaults to ["syndirella_product", "syndirella_placed"]
+        :param product_tags: Add these tags to all inserted product compounds, defaults to ["syndirella_product"]
         :returns: annotated DataFrame
         """
 
@@ -1034,6 +1041,9 @@ class HIPPO:
             "one_of_multiple_products",
             "selectivity_issue_contains_reaction_atoms_of_both_reactants",
         ]
+
+        pose_tags = pose_tags or ["syndirella_product", "syndirella_placed"]
+        product_tags = product_tags or ["syndirella_product"]
 
         from .syndirella import reactions_from_row
 
@@ -1054,17 +1064,11 @@ class HIPPO:
 
         ###### PREP ######
 
-        # filter out
-
         # flags
 
         present_flags = set()
         for step in range(num_steps):
             step += 1
-
-            # display(df[df[f"{step}_flag"].notna()])
-
-            # print(set(df[df[f"{step}_flag"].notna()][f"{step}_flag"].to_list()))
 
             for flags in set(df[df[f"{step}_flag"].notna()][f"{step}_flag"].to_list()):
                 for flag in flags:
@@ -1130,13 +1134,13 @@ class HIPPO:
         mrich.var("#scaffold entries", len(scaffold_df))
         mrich.var("#elab entries", len(elab_df))
 
-        if not len(scaffold_df) and not scaffold_route:
+        if not len(scaffold_df) and not scaffold_route and not scaffold_compound:
             mrich.error("No valid scaffold rows")
             return None
 
         elif scaffold_route:
 
-            ### MAKE THE SCAFFOLD ROWS
+            ### SUPPLEMENT THE SCAFFOLD ROWS FROM KNOWN ROUTE
 
             assert scaffold_route.num_reactions == 1
 
@@ -1164,6 +1168,22 @@ class HIPPO:
             scaffold_df = df[df["is_scaffold"]]
             elab_df = df[~df["is_scaffold"]]
 
+        elif scaffold_compound:
+
+            ### SUPPLEMENT PARTIAL SCAFFOLD ROWS FROM KNOWN PRODUCT
+
+            scaffold_dict = {
+                "scaffold_smiles": scaffold_compound.smiles,
+                "is_scaffold": True,
+            }
+
+            scaffold_df = pd.DataFrame([scaffold_dict])
+
+            df = pd.concat([scaffold_df, df])
+
+            scaffold_df = df[df["is_scaffold"]]
+            elab_df = df[~df["is_scaffold"]]
+
         if dry_run:
             mrich.error("Not registering records (dry_run)")
             return df
@@ -1178,24 +1198,36 @@ class HIPPO:
 
         for smiles_col in smiles_cols:
 
-            mrich.debug(f"Registering compounds from column: {smiles_col}")
-
             inchikey_col = smiles_col.replace("_smiles", "_inchikey")
             compound_id_col = smiles_col.replace("_smiles", "_compound_id")
 
+            unique_smiles = df[smiles_col].dropna().unique()
+
+            mrich.debug(
+                f"Registering {len(unique_smiles)} compounds from column: {smiles_col}"
+            )
+
             values = self.register_compounds(
-                smiles=df[smiles_col].values,
+                smiles=unique_smiles,
                 radical=False,
                 sanitisation_verbosity=False,
             )
 
-            inchikeys = [inchikey for inchikey, smiles in values]
-            df[inchikey_col] = inchikeys
+            orig_smiles_to_inchikey = {
+                orig_smiles: inchikey
+                for orig_smiles, (inchikey, new_smiles) in zip(unique_smiles, values)
+            }
+
+            df[inchikey_col] = df[smiles_col].apply(
+                lambda x: orig_smiles_to_inchikey.get(x)
+            )
 
             # get associated IDs
-            compound_inchikey_id_dict = self.db.get_compound_inchikey_id_dict(inchikeys)
+            compound_inchikey_id_dict = self.db.get_compound_inchikey_id_dict(
+                list(orig_smiles_to_inchikey.values())
+            )
             df[compound_id_col] = df[inchikey_col].apply(
-                lambda x: compound_inchikey_id_dict[x]
+                lambda x: compound_inchikey_id_dict.get(x)
             )
 
         # bulk register reactions
@@ -1207,36 +1239,57 @@ class HIPPO:
 
                 mrich.debug(f"Registering reactions for step {step}")
 
-                reactant_id_sets = []
-                for r1_id, r2_id in df[
-                    [f"{step}_r1_compound_id", f"{step}_r2_compound_id"]
+                reaction_dicts = []
+
+                for reaction_name, r1_id, r2_id, product_id in df[
+                    [
+                        f"{step}_reaction",
+                        f"{step}_r1_compound_id",
+                        f"{step}_r2_compound_id",
+                        f"{step}_product_compound_id",
+                    ]
                 ].values:
 
-                    id_set = set()
+                    # skip invalid rows
+                    if pd.isna(r1_id) or pd.isna(product_id):
+                        mrich.warning("Can't insert reactions for missing scaffold")
+                        continue
 
-                    if r1_id := int(r1_id):
-                        assert isinstance(r1_id, int), type(r1_id)
-                        id_set.add(r1_id)
+                    # reactant IDs
 
-                    if r2_id := int(r2_id):
-                        assert isinstance(r2_id, int), type(r2_id)
-                        id_set.add(r2_id)
+                    reactant_ids = set()
+                    reactant_ids.add(int(r1_id))
 
-                    assert id_set
-                    reactant_id_sets.append(id_set)
+                    if not pd.isna(r2_id):
+                        reactant_ids.add(int(r2_id))
 
-                if any(len(ids) != len(id_set) for ids in reactant_id_sets):
-                    mrich.error("Non-uniform number of reactants in dataset")
-                    return df
+                    product_id = int(product_id)
 
-                reaction_ids = self.register_reactions(
-                    types=df[f"{step}_reaction"],
-                    product_ids=df[f"{step}_product_compound_id"],
-                    reactant_id_lists=reactant_id_sets,
-                )
+                    # registration data
+
+                    reaction_dicts.append(
+                        dict(
+                            reaction_name=reaction_name,
+                            reactant_ids=reactant_ids,
+                            product_id=int(product_id),
+                        )
+                    )
+
+            reaction_ids = self.register_reactions(
+                types=[d["reaction_name"] for d in reaction_dicts],
+                product_ids=[d["product_id"] for d in reaction_dicts],
+                reactant_id_lists=[d["reactant_ids"] for d in reaction_dicts],
+            )
 
         scaffold_df = df[df["is_scaffold"]]
         elab_df = df[~df["is_scaffold"]]
+
+        # tag product compounds:
+
+        product_ids = list(df[f"{num_steps}_product_compound_id"].dropna().unique())
+        products = self.compounds[product_ids]
+        for tag in product_tags:
+            products.add_tag(tag)
 
         # bulk register scaffold relationships
 
@@ -1244,23 +1297,30 @@ class HIPPO:
 
             step += 1
 
-            mrich.debug(f"Registering scaffold relatonships for step {step}")
-
             for role in ["r1", "r2", "product"]:
 
                 key = f"{step}_{role}_compound_id"
 
-                scaffold_ids = set(scaffold_df[key].to_list())
-                if len(scaffold_ids) != 1:
-                    mrich.error(
-                        f"Wrong number of scaffold IDs for {key}: {scaffold_ids}"
+                mrich.debug(f"Registering scaffold relatonships for {key}")
+
+                scaffold_ids = list(scaffold_df[key].dropna().unique())
+
+                if not scaffold_ids:
+                    mrich.warning(
+                        "Can't insert scaffold relationships due to missing",
+                        key,
+                        "for all scaffold rows",
                     )
+                    continue
+
+                if len(scaffold_ids) > 1:
+                    mrich.error("Multiple scaffold row values in", key)
                     return scaffold_df
 
-                (scaffold_id,) = scaffold_ids
-
-                superstructure_ids = set(elab_df[key].to_list())
-                superstructure_ids = [i for i in superstructure_ids if i != scaffold_id]
+                scaffold_id = scaffold_ids[0]
+                superstructure_ids = [
+                    i for i in elab_df[key].unique() if i != scaffold_id
+                ]
 
                 sql = """
                 INSERT OR IGNORE INTO scaffold(scaffold_base, scaffold_superstructure)
@@ -1381,7 +1441,10 @@ class HIPPO:
         self.db.executemany(sql, list(payload))
         self.db.commit()
 
-        # bulk register reaction metadata...
+        # if pose_tags:
+        poses = self.poses[pose_ids]
+        for tag in pose_tags:
+            poses.add_tag(tag)
 
         return df
 
