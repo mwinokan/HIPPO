@@ -1465,7 +1465,9 @@ class PoseSet:
             empty = df[df["smiles"].isna()]
             empty_poses = PoseSet(self.db, set(empty.index))
 
-            for pose in mrich.track(empty_poses, prefix="generating smiles/inchikeys"):
+            for pose in mrich.track(
+                empty_poses, prefix=f"generating smiles/inchikeys ({len(empty)} poses)"
+            ):
                 pose.smiles
 
             records = self.db.select_where(
