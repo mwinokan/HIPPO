@@ -1303,21 +1303,28 @@ class HIPPO:
 
                 mrich.debug(f"Registering scaffold relatonships for {key}")
 
-                scaffold_ids = list(scaffold_df[key].dropna().unique())
+                if step == num_steps and role == "product" and scaffold_compound:
 
-                if not scaffold_ids:
-                    mrich.warning(
-                        "Can't insert scaffold relationships due to missing",
-                        key,
-                        "for all scaffold rows",
-                    )
-                    continue
+                    scaffold_id = scaffold_compound.id
 
-                if len(scaffold_ids) > 1:
-                    mrich.error("Multiple scaffold row values in", key)
-                    return scaffold_df
+                else:
 
-                scaffold_id = scaffold_ids[0]
+                    scaffold_ids = list(scaffold_df[key].dropna().unique())
+
+                    if not scaffold_ids:
+                        mrich.warning(
+                            "Can't insert scaffold relationships due to missing",
+                            key,
+                            "for all scaffold rows",
+                        )
+                        continue
+
+                    if len(scaffold_ids) > 1:
+                        mrich.error("Multiple scaffold row values in", key)
+                        return scaffold_df
+
+                    scaffold_id = scaffold_ids[0]
+
                 superstructure_ids = [
                     i for i in elab_df[key].unique() if i != scaffold_id
                 ]
