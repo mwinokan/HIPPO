@@ -1594,6 +1594,8 @@ class HIPPO:
         delete_unavailable: bool = True,
         overwrite_existing_quotes: bool = False,
         supplier_name: str = "Enamine",
+        currency: str = None,
+        dry_run: bool = False,
     ):
         """
         Load an Enamine quote provided as an excel file
@@ -1609,6 +1611,8 @@ class HIPPO:
         :param orig_name_is_hippo_id: Set to ``True`` if ``orig_name_col`` is the original HIPPO :class:``hippo.compound.Compound`` ID, defaults to ``False``
         :param delete_unavailable: Delete existing Enamine database quotes for compounds that are unavailable in the quote being loaded
         :param overwrite_existing_quotes: Delete existing Enamine database quotes for compounds that are available in the quote being loaded
+        :param dry_run: Stop before any database modification, return first quote data to be inserted
+        :param currency: Specify currency if non-standard price column
         :returns: An :class:`.IngredientSet` of the quoted molecules
         """
 
@@ -1648,6 +1652,8 @@ class HIPPO:
             assert catalogue_col in df.columns, unexpected_column(
                 "catalogue_col", catalogue_col
             )
+        elif catalogue_col not in df.columns:
+            catalogue_col = None
 
         assert (
             "Price, EUR" in df.columns
@@ -1659,7 +1665,8 @@ class HIPPO:
             price_cols = [c for c in df.columns if c.startswith("Price")]
             assert len(price_cols) == 1
             price_col = price_cols[0]
-        currency = price_col.split(", ")[-1]
+
+        currency = currency or price_col.split(", ")[-1]
 
         ingredients = IngredientSet(self.db)
 
@@ -1692,13 +1699,13 @@ class HIPPO:
                 except ValueError:
                     pass
 
-            if (catalogue := row[catalogue_col]) in [
+            if catalogue_col and (catalogue := row[catalogue_col]) in [
                 "No starting material",
                 "Out of stock",
                 "Unavailable",
             ]:
 
-                if delete_unavailable:
+                if not dry_run and delete_unavailable:
 
                     mrich.warning(f"Deleting '{supplier_name}' quotes for", compound)
 
@@ -1732,16 +1739,10 @@ class HIPPO:
             else:
                 lead_time = fixed_lead_time
 
-            if overwrite_existing_quotes:
-                self.db.delete_where(
-                    table="quote",
-                    key=f"quote_supplier = '{supplier_name}' AND quote_compound = {compound.id}",
-                )
-
             quote_data = dict(
                 compound=compound,
                 supplier=supplier_name,
-                catalogue=catalogue,
+                catalogue=catalogue if catalogue_col else None,
                 entry=row[entry_col],
                 amount=amount,
                 purity=purity,
@@ -1750,6 +1751,16 @@ class HIPPO:
                 currency=currency,
                 smiles=smiles,
             )
+
+            if dry_run:
+                mrich.warning("Dry-run, stopping before any database modifications")
+                return quote_data
+
+            if overwrite_existing_quotes:
+                self.db.delete_where(
+                    table="quote",
+                    key=f"quote_supplier = '{supplier_name}' AND quote_compound = {compound.id}",
+                )
 
             q_id = self.db.insert_quote(**quote_data)
 
