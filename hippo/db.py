@@ -4188,11 +4188,57 @@ class Database:
         else:
             return CompoundSet(self, [i for i, _ in result])
 
+    def query_most_similar(
+        self,
+        query: str,
+        subset: "CompoundSet",
+        return_similarity: bool = False,
+        none="error",
+    ) -> "Compound | (Compound, float)":
+        """Search for the most similar compound by tanimoto similarity of binary pattern fingerprints using the chemicalite function `mol_pattern_bfp`
+
+        :param query: SMILES string
+        :param return_similarity: return a list of similarity values together with the :class:`.CompoundSet` (Default value = False)
+        :param none: define the behaviour for no matches, any value other than ``'error'`` will silently return empty data (Default value = 'error')
+        :param subset: optional subset of compounds to search
+        :returns: :class:`.Compound` and optionally a similarity values
+        """
+
+        from .compound import Compound
+
+        sql = f"""
+        WITH subset AS (
+            SELECT compound_id, fp
+            FROM compound
+            JOIN compound_pattern_bfp USING (compound_id)
+            WHERE compound_id IN {subset.str_ids}
+        )
+        
+        SELECT compound_id, bfp_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), fp) AS similarity
+        FROM subset
+        ORDER BY similarity DESC
+        LIMIT 1
+        """
+
+        try:
+            self.execute(sql, (query,))
+        except sqlite3.OperationalError as e:
+            mrich.var("sql", sql)
+            raise
+
+        compound_id, similarity = self.cursor.fetchone()
+
+        if return_similarity:
+            return self.get_compound(id=compound_id), similarity
+
+        return self.get_compound(id=compound_id)
+
     def query_similarity(
         self,
         query: str,
         threshold: float,
         return_similarity: bool = False,
+        subset: "CompoundSet" = None,
         none="error",
     ) -> "CompoundSet | (CompoundSet, list[float])":
         """Search compounds by tanimoto similarity of binary pattern fingerprints using the chemicalite function `mol_pattern_bfp`
@@ -4201,6 +4247,7 @@ class Database:
         :param threshold: similarity threshold to exceed
         :param return_similarity: return a list of similarity values together with the :class:`.CompoundSet` (Default value = False)
         :param none: define the behaviour for no matches, any value other than ``'error'`` will silently return empty data (Default value = 'error')
+        :param subset: optional subset of compounds to search
         :returns: :class:`.CompoundSet` and optionally a list of similarity values
 
         """
@@ -4208,13 +4255,47 @@ class Database:
         from .cset import CompoundSet
 
         # smiles
-        if isinstance(query, str):
+        if subset:
 
             if return_similarity:
-                sql = f"SELECT compound_id, bfp_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), mol_pattern_bfp(compound.compound_mol, 2048)) as t FROM compound JOIN compound_pattern_bfp AS mfp USING(compound_id) WHERE mfp.compound_id match rdtree_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), ?2) ORDER BY t DESC "
+                sql = f"""
+                SELECT compound_id, 
+                       bfp_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), 
+                       mol_pattern_bfp(compound.compound_mol, 2048)) as t 
+                FROM compound 
+                JOIN compound_pattern_bfp AS mfp 
+                USING(compound_id) 
+                WHERE mfp.compound_id match rdtree_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), ?2)
+                AND compound_id IN {subset.str_ids}
+                ORDER BY t DESC
+                """
             else:
-                sql = f"SELECT compound_id FROM compound_pattern_bfp AS bfp WHERE bfp.compound_id match rdtree_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), ?2) "
+                sql = f"""
+                SELECT compound_id 
+                FROM compound_pattern_bfp AS bfp 
+                WHERE bfp.compound_id match rdtree_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), ?2)
+                AND compound_id IN {subset.str_ids}
+                """
 
+        elif isinstance(query, str):
+
+            if return_similarity:
+                sql = f"""
+                SELECT compound_id, 
+                       bfp_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), 
+                       mol_pattern_bfp(compound.compound_mol, 2048)) as t 
+                FROM compound 
+                JOIN compound_pattern_bfp AS mfp 
+                USING(compound_id) 
+                WHERE mfp.compound_id match rdtree_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), ?2) 
+                ORDER BY t DESC
+                """
+            else:
+                sql = f"""
+                SELECT compound_id 
+                FROM compound_pattern_bfp AS bfp 
+                WHERE bfp.compound_id match rdtree_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), ?2)
+                """
         else:
             raise NotImplementedError
 
