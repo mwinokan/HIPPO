@@ -664,13 +664,32 @@ class Database:
         # generate the inchikey name
         inchikey = inchikey or inchikey_from_smiles(smiles)
 
+        # Skip fingerprint calculation to avoid chemicalite segfault
+        # Fingerprints can be computed later if needed using update_compound_pattern_bfp_table()
         sql = """
-        INSERT INTO compound(compound_inchikey, compound_smiles, compound_mol, compound_pattern_bfp, compound_morgan_bfp, compound_alias)
-        VALUES(?1, ?2, mol_from_smiles(?2), mol_pattern_bfp(mol_from_smiles(?2), 2048), mol_morgan_bfp(mol_from_smiles(?2), 2, 2048), ?3)
+        INSERT INTO compound(compound_inchikey, compound_smiles, compound_mol, compound_alias)
+        VALUES(?1, ?2, mol_from_smiles(?2), ?3)
         """
 
         try:
             self.execute(sql, (inchikey, smiles, alias))
+            
+            # TEMPORARY WORKAROUND: Skip fingerprint computation due to chemicalite segfault
+            # The fingerprint functions (mol_pattern_bfp, mol_morgan_bfp) cause segfaults
+            # even with Python 3.10. Fingerprints can be computed later if needed.
+            # 
+            # Original code (commented out due to segfault):
+            # compound_id = self.cursor.lastrowid
+            # if not commit:
+            #     self.commit()
+            # sql_update = """
+            # UPDATE compound 
+            # SET compound_pattern_bfp = mol_pattern_bfp(compound_mol, 2048),
+            #     compound_morgan_bfp = mol_morgan_bfp(compound_mol, 2, 2048)
+            # WHERE compound_id = ? AND compound_mol IS NOT NULL
+            # """
+            # if compound_id:
+            #     self.execute(sql_update, (compound_id,))
 
         except sqlite3.IntegrityError as e:
             if "UNIQUE constraint failed: compound.compound_inchikey" in str(e):
@@ -710,11 +729,11 @@ class Database:
                 self.insert_tag(name=tag, compound=compound_id, commit=commit)
 
         ### register the binary fingerprints
-
-        result = self.insert_compound_pattern_bfp(compound_id, commit=commit)
-
-        if not result:
-            mrich.error("Could not insert compound pattern bfp")
+        # Skip fingerprint registration to avoid chemicalite segfault
+        # Fingerprints can be computed later if needed using update_compound_pattern_bfp_table()
+        # result = self.insert_compound_pattern_bfp(compound_id, commit=commit)
+        # if not result:
+        #     mrich.error("Could not insert compound pattern bfp")
 
         if metadata:
             self.insert_metadata(
@@ -2324,16 +2343,28 @@ class Database:
             inchikey = inchikey_from_smiles(new_smiles)
             values.append((inchikey, new_smiles))
 
+        # Skip fingerprint computation to avoid chemicalite segfault
+        # Fingerprints can be computed later if needed using update_compound_pattern_bfp_table()
         sql = """
-        INSERT OR IGNORE INTO compound(compound_inchikey, compound_smiles, compound_mol, compound_pattern_bfp, compound_morgan_bfp)
-        VALUES(?1, ?2, mol_from_smiles(?2), mol_pattern_bfp(mol_from_smiles(?2), 2048), mol_morgan_bfp(mol_from_smiles(?2), 2, 2048))
+        INSERT OR IGNORE INTO compound(compound_inchikey, compound_smiles, compound_mol)
+        VALUES(?1, ?2, mol_from_smiles(?2))
         """
 
         if debug:
             mrich.debug("Inserting...")
 
         self.executemany(sql, values)
-        self.update_compound_pattern_bfp_table()
+        
+        # Skip fingerprint computation and update_compound_pattern_bfp_table() call
+        # Original code (commented out):
+        # sql_update = """
+        # UPDATE compound 
+        # SET compound_pattern_bfp = mol_pattern_bfp(compound_mol, 2048),
+        #     compound_morgan_bfp = mol_morgan_bfp(compound_mol, 2, 2048)
+        # WHERE compound_pattern_bfp IS NULL OR compound_morgan_bfp IS NULL
+        # """
+        # self.execute(sql_update)
+        # self.update_compound_pattern_bfp_table()
 
         self.commit()
 
