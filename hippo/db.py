@@ -38,7 +38,11 @@ class Database:
     """
 
     def __init__(
-        self, path: Path, animal: "HIPPO", update_legacy: bool = False
+        self,
+        path: Path,
+        animal: "HIPPO",
+        update_legacy: bool = False,
+        auto_compute_bfps: bool = True,
     ) -> None:
 
         assert isinstance(path, Path)
@@ -49,6 +53,7 @@ class Database:
         self._connection = None
         self._cursor = None
         self._animal = animal
+        self._auto_compute_bfps = auto_compute_bfps
 
         mrich.debug(f"Database.path = {self.path}")
 
@@ -205,6 +210,16 @@ class Database:
             "SELECT name FROM sqlite_master WHERE type='table';"
         ).fetchall()
         return [n for n, in results]
+
+    @property
+    def auto_compute_bfps(self) -> bool:
+        """Automatically compute compound binary fingerprints on insertion"""
+        return self._auto_compute_bfps
+
+    @auto_compute_bfps.setter
+    def auto_compute_bfps(self, b: bool):
+        """Automatically compute compound binary fingerprints on insertion"""
+        self._auto_compute_bfps = b
 
     ### PUBLIC METHODS / API CALLS
 
@@ -711,10 +726,13 @@ class Database:
 
         ### register the binary fingerprints
 
-        result = self.insert_compound_pattern_bfp(compound_id, commit=commit)
+        if self.auto_compute_bfps:
+            result = self.insert_compound_pattern_bfp(compound_id, commit=commit)
 
-        if not result:
-            mrich.error("Could not insert compound pattern bfp")
+            if not result:
+                mrich.error("Could not insert compound pattern bfp")
+
+        ### insert metadata
 
         if metadata:
             self.insert_metadata(
@@ -2324,16 +2342,27 @@ class Database:
             inchikey = inchikey_from_smiles(new_smiles)
             values.append((inchikey, new_smiles))
 
-        sql = """
-        INSERT OR IGNORE INTO compound(compound_inchikey, compound_smiles, compound_mol, compound_pattern_bfp, compound_morgan_bfp)
-        VALUES(?1, ?2, mol_from_smiles(?2), mol_pattern_bfp(mol_from_smiles(?2), 2048), mol_morgan_bfp(mol_from_smiles(?2), 2, 2048))
-        """
+        if self.auto_compute_bfps:
+
+            sql = """
+            INSERT OR IGNORE INTO compound(compound_inchikey, compound_smiles, compound_mol, compound_pattern_bfp, compound_morgan_bfp)
+            VALUES(?1, ?2, mol_from_smiles(?2), mol_pattern_bfp(mol_from_smiles(?2), 2048), mol_morgan_bfp(mol_from_smiles(?2), 2, 2048))
+            """
+
+        else:
+
+            sql = """
+            INSERT OR IGNORE INTO compound(compound_inchikey, compound_smiles, compound_mol)
+            VALUES(?1, ?2, mol_from_smiles(?2))
+            """
 
         if debug:
             mrich.debug("Inserting...")
 
         self.executemany(sql, values)
-        self.update_compound_pattern_bfp_table()
+
+        if self.auto_compute_bfps:
+            self.update_compound_pattern_bfp_table()
 
         self.commit()
 
