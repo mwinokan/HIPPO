@@ -100,6 +100,7 @@ def calculate_interactions(
     animal = setup_animal(database=database, backup=backup)
 
     mrich.h3("State Before")
+    mrich.var("#poses", animal.num_poses)
     mrich.var("#fingerprinted", animal.poses.num_fingerprinted)
 
     mrich.h3("Calculation")
