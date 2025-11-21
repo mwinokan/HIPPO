@@ -3,7 +3,7 @@
 HIPPO
 =====
 
-> 🦛 Hit Interaction Profiling for Procurement Optimisation
+> 🦛 Hit Interaction Profiling for Progression Optimisation
 
 HIPPO is in active development and feedback is appreciated.
 
