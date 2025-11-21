@@ -3050,7 +3050,7 @@ class HIPPO:
         prefix = key[0]
         index = key[1:]
 
-        if prefix not in "CPR":
+        if prefix not in "CPRTFIS":
             raise AttributeError(f"'HIPPO' object has no attribute '{key}'")
 
         try:
@@ -3066,6 +3066,14 @@ class HIPPO:
                 return self.poses[index]
             case "R":
                 return self.reactions[index]
+            case "T":
+                return self.db.get_target(id=index)
+            case "F":
+                return self.db.get_feature(id=index)
+            case "I":
+                return self.db.get_interaction(id=index)
+            case "S":
+                return self.db.get_subsite(id=index)
 
         mrich.error(f"Unsupported {prefix=}")
         return None
