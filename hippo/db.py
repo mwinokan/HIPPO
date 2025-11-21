@@ -3980,13 +3980,19 @@ class Database:
 
         from .subsite import Subsite
 
-        name, target = self.select_where(
+        results = self.select_where(
             table="subsite",
             key="id",
             value=id,
             multiple=False,
             query="subsite_name, subsite_target",
         )
+
+        if not results:
+            mrich.error(f"No subsite with {id=}")
+            return None
+
+        name, target = results
 
         subsite = Subsite(db=self, id=id, name=name, target_id=target)
 
