@@ -24,7 +24,7 @@ HIPPO is pip-installable, but use of a `conda` environment is recommended for th
 
 ```
 pip install --upgrade hippo-db
-conda install -c conda-forge chemicalite=2022.04.1
+conda install -c conda-forge chemicalite=2024.05.1
 ```
 
 For more information see the [installation guide](https://hippo-docs.winokan.com/en/latest/#installation)
