@@ -1,0 +1,26 @@
+## CONFIGURE TESTING DATA
+TARGET = "SARS2_Nprot"
+PROPOSAL = "lb32627-93"
+STACK = "production"
+DB = "db_test.sqlite"
+TARGET = "SARS2_Nprot"
+
+## DISABLE TESTS
+
+CLEANUP = True
+DOWNLOAD = True
+SETUP = True
+ADD_HITS = True
+SCAFFOLDS = True
+SUBSITES = True
+
+## CONFIGURE CLEANUP
+
+CLEANUP_FILES = [
+    DB,
+    f"{TARGET}.tar.gz",
+]
+
+CLEANUP_DIRS = [
+    TARGET,
+]
