@@ -2453,7 +2453,7 @@ class Database:
 
         return pose_ids
 
-    def calculate_all_scaffolds(self):
+    def calculate_all_scaffolds(self) -> None:
         """Determine and insert records for all substructure/superstructure relationships in the Compound table"""
 
         n_before = self.count("scaffold")
@@ -2468,6 +2468,8 @@ class Database:
 
         with mrich.loading("Fetching compounds..."):
             records = self.execute(sql).fetchall()
+
+        self.commit()
 
         sql = """
             INSERT OR IGNORE INTO scaffold
@@ -2484,8 +2486,7 @@ class Database:
             self.executemany(sql, records)
             mrich.print("Took", f"{time.time() - t1:.1f}", "seconds")
 
-        with mrich.loading("Committing..."):
-            self.commit()
+        self.commit()
 
         diff = self.count("scaffold") - n_before
 
@@ -2498,7 +2499,9 @@ class Database:
                 "Found", diff, "new substructure-superstructure relationships"
             )
 
-    def calculate_all_murcko_scaffolds(self, generic: bool = True):
+    def calculate_all_murcko_scaffolds(
+        self, generic: bool = True
+    ) -> "dict | (dict, dict)":
         """Determine Murcko and optionally generic Murcko scaffolds for all Compounds in the Database and add relevant records.
 
         :param generic: Calculate generic (single bonds and all carbon) scaffolds as well
