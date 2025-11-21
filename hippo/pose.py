@@ -502,9 +502,12 @@ class Pose:
             INNER JOIN compound ON compound_id = pose_compound
             """
 
-            (diff,) = self.db.execute(sql).fetchone()
+            result = self.db.execute(sql).fetchone()
 
-            self._num_atoms_added_wrt_inspirations = diff
+            if not result:
+                return None
+
+            (self._num_atoms_added_wrt_inspirations,) = result
 
         return self._num_atoms_added_wrt_inspirations
 
