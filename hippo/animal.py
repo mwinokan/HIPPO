@@ -2391,7 +2391,7 @@ class HIPPO:
     def register_pose(
         self,
         *,
-        compound: Compound | int,
+        compound: Compound | int | None = None,
         target: str,
         path: str,
         inchikey: str | None = None,
@@ -2415,7 +2415,7 @@ class HIPPO:
     ) -> Pose:
         """Add a :class:`.Pose` to the :class:`.Database`. If it already exists return the pose
 
-        :param compound: The :class:`.Compound` object or ID that this :class:`.Pose` is a conformer of
+        :param compound: The :class:`.Compound` object or ID that this :class:`.Pose` is a conformer of. Can be ``None`` for apo/reference structures.
         :param target: The :class:`.Target` name or ID
         :param path: Path to the :class:`.Pose`'s conformer file (.pdb or .mol)
         :param alias: The string alias of this :class:`.Pose`, defaults to ``None``
@@ -2493,60 +2493,65 @@ class HIPPO:
 
                 return results
 
-        if isinstance(compound, int):
+        if compound is None:
+            compound_id = None
+        elif isinstance(compound, int):
             compound_id = compound
         else:
             compound_id = compound.id
 
         if check_RMSD:
+            if compound_id is None:
+                mrich.warning("Cannot check RMSD for apo structure (no compound)")
+                check_RMSD = False
+            else:
+                # check if the compound has existing poses
+                other_pose_ids = self.db.select_id_where(
+                    table="pose",
+                    key="compound",
+                    value=compound_id,
+                    none="quiet",
+                    multiple=True,
+                )
 
-            # check if the compound has existing poses
-            other_pose_ids = self.db.select_id_where(
-                table="pose",
-                key="compound",
-                value=compound_id,
-                none="quiet",
-                multiple=True,
-            )
+                if other_pose_ids:
+                    other_poses = PoseSet(self.db, [i for i, in other_pose_ids])
 
-            if other_pose_ids:
-                other_poses = PoseSet(self.db, [i for i, in other_pose_ids])
+                    from molparse.rdkit import draw_mols, draw_flat
+                    from rdkit.Chem import MolFromMolFile
+                    from numpy.linalg import norm
+                    from numpy import array
 
-                from molparse.rdkit import draw_mols, draw_flat
-                from rdkit.Chem import MolFromMolFile
-                from numpy.linalg import norm
-                from numpy import array
+                    mol = MolFromMolFile(str(path.resolve()))
 
-                mol = MolFromMolFile(str(path.resolve()))
+                    c1 = mol.GetConformer()
+                    atoms1 = [a for a in mol.GetAtoms()]
+                    symbols1 = [a.GetSymbol() for a in atoms1]
+                    positions1 = [c1.GetAtomPosition(i) for i, _ in enumerate(atoms1)]
 
-                c1 = mol.GetConformer()
-                atoms1 = [a for a in mol.GetAtoms()]
-                symbols1 = [a.GetSymbol() for a in atoms1]
-                positions1 = [c1.GetAtomPosition(i) for i, _ in enumerate(atoms1)]
+                    for pose in other_poses:
+                        c2 = pose.mol.GetConformer()
+                        atoms2 = [a for a in pose.mol.GetAtoms()]
+                        symbols2 = [a.GetSymbol() for a in atoms2]
+                        positions2 = [c2.GetAtomPosition(i) for i, _ in enumerate(atoms2)]
 
-                for pose in other_poses:
-                    c2 = pose.mol.GetConformer()
-                    atoms2 = [a for a in pose.mol.GetAtoms()]
-                    symbols2 = [a.GetSymbol() for a in atoms2]
-                    positions2 = [c2.GetAtomPosition(i) for i, _ in enumerate(atoms2)]
-
-                    for s1, p1 in zip(symbols1, positions1):
-                        for s2, p2 in zip(symbols2, positions2):
-                            if s2 != s1:
-                                continue
-                            if norm(array(p2 - p1)) <= RMSD_tolerance:
-                                # this atom (1) is within tolerance
+                        for s1, p1 in zip(symbols1, positions1):
+                            for s2, p2 in zip(symbols2, positions2):
+                                if s2 != s1:
+                                    continue
+                                if norm(array(p2 - p1)) <= RMSD_tolerance:
+                                    # this atom (1) is within tolerance
+                                    break
+                            else:
+                                # this atom (1) is outside of tolerance
                                 break
                         else:
-                            # this atom (1) is outside of tolerance
-                            break
-                    else:
-                        # all atoms within tolerance --> too similar
-                        mrich.warning(f"Found similar {pose=}")
-                        if return_pose:
-                            return pose
-                        else:
-                            return pose.id
+                            # all atoms within tolerance --> too similar
+                            mrich.warning(f"Found similar {pose=}")
+                            if return_pose:
+                                return pose
+                            else:
+                                return pose.id
 
         pose_data = dict(
             compound=compound,

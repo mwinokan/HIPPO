@@ -811,7 +811,9 @@ class Database:
 
         """
 
-        if isinstance(compound, Compound):
+        if compound is None:
+            compound = None
+        elif isinstance(compound, Compound):
             compound = compound.id
 
         if isinstance(reference, Pose):
