@@ -264,6 +264,11 @@ class Pose:
                     if not lig_residues:
                         lig_residues = [r for r in sys.residues if r.type == "LIG"]
 
+                    if len(lig_residues) == 0:
+                        mrich.warning(f"No ligand residues found in PDB {self.path} (apo structure)")
+                        self._mol = None
+                        return None
+
                     if len(lig_residues) > 1:
                         mrich.warning(f"Multiple ligands in PDB {self}")
 
