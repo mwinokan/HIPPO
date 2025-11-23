@@ -234,7 +234,10 @@ class Database:
         try:
             conn = sqlite3.connect(self.path)
 
-            mrich.debug(f"{sqlite3.version=}")
+            try:
+                mrich.debug(f"{sqlite3.version=}")
+            except AttributeError:
+                mrich.debug(f"sqlite3.version not available, sqlite_version={sqlite3.sqlite_version}")
 
             conn.enable_load_extension(True)
             conn.load_extension("chemicalite")
