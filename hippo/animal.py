@@ -1912,9 +1912,10 @@ class HIPPO:
                     f"Could not determine file type from extension, use '.csv' or '.sqlite' {path}"
                 )
 
-        smiles_alias_tuples = []
+        unique = df[df["CompoundSMILES"] != "-"].drop_duplicates(subset=[smiles_col, alias_col])
 
-        for i, row in df.iterrows():
+        smiles_alias_tuples = []
+        for j, (i, row) in enumerate(unique.iterrows()):
 
             smiles = row[smiles_col]
             alias = row[alias_col]
@@ -1927,10 +1928,10 @@ class HIPPO:
 
             smiles_alias_tuples.append((smiles, alias))
 
-            if stop_after and i > stop_after:
+            if stop_after and j > stop_after:
                 break
 
-        smiles_alias_tuples = set(smiles_alias_tuples)
+        mrich.var("#unique compounds", len(smiles_alias_tuples))
 
         old_smiles = [s for s, a in smiles_alias_tuples]
 
@@ -1943,6 +1944,7 @@ class HIPPO:
             inchikey: old_s
             for old_s, (inchikey, new_s) in zip(old_smiles, inchikey_new_smiles_tuples)
         }
+        
         alias_lookup = {s: a for s, a in smiles_alias_tuples}
         alias_dicts = [
             dict(compound_inchikey=inchikey, compound_alias=alias_lookup[old_s])
@@ -1959,6 +1961,7 @@ class HIPPO:
 
             mrich.debug("Updating aliases...")
             self.db.executemany(sql, alias_dicts)
+            self.db.commit()
 
         inchikeys = [d["compound_inchikey"] for d in alias_dicts]
 
