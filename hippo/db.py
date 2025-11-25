@@ -2340,7 +2340,27 @@ class Database:
         return values
 
     def register_poses(self, dicts: list[dict]) -> set[int]:
-        """Insert or ignore a bunch of poses, also returns a set of Pose IDs"""
+        """Insert or ignore a bunch of poses, also returns a set of Pose IDs
+
+        :param dicts: a list of dictionaries describing the poses to be inserted. See the expected format below:
+
+        dicts = [
+            dict(
+                alias=...,           # string can be None
+                reference_id=...,    # reference pose id
+                inchikey=...,        # pre-computed inchikey
+                smiles=...,          # SMILEs
+                path=...,            # path to mol-file on disk, used for uniqueness check, can be a fake path
+                compound_id=...,     # Compound database ID
+                target_id=...,       # Target database ID
+                mol=...,             # rdkit.Chem.Mol
+                energy_score=...,    # float, can be None
+                distance_score=...,  # float, can be None
+                metadata=...,        # dictionary, can be empty
+            )
+        ]
+
+        """
 
         from json import dumps
 

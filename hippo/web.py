@@ -1,3 +1,5 @@
+"""Classes for web (static HTML) output"""
+
 from pathlib import Path
 import shutil
 
@@ -29,7 +31,8 @@ class ProjectPage:
         scaffold_tag: str = "Syndirella scaffold",
         extra_recipe_dir: str | Path = None,
         skip_existing: bool = True,
-    ):
+    ) -> None:
+        """ProjectPage initialisation"""
 
         # setup directories
         self._output_dir = Path(output_dir)
@@ -126,69 +129,83 @@ class ProjectPage:
         return self.output_dir / "index.html"
 
     @property
-    def proposals(self):
+    def proposals(self) -> "list[Recipe]":
+        """List of proposal :class:`.Recipe` objects"""
         return self._proposals
 
     @property
-    def scaffolds(self):
+    def scaffolds(self) -> "CompoundSet":
+        """Scaffold :class:`.CompoundSet`"""
         return self._scaffolds
 
     @property
-    def suppliers(self):
+    def suppliers(self) -> list[str]:
+        """Compound suppliers"""
         return self._suppliers
 
     @property
-    def starting_recipe(self):
+    def starting_recipe(self) -> "Recipe":
+        """Starting :class:`.Recipe`"""
         return self._starting_recipe
 
     @property
-    def rgen(self):
+    def rgen(self) -> "RandomRecipeGenerator":
+        """:class:`.RandomRecipeGenerator`"""
         return self._rgen
 
     @property
-    def scorer(self):
+    def scorer(self) -> "Scorer":
+        """:class:`.Scorer`"""
         return self._scorer
 
     @property
-    def all_scaffolds(self):
+    def all_scaffolds(self) -> "CompoundSet":
+        """All scaffold compounds"""
         return self._all_scaffolds
 
     @property
-    def all_elabs(self):
+    def all_elabs(self) -> "CompoundSet":
+        """All elaborations"""
         if self._all_elabs is None:
             self._all_elabs = self.all_scaffolds.elabs
         return self._all_elabs
 
     @property
-    def all_elab_poses(self):
+    def all_elab_poses(self) -> "PoseSet":
+        """All elaboration poses"""
         if self._all_elab_poses is None:
             self._all_elab_poses = self.all_elabs.poses
         return self._all_elab_poses
 
     @property
-    def scaffold_poses(self):
+    def scaffold_poses(self) -> "PoseSet":
+        """Scaffold poses"""
         if self._scaffold_poses is None:
             self._scaffold_poses = self.scaffolds.poses
         return self._scaffold_poses
 
     @property
-    def all_scaffold_poses(self):
+    def all_scaffold_poses(self) -> "PoseSet":
+        """All scaffold poses"""
         if self._all_scaffold_poses is None:
             self._all_scaffold_poses = self.all_scaffolds.poses
         return self._all_scaffold_poses
 
     @property
-    def proposal(self):
+    def proposal(self) -> "Recipe":
+        """Return single :class:`.Recipe` proposal"""
         if len(self.proposals) != 1:
             mrich.warning(f"{len(self.proposals)=}")
         return self._proposals[0]
 
     @property
-    def extra_recipe_dir(self):
+    def extra_recipe_dir(self) -> "Path":
+        """Optional extra recipe directory"""
         return self._extra_recipe_dir
 
     @property
     def skip_existing(self) -> bool:
+        """Skip creation of existing files"""
         return self._skip_existing
 
     ### METHODS
@@ -342,7 +359,7 @@ class ProjectPage:
         raise NotImplementedError
 
     def sidebar(self) -> None:
-        # https://www.w3schools.com/w3css/w3css_sidebar.asp
+        """https://www.w3schools.com/w3css/w3css_sidebar.asp"""
         raise NotImplementedError
 
     def var(self, key, value, tag=None, separator=": ") -> None:
@@ -364,6 +381,7 @@ class ProjectPage:
             function()
 
     def plotly_graph(self, figure, filename, write: bool = True):
+        """Generic plotly graph component"""
 
         # from plotly.offline import plot
         from hippo_plot import write_html
@@ -416,6 +434,7 @@ class ProjectPage:
     #         **kwargs)
 
     def save_compound_image(self, compound):
+        """Create 2D compound drawing"""
         from rdkit.Chem.Draw import MolToImage
 
         image = MolToImage(compound.mol)
@@ -424,14 +443,17 @@ class ProjectPage:
         image.save(path)
 
     def save_pose_sdf(self, pose):
+        """Export pose SDF"""
         path = self.pose_sdf_dir / f"P{pose.id}.sdf"
         self.animal.poses([pose.id]).write_sdf(path, inspirations=False)
 
     def save_pset_sdf(self, name, pset):
+        """Save poseset as SDF"""
         path = self.pose_sdf_dir / f"{name}.sdf"
         pset.write_sdf(path, inspirations=False)
 
     def compound_image(self, compound, max_height="250px"):
+        """Compound image stag"""
         self.save_compound_image(compound)
 
         src = str(
@@ -442,19 +464,21 @@ class ProjectPage:
 
         self.doc.stag("img", src=src, style=f"max-height:{max_height}")
 
-    def pose_3d_view(self, pose):
+    # def pose_3d_view(self, pose):
+    #     """Compound image stag"""
 
-        self.save_pose_sdf(compound)
+    #     self.save_pose_sdf(compound)
 
-        src = str(
-            Path(self.resource_dir.name)
-            / Path(self.mol_image_dir.name)
-            / f"C{compound.id}.png"
-        )
+    #     src = str(
+    #         Path(self.resource_dir.name)
+    #         / Path(self.mol_image_dir.name)
+    #         / f"C{compound.id}.png"
+    #     )
 
-        self.doc.stag("img", src=src, style=f"max-height:{max_height}")
+    #     self.doc.stag("img", src=src, style=f"max-height:{max_height}")
 
     def compound_grid(self, compounds, style="w3-center", pose_modal: bool = False):
+        """Compound grid component"""
 
         id_num_poses_dict = compounds.id_num_poses_dict
 
@@ -514,6 +538,7 @@ class ProjectPage:
                             self.save_pset_sdf(modal_name, poses)
 
                             def modal_content():
+                                """modal content"""
                                 with self.tag("p"):
                                     self.text("TEXT TEXT TEXT")
 
@@ -522,12 +547,14 @@ class ProjectPage:
     def modal_button(
         self, text, modal_name, disable: bool = False, style: str = "w3-teal"
     ):
+        """Modal opening button"""
         onclick = f"document.getElementById('{modal_name}').style.display='block'"
         self.button(text, style=style, onclick=onclick, disable=disable)
 
     def button(
         self, text: str, onclick: str = "", style="w3-teal", disable: bool = False
     ):
+        """Generic button component"""
 
         assert text
 
@@ -541,6 +568,7 @@ class ProjectPage:
             self.text(text)
 
     def modal(self, modal_name, content_function):
+        """Generic modal"""
         with self.tag("div", id=modal_name, klass="w3-modal"):
             with self.tag("div", klass="w3-modal-content"):
                 with self.tag("div", klass="w3-container"):
@@ -555,6 +583,7 @@ class ProjectPage:
     def recipe_subsection(
         self, recipe, title, sankey: bool = False, title_style="h3", show_title=True
     ):
+        """recipe subsection"""
 
         if show_title:
             self.section_header(title, title_style)
@@ -570,6 +599,7 @@ class ProjectPage:
         df = recipe.products.compounds.get_df()
 
         def modal_content():
+            """modal content"""
             self.table(df, style="w3-table-all w3-small")
 
         modal_name = f"{recipe_name}_products"
@@ -581,6 +611,7 @@ class ProjectPage:
             df = intermediates.compounds.get_df()
 
             def modal_content():
+                """modal content"""
                 self.table(df, style="w3-table-all w3-small")
 
             modal_name = f"{recipe_name}_intermediates"
@@ -592,6 +623,7 @@ class ProjectPage:
         df = recipe.reactants.df
 
         def modal_content():
+            """modal content"""
             self.table(df, style="w3-table-all w3-small")
 
         modal_name = f"{recipe_name}_reactants"
@@ -603,6 +635,7 @@ class ProjectPage:
         df = recipe.reactions.get_df(mols=False)
 
         def modal_content():
+            """modal content"""
             self.table(df, style="w3-table-all w3-small")
 
         modal_name = f"{recipe_name}_reactions"
@@ -610,6 +643,7 @@ class ProjectPage:
         self.modal(modal_name, modal_content)
 
     def scorer_attribute(self, attribute, histogram: bool = True):
+        """scorer attribute component"""
 
         from .scoring import DEFAULT_ATTRIBUTES
 
@@ -726,6 +760,7 @@ class ProjectPage:
         df = self.all_scaffolds.get_df(mol=False, num_poses=True)  # , routes=True)
 
         def modal_content():
+            """modal content"""
             self.table(df, style="w3-table-all w3-small")
 
         modal_name = "all_scaffolds_modal"
@@ -1021,6 +1056,7 @@ class ProjectPage:
         num_inspirations: int | None = None,
         num_inspiration_sets: int | None = None,
     ) -> "plotly.graph_objects.Figure":
+        """Funnel plot"""
 
         if scaffolds is None:
             scaffolds = self.all_scaffolds
@@ -1078,5 +1114,3 @@ class ProjectPage:
         # fig.update_layout(title=title, title_automargin=False, title_yref="container")
 
         return fig
-
-    ### DUNDERS

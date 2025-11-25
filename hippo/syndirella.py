@@ -1,4 +1,10 @@
-def reactions_from_row(*, animal, row, num_steps):
+"""Functions for interfacing with syndirella data"""
+
+
+def reactions_from_row(
+    *, animal: "HIPPO", row: "pandas.Series", num_steps: int
+) -> "ReactionSet":
+    """Get :class:`.ReactionSet` from a syndirella *to-hippo* DataFrame row"""
 
     reaction_ids = set()
 

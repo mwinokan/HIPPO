@@ -1,4 +1,16 @@
-__version__ = "0.3.28"
+"""
+
+Hit Interaction Profiling for Progression Optimisation
+
+HIPPO is a Python toolkit for structure- and fragment-based computational drug discovery,
+storing large datasets in a database and facilitating rational decision making.
+HIPPO was originally developed by Max Winokan while in XChem at Diamond Light Source.
+
+See https://hippo-docs.winokan.com and https://github.com/mwinokan/HIPPO
+
+"""
+
+__version__ = "0.3.38"
 
 from .animal import HIPPO
 from .compound import Compound, Ingredient

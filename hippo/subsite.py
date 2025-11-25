@@ -1,3 +1,5 @@
+"""Classes for working with protein subsites"""
+
 import mcol
 
 
@@ -13,7 +15,8 @@ class Subsite:
 
     _table = "subsite"
 
-    def __init__(self, db: "Database", id: int, target_id: int, name: str):
+    def __init__(self, db: "Database", id: int, target_id: int, name: str) -> None:
+        """Subsite initialisation"""
 
         self._db = db
         self._id = id
@@ -21,8 +24,6 @@ class Subsite:
         self._name = name
         self._metadata = None
         self._target = None
-
-    ### FACTORIES
 
     ### PROPERTIES
 
@@ -112,6 +113,7 @@ class SubsiteTag:
     _table = "subsite_tag"
 
     def __init__(self, db: "Database", id: int, subsite_id: int, pose_id: int):
+        """SubsiteTag initialisation"""
 
         self._db = db
         self._id = id
@@ -161,8 +163,6 @@ class SubsiteTag:
         if self._metadata is None:
             self._metadata = self.db.get_metadata(table="subsite_tag", id=self.id)
         return self._metadata
-
-    ### METHODS
 
     ### DUNDERS
 

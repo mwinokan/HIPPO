@@ -1,7 +1,9 @@
-# from .db import Database
-from collections.abc import MutableSet
+"""Classes for managing compound/pose tags"""
+
 import mcol
 import mrich
+
+from collections.abc import MutableSet
 
 
 class TagTable:
@@ -19,10 +21,9 @@ class TagTable:
         self,
         db: "Database",
     ) -> None:
+        """TagTable initialisation"""
 
         self._db = db
-
-    ### FACTORIES
 
     ### PROPERTIES
 
@@ -142,6 +143,7 @@ class TagSet(MutableSet):
         immutable: bool = False,
         commit: bool = True,
     ):
+        """TagSet initialisation"""
 
         self._elements = []
         self._immutable = immutable
@@ -152,14 +154,6 @@ class TagSet(MutableSet):
         for tag in tags:
             if tag not in self._elements:
                 self._elements.append(tag)
-
-        # for tag in tags:
-        #     self.add(tag, commit=False)
-
-        # if commit:
-        #     self.db.commit()
-
-    ### FACTORIES
 
     ### PROPERTIES
 

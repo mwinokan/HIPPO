@@ -1,11 +1,10 @@
-import mout
-import numpy as np
-
-# from .block import BuildingBlockSet
-from scipy.interpolate import interp1d
-import pandas as pd
+"""Classes for scoring Recipes"""
 
 import mrich
+
+import numpy as np
+import pandas as pd
+from scipy.interpolate import interp1d
 
 DATA_COLUMNS = [
     "score",
@@ -39,6 +38,7 @@ class Scorer:
         load_cache: bool = True,
         allowed_poses: "PoseSet | list[int] | None" = None,
     ) -> None:
+        """Scorer initialisation"""
 
         from .pset import PoseSet
         from .recipe import RecipeSet
@@ -171,27 +171,33 @@ class Scorer:
         return len(self._recipes)
 
     @property
-    def attributes(self):
+    def attributes(self) -> "list[Attribute | CustomAttribute]":
+        """List of scoring :class:`.Attribute`/:class:`.CustomAttribute` objects"""
         return list(self._attributes.values())
 
     @property
-    def attribute_keys(self):
+    def attribute_keys(self) -> list[str]:
+        """List of attribute keys / names"""
         return list(self._attributes.keys())
 
     @property
-    def recipes(self):
+    def recipes(self) -> "RecipeSet":
+        """:class:`.RecipeSet`"""
         return self._recipes
 
     @property
-    def num_attributes(self):
+    def num_attributes(self) -> int:
+        """Scoring attribute count"""
         return len(self.attributes)
 
     @property
-    def weights(self):
+    def weights(self) -> list[float]:
+        """List of attribute scoring weights"""
         return [a.weight for a in self.attributes]
 
     @weights.setter
-    def weights(self, ws):
+    def weights(self, ws: float | list[float]) -> None:
+        """Set attribute scoring weights"""
 
         self._flag_weight_modification()
 
@@ -205,7 +211,8 @@ class Scorer:
             a.weight = w / wsum
 
     @property
-    def score_dict(self):
+    def score_dict(self) -> dict[str, float]:
+        """Dictionary of recipe scores keyed by recipe hashes"""
 
         col = self._data["score"]
 
@@ -223,19 +230,23 @@ class Scorer:
         return col.to_dict()
 
     @property
-    def scores(self):
+    def scores(self) -> list[float]:
+        """List of recipe scores"""
         return list(self.score_dict.values())
 
     @property
-    def best(self):
+    def best(self) -> "Recipe":
+        """Best :class:`.Recipe`"""
         return self.top(1)
 
     @property
-    def db(self):
+    def db(self) -> "Database":
+        """Associated :class:`.Database`"""
         return self._db
 
     @property
-    def json_path(self):
+    def json_path(self) -> "Path":
+        """Path where serialised Scorer JSON cache is written"""
         from pathlib import Path
 
         return Path(self.db.path.name.replace(".sqlite", "_scorer.json"))
@@ -256,6 +267,7 @@ class Scorer:
         function,
         weight_reset_warning: bool = True,
     ) -> "CustomAttribute":
+        """Add a :class:`.CustomAttribute` for scoring"""
 
         ca = CustomAttribute(self, key, function)
 
@@ -276,7 +288,13 @@ class Scorer:
 
         return self._attributes[key]
 
-    def add_recipes(self, json_paths: "list", debug: bool = False):
+    def add_recipes(self, json_paths: "list", debug: bool = False) -> None:
+        """Add extra :class:`.Recipe` objects for scoring
+
+        :param json_paths: list of serialiased :class:`.Recipe` JSON files
+        :param debug: increase verbosity for debugging
+
+        """
 
         from pathlib import Path
         from .recipe import Recipe
@@ -319,13 +337,16 @@ class Scorer:
         *,
         debug: bool = False,
     ) -> float:
+        """Score a given :class:`.Recipe`
+
+        :param debug: increase verbosity for debugging
+        """
 
         score = 0.0
 
         for attribute in self.attributes:
             recipe_score = attribute(recipe)
             score += recipe_score
-            # score = sum([a(recipe) for a in self.attributes])
 
         if debug:
             print_data = []
@@ -370,72 +391,8 @@ class Scorer:
         df = pd.DataFrame(print_data).set_index("attribute (weight)")
         mrich.print(df)
 
-    def get_df(
-        self,
-        serialise_price: bool = True,
-        debug: bool = True,
-        **kwargs,
-    ) -> "pandas.DataFrame":
-
-        raise NotImplementedError
-
-        from pandas import DataFrame
-
-        params = dict(serialise_price=serialise_price, **kwargs)
-
-        if self._df is None or params != self._df_params:
-
-            if debug:
-                mrich.debug("Scorer.get_df()")
-
-            if debug:
-                mrich.debug("Scorer.recipes.get_df()")
-
-            data = []
-
-            for recipe in self.recipes:
-
-                key = recipe.hash
-
-                d = recipe.get_dict(
-                    # reactant_supplier=False,
-                    database=False,
-                    timestamp=False,
-                    **kwargs,
-                    # timestamp=False,
-                )
-
-                d["hash"] = key
-                d["score"] = self.scores[key]
-
-                data.append(d)
-
-            df = DataFrame(data)
-
-            for attribute in self.attributes:
-
-                if debug:
-                    mrich.debug(f"Getting {attribute.key=} values")
-
-                if isinstance(attribute, CustomAttribute):
-
-                    df[attribute.key] = attribute.values
-
-                else:
-
-                    df[attribute.key] = self.recipes.get_values(
-                        key=attribute.key, serialise_price=serialise_price
-                    )
-
-            if serialise_price:
-                df["price"] = df.apply(lambda x: x["price"].amount, axis=1)
-
-            self._df = df
-            self._df_params = params
-
-        return self._df
-
-    def get_sorted_df(self, budget: float | None = None):
+    def get_sorted_df(self, budget: float | None = None) -> "pandas.DataFrame":
+        """Get scoring data sorted by descending score"""
         self.scores
         return self._data.sort_values(by="score", ascending=False)
 
@@ -443,8 +400,13 @@ class Scorer:
         self,
         keys: str | list[str],
         budget: float | None = None,
-        # **kwargs,
-    ):
+    ) -> "plotly.graph_objects.Figure":
+        """Scatter plot of two scoring keys
+
+        :param keys: list of two :class:`.Attribute` or :class:`.CustomAttribute` keys to plot
+        :param budget: optional budget to limit by
+        :returns: plotly.graph_objects.Figure
+        """
 
         import plotly.express as px
 
@@ -489,11 +451,21 @@ class Scorer:
             df, x=keys[0], y=keys[1], color="score", hover_data=hover_data
         )
 
-    def top_keys(self, n: int, budget: float | None = None):
+    def top_keys(self, n: int, budget: float | None = None) -> list[str]:
+        """Get top `n` :class:`.Recipe` keys/hashes
+
+        :param n: number of keys to return
+        :param budget: limit recipes to this budget
+        """
         keys = self.get_sorted_df(budget=budget).index[:n]
         return keys
 
-    def top(self, n: int, budget: float | None = None):
+    def top(self, n: int, budget: float | None = None) -> "list[Recipe]":
+        """Get top `n` :class:`.Recipe` objects
+
+        :param n: number of recipes to return
+        :param budget: limit recipes to this budget
+        """
         keys = self.top_keys(n=n, budget=budget)
         if n == 1:
             return [self.recipes[key] for key in keys][0]
@@ -503,22 +475,21 @@ class Scorer:
     ### INTERNALS
 
     def _flag_weight_modification(self):
-
+        """Reset scores as result of weight modifications"""
         self._data["score"] = None
 
-    def summary(self):
+    def summary(self) -> None:
+        """Print a summary of attribute value distributions"""
 
         mrich.header(self)
         for attribute in self.attributes:
-            # mrich.out(
-            # f"{repr(attribute)} min={attribute.min:.3g}, mean={attribute.mean:.3g}, std={attribute.std:.3g}, max={attribute.max:.3g}"
-            # )
             mrich.print(
                 attribute,
                 f"min={attribute.min:.3g}, mean={attribute.mean:.3g}, std={attribute.std:.3g}, max={attribute.max:.3g}",
             )
 
-    def __check_integrity(self):
+    def __check_integrity(self) -> bool:
+        """Check integrity of data"""
 
         n_recipes = len(self.recipes)
 
@@ -532,7 +503,8 @@ class Scorer:
 
         return True
 
-    def _populate_query_cache(self):
+    def _populate_query_cache(self) -> None:
+        """Update internal data with pre-fetched related database IDs"""
 
         from .cset import CompoundSet
         from .pset import PoseSet
@@ -659,7 +631,8 @@ class Scorer:
 
                 df.at[key, col] = metadata
 
-    def _populate_recipe_child_sets(self):
+    def _populate_recipe_child_sets(self) -> None:
+        """Populate internal cache of recipe child compound/pose/interaction sets"""
 
         from .cset import CompoundSet
         from .pset import PoseSet
@@ -692,12 +665,14 @@ class Scorer:
                 cache = row["pose_metadata"]
                 recipe._poses._metadata_dict = cache
 
-    def _dump_json(self):
+    def _dump_json(self) -> None:
+        """Write JSON cache to file"""
         path = self.json_path
         mrich.writing(path)
         self._data.to_json(path)
 
     def _load_json(self):
+        """Load JSON cache from file"""
         path = self.json_path
 
         mrich.reading(path)
@@ -734,8 +709,6 @@ class Scorer:
 
         self._data = cached
 
-        # return cached
-
     ### DUNDERS
 
     def __str__(self) -> str:
@@ -767,7 +740,8 @@ class Attribute:
         inverse: bool = False,
         weight: float = 1.0,
         bins: int = 100,
-    ):
+    ) -> None:
+        """Attribute initialisation"""
 
         self._scorer = scorer
 
@@ -784,31 +758,34 @@ class Attribute:
     ### PROPERTIES
 
     @property
-    def scorer(self):
+    def scorer(self) -> "Scorer":
+        """Parent :class:`.Scorer` object"""
         return self._scorer
 
     @property
-    def key(self):
+    def key(self) -> str:
+        """Key or name"""
         return self._key
 
     @property
-    def inverse(self):
+    def inverse(self) -> bool:
+        """Is scoring inverted?"""
         return self._inverse
 
     @property
-    def bins(self):
+    def bins(self) -> int:
+        """Number of bins"""
         return self._bins
 
     @property
-    def value_dict(self):
+    def value_dict(self) -> dict[str, float]:
+        """Get dictionary of values keyed by :class:`.Recipe` hash"""
+
         df = self.scorer._data[self.key]
 
         null = df.isnull()
 
         if null.sum():
-            # for key in mrich.track(
-            # df[null].index.values, f"Constructing value dictionary for {self}"
-            # , total = len(df[null])):
             with mrich.loading(f"Constructing value dictionary for {self}"):
                 for key in df[null].index.values:
                     recipe = self.scorer.recipes[key]
@@ -818,37 +795,45 @@ class Attribute:
         return df.to_dict()
 
     @property
-    def values(self):
+    def values(self) -> list[float]:
+        """Get list of values"""
         return list(self.value_dict.values())
 
     @property
-    def mean(self):
+    def mean(self) -> float:
+        """Get mean value"""
         return np.mean(self.values)
 
     @property
-    def std(self):
+    def std(self) -> float:
+        """Get standard deviation of values"""
         return np.std(self.values)
 
     @property
-    def max(self):
+    def max(self) -> float:
+        """Get maximal value"""
         return max(self.values)
 
     @property
     def min(self):
+        """Get minimal value"""
         return min(self.values)
 
     @property
-    def weight(self):
+    def weight(self) -> float:
+        """Get scoring weight"""
         return self._weight
 
     @weight.setter
-    def weight(self, w):
+    def weight(self, w: float) -> None:
+        """Set scoring weight"""
         self.scorer._flag_weight_modification()
         self._weight = abs(w)
         self._reverse = w < 0
 
     @property
-    def percentile_interpolator(self):
+    def percentile_interpolator(self) -> "scipy.interpolate.interp1d":
+        """Return interpolator function"""
         if self._percentile_interpolator is None:
 
             count, bins_count = np.histogram(self.values, bins=self.bins)
@@ -869,6 +854,7 @@ class Attribute:
         serialise_price: bool = True,
         force: bool = False,
     ) -> float:
+        """Get :class:`.Recipe` scoring value"""
 
         if not force:
             cached = self.scorer._data[self.key][recipe.hash]
