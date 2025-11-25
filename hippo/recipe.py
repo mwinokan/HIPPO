@@ -2561,11 +2561,24 @@ class RouteSet:
         """Get the :class:`.Compound` ID's of the products"""
         ids = self.db.select_where(
             table="route",
-            query="route_product",
+            query="DISTINCT route_product",
             key=f"route_id IN {self.str_ids}",
             multiple=True,
         )
         return [i for i, in ids]
+
+    @property
+    def reactant_ids(self) -> list[int]:
+        """Get the :class:`.Compound` ID's of the reactants"""
+        sql = f"""
+        SELECT DISTINCT component_ref FROM component
+        INNER JOIN route ON component_route = route_id
+        WHERE component_type = 2
+        AND route_id IN {self.str_ids}
+        """
+
+        c = self.db.execute(sql)
+        return [i for i, in c]
 
     @property
     def products(self) -> "CompoundSet":
@@ -2573,6 +2586,13 @@ class RouteSet:
         from .cset import CompoundSet
 
         return CompoundSet(self.db, self.product_ids)
+
+    @property
+    def reactants(self) -> "CompoundSet":
+        """Return a :class:`.CompoundSet` of all the route reactants"""
+        from .cset import CompoundSet
+
+        return CompoundSet(self.db, self.reactant_ids)
 
     @property
     def str_ids(self) -> str:
