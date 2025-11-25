@@ -1,3 +1,5 @@
+"""Classes and functions for generating molecular principal component analyses"""
+
 # https://github.com/rdkit/rdkit-tutorials/blob/master/notebooks/005_Chemical_space_analysis_and_visualization.ipynb
 
 import numpy as np
@@ -17,19 +19,27 @@ class FP:
         Names of the features
     """
 
-    def __init__(self, fp, names):
+    def __init__(self, fp: "np.array", names: list[str]) -> None:
+        """FP initialisation"""
         self.fp = fp
         self.names = names
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """string representation"""
         return "%d bit FP" % len(self.fp)
 
-    def __len__(self):
+    def __len__(self) -> int:
+        """length"""
         return len(self.fp)
 
 
 def get_cfps(
-    mol, radius=2, nBits=1024, useFeatures=False, counts=False, dtype=np.float32
+    mol: "rdkit.Chem.Mol",
+    radius: int = 2,
+    nBits: int = 1024,
+    useFeatures: bool = False,
+    counts: bool = False,
+    dtype=np.float32,
 ):
     """Calculates circular (Morgan) fingerprint.
     http://rdkit.org/docs/GettingStartedInPython.html#morgan-fingerprints-circular-fingerprints

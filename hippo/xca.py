@@ -1,3 +1,5 @@
+"""Functions for interfacing with XChemAlign data"""
+
 import mrich
 from mrich import print
 
@@ -34,4 +36,7 @@ def parse_observation_longcode(longcode: str) -> dict[str]:
     )
 
 
-class UnsupportedXCALongcodeError(NotImplementedError): ...
+class UnsupportedXCALongcodeError(NotImplementedError):
+    """XChemAlign longcode has unsupported syntax"""
+
+    ...

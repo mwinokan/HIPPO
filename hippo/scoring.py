@@ -1,11 +1,10 @@
-import mout
-import numpy as np
-
-# from .block import BuildingBlockSet
-from scipy.interpolate import interp1d
-import pandas as pd
+"""Classes for scoring Recipes"""
 
 import mrich
+
+import numpy as np
+import pandas as pd
+from scipy.interpolate import interp1d
 
 DATA_COLUMNS = [
     "score",
@@ -40,6 +39,7 @@ class Scorer:
         allowed_poses: "PoseSet | list[int] | None" = None,
         out_key: str = "scorer",
     ) -> None:
+        """Scorer initialisation"""
 
         from .pset import PoseSet
         from .recipe import RecipeSet
@@ -357,7 +357,6 @@ class Scorer:
         for attribute in self.attributes:
             recipe_score = attribute(recipe)
             score += recipe_score
-            # score = sum([a(recipe) for a in self.attributes])
 
         if debug:
             print_data = []
@@ -494,6 +493,7 @@ class Scorer:
     ### INTERNALS
 
     def _flag_weight_modification(self):
+        """Reset scores due to weight modification"""
         self._data["score"] = None
 
     def summary(self) -> None:
@@ -501,15 +501,13 @@ class Scorer:
 
         mrich.header(self)
         for attribute in self.attributes:
-            # mrich.out(
-            # f"{repr(attribute)} min={attribute.min:.3g}, mean={attribute.mean:.3g}, std={attribute.std:.3g}, max={attribute.max:.3g}"
-            # )
             mrich.print(
                 attribute,
                 f"min={attribute.min:.3g}, mean={attribute.mean:.3g}, std={attribute.std:.3g}, max={attribute.max:.3g}",
             )
 
-    def __check_integrity(self):
+    def __check_integrity(self) -> bool:
+        """Check integrity of data"""
 
         n_recipes = len(self.recipes)
 
@@ -523,7 +521,8 @@ class Scorer:
 
         return True
 
-    def _populate_query_cache(self):
+    def _populate_query_cache(self) -> None:
+        """Update internal data with pre-fetched related database IDs"""
 
         from .cset import CompoundSet
         from .pset import PoseSet
@@ -650,7 +649,8 @@ class Scorer:
 
                 df.at[key, col] = metadata
 
-    def _populate_recipe_child_sets(self):
+    def _populate_recipe_child_sets(self) -> None:
+        """Populate internal cache of recipe child compound/pose/interaction sets"""
 
         from .cset import CompoundSet
         from .pset import PoseSet
@@ -683,12 +683,14 @@ class Scorer:
                 cache = row["pose_metadata"]
                 recipe._poses._metadata_dict = cache
 
-    def _dump_json(self):
+    def _dump_json(self) -> None:
+        """Write JSON cache to file"""
         path = self.json_path
         mrich.writing(path)
         self._data.to_json(path)
 
     def _load_json(self):
+        """Load JSON cache from file"""
         path = self.json_path
 
         mrich.reading(path)
@@ -724,8 +726,6 @@ class Scorer:
         cached.replace({np.nan: None}, inplace=True),
 
         self._data = cached
-
-        # return cached
 
     ### DUNDERS
 
@@ -766,7 +766,8 @@ class Attribute:
         inverse: bool = False,
         weight: float = 1.0,
         bins: int = 100,
-    ):
+    ) -> None:
+        """Attribute initialisation"""
 
         self._scorer = scorer
 
@@ -956,10 +957,12 @@ class Attribute:
 
 
 class CustomAttribute(Attribute):
+    """Scoring attribute with a custom function"""
 
     _type = "CustomAttribute"
 
-    def __init__(self, scorer, key, function):
+    def __init__(self, scorer: "Scorer", key: str, function: "Callable") -> None:
+        """CustomAttribute initialisation"""
         self._function = function
         super(CustomAttribute, self).__init__(scorer=scorer, key=key)
 

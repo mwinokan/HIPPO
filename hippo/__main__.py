@@ -1,3 +1,5 @@
+"""Define CLI commands for HIPPO"""
+
 import mrich
 from typer import Typer
 from pathlib import Path
@@ -10,6 +12,7 @@ def setup_animal(
     backup: bool = True,
     update_legacy: bool = False,
 ) -> "HIPPO":
+    """Setup the :class:`.HIPPO` object and optionally perform a database backup"""
 
     from .animal import HIPPO
 
@@ -87,7 +90,7 @@ def calculate_interactions(
     prolif: bool = False,
     backup: bool = True,
     force: bool = False,
-):
+) -> None:
     """Calculate interactions for all poses"""
 
     mrich.h1("hippo.calculate_interactions")
@@ -100,6 +103,7 @@ def calculate_interactions(
     animal = setup_animal(database=database, backup=backup)
 
     mrich.h3("State Before")
+    mrich.var("#poses", animal.num_poses)
     mrich.var("#fingerprinted", animal.poses.num_fingerprinted)
 
     mrich.h3("Calculation")
@@ -127,7 +131,7 @@ def calculate_interactions(
 
 
 @app.command()
-def verify():
+def verify() -> None:
     """Verify installation"""
 
     import os
@@ -149,7 +153,7 @@ def verify():
 @app.command()
 def tag_summary(
     database: str,
-):
+) -> None:
     """Print a table of statistics for all tags in the database"""
 
     mrich.h1("hippo.tag_summary")
@@ -200,8 +204,8 @@ def add_hits(
     )
 
 
-def main():
-    app()
+def main() -> None:
+    """CLI entry point"""
 
 
 if __name__ == "__main__":

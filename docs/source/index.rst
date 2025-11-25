@@ -26,9 +26,11 @@ You will also need `chemicalite` which is an extension to SQLite for cheminforma
 
 ::
 
-   $ conda install -c conda-forge chemicalite=2022.04.1
+   $ conda install -c conda-forge chemicalite=2024.05.1
 
 N.B. Compatibility between rdkit and chemicalite versions is quite strict, and database files created with a certain version pair may not be interoperable with others. 
+
+See also :ref:`installation-snippets`.
 
 Getting started
 ===============
@@ -41,18 +43,12 @@ HIPPO uses an sqlite database with several inter-connected tables and Python-cla
    :caption: Documentation Pages
 
    Home <self>
-=======
-N.B. HIPPO and this documentation are still in beta-development.
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Documentation Contents:
 
    Definitions, units, and data types <definitions>
 
    Getting started <getting_started>
 
-   Adding data <insert_elaborations>
+   Adding data <add_data>
 
    Interfacing with Syndirella <syndirella>
    
@@ -88,27 +84,7 @@ A :class:`.Reaction` is a simplified representation of a synthetic pathway to cr
 
 See :doc:`definitions` for more detail.
 
-
-Installation
-============
-
-On Mac OS and Linux it is recommended to install from PyPI using Conda/Miniconda. 
-
-Chemicalite is not supported on Windows, but there is a workaround described in the :doc:`windows`.
-
-The `hippo` python module can be obtained from PyPI:
-
-::
-   
-   pip install --upgrade hippo-db
-
-You will also need `chemicalite` which is an extension to SQLite for cheminformatics:
-
-::
-
-   conda install -c conda-forge chemicalite=2024.05.1
-
-N.B. Compatibility between rdkit and chemicalite versions is quite strict, and database files created with a certain version pair may not be interoperable with others. 
+.. _installation-snippets:
 
 Installation Snippets
 ---------------------

@@ -1,15 +1,15 @@
-# from .tools import df_row_to_dict
+"""Classes for working with sets of compounds"""
 
-from .compound import Compound, Ingredient
-from .db import Database
-from .recipe import Recipe
-
-from numpy import int64, nan, isnan, mean, std
-from typing import Callable
-
-import os
 import mcol
 import mrich
+
+import os
+from typing import Callable
+from numpy import int64, nan, isnan, mean, std
+
+from .db import Database
+from .recipe import Recipe
+from .compound import Compound, Ingredient
 
 
 class CompoundTable:
@@ -66,10 +66,9 @@ class CompoundTable:
         self,
         db: Database,
     ) -> None:
+        """CompoundTable initialisation"""
 
         self._db = db
-
-    ### FACTORIES
 
     ### PROPERTIES
 
@@ -90,7 +89,8 @@ class CompoundTable:
         return [q for q, in result]
 
     @property
-    def name(self):
+    def name(self) -> None | str:
+        """Optional name of this compound set"""
         return self._name
 
     @property
@@ -635,7 +635,8 @@ class CompoundSet:
         indices: list = None,
         sort: bool = True,
         name: str | None = None,
-    ):
+    ) -> None:
+        """CompoundSet initialisation"""
 
         self._db = db
 
@@ -658,7 +659,7 @@ class CompoundSet:
 
     @property
     def db(self) -> "Database":
-        """ """
+        """Associated :class:`.Database` object"""
         return self._db
 
     @property
@@ -1349,6 +1350,7 @@ class CompoundSet:
         if function:
 
             def widget(i):
+                """interactive function widget"""
                 compound = self[i]
                 display(compound)
                 function(compound)
@@ -1399,16 +1401,17 @@ class CompoundSet:
 
             def widget(
                 i,
-                name=True,
-                summary=True,
-                draw=True,
-                poses=True,
-                reactions=True,
-                tags=True,
-                quotes=True,
-                metadata=True,
-                classify=True,
+                name: bool = True,
+                summary: bool = True,
+                draw: bool = True,
+                poses: bool = True,
+                reactions: bool = True,
+                tags: bool = True,
+                quotes: bool = True,
+                metadata: bool = True,
+                classify: bool = True,
             ):
+                """interactive default widget"""
                 """
 
                 :param i: param name:  (Default value = True)
@@ -2357,6 +2360,7 @@ class IngredientSet:
         supplier: str | list | None = None,
         debug: bool = False,
     ) -> None:
+        """IngredientSet initialisation"""
 
         from pandas import DataFrame
 

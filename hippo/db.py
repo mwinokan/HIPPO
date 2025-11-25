@@ -1,24 +1,25 @@
-import mout
+"""Sqlite database wrapper class"""
+
 import mcol
-import sqlite3
-from sqlite3 import Error
-from pprint import pprint
+import mrich
+
 import json
 import time
+import sqlite3
+from pathlib import Path
+from pprint import pprint
+from sqlite3 import Error
 
-from .compound import Compound
 from .pose import Pose
-from .reaction import Reaction
 from .quote import Quote
-from .metadata import MetaData
 from .target import Target
 from .feature import Feature
+from .compound import Compound
+from .reaction import Reaction
+from .metadata import MetaData
 from .recipe import Recipe, Route
 from .tools import inchikey_from_smiles, sanitise_smiles, SanitisationError
 
-from pathlib import Path
-
-import mrich
 
 CHEMICALITE_COMPOUND_PROPERTY_MAP = {
     "num_heavy_atoms": "mol_num_hvyatms",
@@ -38,8 +39,13 @@ class Database:
     """
 
     def __init__(
-        self, path: Path, animal: "HIPPO", update_legacy: bool = False
+        self,
+        path: Path,
+        animal: "HIPPO",
+        update_legacy: bool = False,
+        auto_compute_bfps: bool = True,
     ) -> None:
+        """Database initialisation"""
 
         assert isinstance(path, Path)
 
@@ -49,6 +55,7 @@ class Database:
         self._connection = None
         self._cursor = None
         self._animal = animal
+        self._auto_compute_bfps = auto_compute_bfps
 
         mrich.debug(f"Database.path = {self.path}")
 
@@ -157,6 +164,7 @@ class Database:
         mrich.print(f"Copying {source} --> {destination}")
 
         def progress(status, remaining, total):
+            """print progress"""
             mrich.debug(f"Copied {total-remaining} of {total} pages...")
 
         src = sqlite3.connect(source)
@@ -206,6 +214,16 @@ class Database:
         ).fetchall()
         return [n for n, in results]
 
+    @property
+    def auto_compute_bfps(self) -> bool:
+        """Automatically compute compound binary fingerprints on insertion"""
+        return self._auto_compute_bfps
+
+    @auto_compute_bfps.setter
+    def auto_compute_bfps(self, b: bool):
+        """Automatically compute compound binary fingerprints on insertion"""
+        self._auto_compute_bfps = b
+
     ### PUBLIC METHODS / API CALLS
 
     def close(self) -> None:
@@ -213,7 +231,7 @@ class Database:
         mrich.debug("hippo.Database.close()")
         if self.connection:
             self.connection.close()
-        mout.success(f"Closed connection to {self.path}")
+        mrich.success(f"Closed connection to {self.path}")
 
     def backup(
         self,
@@ -711,10 +729,13 @@ class Database:
 
         ### register the binary fingerprints
 
-        result = self.insert_compound_pattern_bfp(compound_id, commit=commit)
+        if self.auto_compute_bfps:
+            result = self.insert_compound_pattern_bfp(compound_id, commit=commit)
 
-        if not result:
-            mrich.error("Could not insert compound pattern bfp")
+            if not result:
+                mrich.error("Could not insert compound pattern bfp")
+
+        ### insert metadata
 
         if metadata:
             self.insert_metadata(
@@ -2324,25 +2345,54 @@ class Database:
             inchikey = inchikey_from_smiles(new_smiles)
             values.append((inchikey, new_smiles))
 
-        return values
+        if self.auto_compute_bfps:
 
-        sql = """
-        INSERT OR IGNORE INTO compound(compound_inchikey, compound_smiles, compound_mol, compound_pattern_bfp, compound_morgan_bfp)
-        VALUES(?1, ?2, mol_from_smiles(?2), mol_pattern_bfp(mol_from_smiles(?2), 2048), mol_morgan_bfp(mol_from_smiles(?2), 2, 2048))
-        """
+            sql = """
+            INSERT OR IGNORE INTO compound(compound_inchikey, compound_smiles, compound_mol, compound_pattern_bfp, compound_morgan_bfp)
+            VALUES(?1, ?2, mol_from_smiles(?2), mol_pattern_bfp(mol_from_smiles(?2), 2048), mol_morgan_bfp(mol_from_smiles(?2), 2, 2048))
+            """
+
+        else:
+
+            sql = """
+            INSERT OR IGNORE INTO compound(compound_inchikey, compound_smiles, compound_mol)
+            VALUES(?1, ?2, mol_from_smiles(?2))
+            """
 
         if debug:
             mrich.debug("Inserting...")
 
         self.executemany(sql, values)
-        self.update_compound_pattern_bfp_table()
+
+        if self.auto_compute_bfps:
+            self.update_compound_pattern_bfp_table()
 
         self.commit()
 
         return values
 
     def register_poses(self, dicts: list[dict]) -> set[int]:
-        """Insert or ignore a bunch of poses, also returns a set of Pose IDs"""
+        """Insert or ignore a bunch of poses, also returns a set of Pose IDs
+
+        :param dicts: a list of dictionaries describing the poses to be inserted. See the expected format below:
+
+        dicts = [
+            dict(
+                alias=...,           # string can be None
+                reference_id=...,    # reference pose id
+                inchikey=...,        # pre-computed inchikey
+                smiles=...,          # SMILEs
+                path=...,            # path to mol-file on disk, used for uniqueness check, can be a fake path
+                compound_id=...,     # Compound database ID
+                target_id=...,       # Target database ID
+                mol=...,             # rdkit.Chem.Mol
+                energy_score=...,    # float, can be None
+                distance_score=...,  # float, can be None
+                metadata=...,        # dictionary, can be empty
+            )
+        ]
+
+        """
 
         from json import dumps
 
@@ -2426,7 +2476,7 @@ class Database:
 
         return pose_ids
 
-    def calculate_all_scaffolds(self):
+    def calculate_all_scaffolds(self) -> None:
         """Determine and insert records for all substructure/superstructure relationships in the Compound table"""
 
         n_before = self.count("scaffold")
@@ -2441,6 +2491,8 @@ class Database:
 
         with mrich.loading("Fetching compounds..."):
             records = self.execute(sql).fetchall()
+
+        self.commit()
 
         sql = """
             INSERT OR IGNORE INTO scaffold
@@ -2457,8 +2509,7 @@ class Database:
             self.executemany(sql, records)
             mrich.print("Took", f"{time.time() - t1:.1f}", "seconds")
 
-        with mrich.loading("Committing..."):
-            self.commit()
+        self.commit()
 
         diff = self.count("scaffold") - n_before
 
@@ -2471,7 +2522,9 @@ class Database:
                 "Found", diff, "new substructure-superstructure relationships"
             )
 
-    def calculate_all_murcko_scaffolds(self, generic: bool = True):
+    def calculate_all_murcko_scaffolds(
+        self, generic: bool = True
+    ) -> "dict | (dict, dict)":
         """Determine Murcko and optionally generic Murcko scaffolds for all Compounds in the Database and add relevant records.
 
         :param generic: Calculate generic (single bonds and all carbon) scaffolds as well
@@ -3950,13 +4003,19 @@ class Database:
 
         from .subsite import Subsite
 
-        name, target = self.select_where(
+        results = self.select_where(
             table="subsite",
             key="id",
             value=id,
             multiple=False,
             query="subsite_name, subsite_target",
         )
+
+        if not results:
+            mrich.error(f"No subsite with {id=}")
+            return None
+
+        name, target = results
 
         subsite = Subsite(db=self, id=id, name=name, target_id=target)
 
@@ -4629,7 +4688,10 @@ class Database:
         return f"[bold underline]{self}"
 
 
-class LegacyDatabaseError(Exception): ...
+class LegacyDatabaseError(Exception):
+    """This database is in a legacy format"""
+
+    ...
 
 
 def backup(
@@ -4653,6 +4715,7 @@ def backup(
         mrich.writing(destination)
 
         def progress(status, remaining, total):
+            """print progress"""
             mrich.debug(f"Copied {total-remaining} of {total} pages...")
 
         src = sqlite3.connect(source)

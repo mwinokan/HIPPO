@@ -1,3 +1,5 @@
+"""Generic tools for use in the HIPPO package"""
+
 import re
 import numpy as np
 from molparse.rdkit import mol_from_smiles
@@ -10,11 +12,10 @@ from string import ascii_uppercase
 import mrich
 
 
-def df_row_to_dict(df_row):
-    """
+def df_row_to_dict(df_row) -> dict:
+    """Convert a dataframe row to a dictionary
 
-    :param df_row:
-
+    :param df_row: pandas dataframe row / series
     """
 
     assert len(df_row) == 1, f"{len(df_row)=}"
@@ -36,14 +37,10 @@ def df_row_to_dict(df_row):
     return data
 
 
-def remove_other_ligands(sys, residue_number, chain):
-    """
-
-    :param sys:
-    :param residue_number:
-    :param chain:
-
-    """
+def remove_other_ligands(
+    sys: "molparse.System", residue_number: int, chain: str
+) -> "molparse.System":
+    """Remove ligands other than the specified one"""
 
     ligand_residues = [r.number for r in sys["rLIG"] if r.number != residue_number]
 
@@ -63,32 +60,20 @@ def remove_other_ligands(sys, residue_number, chain):
     return sys
 
 
-def inchikey_from_smiles(smiles):
-    """
-
-    :param smiles:
-
-    """
+def inchikey_from_smiles(smiles: str) -> str:
+    """InChI-Key from smiles string"""
     mol = mol_from_smiles(smiles)
     return MolToInchiKey(mol)
 
 
-def flat_inchikey(smiles):
-    """
-
-    :param smiles:
-
-    """
+def flat_inchikey(smiles: str) -> str:
+    """Stereochemistry-flattened InChI-Key from smiles string"""
     smiles = sanitise_smiles(smiles)
     return inchikey_from_smiles(smiles)
 
 
-def remove_isotopes_from_smiles(smiles):
-    """
-
-    :param smiles:
-
-    """
+def remove_isotopes_from_smiles(smiles: str) -> str:
+    """Remove isotopes from smiles string"""
 
     mol = MolFromSmiles(smiles)
 
@@ -101,13 +86,8 @@ def remove_isotopes_from_smiles(smiles):
     return MolToSmiles(mol)
 
 
-def smiles_has_isotope(smiles, regex=True):
-    """
-
-    :param smiles:
-    :param regex:  (Default value = True)
-
-    """
+def smiles_has_isotope(smiles: str, regex=True) -> bool:
+    """Does provided smiles string contain isotopes?"""
     if regex:
         return re.search(r"([\[][0-9]+[A-Z]+\])", smiles)
     else:
@@ -120,14 +100,25 @@ REPLACE = {
 }
 
 
-def sanitise_smiles(s, verbosity=False, sanitisation_failed="error", radical="error"):
-    """
+def sanitise_smiles(
+    s: str,
+    verbosity: bool = False,
+    sanitisation_failed: str = "error",
+    radical: str = "error",
+) -> str:
+    """Sanitise smiles by:
 
-    :param s:
-    :param verbosity:  (Default value = False)
-    :param sanitisation_failed:  (Default value = 'error')
-    :param radical:  (Default value = 'error')
+    - Taking largest fragment
+    - Flattening stereochemistry
+    - Removing isotopes
+    - RDKit round-trip
+    - Treating radicals
 
+    :param s: input smiles string
+    :param verbosity: print smiles changes (Default value = False)
+    :param sanitisation_failed: behvaiour when sanitisation fails, choose from ["error", "warning", "quiet"] (Default value = 'error')
+    :param radical: behvaiour when radicals occur, choose from ["error", "warning", "remove"] (Default value = 'error')
+    :returns: SMILES string
     """
 
     assert isinstance(s, str), f"non-string smiles={s}"
@@ -204,24 +195,15 @@ def sanitise_smiles(s, verbosity=False, sanitisation_failed="error", radical="er
     return smiles
 
 
-def sanitise_mol(m):
-    """
-
-    :param m:
-
-    """
+def sanitise_mol(m: "rdkit.Chem.Mol") -> "rdkit.Chem.Mol":
+    """Sanitise by RDKit round-trip"""
     from rdkit.Chem import MolToMolBlock, MolFromMolBlock
 
     return MolFromMolBlock(MolToMolBlock(m))
 
 
-def pose_gap(a, b):
-    """
-
-    :param a:
-    :param b:
-
-    """
+def pose_gap(a: "Pose", b: "Pose") -> float:
+    """Calculate minimum distance between two :class:`.Pose` objects"""
 
     from numpy.linalg import norm
     from molparse.rdkit import mol_to_AtomGroup
@@ -243,7 +225,8 @@ def pose_gap(a, b):
 ALPHANUMERIC_CHARS = "0123456789" + ascii_uppercase
 
 
-def numberToBase(n, b):
+def number_to_base(n: int, b: int) -> int:
+    """Convert an integer `n` into base `b` representation"""
     if n == 0:
         return [0]
     digits = []
@@ -253,7 +236,8 @@ def numberToBase(n, b):
     return digits[::-1]
 
 
-def dt_hash():
+def dt_hash() -> str:
+    """Create 7 alphanumeric-character hash based on current timestamp"""
     dt = datetime.now()
     x = int(
         dt.month * 36000 * 24 * 365.25
@@ -263,11 +247,11 @@ def dt_hash():
         + dt.second * 10
         + dt.microsecond / 10000
     )
-    timehash = "".join([ALPHANUMERIC_CHARS[v] for v in numberToBase(x, 36)])
+    timehash = "".join([ALPHANUMERIC_CHARS[v] for v in number_to_base(x, 36)])
     return f"{timehash:>07}"
 
 
 class SanitisationError(Exception):
-    """ """
+    """Something went wrong in Molecule/SMILES sanitisation"""
 
     ...

@@ -1,10 +1,11 @@
+"""Classes for working with Recipes (reaction networks)"""
+
+import mcol
+import mrich
+
 from dataclasses import dataclass, field
 
 from .compound import Ingredient
-
-import mcol
-
-import mrich
 
 
 class Recipe:
@@ -21,7 +22,8 @@ class Recipe:
         intermediates: "IngredientSet | None" = None,
         reactions: "ReactionSet | None" = None,
         compounds: "IngredientSet | None" = None,
-    ):
+    ) -> None:
+        """Recipe initialisation"""
 
         from .cset import IngredientSet
         from .rset import ReactionSet
@@ -155,7 +157,8 @@ class Recipe:
                 else:
                     return []
 
-        def get_reactant_amount_pairs(reaction):
+        def get_reactant_amount_pairs(reaction: "Reaction") -> list[tuple[int, float]]:
+            """Get pairs of reactant ID and float amounts"""
             if reaction_reactant_cache and reaction.id in reaction_reactant_cache:
                 print("reaction_reactant_cache used")
                 return reaction_reactant_cache[reaction.id]
@@ -387,9 +390,6 @@ class Recipe:
 
         assert isinstance(compounds, CompoundSet)
 
-        # if permitted_reactions:
-        #   raise NotImplementedError
-
         db = compounds.db
 
         n_comps = len(compounds)
@@ -495,9 +495,6 @@ class Recipe:
 
         if not solve_combinations:
             return combinations
-
-        # if pick_first:
-        #     combinations = [combinations[0]]
 
         solutions = []
 
@@ -776,6 +773,7 @@ class Recipe:
 
     @property
     def combined_compound_ids(self) -> set[int]:
+        """Combined :class:`.Compound` IDs from :meth:`.Recipe.product_compounds` and :meth:`.Recipe.compounds`"""
         return set(self.product_compounds.ids) | set(self.compounds.ids)
 
     @property
@@ -887,6 +885,7 @@ class Recipe:
 
     @property
     def type(self) -> str:
+        """Get Recipe type (EMPTY/MIXED/CHEM/NOCHEM)"""
 
         if self.empty:
             return "EMPTY"
@@ -1051,13 +1050,7 @@ class Recipe:
         target = [nodes[b] for a, b in graph.edges]
         value = [1 for l in graph.edges]
 
-        # print(graph.nodes)
-
         labels = list(nodes.keys())
-
-        # compound_ids = [n.id for n in nodes]
-        # smiles = [n.smiles for n in nodes]
-        # customdata = [(n.id, n.smiles) for n in ]
 
         hoverkeys = None
 
@@ -1074,14 +1067,10 @@ class Recipe:
                 customdata.append((compound_id, None))
 
             else:
-                # customdata.append((n['id'], n['smiles']))
                 d = tuple(v if v is not None else "N/A" for v in n.values())
                 customdata.append(d)
-                # id=product.id, smiles=product.smiles, amount=ingredient.amount, price=ingredient.price, lead_time=ingredient.lead_time
 
         hoverkeys_edges = None
-
-        # edgedata = [graph.edges[a,b]["reaction_id"] for a,b in graph.edges]
 
         customdata_edges = []
 
@@ -1111,15 +1100,6 @@ class Recipe:
             "Reaction " + "<br>".join(hoverlines_edges) + "<extra></extra>"
         )
 
-        # print(hovertemplate)
-
-        # compound_ids = [int(s[1:]) for s in labels]
-
-        # from .cset import CompoundSet
-        # smiles = CompoundSet(self.db, compound_ids).smiles
-
-        # print(compound_ids)
-
         fig = go.Figure(
             data=[
                 go.Sankey(
@@ -1147,23 +1127,12 @@ class Recipe:
         )
 
         if not title:
-            # title = f"Recipe<br><sup>price={self.price}, lead-time={self.lead_time}</sup>"
             try:
                 title = f"Recipe<br><sup>price={self.price}</sup>"
             except AssertionError:
                 title = f"Recipe"
 
         fig.update_layout(title=title)
-
-        # link = dict(
-        #       source = [0, 1, 0, 2, 3, 3], # indices correspond to labels, eg A1, A2, A2, B1, ...
-        #       target = [2, 3, 3, 4, 4, 5],
-        #       value = [8, 4, 2, 8, 4, 2],
-        #       customdata = ["q","r","s","t","u","v"],
-        #       hovertemplate='Link from node %{source.customdata}<br />'+
-        #         'to node%{target.customdata}<br />has value %{value}'+
-        #         '<br />and data %{customdata}<extra></extra>',
-        #   )
 
         return fig
 
@@ -1699,7 +1668,8 @@ class Recipe:
                 mrich.error("No upstream reactions for", product)
                 continue
 
-            def get_scaffold_series():
+            def get_scaffold_series() -> tuple[list[int], bool]:
+                """Get scaffold series value"""
 
                 if scaffolds := product.scaffolds:
                     return scaffolds.ids, False
@@ -2334,6 +2304,7 @@ class Recipe:
         return f"[bold underline]{self.__longstr()}"
 
     def __add__(self, other: "Recipe"):
+        """Add another :class:`.Recipe` to this one"""
         result = self.copy()
         result.reactants += other.reactants
         result.intermediates += other.intermediates
@@ -2347,7 +2318,17 @@ class Recipe:
 class Route(Recipe):
     """A recipe with a single product, that is stored in the database"""
 
-    def __init__(self, db, *, route_id, product, reactants, intermediates, reactions):
+    def __init__(
+        self,
+        db,
+        *,
+        route_id: int,
+        product: "IngredientSet",
+        reactants: "IngredientSet",
+        intermediates: "IngredientSet",
+        reactions: "ReactionSet",
+    ) -> None:
+        """Route initialisation"""
 
         from .cset import IngredientSet
         from .rset import ReactionSet
@@ -2473,7 +2454,8 @@ class Route(Recipe):
 class RouteSet:
     """A set of Route objects"""
 
-    def __init__(self, db, routes):
+    def __init__(self, db: "Database", routes: "list[Route]") -> None:
+        """RouteSet initialisation"""
 
         data = {}
         for route in routes:
@@ -2873,13 +2855,17 @@ class RouteSet:
         return f"[bold underline]{self}"
 
     def __iter__(self):
+        """Iterate over routes in this set"""
         return iter(self.data.values())
 
 
 class RecipeSet:
     """A set of recipes stored on disk"""
 
-    def __init__(self, db, directory, pattern="*.json"):
+    def __init__(
+        self, db: "Database", directory: "str | Path", pattern: str = "*.json"
+    ):
+        """RecipeSet initialisation"""
 
         from pathlib import Path
         from json import JSONDecodeError
@@ -2994,6 +2980,7 @@ class RecipeSet:
         self,
         key: int | str,
     ) -> Recipe:
+        """Get a :class:`.Recipe` in this set by it's index or key/hash"""
 
         match key:
 
@@ -3011,9 +2998,11 @@ class RecipeSet:
         return None
 
     def __iter__(self):
+        """Iterate over recipes"""
         return iter(self._recipes.values())
 
-    def __contains__(self, key):
+    def __contains__(self, key: str):
+        """Is this hash contained in the set"""
         assert isinstance(key, str)
         return key in self._recipes
 

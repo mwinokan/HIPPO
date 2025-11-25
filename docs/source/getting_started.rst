@@ -14,8 +14,7 @@ To create a HIPPO database or interface with an existing one, create a :class:`.
 Loading crystallographic hits from Fragalysis
 =============================================
 
-1. Go `Fragalysis
-<https://fragalysis.diamond.ac.uk>`_ and download a dataset. For public datasets you can use :func:`.fragalysis.download_target`
+1. Go `Fragalysis <https://fragalysis.diamond.ac.uk>`_ and download a dataset. Alternatively, you can use the `Fragalysis Python API <https://fragalysis.readthedocs.io/en/latest/py_api.html>`_.
 
 2. Load the crystallographic data
 
@@ -131,7 +130,9 @@ Interactions fingerprinted as follows:
 	for pose in mrich.track(animal.poses):
 		pose.calculate_interactions()
 
-*N.B. mrich.track just gives you a nice progress bar*
+.. note::
+
+	N.B. `mrich.track` just gives you a nice progress bar
 
 Interaction fingerprints can be visualised with a 'punchcard', per-residue histogram, or viewed individually for a :class:`.Pose`.
 

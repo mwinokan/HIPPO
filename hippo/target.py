@@ -1,5 +1,6 @@
-import mcol
+"""Classes for protein targets"""
 
+import mcol
 import mrich
 
 
@@ -20,6 +21,7 @@ class Target:
         id: int,
         name: str,
     ) -> None:
+        """Target initialisation"""
 
         self._db = db
         self._id = id
@@ -68,7 +70,8 @@ class Target:
         return None
 
     @property
-    def subsites(self):
+    def subsites(self) -> "list[Subsite]":
+        """List of :class:`.Subsite` objects on this target"""
 
         from .subsite import Subsite
 

@@ -1,14 +1,14 @@
-from .db import Database
-from .pose import Pose
-from .cset import IngredientSet
+"""Classes to work with sets of Poses"""
 
 import mcol
-
-from typing import Callable
+import mrich
 
 import os
+from typing import Callable
 
-import mrich
+from .pose import Pose
+from .db import Database
+from .cset import IngredientSet
 
 
 class PoseTable:
@@ -65,11 +65,10 @@ class PoseTable:
         self,
         db: Database,
     ) -> None:
+        """PoseTable initialisation"""
 
         self._db = db
         self._interactions = None
-
-    ### FACTORIES
 
     ### PROPERTIES
 
@@ -591,6 +590,7 @@ class PoseSet:
         sort: bool = True,
         name: str | None = None,
     ) -> None:
+        """PoseSet initialisation"""
 
         self._db = db
 
@@ -1112,6 +1112,8 @@ class PoseSet:
 
     @property
     def derivatives(self) -> "PoseSet":
+        """Get the :class:`.PoseSet` of derivatives"""
+
         ids = self.db.select_where(
             table="inspiration",
             query="inspiration_derivative",
@@ -2117,7 +2119,8 @@ class PoseSet:
         # comma separate subsites
         if subsites:
 
-            def fix_subsites(subsite_list):
+            def fix_subsites(subsite_list: list[str]):
+                """Fix subsites"""
                 if not subsite_list:
                     return "None"
                 return ",".join(subsite_list)
@@ -2646,6 +2649,7 @@ class PoseSet:
         if method:
 
             def widget(i):
+                """Method widget"""
                 pose = self[i]
                 if print_name:
                     print(repr(pose))
@@ -2668,6 +2672,7 @@ class PoseSet:
         elif function:
 
             def widget(i):
+                """Function widget"""
                 pose = self[i]
                 if print_name:
                     display(pose)
@@ -2717,15 +2722,16 @@ class PoseSet:
 
             def widget(
                 i,
-                name=True,
-                summary=True,
-                grid=True,
-                draw2d=True,
-                draw=True,
-                tags=True,
-                subsites=True,
-                metadata=True,
+                name: bool = True,
+                summary: bool = True,
+                grid: bool = True,
+                draw2d: bool = True,
+                draw: bool = True,
+                tags: bool = True,
+                subsites: bool = True,
+                metadata: bool = True,
             ):
+                """Default widget"""
                 pose = self[i]
                 if name:
                     print(repr(pose))

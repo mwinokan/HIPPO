@@ -1,17 +1,14 @@
+"""Classes for working with compounds"""
+
 import mcol
+import mrich
 
 from rdkit import Chem
 
 from .pose import Pose
-
-# from .pset import PoseSet
 from .tags import TagSet
-
-# from .rset import ReactionSet
-from .target import Target
 from .quote import Quote
-
-import mrich
+from .target import Target
 
 
 class Compound:
@@ -36,6 +33,7 @@ class Compound:
         mol: Chem.Mol | bytes | None = None,
         metadata: dict | None = None,
     ):
+        """Compound initialisation"""
 
         # from compound table
         self._id = id
@@ -238,7 +236,10 @@ class Compound:
     @property
     def num_scaffolds(self) -> int:
         """Get the number of scaffold compounds for this elaboration"""
-        return len(self.scaffolds)
+        if scaffolds := self.scaffolds:
+            return len(scaffolds)
+        else:
+            return 0
 
     @property
     def elabs(self):
@@ -809,6 +810,7 @@ class Compound:
             display(self.mol)
 
     def draw_elabs(self):
+        """Draw elaborations"""
 
         from molparse.rdkit import draw_highlighted_mol
         from rdkit.Chem import rdRGroupDecomposition, MolFromSmarts
@@ -1074,8 +1076,15 @@ class Ingredient:
     _table = "ingredient"
 
     def __init__(
-        self, db, compound, amount, quote, max_lead_time=None, supplier=None
+        self,
+        db: "Database",
+        compound: "Compound | int",
+        amount: float,
+        quote: "Quote | None",
+        max_lead_time: float | None = None,
+        supplier: str | None = None,
     ) -> "Ingredient":
+        """Ingredient initialisation"""
 
         assert compound
 

@@ -1,4 +1,4 @@
-from mout import debug_log
+"""functions for validating chemistry"""
 
 import mrich
 
@@ -152,7 +152,13 @@ def check_reaction_types(types: list[str]) -> None:
             mrich.error(f"Can't check chemistry of unsupported {reaction_type=}")
 
 
-def check_chemistry(reaction_type, reactants, product, debug=False):
+def check_chemistry(
+    reaction_type: str,
+    reactants: "CompoundSet",
+    product: "Compound",
+    debug: bool = False,
+) -> bool:
+    """Check chemistry of given reaction"""
 
     if reaction_type not in SUPPORTED_CHEMISTRY:
 
@@ -191,16 +197,14 @@ def check_chemistry(reaction_type, reactants, product, debug=False):
     return True
 
 
-def check_count_diff(check_type, reaction_type, reactants, product, debug=False):
-    """
-
-    :param check_type:
-    :param reaction_type:
-    :param reactants:
-    :param product:
-    :param debug:  (Default value = False)
-
-    """
+def check_count_diff(
+    check_type: str,
+    reaction_type: str,
+    reactants: "CompoundSet",
+    product: "Compound",
+    debug: bool = False,
+):
+    """Check integer difference"""
 
     # get target value
     diff = SUPPORTED_CHEMISTRY[reaction_type][f"{check_type}_diff"]
@@ -246,15 +250,13 @@ def check_count_diff(check_type, reaction_type, reactants, product, debug=False)
     return True
 
 
-def check_atomtype_diff(reaction_type, reactants, product, debug=False):
-    """
-
-    :param reaction_type:
-    :param reactants:
-    :param product:
-    :param debug:  (Default value = False)
-
-    """
+def check_atomtype_diff(
+    reaction_type: str,
+    reactants: "CompoundSet",
+    product: "Compound",
+    debug: bool = False,
+) -> bool:
+    """check atomtypes"""
 
     check_type = "atomtype"
 
@@ -288,16 +290,14 @@ def check_atomtype_diff(reaction_type, reactants, product, debug=False):
     return True
 
 
-def check_specific_atomtype_diff(reaction_type, prod, reac, removal=False, debug=False):
-    """
-
-    :param reaction_type:
-    :param prod:
-    :param reac:
-    :param removal:  (Default value = False)
-    :param debug:  (Default value = False)
-
-    """
+def check_specific_atomtype_diff(
+    reaction_type: str,
+    prod: "Compound",
+    reac: "Compound",
+    removal: bool = False,
+    debug: bool = False,
+) -> bool:
+    """check specific atomtype difference"""
 
     if removal:
         add_str = "removed"
@@ -379,12 +379,8 @@ def check_specific_atomtype_diff(reaction_type, prod, reac, removal=False, debug
     return True
 
 
-def halogen_count(atomtype_dict):
-    """
-
-    :param atomtype_dict:
-
-    """
+def halogen_count(atomtype_dict: dict[str, int]) -> int:
+    """Count halogens"""
     count = 0
     symbols = ["F", "Cl", "Br", "I"]
     for symbol in symbols:
@@ -394,12 +390,12 @@ def halogen_count(atomtype_dict):
 
 
 class InvalidChemistryError(Exception):
-    """ """
+    """Chemistry is not valid"""
 
-    pass
+    ...
 
 
 class UnsupportedChemistryError(Exception):
-    """ """
+    """Chemistry is not supported"""
 
-    pass
+    ...

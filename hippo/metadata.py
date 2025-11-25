@@ -1,5 +1,7 @@
-from collections import UserDict
+"""Class for working with database stored JSON metadata"""
+
 from typing import Mapping
+from collections import UserDict
 
 
 class MetaData(UserDict):
@@ -15,6 +17,7 @@ class MetaData(UserDict):
         self,
         __dict: Mapping[str, str] | None,
     ) -> None:
+        """Metadata initialisation"""
 
         super().__init__()
         if __dict:

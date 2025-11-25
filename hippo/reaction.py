@@ -1,9 +1,10 @@
+"""Classes to work with Reaction objects"""
+
 import mcol
-
-from .compound import Compound
-from .recipe import Recipe
-
 import mrich
+
+from .recipe import Recipe
+from .compound import Compound
 
 
 class Reaction:
@@ -26,6 +27,7 @@ class Reaction:
         product: int,
         product_yield: float,
     ) -> None:
+        """Reaction initialisation"""
 
         self._db = db
         self._id = id

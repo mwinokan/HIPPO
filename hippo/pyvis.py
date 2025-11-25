@@ -1,3 +1,5 @@
+"""Functions to visualise networks with pyvis"""
+
 import mrich
 
 
@@ -25,7 +27,8 @@ def get_scaffold_network(
 
     arrows = "to" if arrows else None
 
-    def add_node(compound):
+    def add_node(compound: "Compound") -> None:
+        """Add node to network"""
 
         if compound.id in nodes:
             return
@@ -43,7 +46,8 @@ def get_scaffold_network(
 
         nodes.add(compound.id)
 
-    def add_edge(scaffold, compound):
+    def add_edge(scaffold: "Compound", compound: "Compound") -> None:
+        """Add edge to network"""
 
         key = (scaffold.id, compound.id)
 
@@ -61,7 +65,11 @@ def get_scaffold_network(
 
         edges.add(key)
 
-    def get_scaffold_records(scaffolds=None, compounds=None):
+    def get_scaffold_records(
+        scaffolds: "None | CompoundSet" = None, compounds: "None | CompoundSet" = None
+    ):
+        """Get scaffold records"""
+
         if scaffolds:
             return animal.db.select_all_where(
                 table="scaffold",

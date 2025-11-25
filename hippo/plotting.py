@@ -1,10 +1,13 @@
-import molparse as mp
-import plotly.express as px
-import pandas as pd
-import mout
-import plotly.graph_objects as go
+"""Functions to generate standard HIPPO plots"""
 
 import mrich
+import molparse as mp
+
+import functools
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+
 
 """
 
@@ -15,16 +18,10 @@ import mrich
 
 """
 
-import functools
-
 
 # hippo_graph decorator
 def hippo_graph(func):
-    """
-
-    :param func:
-
-    """
+    """HIPPO graph decorator"""
 
     @functools.wraps(func)
     def wrapper(animal, *args, logo="top right", **kwargs):
@@ -713,7 +710,7 @@ def plot_reactant_amounts(
 
     bbs = animal.building_blocks
 
-    mout.debug("making plot_data")
+    mrich.debug("making plot_data")
     plot_data = []
     for bb in bbs:
         d = bb.dict
@@ -723,7 +720,7 @@ def plot_reactant_amounts(
             plot_data.append(d)
 
     if most_common:
-        mout.debug("sorting")
+        mrich.debug("sorting")
         plot_data = sorted(plot_data, key=lambda x: x["amount"], reverse=True)[
             :most_used_number
         ]
@@ -1078,7 +1075,7 @@ def plot_compound_property(
         fig.update_layout(xaxis_title=prop[0], yaxis_title=prop[1])
 
     else:
-        mout.error("Unsupported", code="plotting.plot_compound_property.1")
+        mrich.error("Unsupported")
 
     title = f"<b>{animal.name}</b>: {title}<br>"
 
@@ -1368,7 +1365,7 @@ def plot_pose_property(
         fig.update_layout(xaxis_title=prop[0], yaxis_title=prop[1])
 
     else:
-        mout.error("Unsupported", code="plotting.plot_pose_property.1")
+        mrich.error("Unsupported")
 
     title = title or f"<b>{animal.name}</b>: {title}<br>"
 
@@ -1856,6 +1853,7 @@ def plot_compound_tsnee(
         df["FP"] = df["mol"].map(get_cfps)
 
     def get_cluster(row):
+        """Get cluster"""
 
         scaffolds = row[cluster_by]
 
@@ -1872,6 +1870,7 @@ def plot_compound_tsnee(
         return tuple(scaffolds)
 
     def get_type(row):
+        """Get type"""
 
         if row[cluster_by] is None:
             return "scaffold"

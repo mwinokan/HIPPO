@@ -1,12 +1,12 @@
-from .db import Database
+"""Classes for working with sets of :class:`.Reaction` objects"""
 
 import mcol
+import mrich
 
 import os
 from numpy import int64
 
-import mrich
-
+from .db import Database
 from .reaction import Reaction
 
 
@@ -55,6 +55,7 @@ class ReactionTable:
         db: Database,
         table: str = "reaction",
     ) -> None:
+        """ReactionTable initialisation"""
 
         self._db = db
         self._table = table
@@ -389,6 +390,7 @@ class ReactionSet:
         sort: bool = True,
         name: str | None = None,
     ) -> None:
+        """ReactionSet initialisation"""
 
         self._db = db
         indices = indices or []
@@ -684,12 +686,15 @@ class ReactionSet:
         return f"[bold underline]{self}"
 
     def __len__(self) -> int:
+        """Number of member :class:`.Reaction` objects"""
         return len(self.indices)
 
     def __iter__(self):
+        """Iterate through member :class:`.Reaction` objects"""
         return iter(self.db.get_reaction(id=i) for i in self.indices)
 
     def __getitem__(self, key) -> "Reaction | ReactionSet":
+        """Get member :class:`.Reaction` object by single, slice or list/set/tuple of ID"""
 
         match key:
             case int():
@@ -714,7 +719,8 @@ class ReactionSet:
 
         return None
 
-    def __add__(self, other) -> "ReactionSet":
+    def __add__(self, other: "ReactionSet") -> "ReactionSet":
+        """Add a :class:`.ReactionSet` to this one"""
         if other:
             for reaction in other:
                 self.add(reaction)
