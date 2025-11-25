@@ -38,7 +38,11 @@ class Database:
     """
 
     def __init__(
-        self, path: Path, animal: "HIPPO", update_legacy: bool = False
+        self,
+        path: Path,
+        animal: "HIPPO",
+        update_legacy: bool = False,
+        auto_compute_bfps: bool = True,
     ) -> None:
 
         assert isinstance(path, Path)
@@ -49,6 +53,7 @@ class Database:
         self._connection = None
         self._cursor = None
         self._animal = animal
+        self._auto_compute_bfps = auto_compute_bfps
 
         mrich.debug(f"Database.path = {self.path}")
 
@@ -205,6 +210,16 @@ class Database:
             "SELECT name FROM sqlite_master WHERE type='table';"
         ).fetchall()
         return [n for n, in results]
+
+    @property
+    def auto_compute_bfps(self) -> bool:
+        """Automatically compute compound binary fingerprints on insertion"""
+        return self._auto_compute_bfps
+
+    @auto_compute_bfps.setter
+    def auto_compute_bfps(self, b: bool):
+        """Automatically compute compound binary fingerprints on insertion"""
+        self._auto_compute_bfps = b
 
     ### PUBLIC METHODS / API CALLS
 
@@ -711,10 +726,13 @@ class Database:
 
         ### register the binary fingerprints
 
-        result = self.insert_compound_pattern_bfp(compound_id, commit=commit)
+        if self.auto_compute_bfps:
+            result = self.insert_compound_pattern_bfp(compound_id, commit=commit)
 
-        if not result:
-            mrich.error("Could not insert compound pattern bfp")
+            if not result:
+                mrich.error("Could not insert compound pattern bfp")
+
+        ### insert metadata
 
         if metadata:
             self.insert_metadata(
@@ -2324,16 +2342,27 @@ class Database:
             inchikey = inchikey_from_smiles(new_smiles)
             values.append((inchikey, new_smiles))
 
-        sql = """
-        INSERT OR IGNORE INTO compound(compound_inchikey, compound_smiles, compound_mol, compound_pattern_bfp, compound_morgan_bfp)
-        VALUES(?1, ?2, mol_from_smiles(?2), mol_pattern_bfp(mol_from_smiles(?2), 2048), mol_morgan_bfp(mol_from_smiles(?2), 2, 2048))
-        """
+        if self.auto_compute_bfps:
+
+            sql = """
+            INSERT OR IGNORE INTO compound(compound_inchikey, compound_smiles, compound_mol, compound_pattern_bfp, compound_morgan_bfp)
+            VALUES(?1, ?2, mol_from_smiles(?2), mol_pattern_bfp(mol_from_smiles(?2), 2048), mol_morgan_bfp(mol_from_smiles(?2), 2, 2048))
+            """
+
+        else:
+
+            sql = """
+            INSERT OR IGNORE INTO compound(compound_inchikey, compound_smiles, compound_mol)
+            VALUES(?1, ?2, mol_from_smiles(?2))
+            """
 
         if debug:
             mrich.debug("Inserting...")
 
         self.executemany(sql, values)
-        self.update_compound_pattern_bfp_table()
+
+        if self.auto_compute_bfps:
+            self.update_compound_pattern_bfp_table()
 
         self.commit()
 
@@ -2444,7 +2473,7 @@ class Database:
 
         return pose_ids
 
-    def calculate_all_scaffolds(self):
+    def calculate_all_scaffolds(self) -> None:
         """Determine and insert records for all substructure/superstructure relationships in the Compound table"""
 
         n_before = self.count("scaffold")
@@ -2459,6 +2488,8 @@ class Database:
 
         with mrich.loading("Fetching compounds..."):
             records = self.execute(sql).fetchall()
+
+        self.commit()
 
         sql = """
             INSERT OR IGNORE INTO scaffold
@@ -2475,8 +2506,7 @@ class Database:
             self.executemany(sql, records)
             mrich.print("Took", f"{time.time() - t1:.1f}", "seconds")
 
-        with mrich.loading("Committing..."):
-            self.commit()
+        self.commit()
 
         diff = self.count("scaffold") - n_before
 
@@ -2489,7 +2519,9 @@ class Database:
                 "Found", diff, "new substructure-superstructure relationships"
             )
 
-    def calculate_all_murcko_scaffolds(self, generic: bool = True):
+    def calculate_all_murcko_scaffolds(
+        self, generic: bool = True
+    ) -> "dict | (dict, dict)":
         """Determine Murcko and optionally generic Murcko scaffolds for all Compounds in the Database and add relevant records.
 
         :param generic: Calculate generic (single bonds and all carbon) scaffolds as well
@@ -3968,13 +4000,19 @@ class Database:
 
         from .subsite import Subsite
 
-        name, target = self.select_where(
+        results = self.select_where(
             table="subsite",
             key="id",
             value=id,
             multiple=False,
             query="subsite_name, subsite_target",
         )
+
+        if not results:
+            mrich.error(f"No subsite with {id=}")
+            return None
+
+        name, target = results
 
         subsite = Subsite(db=self, id=id, name=name, target_id=target)
 
@@ -4179,19 +4217,66 @@ class Database:
         else:
             return CompoundSet(self, [i for i, _ in result])
 
+    def query_most_similar(
+        self,
+        query: str,
+        subset: "CompoundSet",
+        return_similarity: bool = False,
+        none="error",
+    ) -> "Compound | (Compound, float)":
+        """Search for the most similar compound by tanimoto similarity of binary pattern fingerprints using the chemicalite function `mol_pattern_bfp`
+
+        :param query: SMILES string
+        :param return_similarity: return a list of similarity values together with the :class:`.CompoundSet` (Default value = False)
+        :param none: define the behaviour for no matches, any value other than ``'error'`` will silently return empty data (Default value = 'error')
+        :param subset: optional subset of compounds to search
+        :returns: :class:`.Compound` and optionally a similarity values
+        """
+
+        from .compound import Compound
+
+        sql = f"""
+        WITH subset AS (
+            SELECT compound_id, fp
+            FROM compound
+            JOIN compound_pattern_bfp USING (compound_id)
+            WHERE compound_id IN {subset.str_ids}
+        )
+        
+        SELECT compound_id, bfp_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), fp) AS similarity
+        FROM subset
+        ORDER BY similarity DESC
+        LIMIT 1
+        """
+
+        try:
+            self.execute(sql, (query,))
+        except sqlite3.OperationalError as e:
+            mrich.var("sql", sql)
+            raise
+
+        compound_id, similarity = self.cursor.fetchone()
+
+        if return_similarity:
+            return self.get_compound(id=compound_id), similarity
+
+        return self.get_compound(id=compound_id)
+
     def query_similarity(
         self,
         query: str,
         threshold: float,
         return_similarity: bool = False,
+        subset: "CompoundSet" = None,
         none="error",
     ) -> "CompoundSet | (CompoundSet, list[float])":
-        """Search compounds by tanimoto similarity
+        """Search compounds by tanimoto similarity of binary pattern fingerprints using the chemicalite function `mol_pattern_bfp`
 
         :param query: SMILES string
         :param threshold: similarity threshold to exceed
         :param return_similarity: return a list of similarity values together with the :class:`.CompoundSet` (Default value = False)
         :param none: define the behaviour for no matches, any value other than ``'error'`` will silently return empty data (Default value = 'error')
+        :param subset: optional subset of compounds to search
         :returns: :class:`.CompoundSet` and optionally a list of similarity values
 
         """
@@ -4199,13 +4284,47 @@ class Database:
         from .cset import CompoundSet
 
         # smiles
-        if isinstance(query, str):
+        if subset:
 
             if return_similarity:
-                sql = f"SELECT compound_id, bfp_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), mol_pattern_bfp(compound.compound_mol, 2048)) as t FROM compound JOIN compound_pattern_bfp AS mfp USING(compound_id) WHERE mfp.compound_id match rdtree_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), ?2) ORDER BY t DESC "
+                sql = f"""
+                SELECT compound_id, 
+                       bfp_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), 
+                       mol_pattern_bfp(compound.compound_mol, 2048)) as t 
+                FROM compound 
+                JOIN compound_pattern_bfp AS mfp 
+                USING(compound_id) 
+                WHERE mfp.compound_id match rdtree_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), ?2)
+                AND compound_id IN {subset.str_ids}
+                ORDER BY t DESC
+                """
             else:
-                sql = f"SELECT compound_id FROM compound_pattern_bfp AS bfp WHERE bfp.compound_id match rdtree_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), ?2) "
+                sql = f"""
+                SELECT compound_id 
+                FROM compound_pattern_bfp AS bfp 
+                WHERE bfp.compound_id match rdtree_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), ?2)
+                AND compound_id IN {subset.str_ids}
+                """
 
+        elif isinstance(query, str):
+
+            if return_similarity:
+                sql = f"""
+                SELECT compound_id, 
+                       bfp_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), 
+                       mol_pattern_bfp(compound.compound_mol, 2048)) as t 
+                FROM compound 
+                JOIN compound_pattern_bfp AS mfp 
+                USING(compound_id) 
+                WHERE mfp.compound_id match rdtree_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), ?2) 
+                ORDER BY t DESC
+                """
+            else:
+                sql = f"""
+                SELECT compound_id 
+                FROM compound_pattern_bfp AS bfp 
+                WHERE bfp.compound_id match rdtree_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), ?2)
+                """
         else:
             raise NotImplementedError
 

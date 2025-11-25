@@ -1872,10 +1872,14 @@ class CompoundSet:
         """Get a dictionary object with all serialisable data needed to reconstruct this set"""
         return dict(db=str(self.db.path.resolve()), indices=self.indices)
 
-    def write_smiles_csv(self, file: str, tags: bool = True) -> None:
+    def write_smiles_csv(
+        self, file: str, tags: bool = True, split_tags: bool = True
+    ) -> None:
         """Write a CSV of the smiles contained in this set to a file
 
         :param file: path of the CSV file
+        :param tags: include tags in output
+        :param split_tags: split tags into separate columns
 
         """
         from pandas import DataFrame
@@ -1902,13 +1906,18 @@ class CompoundSet:
             multiple=True,
         )
 
+        data = [dict(id=id, smiles=smiles) for id, smiles in records]
+
         if tags:
-            data = [
-                dict(id=id, smiles=smiles, tags=TAGS.get(id, []))
-                for id, smiles in records
-            ]
-        else:
-            data = [dict(id=id, smiles=smiles) for id, smiles in records]
+            for d in data:
+
+                tagset = TAGS.get(d["id"], set())
+
+                if split_tags:
+                    for tag in tagset:
+                        d[tag] = True
+                else:
+                    d["tags"] = tagset
 
         df = DataFrame(data)
         mrich.writing(file)
@@ -2186,11 +2195,15 @@ class CompoundSet:
 
     def __sub__(
         self,
-        other: "CompoundSet | IngredientSet",
+        other: "Compound | CompoundSet | IngredientSet",
     ) -> "CompoundSet":
-        """Subtract a :class:`.Compound` object or ID to this set, or subtract multiple at once when ``other`` is a :class:`.CompoundSet` or :class:`.IngredientSet`"""
+        """Subtract a :class:`.Compound` object or ID from this set, or subtract multiple at once when ``other`` is a :class:`.CompoundSet` or :class:`.IngredientSet`"""
 
         match other:
+
+            case Compound():
+                ids = set(self.ids) - set([other.id])
+                return CompoundSet(self.db, ids)
 
             case CompoundSet():
                 ids = set(self.ids) - set(other.ids)

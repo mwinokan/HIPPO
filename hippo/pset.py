@@ -1397,14 +1397,14 @@ class PoseSet:
                 for inspiration, derivative in tuples:
                     lookup.setdefault(derivative, set())
                     lookup[derivative].add(inspiration)
-                df["inspiration_ids"] = df["id"].apply(lambda x: lookup.get(x, {}))
+                df["inspiration_ids"] = df["id"].apply(lambda x: lookup.get(x, set()))
 
             if derivative_ids:
                 lookup = {}
                 for inspiration, derivative in tuples:
                     lookup.setdefault(inspiration, set())
                     lookup[inspiration].add(derivative)
-                df["derivative_ids"] = df["id"].apply(lambda x: lookup.get(x, {}))
+                df["derivative_ids"] = df["id"].apply(lambda x: lookup.get(x, set()))
 
         if inspiration_aliases:
             inspirations = PoseSet(
@@ -1419,10 +1419,15 @@ class PoseSet:
 
         if reference_alias:
             references = PoseSet(
-                self.db, set([int(x) for x in df["reference_id"].values])
+                self.db,
+                set([int(x) for x in df["reference_id"].values if x is not None]),
             )
-            lookup = self.db.get_pose_id_alias_dict(pset=references)
-            df["reference_alias"] = df["reference_id"].apply(lambda x: lookup[x])
+
+            if references:
+                lookup = self.db.get_pose_id_alias_dict(pset=references)
+                df["reference_alias"] = df["reference_id"].apply(lambda x: lookup[x])
+            else:
+                df["reference_alias"] = None
 
             if not reference_id:
                 df = df.drop(columns=["reference_id"])
@@ -1448,16 +1453,21 @@ class PoseSet:
 
         ### Fill missing smiles entries
 
-        if (smiles or inchikey) and (
-            df["smiles"].isna().any() or df["inchikey"].isna().any()
-        ):
+        smiles_missing = smiles and "smiles" in df.columns and df["smiles"].isna().any()
+        inchikey_missing = (
+            inchikey and "inchikey" in df.columns and df["inchikey"].isna().any()
+        )
+
+        if smiles_missing or inchikey_missing:
 
             mrich.error("None in smiles/inchikey column")
 
             empty = df[df["smiles"].isna()]
             empty_poses = PoseSet(self.db, set(empty.index))
 
-            for pose in mrich.track(empty_poses, prefix="generating smiles/inchikeys"):
+            for pose in mrich.track(
+                empty_poses, prefix=f"generating smiles/inchikeys ({len(empty)} poses)"
+            ):
                 pose.smiles
 
             records = self.db.select_where(
@@ -2486,81 +2496,114 @@ class PoseSet:
 
         out_key = Path(".") / out_key
 
-        if separate:
-            dfs = []
-            from pandas import concat
+        out_dir = out_key.parent
+        out_key = out_key.name
 
-            for i, pose in enumerate(self):
-                mrich.h3(f"{i}/{len(self)}: {pose}")
-                this_out_key = out_key / f"P{pose.id}"
-                df = pose.to_syndirella(out_key=this_out_key)
-                dfs.append(df)
-            return concat(dfs)
+        mrich.var("out_key", out_key)
+        mrich.var("#poses", len(self))
+
+        out_dir.mkdir(parents=True, exist_ok=True)
 
         import shutil
         from pandas import DataFrame
 
-        out_dir = out_key.parent
-        out_key = out_key.name
+        ### Prepare Syndirella CSV data
 
-        out_dir.mkdir(parents=True, exist_ok=True)
+        df = self.get_df(
+            inchikey=False, alias=False, reference_alias=True, inspiration_aliases=True
+        )
+        df = df.rename(columns={"reference_alias": "template"})
+
+        # compound_set
+
+        if separate:
+            df["compound_set"] = df.apply(
+                lambda row: f"{out_key}_{row['name']}", axis=1
+            )
+
+        else:
+            df["compound_set"] = out_key
+
+        # template
+
+        null_template = df["template"].isnull()
+        if null_template.any():
+            mrich.warning(
+                len(null_template), "poses have no reference. Setting to self"
+            )
+            mrich.print(df.loc[null_template, "name"].values)
+            df["template"] = df["template"].fillna(df["name"])
+
+        # inspirations
+
+        null_inspirations = df["inspiration_aliases"].apply(lambda x: not x)
+
+        if null_inspirations.any():
+            mrich.warning(
+                len(null_inspirations), "poses have no inspirations. Setting to self"
+            )
+            mrich.print(df.loc[null_inspirations, "name"].values)
+            df.loc[null_inspirations, "inspiration_aliases"] = df.loc[
+                null_inspirations
+            ].apply(lambda row: set([row["name"]]), axis=1)
+
+        for i, row in df.iterrows():
+            for j, inspiration in enumerate(row["inspiration_aliases"]):
+                df.loc[i, f"hit{j+1}"] = inspiration
+
+        all_inspirations = set.union(*list(df["inspiration_aliases"].values))
+
+        df = df.drop(columns=["name", "inspiration_aliases"])
+
+        ### Copy Templates
 
         template_dir = out_dir / "templates"
         mrich.writing(template_dir)
         template_dir.mkdir(parents=True, exist_ok=True)
 
-        # mrich.var("out_dir", out_dir)
-        mrich.var("out_key", out_key)
-        mrich.var("#poses", len(self))
+        templates = df["template"].unique()
 
-        pset_inspirations = set()
+        records = self.db.select_id_where(
+            table="pose",
+            key=f"pose_alias IN {str(tuple(templates)).replace(',)', ')')}",
+            multiple=True,
+        )
 
-        data = []
-        for pose in mrich.track(self, prefix="preparing inputs..."):
+        templates = PoseSet(self.db, [i for i, in records])
 
-            comp = pose.compound
-
-            ref = pose.reference
-            inspirations = pose.inspirations
-
-            if not ref:
-                mrich.warning(pose, "has no reference, using self as template")
-                ref = pose
-                assert ref.apo_path, f"Reference {ref} has no apo_path"
-
-            if not inspirations:
-                mrich.warning(pose, "has no inspirations, using self")
-                inspirations = PoseSet(self.db, [pose.id])
-
-            for i in inspirations.ids:
-                pset_inspirations.add(i)
-
-            d = dict(
-                smiles=comp.smiles,
-                template=ref.name,
-                compound_set=out_key,
-            )
-
+        for ref in templates:
             template = template_dir / ref.apo_path.name
             if not template.exists():
                 mrich.writing(template)
                 shutil.copy(ref.apo_path, template)
 
-            for i, p in enumerate(inspirations):
-                d[f"hit{i+1}"] = p.name
+        ### Inspirations
 
-            data.append(d)
+        records = self.db.select_id_where(
+            table="pose",
+            key=f"pose_alias IN {str(tuple(all_inspirations)).replace(',)', ')')}",
+            multiple=True,
+        )
 
-        df = DataFrame(data)
+        all_inspirations = PoseSet(self.db, [i for i, in records])
 
-        csv_name = out_dir / f"{out_key}_syndirella_input.csv"
-        mrich.writing(csv_name)
-        df.to_csv(csv_name, index=False)
+        ### Write CSV
 
-        inspirations = PoseSet(self.db, pset_inspirations)
+        if separate:
+            for i, row in df.iterrows():
+                csv_name = out_dir / f"{row['compound_set']}_syndirella_input.csv"
+                mrich.writing(csv_name)
+                row.to_frame().T.to_csv(csv_name, index=False)
+
+        else:
+            csv_name = out_dir / f"{out_key}_syndirella_input.csv"
+            mrich.writing(csv_name)
+            df.to_csv(csv_name, index=False)
+
+        ### Write Inspirations
 
         sdf_name = out_dir / f"{out_key}_syndirella_inspiration_hits.sdf"
-        inspirations.write_sdf(
+        all_inspirations.write_sdf(
             sdf_name,
             tags=False,
             metadata=False,

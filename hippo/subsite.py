@@ -81,7 +81,7 @@ class Subsite:
         indices = [i for i, in indices]
         if not indices:
             return None
-        return PoseSet(self.db, indices, name="poses in {self}")
+        return PoseSet(self.db, indices, name=f"poses in {self}")
 
     ### METHODS
 

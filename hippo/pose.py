@@ -300,9 +300,21 @@ class Pose:
 
                 else:
 
-                    mrich.warning(
-                        f"There are multiple *_ligand.mol files in {Path(self.path).parent}"
-                    )
+                    path = Path(self.path)
+                    parent_dir = path.parent
+                    mol_path = parent_dir / path.name.replace(
+                        "_hippo.pdb", ".pdb"
+                    ).replace(".pdb", "_ligand.mol")
+
+                    if not mol_path.exists():
+                        mrich.warning(
+                            f"There are multiple *_ligand.mol files in {Path(self.path).parent}"
+                        )
+                        raise FileNotFoundError(mol_path)
+
+                    from rdkit.Chem import MolFromMolFile
+
+                    mol = MolFromMolFile(str(mol_path))
 
                 self.mol = mol
 
@@ -490,9 +502,12 @@ class Pose:
             INNER JOIN compound ON compound_id = pose_compound
             """
 
-            (diff,) = self.db.execute(sql).fetchone()
+            result = self.db.execute(sql).fetchone()
 
-            self._num_atoms_added_wrt_inspirations = diff
+            if not result:
+                return None
+
+            (self._num_atoms_added_wrt_inspirations,) = result
 
         return self._num_atoms_added_wrt_inspirations
 

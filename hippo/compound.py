@@ -238,7 +238,10 @@ class Compound:
     @property
     def num_scaffolds(self) -> int:
         """Get the number of scaffold compounds for this elaboration"""
-        return len(self.scaffolds)
+        if scaffolds := self.scaffolds:
+            return len(scaffolds)
+        else:
+            return 0
 
     @property
     def elabs(self):

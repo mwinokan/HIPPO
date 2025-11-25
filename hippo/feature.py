@@ -21,8 +21,8 @@ class Feature:
     """
 
     id: int
-    family: Target
-    target: int
+    family: str
+    target: Target
     chain_name: str
     residue_name: str
     residue_number: int
