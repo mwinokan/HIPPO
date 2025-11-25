@@ -29,6 +29,14 @@ conda install -c conda-forge chemicalite=2024.05.1
 
 For more information see the [installation guide](https://hippo-docs.winokan.com/en/latest/#installation)
 
+You can verify the installation:
+
+```
+python -m hippo verify
+```
+
+Or by running the full suite of tests (see Developer information)
+
 ## More Information
 
 <details>
