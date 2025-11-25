@@ -3,7 +3,7 @@
 HIPPO
 =====
 
-> 🦛 Hit Interaction Profiling for Procurement Optimisation
+> 🦛 Hit Interaction Profiling for Progression Optimisation
 
 HIPPO is in active development and feedback is appreciated.
 
@@ -29,7 +29,19 @@ conda install -c conda-forge chemicalite=2024.05.1
 
 For more information see the [installation guide](https://hippo-docs.winokan.com/en/latest/#installation)
 
-## Developer Information
+You can verify the installation:
+
+```
+python -m hippo verify
+```
+
+Or by running the full suite of tests (see Developer information)
+
+## More Information
+
+<details>
+
+<summary> Information for HIPPO developers </summary>
 
 ### Developer installation
 
@@ -63,6 +75,13 @@ cd docs
 make html
 ```
 
+To check API reference coverage use [docstr-coverage](https://pypi.org/project/docstr-coverage/)
+
+```
+pip install docstr-coverage
+docstr-coverage hippo
+```
+
 ### Tests
 
 Some tests are provided in the tests directory, which can be run with pytest:
@@ -79,3 +98,5 @@ N.B. the numbered tests, e.g. `test_00_cleanup.py` need to run in sequential ord
 - [HIPPO/main](https://github.com/mwinokan/HIPPO/tree/main): latest stable version
 - [HIPPO/dev](https://github.com/mwinokan/HIPPO/tree/dev): @mwinokan's development branch
 - [HIPPO/django_lean](https://github.com/mwinokan/HIPPO/tree/django_lean): An experimental branch implementing HIPPO as a Django web-app
+
+</details>
