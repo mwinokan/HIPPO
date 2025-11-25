@@ -1472,14 +1472,15 @@ class PoseSet:
 
             records = self.db.select_where(
                 table="pose",
-                query="pose_id, pose_smiles, pose_inchikey",
+                query="pose_id, pose_smiles, pose_inchikey, pose_mol",
                 key=f"pose_id IN {empty_poses.str_ids}",
                 multiple=True,
             )
 
-            for pose_id, pose_smiles, pose_inchikey in records:
+            for pose_id, pose_smiles, pose_inchikey, pose_mol in records:
                 df.loc[pose_id, "smiles"] = pose_smiles
                 df.loc[pose_id, "inchikey"] = pose_inchikey
+                df.loc[pose_id, "mol"] = Mol(pose_mol)
 
             assert not df["smiles"].isna().any()
             assert not df["inchikey"].isna().any()
