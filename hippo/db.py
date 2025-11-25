@@ -2324,6 +2324,8 @@ class Database:
             inchikey = inchikey_from_smiles(new_smiles)
             values.append((inchikey, new_smiles))
 
+        return values
+
         sql = """
         INSERT OR IGNORE INTO compound(compound_inchikey, compound_smiles, compound_mol, compound_pattern_bfp, compound_morgan_bfp)
         VALUES(?1, ?2, mol_from_smiles(?2), mol_pattern_bfp(mol_from_smiles(?2), 2048), mol_morgan_bfp(mol_from_smiles(?2), 2, 2048))
@@ -4163,6 +4165,9 @@ class Database:
         self,
         query: str,
         subset: "CompoundSet",
+        fp = "pattern",
+        bits = 2048,
+        morgan_radius = 1,
         return_similarity: bool = False,
         none="error",
     ) -> "Compound | (Compound, float)":
@@ -4177,19 +4182,50 @@ class Database:
 
         from .compound import Compound
 
-        sql = f"""
-        WITH subset AS (
-            SELECT compound_id, fp
-            FROM compound
-            JOIN compound_pattern_bfp USING (compound_id)
-            WHERE compound_id IN {subset.str_ids}
-        )
-        
-        SELECT compound_id, bfp_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), fp) AS similarity
-        FROM subset
-        ORDER BY similarity DESC
-        LIMIT 1
-        """
+        if fp == "pattern" and bits == 2048:
+            sql = f"""
+            WITH subset AS (
+                SELECT compound_id, fp
+                FROM compound
+                JOIN compound_pattern_bfp USING (compound_id)
+                WHERE compound_id IN {subset.str_ids}
+            )
+            
+            SELECT compound_id, bfp_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), {bits}), fp) AS similarity
+            FROM subset
+            ORDER BY similarity DESC
+            LIMIT 1
+            """
+
+        elif fp == "morgan":
+
+            sql = f"""
+            WITH subset AS (
+                SELECT compound_id, mol_{fp}_bfp(compound_mol, {morgan_radius}, {bits}) AS fp
+                FROM compound
+                WHERE compound_id IN {subset.str_ids}
+            )
+            
+            SELECT compound_id, bfp_tanimoto(mol_{fp}_bfp(mol_from_smiles(?1), {morgan_radius}, {bits}), fp) AS similarity
+            FROM subset
+            ORDER BY similarity DESC
+            LIMIT 1
+            """
+
+        else:
+
+            sql = f"""
+            WITH subset AS (
+                SELECT compound_id, mol_{fp}_bfp(compound_mol, {bits}) AS fp
+                FROM compound
+                WHERE compound_id IN {subset.str_ids}
+            )
+            
+            SELECT compound_id, bfp_tanimoto(mol_{fp}_bfp(mol_from_smiles(?1), {bits}), fp) AS similarity
+            FROM subset
+            ORDER BY similarity DESC
+            LIMIT 1
+            """
 
         try:
             self.execute(sql, (query,))
