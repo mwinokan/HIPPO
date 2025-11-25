@@ -493,6 +493,7 @@ class Scorer:
     ### INTERNALS
 
     def _flag_weight_modification(self):
+        """Reset scores due to weight modification"""
         self._data["score"] = None
 
     def summary(self) -> None:
@@ -956,10 +957,12 @@ class Attribute:
 
 
 class CustomAttribute(Attribute):
+    """Scoring attribute with a custom function"""
 
     _type = "CustomAttribute"
 
-    def __init__(self, scorer, key, function):
+    def __init__(self, scorer: "Scorer", key: str, function: "Callable") -> None:
+        """CustomAttribute initialisation"""
         self._function = function
         super(CustomAttribute, self).__init__(scorer=scorer, key=key)
 

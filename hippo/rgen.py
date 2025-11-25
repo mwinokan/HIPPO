@@ -1,14 +1,13 @@
-from .recipe import Recipe
-from .cset import CompoundSet, IngredientSet
-
-from tqdm import tqdm
-
-from pathlib import Path
-import json
-
-from .tools import dt_hash
+"""Classes for generating random recipes/selections"""
 
 import mrich
+
+import json
+from pathlib import Path
+
+from .tools import dt_hash
+from .recipe import Recipe
+from .cset import CompoundSet, IngredientSet
 
 
 class RRGMixin:
@@ -60,7 +59,8 @@ class RRGMixin:
 
         return f"{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}"
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args, **kwargs) -> "Recipe":
+        """Generate Recipe"""
         return self.generate(*args, **kwargs)
 
     def __rich__(self) -> str:
@@ -76,12 +76,12 @@ class RandomRecipeGenerator(RRGMixin):
         db,
         *,
         max_lead_time=None,
-        # max_reactions = None,
         suppliers: list | None = None,
         start_with: Recipe | CompoundSet | IngredientSet | None = None,
         route_pool: "RouteSet | None" = None,
         out_key: str | None = None,
     ):
+        """RandomRecipeGenerator initialisation"""
 
         mrich.debug("RandomRecipeGenerator.__init__()")
 
@@ -138,12 +138,7 @@ class RandomRecipeGenerator(RRGMixin):
 
     @classmethod
     def from_json(cls, db: "Database", path: "Path | str"):
-        """Construct the RandomRecipeGenerator from a JSON file
-
-        :param db:
-        :param path:
-
-        """
+        """Construct the RandomRecipeGenerator from a JSON file"""
 
         data = json.load(open(path, "rt"))
 
@@ -251,7 +246,7 @@ class RandomRecipeGenerator(RRGMixin):
     ### FILE I/O METHODS
 
     def dump_data(self):
-        """ """
+        """Dump data to JSON"""
 
         data = {}
 
@@ -269,26 +264,25 @@ class RandomRecipeGenerator(RRGMixin):
         self,
         budget: float = 10000,
         currency: str = "EUR",
-        max_products=1000,
-        max_reactions=1000,
-        debug=False,
-        max_iter=None,
-        shuffle=True,
+        max_products: int = 1000,
+        max_reactions: int = 1000,
+        debug: bool = False,
+        max_iter: int | None = None,
+        shuffle: bool = True,
         balance_clusters: bool = False,
         permitted_clusters: None | set = None,
     ):
-        """
+        """Generate random recipe
 
-        :param budget: float:  (Default value = 10000)
-        :param currency: str:  (Default value = 'EUR')
-        :param max_products:  (Default value = 1000)
-        :param max_reactions:  (Default value = 1000)
-        :param debug:  (Default value = True)
-        :param max_iter:  (Default value = None)
-        :param # pick_inner_cheapest:  (Default value = True)
-        :param # add_size:  (Default value = 1)
-        :param shuffle:  (Default value = True)
-
+        :param budget: maximum budget (Default value = 10000)
+        :param currency: currency (Default value = 'EUR')
+        :param max_products: maximum number of products (Default value = 1000)
+        :param max_reactions: maximum number of reactions (Default value = 1000)
+        :param debug: increase verbosity for debugging (Default value = True)
+        :param max_iter: maximum number of iterations (Default value = None)
+        :param shuffle: randomly shuffle recipe pool (Default value = True)
+        :param balance_clusters: balance selection across scaffold clusters (Default value = False)
+        :param permitted_clusters: restrict selection to provided set of clusters (Default value = False)
         """
 
         # construct filename
@@ -444,20 +438,18 @@ class RandomSelectionGenerator(RRGMixin):
         compounds: CompoundSet | None = None,
         quoted_only: bool = True,
     ):
+        """RandomSelectionGenerator initialisation"""
 
         mrich.debug("RandomRecipeGenerator.__init__()")
 
         # Static parameters
         self._db_path = db.path
-        # self._max_lead_time = max_lead_time
         self._suppliers = suppliers
         self._amount = amount
         self._quoted_only = quoted_only
         self._db = db
-        # self._compound_pool = compounds
 
         mrich.var("database", self.db_path)
-        # mrich.var("max_lead_time", self.max_lead_time)
         mrich.var("suppliers", self.suppliers)
         mrich.var("amount per compound", self.amount, unit="mg")
         mrich.var("quoted_only", self.quoted_only)
@@ -486,13 +478,10 @@ class RandomSelectionGenerator(RRGMixin):
     ### FACTORIES
 
     @classmethod
-    def from_json(cls, db: "Database", path: "Path | str"):
-        """Construct the RandomRecipeGenerator from a JSON file
-
-        :param db:
-        :param path:
-
-        """
+    def from_json(
+        cls, db: "Database", path: "Path | str"
+    ) -> "RandomSelectionGenerator":
+        """Construct the RandomRecipeGenerator from a JSON file"""
 
         data = json.load(open(path, "rt"))
 
@@ -575,6 +564,7 @@ class RandomSelectionGenerator(RRGMixin):
     def get_compound_pool(
         self, compounds: CompoundSet | None
     ) -> "CompoundTable | CompoundSet":
+        """Get pool of compounds to select from"""
 
         if self.suppliers:
             raise NotImplementedError
@@ -656,7 +646,7 @@ class RandomSelectionGenerator(RRGMixin):
             )
 
     def dump_data(self):
-        """ """
+        """Dump data to JSON"""
 
         data = {}
 
@@ -676,13 +666,19 @@ class RandomSelectionGenerator(RRGMixin):
         budget: float = 10000,
         currency: str = "EUR",
         max_iter: int | None = None,
-        max_compounds=1000,
-        debug=False,
-        shuffle=True,
-        # balance_clusters: bool = False,
-        # permitted_clusters: None | set = None,
+        max_compounds: int = 1000,
+        debug: bool = False,
+        shuffle: bool = True,
     ):
-        """ """
+        """Generate random selection
+
+        :param budget: maximum budget
+        :param currency: currency
+        :param max_iter: maximum number of iterations
+        :param max_compounds: maximum number of compounds
+        :param debug: Increase verbosity for debugging
+        :param shuffle: Randomise order of compound pool
+        """
 
         # construct filename
 
@@ -787,7 +783,6 @@ class RandomSelectionGenerator(RRGMixin):
             "rgen_data_path": str(self.data_path.resolve()),
             "rgen_db_path": str(self.db_path.resolve()),
             "rgen_recipe_dir": str(self.recipe_dir.resolve()),
-            # "rgen_max_lead_time": self.max_lead_time,
             "rgen_suppliers": self.suppliers,
             "rgen_amount": self.amount,
             "gen_budget": budget.amount,
