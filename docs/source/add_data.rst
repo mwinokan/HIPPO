@@ -5,6 +5,8 @@ Adding data into HIPPO
 
 In theory the :class:`.HIPPO` class makes it simple to insert new material into the database, but there are nuances, especially to improve performance.
 
+In :doc:`getting_started` we saw the :meth:`.HIPPO.add_hits` method which loads all the data from a Fragalysis download or XChemAlign alignment. In this documentation page we'll show how to insert data using other means.
+
 Registering compounds
 =====================
 
@@ -19,7 +21,7 @@ The :meth:`.HIPPO.register_compound` method takes as a minimum a smiles string a
 In the case that a compound with this structure already exists, the compound is instead retrieved from the database (duplicates will never be created).
 
 Tags, scaffolds, and metadata
--------------------------
+-----------------------------
 
 Additional detail can be added to the compound upon registration:
 
@@ -36,6 +38,18 @@ Additional detail can be added to the compound upon registration:
 	)
 
 See also the API reference :meth:`.HIPPO.register_compound`.
+
+Registering compounds in bulk
+-----------------------------
+
+The :meth:`.HIPPO.register_compounds` method can insert many compounds at once from a list of smiles
+
+::
+
+	smiles = [...]
+	values = animal.register_compounds(smiles=smiles)
+
+Part of the HIPPO compound registration process involves sanitising and flattening of smiles and generating InChI-keys. These returned `values` is a list of `(inchikey, new_smiles)` tuples which are in the same order as the input smiles.
 
 Registering a Target and associated Poses
 =========================================
@@ -67,6 +81,49 @@ Optional arguments include:
 
 See also the API reference :meth:`.HIPPO.register_target` and :meth:`.HIPPO.register_pose`.
 
+Registering poses in bulk
+=========================
+
+The :meth:`.Database.register_poses` method can insert many poses at once from a list of dictionaries:
+
+::
+
+    dicts = [
+        dict(
+            alias=...,           # string can be None
+            reference_id=...,    # reference pose id
+            inchikey=...,        # pre-computed inchikey
+            smiles=...,          # SMILEs
+            path=...,            # path to mol-file on disk, used for uniqueness check, can be a fake path
+            compound_id=...,     # Compound database ID
+            target_id=...,       # Target database ID
+            mol=...,             # rdkit.Chem.Mol
+            energy_score=...,    # float, can be None
+            distance_score=...,  # float, can be None
+            metadata=...,        # dictionary, can be empty
+        ),
+        ...
+    ]
+
+    pose_ids = animal.db.register_poses(dicts=dicts)
+
+    poses = animal.poses[pose_ids]
+
+Loading data from an SDF
+========================
+
+HIPPO can load compounds, poses, and their related information from a formatted SDF using the :meth:`.HIPPO.load_sdf` method:
+
+::
+
+	animal.load_sdf(
+		target=..., # name of target
+		path=..., # path to SDF
+	)
+
+
+Refer to the full API reference for more details: :meth:`.HIPPO.load_sdf`
+
 Registering a reaction
 ======================
 
@@ -84,76 +141,3 @@ The above will register an amidation reaction combining compounds **a** and **b*
 
 See also the API reference :meth:`.HIPPO.register_reaction`.
 
-Improving Performance
-=====================
-
-Querying a large database can become expensive, and permance gains can also be realised by commiting database transactions in bulk. Additionally, initialising python object instances like Compound may not be necessary.
-
-In a large loop of registering compounds, reactions, and poses the above issues can be mitigated:
-
-::
-
-	for i,row in df.iterrows():
-
-		# register the reactants
-
-		reactant1 = animal.register_compound(
-			smiles=row.r1_smiles, 
-			return_compound=False, # this just returns the compound ID
-			commit=False, # this does not commit the change to the database
-		)
-
-		reactant2 = animal.register_compound(
-			smiles=row.r2_smiles, 
-			return_compound=False, # this just returns the compound ID
-			commit=False, # this does not commit the change to the database
-		)
-
-		# register the product
-
-		product = animal.register_compound(
-			smiles=row.smiles, 
-			return_compound=True, 
-			metadata=comp_metadata, 
-			commit=False
-		)
-
-		# register the reaction
-
-		reaction = animal.register_reaction(
-			type=row.reaction, 
-			product=product, 
-			reactants=[reactant1, reactant2], 
-			commit=False,
-		)
-
-		# register the pose
-		
-		pose = animal.register_pose(
-			compound=product, 
-			target='A71EV2A', 
-			path=pose_path, 
-			metadata=pose_metadata, 
-			inspirations=[inspiration1, inspiration2], 
-			commit=False, 
-			return_pose=False, 
-			overwrite_metadata=True, # don't bother checking existing metadata
-		)
-
-		# add tags and scaffolds:
-
-		animal.db.update(
-			table='compound', 
-			id=product_id, 
-			key='compound_base', 
-			value=base_id, 
-			commit=False
-		)
-
-		animal.db.insert_tag(
-			name='elab', 
-			compound=product_id, 
-			commit=False,
-		)
-
-		animal.db.commit()

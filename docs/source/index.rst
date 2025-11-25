@@ -43,18 +43,12 @@ HIPPO uses an sqlite database with several inter-connected tables and Python-cla
    :caption: Documentation Pages
 
    Home <self>
-=======
-N.B. HIPPO and this documentation are still in beta-development.
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Documentation Contents:
 
    Definitions, units, and data types <definitions>
 
    Getting started <getting_started>
 
-   Adding data <insert_elaborations>
+   Adding data <add_data>
 
    Interfacing with Syndirella <syndirella>
    
