@@ -4165,9 +4165,9 @@ class Database:
         self,
         query: str,
         subset: "CompoundSet",
-        fp = "pattern",
-        bits = 2048,
-        morgan_radius = 1,
+        fp="pattern",
+        bits=2048,
+        morgan_radius=1,
         return_similarity: bool = False,
         none="error",
     ) -> "Compound | (Compound, float)":

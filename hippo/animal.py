@@ -1912,7 +1912,9 @@ class HIPPO:
                     f"Could not determine file type from extension, use '.csv' or '.sqlite' {path}"
                 )
 
-        unique = df[df["CompoundSMILES"] != "-"].drop_duplicates(subset=[smiles_col, alias_col])
+        unique = df[df["CompoundSMILES"] != "-"].drop_duplicates(
+            subset=[smiles_col, alias_col]
+        )
 
         smiles_alias_tuples = []
         for j, (i, row) in enumerate(unique.iterrows()):
@@ -1944,7 +1946,7 @@ class HIPPO:
             inchikey: old_s
             for old_s, (inchikey, new_s) in zip(old_smiles, inchikey_new_smiles_tuples)
         }
-        
+
         alias_lookup = {s: a for s, a in smiles_alias_tuples}
         alias_dicts = [
             dict(compound_inchikey=inchikey, compound_alias=alias_lookup[old_s])
