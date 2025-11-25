@@ -1,6 +1,5 @@
 """Functions to generate standard HIPPO plots"""
 
-import mout
 import mrich
 import molparse as mp
 
@@ -711,7 +710,7 @@ def plot_reactant_amounts(
 
     bbs = animal.building_blocks
 
-    mout.debug("making plot_data")
+    mrich.debug("making plot_data")
     plot_data = []
     for bb in bbs:
         d = bb.dict
@@ -721,7 +720,7 @@ def plot_reactant_amounts(
             plot_data.append(d)
 
     if most_common:
-        mout.debug("sorting")
+        mrich.debug("sorting")
         plot_data = sorted(plot_data, key=lambda x: x["amount"], reverse=True)[
             :most_used_number
         ]
@@ -1076,7 +1075,7 @@ def plot_compound_property(
         fig.update_layout(xaxis_title=prop[0], yaxis_title=prop[1])
 
     else:
-        mout.error("Unsupported", code="plotting.plot_compound_property.1")
+        mrich.error("Unsupported")
 
     title = f"<b>{animal.name}</b>: {title}<br>"
 
@@ -1366,7 +1365,7 @@ def plot_pose_property(
         fig.update_layout(xaxis_title=prop[0], yaxis_title=prop[1])
 
     else:
-        mout.error("Unsupported", code="plotting.plot_pose_property.1")
+        mrich.error("Unsupported")
 
     title = title or f"<b>{animal.name}</b>: {title}<br>"
 
