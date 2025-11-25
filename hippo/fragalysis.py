@@ -1,3 +1,5 @@
+"""Functions for interfacing with Fragalysis data"""
+
 import mrich
 
 
@@ -94,6 +96,7 @@ def parse_observation_longcode(longcode: str) -> dict[str]:
 def find_observation_longcode_matches(
     query: str, codes: list[str], debug: bool = False, allow_version_none: bool = False
 ) -> list[str]:
+    """find_observation_longcode_matches"""
 
     dq = parse_observation_longcode(query)
 
@@ -146,4 +149,7 @@ STACK_URLS = {
 }
 
 
-class UnsupportedFragalysisLongcodeError(NotImplementedError): ...
+class UnsupportedFragalysisLongcodeError(NotImplementedError):
+    """Provided Fragalysis observation long code syntax is not supported"""
+
+    ...

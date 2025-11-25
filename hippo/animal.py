@@ -1,26 +1,25 @@
-import pandas as pd
-import numpy as np
-
-from .cset import CompoundTable, IngredientSet, CompoundSet
-from .pset import PoseTable, PoseSet
-from .tags import TagTable
-from .rset import ReactionTable, ReactionSet
-from .iset import InteractionTable
-from .compound import Compound
-from .reaction import Reaction
-from .target import Target
-from .pose import Pose
-
-from .db import Database
-from pathlib import Path
-
-from .tools import inchikey_from_smiles, sanitise_smiles, SanitisationError
+"""Main animal class for HIPPO"""
 
 import mcol
 import mrich
 from mrich import print
 
+import numpy as np
+import pandas as pd
+from pathlib import Path
 from rdkit.Chem import Mol
+
+from .pose import Pose
+from .db import Database
+from .tags import TagTable
+from .target import Target
+from .compound import Compound
+from .reaction import Reaction
+from .iset import InteractionTable
+from .pset import PoseTable, PoseSet
+from .rset import ReactionTable, ReactionSet
+from .cset import CompoundTable, IngredientSet, CompoundSet
+from .tools import inchikey_from_smiles, sanitise_smiles, SanitisationError
 
 
 class HIPPO:
@@ -48,7 +47,8 @@ class HIPPO:
         copy_from: str | Path | None = None,
         overwrite_existing: bool = False,
         update_legacy: bool = False,
-    ):
+    ) -> None:
+        """HIPPO initialisation"""
 
         mrich.bold("Creating HIPPO animal")
 
@@ -78,7 +78,6 @@ class HIPPO:
         self._poses = PoseTable(self.db)
         self._tags = TagTable(self.db)
         self._reactions = ReactionTable(self.db)
-        # self._interactions = InteractionTable(self.db)
 
         ### in memory subsets
         self._reactants = None
@@ -88,8 +87,6 @@ class HIPPO:
         self._elabs = None
 
         mrich.success("Initialised animal", f"[var_name]{self}")
-
-    ### FACTORIES
 
     ### PROPERTIES
 
@@ -298,11 +295,14 @@ class HIPPO:
         ### Determine data format
 
         class DataFormat(Enum):
+            """DataFormat enum"""
+
             Fragalysis_v2 = 1
             XChemAlign_v2 = 2
             XChemAlign_v3 = 3
 
-            def __str__(self):
+            def __str__(self) -> str:
+                """name"""
                 return self.name
 
         subdirs = list(aligned_directory.glob("*[0-9][0-9][0-9][0-9]*"))
@@ -1618,7 +1618,8 @@ class HIPPO:
 
         df = pd.read_excel(path)
 
-        def unexpected_column(key, value) -> str:
+        def unexpected_column(key: str, value: str | float) -> str:
+            """Generate assertion message"""
             return (
                 f"Unexpected Excel format ({key}='{value}') \n\nfirst row:\n{df.loc[0]}"
             )
@@ -2063,7 +2064,13 @@ class HIPPO:
 
         duplicate = not bool(compound_id)
 
-        def _return(compound, duplicate, return_compound, return_duplicate):
+        def _return(
+            compound: "Compound",
+            duplicate: bool,
+            return_compound: bool,
+            return_duplicate: bool,
+        ):
+            """Run on exit"""
             if commit:
                 self.db.commit()
             if not return_compound and not isinstance(compound, int):
@@ -2073,7 +2080,8 @@ class HIPPO:
             else:
                 return compound
 
-        def check_smiles(compound_id, smiles):
+        def check_smiles(compound_id: int, smiles: str) -> None:
+            """Check smiles"""
             assert compound_id
             db_smiles = self.db.select_where(
                 table="compound", query="compound_smiles", key="id", value=compound_id
@@ -2084,7 +2092,10 @@ class HIPPO:
                     f"SMILES changed during compound registration: {smiles} --> {db_smiles}"
                 )
 
-        def insert_scaffolds(scaffolds, compound_id):
+        def insert_scaffolds(
+            scaffolds: "list[Compound] | list[int]", compound_id: int
+        ) -> None:
+            """Insert scaffolds"""
             scaffolds = [b for b in scaffolds if b is not None] or []
             for scaffold in scaffolds:
                 self.db.insert_scaffold(
@@ -3121,6 +3132,3 @@ GENERATED_TAG_COLS = [
     "Experiment code",
     "Pose",
 ]
-
-
-class InvalidRowError(Exception): ...

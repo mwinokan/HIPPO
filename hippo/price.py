@@ -1,5 +1,6 @@
-import mcol
+"""Class for working with prices"""
 
+import mcol
 import mrich
 
 CURRENCIES = {
@@ -22,7 +23,8 @@ class Price:
 
     """
 
-    def __init__(self, amount, currency):
+    def __init__(self, amount: float | None, currency: str | None):
+        """Price initialisation"""
 
         if currency not in CURRENCIES:
             assert currency is None, f"Unrecognised {currency=}"

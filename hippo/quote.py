@@ -1,7 +1,9 @@
-import mcol
-from .price import Price
+"""Classes to work with quote data"""
 
+import mcol
 import mrich
+
+from .price import Price
 
 
 class Quote:
@@ -32,6 +34,7 @@ class Quote:
         date: str | None = None,
         type: str | None = None,
     ) -> None:
+        """Quote initialisation"""
 
         price = Price(price, currency)
 
@@ -200,8 +203,6 @@ class Quote:
     def currency_symbol(self) -> str:
         """Currency symbol of the associated :class:`.Price`"""
         return self.price.symbol
-
-    ### METHODS
 
     ### DUNDERS
 

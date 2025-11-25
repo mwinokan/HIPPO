@@ -1,5 +1,8 @@
+"""Functions for ProLIF interaction profiling"""
+
 import mrich
 from mrich import print
+
 import molparse as mp
 
 from molparse.rdkit.features import FEATURE_FAMILIES, INTERACTION_TYPES
@@ -114,8 +117,13 @@ def guess_feature_families(
 
 
 def parse_prolif_interactions(
-    pose, fp, protonated_sys, table: str = "temp_interaction", debug: bool = False
-):
+    pose: "Pose",
+    fp: "plf.Fingerprint",
+    protonated_sys: "molparse.System",
+    table: str = "temp_interaction",
+    debug: bool = False,
+) -> None:
+    """Parse ProLIF output into HIPPO database table"""
 
     target_id = pose.target.id
 

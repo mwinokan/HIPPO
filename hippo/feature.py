@@ -1,3 +1,5 @@
+"""Classes to work with pharmacophoric features"""
+
 import mcol
 import mrich
 
@@ -57,6 +59,7 @@ class Feature:
 
     @property
     def res_name_number_family_str(self) -> str:
+        """Return a string representation of the feature"""
         return f"{self.residue_name} {self.residue_number} {self.family}"
 
     @property

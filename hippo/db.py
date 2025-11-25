@@ -1,24 +1,25 @@
-import mout
+"""Sqlite database wrapper class"""
+
 import mcol
-import sqlite3
-from sqlite3 import Error
-from pprint import pprint
+import mrich
+
 import json
 import time
+import sqlite3
+from pathlib import Path
+from pprint import pprint
+from sqlite3 import Error
 
-from .compound import Compound
 from .pose import Pose
-from .reaction import Reaction
 from .quote import Quote
-from .metadata import MetaData
 from .target import Target
 from .feature import Feature
+from .compound import Compound
+from .reaction import Reaction
+from .metadata import MetaData
 from .recipe import Recipe, Route
 from .tools import inchikey_from_smiles, sanitise_smiles, SanitisationError
 
-from pathlib import Path
-
-import mrich
 
 CHEMICALITE_COMPOUND_PROPERTY_MAP = {
     "num_heavy_atoms": "mol_num_hvyatms",
@@ -44,6 +45,7 @@ class Database:
         update_legacy: bool = False,
         auto_compute_bfps: bool = True,
     ) -> None:
+        """Database initialisation"""
 
         assert isinstance(path, Path)
 
@@ -162,6 +164,7 @@ class Database:
         mrich.print(f"Copying {source} --> {destination}")
 
         def progress(status, remaining, total):
+            """print progress"""
             mrich.debug(f"Copied {total-remaining} of {total} pages...")
 
         src = sqlite3.connect(source)
@@ -228,7 +231,7 @@ class Database:
         mrich.debug("hippo.Database.close()")
         if self.connection:
             self.connection.close()
-        mout.success(f"Closed connection to {self.path}")
+        mrich.success(f"Closed connection to {self.path}")
 
     def backup(
         self,
@@ -4651,7 +4654,10 @@ class Database:
         return f"[bold underline]{self}"
 
 
-class LegacyDatabaseError(Exception): ...
+class LegacyDatabaseError(Exception):
+    """This database is in a legacy format"""
+
+    ...
 
 
 def backup(
@@ -4675,6 +4681,7 @@ def backup(
         mrich.writing(destination)
 
         def progress(status, remaining, total):
+            """print progress"""
             mrich.debug(f"Copied {total-remaining} of {total} pages...")
 
         src = sqlite3.connect(source)

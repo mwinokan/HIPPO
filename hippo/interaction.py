@@ -1,5 +1,6 @@
-import mcol
+"""Classes for working with interactions"""
 
+import mcol
 import mrich
 
 
@@ -28,6 +29,7 @@ class Interaction:
         energy: float | None,
         table: str = "interaction",
     ) -> None:
+        """Interaction initialisation"""
 
         import json
 

@@ -1,5 +1,6 @@
-import mcol
+"""Classes for working with sets of interactions"""
 
+import mcol
 import mrich
 
 
@@ -13,6 +14,7 @@ class InteractionTable:
     """
 
     def __init__(self, db: "Database", table: str = "interaction") -> None:
+        """InteractionTable initialisation"""
 
         self._db = db
         self._df = None
@@ -81,6 +83,7 @@ class InteractionSet:
         indices: list = None,
         table: str = "interaction",
     ) -> None:
+        """InteractionSet initialisation"""
 
         self._db = db
         self._table = table

@@ -1,10 +1,14 @@
-import molparse as mp
-import plotly.express as px
-import pandas as pd
+"""Functions to generate standard HIPPO plots"""
+
 import mout
+import mrich
+import molparse as mp
+
+import functools
+import pandas as pd
+import plotly.express as px
 import plotly.graph_objects as go
 
-import mrich
 
 """
 
@@ -15,16 +19,10 @@ import mrich
 
 """
 
-import functools
-
 
 # hippo_graph decorator
 def hippo_graph(func):
-    """
-
-    :param func:
-
-    """
+    """HIPPO graph decorator"""
 
     @functools.wraps(func)
     def wrapper(animal, *args, logo="top right", **kwargs):
@@ -1856,6 +1854,7 @@ def plot_compound_tsnee(
         df["FP"] = df["mol"].map(get_cfps)
 
     def get_cluster(row):
+        """Get cluster"""
 
         scaffolds = row[cluster_by]
 
@@ -1872,6 +1871,7 @@ def plot_compound_tsnee(
         return tuple(scaffolds)
 
     def get_type(row):
+        """Get type"""
 
         if row[cluster_by] is None:
             return "scaffold"

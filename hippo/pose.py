@@ -1,19 +1,18 @@
+"""Classes for working with poses"""
+
 import mcol
-import molparse as mp
-
-from rdkit import Chem
-
-import numpy as np
-
-from .tags import TagSet
-
-import pickle
-
-from pathlib import Path
-
 import mrich
 from mrich import print
 
+
+import pickle
+import numpy as np
+from rdkit import Chem
+from pathlib import Path
+
+from .tags import TagSet
+
+import molparse as mp
 from molparse.rdkit.features import (
     FEATURE_FAMILIES,
     COMPLEMENTARY_FEATURES,
@@ -64,6 +63,7 @@ class Pose:
         inspiration_score: float | None = None,
         metadata: dict | None = None,
     ):
+        """Pose initialisation"""
 
         self._db = db
         self._id = id
@@ -382,6 +382,7 @@ class Pose:
 
     @property
     def complex_system(self) -> "molparse.System":
+        """Get molparse.System representation of the protein-ligand complex"""
 
         if self.has_complex_pdb_path:
             return mp.parse(self.path, verbosity=False)
@@ -562,7 +563,8 @@ class Pose:
         return self.interactions.classic_fingerprint
 
     @property
-    def subsites(self):
+    def subsites(self) -> "list[SubsiteTag]":
+        """Get member :class:`.SubsiteTag`"""
 
         from .subsite import SubsiteTag
 
@@ -595,7 +597,8 @@ class Pose:
         return False
 
     @property
-    def mol_path(self):
+    def mol_path(self) -> "Path":
+        """Get Path to molecule file"""
         path = Path(self.path)
         if path.name.endswith(".pdb"):
             mol_path = path.parent / path.name.replace("_hippo.pdb", ".pdb").replace(
@@ -615,7 +618,8 @@ class Pose:
             raise NotImplementedError
 
     @property
-    def apo_path(self):
+    def apo_path(self) -> "Path":
+        """Get path to apo protein file"""
         path = Path(self.path)
         if path.name.endswith(".pdb"):
             apo_path = path.parent / path.name.replace("_hippo.pdb", ".pdb").replace(
@@ -897,6 +901,7 @@ class Pose:
         if not self.has_fingerprint or force:
 
             def norm(coords):
+                """Vector norm"""
                 import numpy as np
 
                 coords = np.array(coords).T
@@ -1455,6 +1460,7 @@ class Pose:
         sys = self.complex_system
 
         def make_view(width="640px", height="480px"):
+            """Create py3Dmol view"""
 
             view = render(
                 sys,
