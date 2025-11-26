@@ -102,16 +102,22 @@ class InteractionSet:
 
     @classmethod
     def from_pose(
-        cls, pose: "Pose | PoseSet", table: str = "interaction"
+        cls,
+        pose: "Pose | PoseSet",
+        table: str = "interaction",
+        db: "Database | None" = None,
     ) -> "InteractionSet":
         """Construct a :class:`.InteractionSet` from one or more poses.
 
         :param pose: a :class:`.Pose` or :class:`.PoseSet` object
+        :param table: Database table name
+        :param db: Use this instead of Pose's Database
         :returns: an :class:`.InteractionSet`
-
         """
 
         self = cls.__new__(cls)
+
+        db = db or pose.db
 
         ### get the ID's
 
@@ -120,7 +126,7 @@ class InteractionSet:
         if isinstance(pose, PoseSet):
 
             # check if all poses have fingerprints
-            (has_invalid_fps,) = pose.db.select_where(
+            (has_invalid_fps,) = db.select_where(
                 query="COUNT(1)",
                 table="pose",
                 key=f"pose_id IN {pose.str_ids} AND pose_fingerprint = 0",
@@ -141,11 +147,11 @@ class InteractionSet:
             WHERE interaction_pose = {pose.id}
             """
 
-        ids = pose.db.execute(sql).fetchall()
+        ids = db.execute(sql).fetchall()
 
         ids = [i for i, in ids]
 
-        self.__init__(pose.db, ids, table=table)
+        self.__init__(db, ids, table=table)
 
         return self
 
@@ -197,7 +203,7 @@ class InteractionSet:
             target = target.id
 
         sql = f"""
-        SELECT interaction_id FROM interaction
+        SELECT interaction_id FROM {self.table}
         INNER JOIN feature
         ON interaction_feature = feature_id
         WHERE feature_target = {target}
@@ -232,7 +238,7 @@ class InteractionSet:
         """Returns the ids of interactions in this set"""
         records = self.db.select_where(
             query="interaction_type",
-            table="interaction",
+            table=self.table,
             key=f"interaction_id IN {self.str_ids}",
             multiple=True,
         )
@@ -252,6 +258,17 @@ class InteractionSet:
     def str_ids(self) -> str:
         """Return an SQL formatted tuple string of the :class:`.Interaction` IDs"""
         return str(tuple(self.ids)).replace(",)", ")")
+
+    @property
+    def feature_ids(self) -> list[int]:
+        """Return a list of :class:`.Feature` ID's"""
+        records = self.db.select_where(
+            query="DISTINCT interaction_feature",
+            table=self.table,
+            key=f"interaction_id IN {self.str_ids}",
+            multiple=True,
+        )
+        return [r for r, in records]
 
     @property
     def classic_fingerprint(self) -> dict:
@@ -465,18 +482,26 @@ class InteractionSet:
         self,
         debug: bool = False,
         commit: bool = True,
+        feature_cache: dict | None = None,
         # table: str = 'interaction',
     ) -> "InteractionSet":
         """Resolve into predicted key interactions. In place modification.
 
         :param debug: Increased verbosity for debugging (Default value = False)
         :param commit: commit the changes (Default value = True)
+        :param feature_cache: lookup dictionary for feature data
         :returns: a filtered :class:`.InteractionSet`
         """
 
         keep_list = []
 
         table = self.table
+
+        # get feature cache
+
+        feature_cache = feature_cache or {
+            i: self.db.get_feature(id=i) for i in self.feature_ids
+        }
 
         ### H-Bonds (closest)
 
@@ -497,12 +522,13 @@ class InteractionSet:
         sql = f"""
         SELECT interaction_id, MIN(interaction_distance)
         FROM {table}
-        INNER JOIN feature
-        ON feature_id = interaction_feature
         WHERE interaction_id IN {self.str_ids}
         AND interaction_type = "π-stacking"
-        GROUP BY feature_atom_names
+        GROUP BY interaction_feature
         """
+        # INNER JOIN feature
+        # ON feature_id = interaction_feature
+        # GROUP BY feature_atom_names
         # GROUP BY interaction_atom_ids
 
         records = self.db.execute(sql).fetchall()
@@ -571,10 +597,13 @@ class InteractionSet:
         lumped_hydrophobic_in_lumped_lumped = {}
 
         for interaction in subset:
-            families = (interaction.feature.family, interaction.family)
+
+            feature = feature_cache[interaction.feature_id]
+
+            families = (feature.family, interaction.family)
 
             if families == ("LumpedHydrophobe", "Hydrophobe"):
-                for name in interaction.feature.atom_names.split():
+                for name in feature.atom_names.split():
                     key = (name, interaction.atom_ids[0])
                     if key not in hydrophobic_interactions_in_lumped:
                         hydrophobic_interactions_in_lumped[key] = []
@@ -582,20 +611,20 @@ class InteractionSet:
 
             elif families == ("Hydrophobe", "LumpedHydrophobe"):
                 for atom_id in interaction.atom_ids:
-                    key = (interaction.feature.atom_names, atom_id)
+                    key = (feature.atom_names, atom_id)
                     if key not in hydrophobic_interactions_in_lumped:
                         hydrophobic_interactions_in_lumped[key] = []
                     hydrophobic_interactions_in_lumped[key].append(interaction.id)
 
             elif families == ("LumpedHydrophobe", "LumpedHydrophobe"):
-                for name in interaction.feature.atom_names.split():
+                for name in feature.atom_names.split():
                     for atom_id in interaction.atom_ids:
                         key = (name, atom_id)
                         if key not in hydrophobic_interactions_in_lumped:
                             hydrophobic_interactions_in_lumped[key] = []
                         hydrophobic_interactions_in_lumped[key].append(interaction.id)
 
-                key = interaction.feature.atom_names
+                key = feature.atom_names
                 lumped_hydrophobic_in_lumped_lumped[key] = tuple(interaction.atom_ids)
 
         keep_hydrophobic_ids = set(subset.ids)
@@ -606,17 +635,20 @@ class InteractionSet:
         # modify keep list by those covered in lumped
 
         for interaction in subset:
-            families = (interaction.feature.family, interaction.family)
+
+            feature = feature_cache[interaction.feature_id]
+
+            families = (feature.family, interaction.family)
 
             if families == ("Hydrophobe", "Hydrophobe"):
-                key = (interaction.feature.atom_names, interaction.atom_ids[0])
+                key = (feature.atom_names, interaction.atom_ids[0])
 
                 if key in hydrophobic_interactions_in_lumped:
                     keep_hydrophobic_ids -= set([interaction.id])
 
             elif families == ("LumpedHydrophobe", "Hydrophobe"):
 
-                key = interaction.feature.atom_names
+                key = feature.atom_names
 
                 if key in lumped_hydrophobic_in_lumped_lumped:
                     atom_id = interaction.atom_ids[0]
@@ -630,7 +662,7 @@ class InteractionSet:
 
                 if key in rev_hydrophobic_in_lumped_lumped:
 
-                    atom_name = interaction.feature.atom_names
+                    atom_name = feature.atom_names
                     value = rev_hydrophobic_in_lumped_lumped[key]
 
                     if atom_name in value:

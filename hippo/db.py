@@ -44,12 +44,17 @@ class Database:
         animal: "HIPPO",
         update_legacy: bool = False,
         auto_compute_bfps: bool = True,
+        create_blank: bool = True,
+        check_legacy: bool = True,
+        debug: bool = True,
     ) -> None:
         """Database initialisation"""
 
-        assert isinstance(path, Path)
+        self._in_memory = path == ":memory:"
+        assert isinstance(path, Path) or self.in_memory
 
-        mrich.debug("hippo.Database.__init__()")
+        if debug:
+            mrich.debug("hippo.Database.__init__()")
 
         self._path = path
         self._connection = None
@@ -57,19 +62,32 @@ class Database:
         self._animal = animal
         self._auto_compute_bfps = auto_compute_bfps
 
-        mrich.debug(f"Database.path = {self.path}")
+        if debug:
+            mrich.debug(f"Database.path = {self.path}")
 
-        try:
-            path = path.resolve(strict=True)
+        if not self.in_memory:
+            try:
+                path = path.resolve(strict=True)
 
-        except FileNotFoundError:
-            # create a blank database
-            self.connect()
-            self.create_blank_db()
+            except FileNotFoundError:
+                # create a blank database
 
+                if create_blank:
+                    self.connect(debug=debug)
+                    self.create_blank_db()
+                else:
+                    raise
+
+            else:
+                # connect to existing database
+                self.connect(debug=debug)
         else:
-            # connect to existing database
-            self.connect()
+            self.connect(debug=debug)
+            if create_blank:
+                self.create_blank_db()
+
+        if not check_legacy:
+            return
 
         if "interaction" not in self.table_names:
             if not update_legacy:
@@ -188,6 +206,11 @@ class Database:
         return self._path
 
     @property
+    def in_memory(self) -> bool:
+        """Is this database stored in memory"""
+        return self._in_memory
+
+    @property
     def connection(self) -> "sqlite3.connection":
         """Returns a ``sqlite3.connection`` to the database"""
         if not self._connection:
@@ -226,12 +249,14 @@ class Database:
 
     ### PUBLIC METHODS / API CALLS
 
-    def close(self) -> None:
+    def close(self, debug: bool = False) -> None:
         """Close the connection"""
-        mrich.debug("hippo.Database.close()")
+        if debug:
+            mrich.debug("hippo.Database.close()")
         if self.connection:
             self.connection.close()
-        mrich.success(f"Closed connection to {self.path}")
+        if debug:
+            mrich.success(f"Closed connection to {self.path}")
 
     def backup(
         self,
@@ -243,22 +268,26 @@ class Database:
 
     ### GENERAL SQL
 
-    def connect(self) -> None:
+    def connect(self, debug: bool = True) -> None:
         """Connect to the database"""
-        mrich.debug("hippo.Database.connect()")
+
+        if debug:
+            mrich.debug("hippo.Database.connect()")
 
         conn = None
 
         try:
             conn = sqlite3.connect(self.path)
 
-            mrich.debug(f"{sqlite3.version=}")
+            if debug:
+                mrich.debug(f"{sqlite3.version=}")
 
             conn.enable_load_extension(True)
             conn.load_extension("chemicalite")
             conn.enable_load_extension(False)
 
-            mrich.success("Database connected @", f"[file]{self.path}")
+            if debug:
+                mrich.success("Database connected @", f"[file]{self.path}")
 
         except sqlite3.OperationalError as e:
 
@@ -605,6 +634,7 @@ class Database:
 
         if debug:
             mrich.debug(f"HIPPO.Database.create_table_interaction({table=})")
+
         sql = f"""CREATE TABLE {table}(
             interaction_id INTEGER PRIMARY KEY,
             interaction_feature INTEGER NOT NULL,
@@ -2037,14 +2067,64 @@ class Database:
 
     ### COPYING / MIGRATION
 
-    def copy_temp_interactions(self) -> int:
+    def copy_temp_interactions(self, source_db: "Database | None" = None) -> int:
         """Copy the records from the 'temp_interaction' table to the 'interaction' table
 
         :returns: ID of the last inserted :class:`.Interaction`
         """
 
-        cursor = self.execute(
+        if source_db is not None:
+
+            sql = """
+            SELECT
+                interaction_feature,
+                interaction_pose,
+                interaction_type,
+                interaction_family,
+                interaction_atom_ids,
+                interaction_prot_coord,
+                interaction_lig_coord,
+                interaction_distance,
+                interaction_angle,
+                interaction_energy
+            FROM temp_interaction
             """
+
+            cursor = source_db.execute(sql)
+            records = cursor.fetchall()
+
+            sql = """
+            INSERT OR IGNORE INTO interaction(
+                interaction_feature, 
+                interaction_pose, 
+                interaction_type, 
+                interaction_family, 
+                interaction_atom_ids, 
+                interaction_prot_coord, 
+                interaction_lig_coord, 
+                interaction_distance, 
+                interaction_angle, 
+                interaction_energy
+            )
+            VALUES(
+                ?1,
+                ?2,
+                ?3,
+                ?4,
+                ?5,
+                ?6,
+                ?7,
+                ?8,
+                ?9,
+                ?10
+            )
+            """
+
+            cursor = self.executemany(sql, records)
+
+        else:
+
+            sql = """
             INSERT OR IGNORE INTO interaction(
                 interaction_feature, 
                 interaction_pose, 
@@ -2068,13 +2148,14 @@ class Database:
                 interaction_angle, 
                 interaction_energy 
             FROM temp_interaction
-        """
-        )
+            """
+
+            cursor = self.execute(sql)
 
         return cursor.lastrowid
 
     def copy_interactions_to_temp(self, pose_id: int) -> int:
-        """Copy the records from the 'temp_interaction' table to the 'interaction' table
+        """Copy the records from the 'interaction' table to the 'temp_interaction' table for a given pose_id
 
         :returns: ID of the last inserted :class:`.Interaction`
         """
@@ -4639,21 +4720,35 @@ class Database:
 
         """
 
-        # mrich.print(self.cursor.fetchall())
+        mrich.print(self.table_df(table))
 
-        from rich.table import Table
+    def table_df(
+        self,
+        table: str,
+    ) -> "pandas.DataFrame":
+        """Get a DataFrame of a table
 
-        tab = Table()
+        :param table: the table to get
+        """
 
-        for col in self.column_names(table):
-            tab.add_column(col.removeprefix(table).removeprefix("_"))
+        from pandas import DataFrame
+
+        data = []
+
+        column_names = self.column_names(table)
 
         self.execute(f"SELECT * FROM {table}")
-        for record in self.cursor.fetchall():
-            record = [str(v) for v in record]
-            tab.add_row(*record)
 
-        mrich.print(tab)
+        for record in self.cursor:
+            d = {}
+            for key, value in zip(column_names, record):
+                d[key] = value
+            data.append(d)
+
+        df = DataFrame(data)
+        df = df.set_index(column_names[0])
+
+        return df
 
     def table_info(
         self,
@@ -4677,7 +4772,10 @@ class Database:
 
     def __str__(self):
         """Unformatted string representation"""
-        return f"Database @ {self.path.resolve()}"
+        if self.in_memory:
+            return f"Database [IN-MEMORY]"
+        else:
+            return f"Database @ {self.path.resolve()}"
 
     def __repr__(self):
         """ANSI Formatted string representation"""

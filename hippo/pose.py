@@ -936,20 +936,35 @@ class Pose:
 
             ### clear old interactions
 
-            self.db.delete_where(
-                table="interaction", key="pose", value=self.id, commit=commit
-            )
             self.set_has_fingerprint(False, commit=commit)
             self._interactions = None
 
+            ### IN-MEMORY DB
+
+            from .db import Database
+
+            temp_db = Database(
+                ":memory:",
+                animal=None,
+                create_blank=False,
+                check_legacy=False,
+                debug=False,
+            )
+
+            temp_db.create_table_interaction(debug=False)
+            temp_db.commit()
+
             ### create temporary table
 
-            if "temp_interaction" in self.db.table_names:
+            if "temp_interaction" in temp_db.table_names:
                 self.db.execute("DROP TABLE temp_interaction")
 
-            self.db.create_table_interaction(table="temp_interaction", debug=False)
+            temp_db.create_table_interaction(table="temp_interaction", debug=False)
 
             ### load the ligand structure
+
+            if debug:
+                mrich.debug("path", self.path)
 
             if self.path.endswith(".pdb"):
                 from molparse import parse
@@ -974,6 +989,9 @@ class Pose:
             ### get features
 
             comp_features = self.features
+
+            if debug:
+                mrich.debug("Getting protein features...")
             protein_features = self.target.calculate_features(
                 protein_system, reference_id=self.reference_id
             )
@@ -1140,7 +1158,7 @@ class Pose:
                             print("Prot:", prot_feature, "Lig:", lig_feature)
 
                         # insert into the Database
-                        self.db.insert_interaction(
+                        temp_db.insert_interaction(
                             feature=prot_feature.id,
                             pose=self.id,
                             type=interaction_type,
@@ -1151,7 +1169,7 @@ class Pose:
                             distance=distance,
                             angle=angle,
                             energy=None,
-                            commit=commit,
+                            commit=False,
                             table="temp_interaction",
                         )
 
@@ -1165,18 +1183,28 @@ class Pose:
             if resolve:
                 from .iset import InteractionSet
 
-                interactions = InteractionSet.from_pose(self, table="temp_interaction")
-                interactions.resolve(debug=debug)
-                # self.interactions.resolve(debug=debug, table='temp_interaction')
+                interactions = InteractionSet.from_pose(
+                    self, table="temp_interaction", db=temp_db
+                )
+
+                feature_ids = interactions.feature_ids
+
+                feature_cache = {i: self.db.get_feature(id=i) for i in feature_ids}
+
+                interactions.resolve(debug=debug, feature_cache=feature_cache)
 
             ### transfer interactions from temporary table
-            self.db.copy_temp_interactions()
+            self.db.delete_where(
+                table="interaction", key="pose", value=self.id, commit=commit
+            )
+
+            self.db.copy_temp_interactions(source_db=temp_db)
             self.set_has_fingerprint(True, commit=commit)
 
             ### delete temporary table
 
             if delete_temp_table:
-                self.db.execute("DROP TABLE temp_interaction")
+                temp_db.close(debug=False)
 
         elif debug:
             mrich.warning(f"{self} is already fingerprinted, no new calculation")
