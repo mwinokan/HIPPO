@@ -623,7 +623,10 @@ class Database:
         """Create the pattern_bfp table"""
         mrich.debug("HIPPO.Database.create_table_pattern_bfp()")
 
-        sql = "CREATE VIRTUAL TABLE compound_pattern_bfp USING rdtree(compound_id, fp bits(2048))"
+        sql = """
+        CREATE VIRTUAL TABLE compound_pattern_bfp 
+        USING rdtree(compound_id, fp bits(2048))
+        """
 
         self.execute(sql)
 
@@ -635,7 +638,8 @@ class Database:
         if debug:
             mrich.debug(f"HIPPO.Database.create_table_interaction({table=})")
 
-        sql = f"""CREATE TABLE {table}(
+        sql = f"""
+        CREATE TABLE {table}(
             interaction_id INTEGER PRIMARY KEY,
             interaction_feature INTEGER NOT NULL,
             interaction_pose INTEGER NOT NULL,
@@ -647,7 +651,13 @@ class Database:
             interaction_distance REAL NOT NULL,
             interaction_angle REAL,
             interaction_energy REAL,
-            CONSTRAINT UC_interaction UNIQUE (interaction_feature, interaction_pose, interaction_type, interaction_family, interaction_atom_ids)
+            CONSTRAINT UC_interaction UNIQUE (
+                interaction_feature, 
+                interaction_pose, 
+                interaction_type, 
+                interaction_family, 
+                interaction_atom_ids
+            )
         );
         """
 
@@ -713,8 +723,22 @@ class Database:
         inchikey = inchikey or inchikey_from_smiles(smiles)
 
         sql = """
-        INSERT INTO compound(compound_inchikey, compound_smiles, compound_mol, compound_pattern_bfp, compound_morgan_bfp, compound_alias)
-        VALUES(?1, ?2, mol_from_smiles(?2), mol_pattern_bfp(mol_from_smiles(?2), 2048), mol_morgan_bfp(mol_from_smiles(?2), 2, 2048), ?3)
+        INSERT INTO compound(
+            compound_inchikey, 
+            compound_smiles, 
+            compound_mol, 
+            compound_pattern_bfp, 
+            compound_morgan_bfp, 
+            compound_alias
+        )
+        VALUES(
+            ?1, 
+            ?2, 
+            mol_from_smiles(?2), 
+            mol_pattern_bfp(mol_from_smiles(?2), 2048), 
+            mol_morgan_bfp(mol_from_smiles(?2), 2, 2048), 
+            ?3
+        )
         """
 
         try:
@@ -866,7 +890,17 @@ class Database:
                 raise
 
         sql = """
-        INSERT INTO pose(pose_inchikey, pose_alias, pose_smiles, pose_compound, pose_target, pose_path, pose_reference, pose_energy_score, pose_distance_score)
+        INSERT INTO pose(
+            pose_inchikey, 
+            pose_alias, 
+            pose_smiles, 
+            pose_compound, 
+            pose_target, 
+            pose_path, 
+            pose_reference, 
+            pose_energy_score, 
+            pose_distance_score
+        )
         VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
         """
 
@@ -1341,7 +1375,14 @@ class Database:
             family = "Unknown"
 
         sql = """
-        INSERT INTO feature(feature_family, feature_target, feature_chain_name, feature_residue_name, feature_residue_number, feature_atom_names)
+        INSERT INTO feature(
+            feature_family, 
+            feature_target, 
+            feature_chain_name, 
+            feature_residue_name, 
+            feature_residue_number, 
+            feature_atom_names
+        )
         VALUES(?1, ?2, ?3, ?4, ?5, ?6)
         """
 
@@ -1627,7 +1668,6 @@ class Database:
         except sqlite3.IntegrityError as e:
             mrich.error(e)
             if warn_duplicate:
-                # mrich.warning(f"Skipping existing interaction: {(feature, pose, family, atom_ids, prot_coord, lig_coord, distance, energy)}")
                 mrich.warning(
                     f"Skipping existing interaction: {feature=} {pose=} {family=} {atom_ids=}"
                 )
@@ -2429,8 +2469,20 @@ class Database:
         if self.auto_compute_bfps:
 
             sql = """
-            INSERT OR IGNORE INTO compound(compound_inchikey, compound_smiles, compound_mol, compound_pattern_bfp, compound_morgan_bfp)
-            VALUES(?1, ?2, mol_from_smiles(?2), mol_pattern_bfp(mol_from_smiles(?2), 2048), mol_morgan_bfp(mol_from_smiles(?2), 2, 2048))
+            INSERT OR IGNORE INTO compound(
+                compound_inchikey, 
+                compound_smiles, 
+                compound_mol, 
+                compound_pattern_bfp, 
+                compound_morgan_bfp
+            )
+            VALUES(
+                ?1, 
+                ?2, 
+                mol_from_smiles(?2), 
+                mol_pattern_bfp(mol_from_smiles(?2), 2048), 
+                mol_morgan_bfp(mol_from_smiles(?2), 2, 2048)
+            )
             """
 
         else:
@@ -2761,7 +2813,7 @@ class Database:
             mrich.var("#generic murcko scaffold relations", len(pairs))
 
             self.executemany(
-                """INSERT OR IGNORE INTO scaffold (scaffold_base, scaffold_superstructure) VALUES (?,?)""",
+                "INSERT OR IGNORE INTO scaffold (scaffold_base, scaffold_superstructure) VALUES (?,?)",
                 pairs,
             )
 
@@ -3019,7 +3071,21 @@ class Database:
 
         """
 
-        query = "quote_compound, quote_supplier, quote_catalogue, quote_entry, quote_amount, quote_price, quote_currency, quote_lead_time, quote_purity, quote_date, quote_smiles, quote_id "
+        query = ", ".join(
+            "quote_compound",
+            "quote_supplier",
+            "quote_catalogue",
+            "quote_entry",
+            "quote_amount",
+            "quote_price",
+            "quote_currency",
+            "quote_lead_time",
+            "quote_purity",
+            "quote_date",
+            "quote_smiles",
+            "quote_id",
+        )
+
         entry = self.select_where(
             query=query, table="quote", key="id", value=id, none=none
         )
@@ -3047,7 +3113,20 @@ class Database:
 
         str_ids = str(tuple(ids)).replace(",)", ")")
 
-        query = "quote_compound, quote_supplier, quote_catalogue, quote_entry, quote_amount, quote_price, quote_currency, quote_lead_time, quote_purity, quote_date, quote_smiles, quote_id "
+        query = ", ".join(
+            "quote_compound",
+            "quote_supplier",
+            "quote_catalogue",
+            "quote_entry",
+            "quote_amount",
+            "quote_price",
+            "quote_currency",
+            "quote_lead_time",
+            "quote_purity",
+            "quote_date",
+            "quote_smiles",
+            "quote_id",
+        )
         records = self.select_where(
             query=query,
             table="quote",
@@ -3674,13 +3753,28 @@ class Database:
     def get_pose_id_obj_dict(self, pset: "PoseSet") -> "dict[id, Pose]":
         """Get a dictionary mapping :class:`.Pose` ID's to their objects"""
 
-        query = "pose_id, pose_inchikey, pose_alias, pose_smiles, pose_reference, pose_path, pose_compound, pose_target, pose_mol, pose_fingerprint, pose_energy_score, pose_distance_score"
+        query = ", ".join(
+            "pose_id",
+            "pose_inchikey",
+            "pose_alias",
+            "pose_smiles",
+            "pose_reference",
+            "pose_path",
+            "pose_compound",
+            "pose_target",
+            "pose_mol",
+            "pose_fingerprint",
+            "pose_energy_score",
+            "pose_distance_score",
+        )
+
         records = self.select_where(
             query=query, table="pose", key=f"pose_id IN {pset.str_ids}", multiple=True
         )
 
         d = {}
         for entry in records:
+
             (
                 pose_id,
                 pose_inchikey,
@@ -3695,6 +3789,7 @@ class Database:
                 pose_energy_score,
                 pose_distance_score,
             ) = entry
+
             d[pose_id] = Pose(
                 self,
                 pose_id,
@@ -3710,6 +3805,7 @@ class Database:
                 pose_energy_score,
                 pose_distance_score,
             )
+
         return d
 
     def get_pose_id_interaction_tuples_dict(self, pset: "PoseSet") -> dict[int, set]:
@@ -3904,11 +4000,18 @@ class Database:
             f"""
             WITH possible_reactants AS 
             (
-                SELECT reactant_reaction, CASE WHEN reactant_compound IN {compound_ids_str} THEN reactant_compound END AS [possible_reactant] FROM reactant
+                SELECT reactant_reaction, CASE 
+                    WHEN reactant_compound IN {compound_ids_str} 
+                    THEN reactant_compound END AS [possible_reactant] 
+                FROM reactant
             )
 
             , possible_reactions AS (
-                SELECT reactant_reaction, COUNT(CASE WHEN possible_reactant IS NULL THEN 1 END) AS [count_null] FROM possible_reactants
+                SELECT reactant_reaction, COUNT(
+                    CASE 
+                        WHEN possible_reactant IS NULL 
+                        THEN 1 END) AS [count_null] 
+                    FROM possible_reactants
                 GROUP BY reactant_reaction
             )
             
@@ -3997,7 +4100,12 @@ class Database:
 
         # all intermediates
         ids = self.execute(
-            "SELECT DISTINCT reaction_product FROM reaction INNER JOIN reactant ON reaction.reaction_product = reactant.reactant_compound"
+            """
+            SELECT DISTINCT reaction_product 
+            FROM reaction 
+            INNER JOIN reactant 
+            ON reaction.reaction_product = reactant.reactant_compound
+            """
         ).fetchall()
         ids = [q for q, in ids]
         intermediates = CompoundSet(self, ids)
@@ -4331,7 +4439,9 @@ class Database:
                 WHERE compound_id IN {subset.str_ids}
             )
             
-            SELECT compound_id, bfp_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), {bits}), fp) AS similarity
+            SELECT compound_id, 
+            bfp_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), {bits}), fp) 
+            AS similarity
             FROM subset
             ORDER BY similarity DESC
             LIMIT 1
@@ -4346,7 +4456,9 @@ class Database:
                 WHERE compound_id IN {subset.str_ids}
             )
             
-            SELECT compound_id, bfp_tanimoto(mol_{fp}_bfp(mol_from_smiles(?1), {morgan_radius}, {bits}), fp) AS similarity
+            SELECT compound_id, 
+            bfp_tanimoto(mol_{fp}_bfp(mol_from_smiles(?1), {morgan_radius}, {bits}), fp) 
+            AS similarity
             FROM subset
             ORDER BY similarity DESC
             LIMIT 1
@@ -4361,7 +4473,8 @@ class Database:
                 WHERE compound_id IN {subset.str_ids}
             )
             
-            SELECT compound_id, bfp_tanimoto(mol_{fp}_bfp(mol_from_smiles(?1), {bits}), fp) AS similarity
+            SELECT compound_id, bfp_tanimoto(mol_{fp}_bfp(mol_from_smiles(?1), {bits}), fp) 
+            AS similarity
             FROM subset
             ORDER BY similarity DESC
             LIMIT 1
@@ -4412,7 +4525,8 @@ class Database:
                 FROM compound 
                 JOIN compound_pattern_bfp AS mfp 
                 USING(compound_id) 
-                WHERE mfp.compound_id match rdtree_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), ?2)
+                WHERE mfp.compound_id
+                MATCH rdtree_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), ?2)
                 AND compound_id IN {subset.str_ids}
                 ORDER BY t DESC
                 """
@@ -4420,7 +4534,8 @@ class Database:
                 sql = f"""
                 SELECT compound_id 
                 FROM compound_pattern_bfp AS bfp 
-                WHERE bfp.compound_id match rdtree_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), ?2)
+                WHERE bfp.compound_id
+                MATCH rdtree_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), ?2)
                 AND compound_id IN {subset.str_ids}
                 """
 
@@ -4434,14 +4549,16 @@ class Database:
                 FROM compound 
                 JOIN compound_pattern_bfp AS mfp 
                 USING(compound_id) 
-                WHERE mfp.compound_id match rdtree_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), ?2) 
+                WHERE mfp.compound_id
+                MATCH rdtree_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), ?2) 
                 ORDER BY t DESC
                 """
             else:
                 sql = f"""
                 SELECT compound_id 
                 FROM compound_pattern_bfp AS bfp 
-                WHERE bfp.compound_id match rdtree_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), ?2)
+                WHERE bfp.compound_id
+                MATCH rdtree_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), ?2)
                 """
         else:
             raise NotImplementedError
@@ -4492,7 +4609,11 @@ class Database:
         """
 
         pairs = self.execute(
-            f"""SELECT {table}_id, {table}_metadata FROM {table} WHERE {table}_metadata LIKE '%"{key}": "%'"""
+            f"""
+            SELECT {table}_id, {table}_metadata 
+            FROM {table} 
+            WHERE {table}_metadata LIKE '%"{key}": "%'
+            """
         ).fetchall()
         from json import loads
 
@@ -4514,7 +4635,7 @@ class Database:
 
         """
 
-        sql = f"""SELECT COUNT(1) FROM {table}; """
+        sql = f"SELECT COUNT(1) FROM {table};"
         self.execute(sql)
         return self.cursor.fetchone()[0]
 
@@ -4536,7 +4657,7 @@ class Database:
         else:
             where_str = key
 
-        sql = f"""SELECT COUNT(1) FROM {table} WHERE {where_str};"""
+        sql = f"SELECT COUNT(1) FROM {table} WHERE {where_str};"
         self.execute(sql)
         return self.cursor.fetchone()[0]
 
