@@ -206,6 +206,7 @@ def add_hits(
 
 def main() -> None:
     """CLI entry point"""
+    app()
 
 
 if __name__ == "__main__":
