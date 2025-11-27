@@ -3002,10 +3002,12 @@ class Database:
 
         str_ids = str(tuple(ids)).replace(",)", ")")
 
-        records = self.select_where(query=query, table="pose", key=f"pose_id IN {str_ids}", multiple=True)
-        
+        records = self.select_where(
+            query=query, table="pose", key=f"pose_id IN {str_ids}", multiple=True
+        )
+
         poses = [Pose(self, *entry) for entry in records]
-        
+
         return poses
 
     def get_pose_id(
