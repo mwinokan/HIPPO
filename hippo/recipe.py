@@ -1605,6 +1605,32 @@ class Recipe:
 
         df = df[[c for c in cols if c in df.columns]]
 
+        ### Add estimated quotes
+
+        unquoted = df[df["quote_id"].isna()]
+
+        if len(unquoted):
+
+            for i, row in unquoted.iterrows():
+
+                compound = self.db.get_compound(id=row["compound_id"])
+                ingredient = compound.as_ingredient(
+                    amount=row["required_amount_mg"], get_quote=False
+                )
+
+                quote = ingredient.quote
+
+                df.loc[i, "quoted_amount_mg"] = quote.amount
+                df.loc[i, "quote_supplier"] = quote.supplier
+                df.loc[i, "quote_catalogue"] = quote.catalogue
+                df.loc[i, "quote_entry"] = quote.entry
+                df.loc[i, "quote_price"] = quote.price.amount
+                df.loc[i, "quote_currency"] = quote.price.currency
+                df.loc[i, "quote_lead_time_days"] = quote.lead_time
+                df.loc[i, "quoted_purity"] = quote.purity
+                df.loc[i, "quoted_smiles"] = quote.smiles
+                df.loc[i, "quote_date"] = quote.date
+
         ### N.B. scaffold series no longer output
 
         mrich.writing(file)
