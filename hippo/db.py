@@ -3091,18 +3091,20 @@ class Database:
         """
 
         query = ", ".join(
-            "quote_compound",
-            "quote_supplier",
-            "quote_catalogue",
-            "quote_entry",
-            "quote_amount",
-            "quote_price",
-            "quote_currency",
-            "quote_lead_time",
-            "quote_purity",
-            "quote_date",
-            "quote_smiles",
-            "quote_id",
+            [
+                "quote_compound",
+                "quote_supplier",
+                "quote_catalogue",
+                "quote_entry",
+                "quote_amount",
+                "quote_price",
+                "quote_currency",
+                "quote_lead_time",
+                "quote_purity",
+                "quote_date",
+                "quote_smiles",
+                "quote_id",
+            ]
         )
 
         entry = self.select_where(
@@ -3133,18 +3135,20 @@ class Database:
         str_ids = str(tuple(ids)).replace(",)", ")")
 
         query = ", ".join(
-            "quote_compound",
-            "quote_supplier",
-            "quote_catalogue",
-            "quote_entry",
-            "quote_amount",
-            "quote_price",
-            "quote_currency",
-            "quote_lead_time",
-            "quote_purity",
-            "quote_date",
-            "quote_smiles",
-            "quote_id",
+            [
+                "quote_compound",
+                "quote_supplier",
+                "quote_catalogue",
+                "quote_entry",
+                "quote_amount",
+                "quote_price",
+                "quote_currency",
+                "quote_lead_time",
+                "quote_purity",
+                "quote_date",
+                "quote_smiles",
+                "quote_id",
+            ]
         )
         records = self.select_where(
             query=query,
