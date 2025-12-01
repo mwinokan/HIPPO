@@ -781,32 +781,30 @@ class Compound:
         :param align_substructure: Align the two drawing by their common substructure, defaults to ``False``
         """
 
-        if scaffolds:
+        if scaffolds and (scaffolds := self.scaffolds):
 
-            if scaffolds := self.scaffolds:
+            from molparse.rdkit import draw_mcs
 
-                from molparse.rdkit import draw_mcs
+            data = {}
+            for scaffold in scaffolds:
+                data[scaffold.smiles] = f"{scaffold} (scaffold)"
+            data[self.smiles] = str(self)
 
-                data = {}
-                for scaffold in scaffolds:
-                    data[scaffold.smiles] = f"{scaffold} (scaffold)"
-                data[self.smiles] = str(self)
+            if len(data) > 1:
 
-                if len(data) > 1:
+                drawing = draw_mcs(
+                    data,
+                    align_substructure=align_substructure,
+                    show_mcs=False,
+                    highlight=False,
+                )
+                display(drawing)
 
-                    drawing = draw_mcs(
-                        data,
-                        align_substructure=align_substructure,
-                        show_mcs=False,
-                        highlight=False,
-                    )
-                    display(drawing)
-
-                else:
-                    mrich.error(
-                        f"Problem drawing {scaffold.id=} vs {self.id=}, self referential?"
-                    )
-                    display(self.mol)
+            else:
+                mrich.error(
+                    f"Problem drawing {scaffold.id=} vs {self.id=}, self referential?"
+                )
+                display(self.mol)
 
         else:
             display(self.mol)
