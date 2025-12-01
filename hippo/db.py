@@ -28,6 +28,22 @@ CHEMICALITE_COMPOUND_PROPERTY_MAP = {
     "molecular_weight": "mol_amw",
 }
 
+POSE_FIELDS = [
+    "pose_id",
+    "pose_inchikey",
+    "pose_alias",
+    "pose_smiles",
+    "pose_reference",
+    "pose_path",
+    "pose_compound",
+    "pose_target",
+    "pose_mol",
+    "pose_fingerprint",
+    "pose_energy_score",
+    "pose_distance_score",
+    "pose_inspiration_score",
+]
+
 
 class Database:
     """Wrapper to connect to the HIPPO sqlite database.
@@ -2969,27 +2985,30 @@ class Database:
             mrich.error(f"Invalid {id=}")
             return None
 
-        fields = [
-            "pose_id",
-            "pose_inchikey",
-            "pose_alias",
-            "pose_smiles",
-            "pose_reference",
-            "pose_path",
-            "pose_compound",
-            "pose_target",
-            "pose_mol",
-            "pose_fingerprint",
-            "pose_energy_score",
-            "pose_distance_score",
-            "pose_inspiration_score",
-        ]
-
-        query = ", ".join(fields)
+        query = ", ".join(POSE_FIELDS)
 
         entry = self.select_where(query=query, table="pose", key="id", value=id)
         pose = Pose(self, *entry)
         return pose
+
+    def get_poses(
+        self,
+        *,
+        ids: list[int],
+    ) -> list[Pose]:
+        """Get list of initialised :class:`.Pose` objects with given ID's"""
+
+        query = ", ".join(POSE_FIELDS)
+
+        str_ids = str(tuple(ids)).replace(",)", ")")
+
+        records = self.select_where(
+            query=query, table="pose", key=f"pose_id IN {str_ids}", multiple=True
+        )
+
+        poses = [Pose(self, *entry) for entry in records]
+
+        return poses
 
     def get_pose_id(
         self,

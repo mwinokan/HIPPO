@@ -90,6 +90,7 @@ def calculate_interactions(
     prolif: bool = False,
     backup: bool = True,
     force: bool = False,
+    #n_tasks: int = 1,
 ) -> None:
     """Calculate interactions for all poses"""
 
@@ -103,26 +104,61 @@ def calculate_interactions(
     animal = setup_animal(database=database, backup=backup)
 
     mrich.h3("State Before")
-    mrich.var("#poses", animal.num_poses)
+    mrich.var("#total poses", animal.num_poses)
     mrich.var("#fingerprinted", animal.poses.num_fingerprinted)
 
     mrich.h3("Calculation")
 
-    n = len(animal.poses)
-    for i, pose in mrich.track(enumerate(animal.poses), total=n):
+    n_tasks = 1
 
-        mrich.set_progress_prefix(f"{i}/{n}")
+    if not force:
+        pose_ids = animal.db.select_id_where(
+            table="pose", key="pose_fingerprint != 1", multiple=True
+        )
+    else:
+        pose_ids = animal.db.execte("SELECT pose_id FROM pose").fetchall()
 
-        try:
-            if prolif:
-                pose.calculate_prolif_interactions(force=force)
-            else:
-                pose.calculate_interactions(force=force)
+    mrich.var("#poses", len(pose_ids))
 
-        except Exception as e:
-            mrich.error(e)
-            mrich.error("Could not fingerprint pose")
-            continue
+    if n_tasks == 1:
+
+        poses = animal.poses[pose_ids]
+
+        n = len(poses)
+        for i, pose in mrich.track(enumerate(poses), total=n):
+
+            mrich.set_progress_prefix(f"{i}/{n}")
+
+            try:
+                if prolif:
+                    pose.calculate_prolif_interactions(force=force)
+                else:
+                    pose.calculate_interactions(force=force)
+
+            except Exception as e:
+                mrich.error(e)
+                mrich.error("Could not fingerprint pose")
+                continue
+
+    else:
+
+        from joblib import Parallel, delayed
+
+        poses = animal.db.get_poses(ids=pose_ids)
+
+        if prolif:
+            raise NotImplementedError(
+                "ProLIF fingerprint calculation does not support in-memory resolution"
+            )
+
+        def calculate_interactions(pose: "Pose") -> None:
+            pose.calculate_interactions(force=force)
+
+        tasks = []
+        for pose in poses:
+            tasks.append(delayed(calculate_interactions)(pose))
+
+        Parallel(verbose=100, n_jobs=n_tasks)(task for task in tasks)
 
     mrich.h3("State After")
     mrich.var("#fingerprinted", animal.poses.num_fingerprinted)
