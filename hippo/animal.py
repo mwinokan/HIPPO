@@ -1594,8 +1594,10 @@ class HIPPO:
         delete_unavailable: bool = True,
         overwrite_existing_quotes: bool = False,
         supplier_name: str = "Enamine",
+        warn_nan_orig_name: bool = True,
         currency: str = None,
         dry_run: bool = False,
+        debug: bool = False,
     ):
         """
         Load an Enamine quote provided as an excel file
@@ -1681,24 +1683,31 @@ class HIPPO:
         for i, row in generator:
             smiles = row[smiles_col]
 
+            if debug:
+                mrich.debug("smiles", smiles)
+
             if not isinstance(smiles, str):
-                break
+                if debug:
+                    mrich.debug("SKIPPING smiles!=str", smiles)
+                continue
 
             compound = self.register_compound(smiles=smiles)
 
             if orig_name_is_hippo_id:
-                try:
-                    expected_id = int(row[orig_name_col])
 
-                    if expected_id != compound.id:
-                        mrich.error("Compound registration mismatch:")
-                        mrich.var("expected_id", expected_id)
-                        mrich.var("new_id", compound.id)
-                        mrich.var("original_smiles", self.compounds[expected_id].smiles)
-                        mrich.var("new_smiles", smiles)
+                if pd.isna(row[orig_name_col]):
+                    if warn_nan_orig_name:
+                        mrich.warning(f"row {i} has NaN {orig_name_col}")
+                    continue
 
-                except ValueError:
-                    pass
+                expected_id = int(row[orig_name_col])
+
+                if expected_id != compound.id:
+                    mrich.error("Compound registration mismatch:")
+                    mrich.var("expected_id", expected_id)
+                    mrich.var("new_id", compound.id)
+                    mrich.var("original_smiles", self.compounds[expected_id].smiles)
+                    mrich.var("new_smiles", smiles)
 
             if catalogue_col and (catalogue := row[catalogue_col]) in [
                 "No starting material",
@@ -1718,6 +1727,19 @@ class HIPPO:
                 continue
 
             if (price := row[price_col]) == 0.0:
+
+                if not dry_run and delete_unavailable:
+
+                    mrich.warning(f"Deleting '{supplier_name}' quotes for", compound)
+
+                    self.db.delete_where(
+                        table="quote",
+                        key=f"quote_supplier = '{supplier_name}' AND quote_compound = {compound.id}",
+                    )
+
+                if debug:
+                    mrich.debug("Skipping NULL price", compound, i)
+
                 continue
 
             if fixed_amount is None:
@@ -1753,6 +1775,9 @@ class HIPPO:
                 smiles=smiles,
             )
 
+            if debug:
+                mrich.print(quote_data)
+
             if dry_run:
                 mrich.warning("Dry-run, stopping before any database modifications")
                 return quote_data
@@ -1764,6 +1789,9 @@ class HIPPO:
                 )
 
             q_id = self.db.insert_quote(**quote_data)
+
+            if debug:
+                mrich.debug("inserted quote", q_id)
 
             ingredients.add(
                 compound_id=compound.id,
