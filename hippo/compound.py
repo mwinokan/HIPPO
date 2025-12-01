@@ -478,7 +478,9 @@ class Compound:
             suitable_quotes = [q for q in quotes if q.amount >= min_amount]
 
             if not suitable_quotes:
-                mrich.debug(f"No quote available with amount >= {min_amount} mg")
+                mrich.debug(
+                    f"No quote available for C{self.id} with amount >= {min_amount} mg. Estimating price..."
+                )
                 quotes = [Quote.combination(min_amount, quotes)]
 
             else:

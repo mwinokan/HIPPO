@@ -66,6 +66,7 @@ class Quote:
         cls,
         required_amount: float,
         quotes: list["Quote"],
+        debug: bool = False,
     ) -> "Quote":
         """Combine a list of quotes into one :class:`.Quote` object.
 
@@ -81,8 +82,7 @@ class Quote:
         unit_price = biggest_pack.price / biggest_pack.amount
         estimated_price = unit_price * required_amount
 
-        self = cls.__new__(cls)
-        self.__init__(
+        quote_data = dict(
             db=biggest_pack.db,
             id=None,
             compound=biggest_pack.compound,
@@ -98,6 +98,19 @@ class Quote:
             date=biggest_pack.date,
             type=f"estimate from quote={biggest_pack.id}",
         )
+
+        if debug:
+            mrich.debug(f"Quote.combination()")
+            mrich.debug(f"{required_amount=}")
+            for quote in quotes:
+                mrich.debug(quote)
+            mrich.debug(f"{biggest_pack=}")
+            mrich.debug(f"{unit_price=}")
+            mrich.debug(f"{estimated_price=}")
+            mrich.print(quote_data)
+
+        self = cls.__new__(cls)
+        self.__init__(**quote_data)
 
         return self
 
