@@ -90,7 +90,7 @@ def calculate_interactions(
     prolif: bool = False,
     backup: bool = True,
     force: bool = False,
-    #n_tasks: int = 1,
+    # n_tasks: int = 1,
 ) -> None:
     """Calculate interactions for all poses"""
 
@@ -117,6 +117,8 @@ def calculate_interactions(
         )
     else:
         pose_ids = animal.db.execte("SELECT pose_id FROM pose").fetchall()
+
+    pose_ids = [i for i, in pose_ids]
 
     mrich.var("#poses", len(pose_ids))
 
