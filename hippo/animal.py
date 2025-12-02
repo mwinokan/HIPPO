@@ -73,20 +73,16 @@ class HIPPO:
 
             mrich.var("db_path", db_path, color="file")
 
-            self._db_path = db_path
-
             if copy_from:
                 self._db = Database.copy_from(
                     source=copy_from,
-                    destination=self.db_path,
+                    destination=db_path,
                     animal=self,
                     update_legacy=update_legacy,
                     overwrite_existing=overwrite_existing,
                 )
             else:
-                self._db = Database(
-                    self.db_path, animal=self, update_legacy=update_legacy
-                )
+                self._db = Database(db_path, animal=self, update_legacy=update_legacy)
 
         self._compounds = CompoundTable(self.db)
         self._poses = PoseTable(self.db)

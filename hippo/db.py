@@ -120,7 +120,7 @@ class Database:
         self._cursor = None
         self._animal = animal
         self._auto_compute_bfps = auto_compute_bfps
-        self._engine = "sqlite"
+        self._engine = "sqlite3"
 
         if debug:
             mrich.debug(f"Database.path = {self.path}")
