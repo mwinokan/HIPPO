@@ -59,7 +59,8 @@ class Database:
 
     ERROR_UNIQUE_VIOLATION = sqlite3.IntegrityError
 
-    SQL_CREATE_TABLE_COMPOUND = """CREATE TABLE compound(
+    SQL_CREATE_TABLE_COMPOUND = """
+    CREATE TABLE compound(
         compound_id INTEGER PRIMARY KEY,
         compound_inchikey TEXT,
         compound_alias TEXT,
@@ -76,7 +77,8 @@ class Database:
     );
     """
 
-    SQL_CREATE_TABLE_POSE = """CREATE TABLE pose(
+    SQL_CREATE_TABLE_POSE = """
+    CREATE TABLE pose(
         pose_id INTEGER PRIMARY KEY,
         pose_inchikey TEXT,
         pose_alias TEXT,
@@ -95,6 +97,25 @@ class Database:
         CONSTRAINT UC_pose_alias UNIQUE (pose_alias)
         CONSTRAINT UC_pose_path UNIQUE (pose_path)
     );
+    """
+
+    SQL_INSERT_COMPOUND = """
+    INSERT INTO compound(
+        compound_inchikey, 
+        compound_smiles, 
+        compound_mol, 
+        compound_pattern_bfp, 
+        compound_morgan_bfp, 
+        compound_alias
+    )
+    VALUES(
+        :inchikey, 
+        :smiles, 
+        mol_from_smiles(:smiles), 
+        mol_pattern_bfp(mol_from_smiles(:smiles), 2048), 
+        mol_morgan_bfp(mol_from_smiles(:smiles), 2, 2048), 
+        :alias
+    )
     """
 
     def __init__(
@@ -461,6 +482,10 @@ class Database:
         # self.connection.rollback()
         pass
 
+    def get_lastrowid(self) -> int:
+        """Get ID of last inserted row"""
+        return self.cursor.lastrowid
+
     ### CREATE TABLES
 
     def create_blank_db(self) -> None:
@@ -767,47 +792,41 @@ class Database:
         # generate the inchikey name
         inchikey = inchikey or inchikey_from_smiles(smiles)
 
-        sql = """
-        INSERT INTO compound(
-            compound_inchikey, 
-            compound_smiles, 
-            compound_mol, 
-            compound_pattern_bfp, 
-            compound_morgan_bfp, 
-            compound_alias
-        )
-        VALUES(
-            ?1, 
-            ?2, 
-            mol_from_smiles(?2), 
-            mol_pattern_bfp(mol_from_smiles(?2), 2048), 
-            mol_morgan_bfp(mol_from_smiles(?2), 2, 2048), 
-            ?3
-        )
-        """
-
         try:
-            self.execute(sql, (inchikey, smiles, alias))
+            self.execute(
+                self.SQL_INSERT_COMPOUND,
+                dict(inchikey=inchikey, smiles=smiles, alias=alias),
+            )
 
         except self.ERROR_UNIQUE_VIOLATION as e:
-            if "UNIQUE constraint failed: compound.compound_inchikey" in str(e):
-                if warn_duplicate:
-                    mrich.warning(
-                        f'Skipping compound with existing inchikey "{inchikey}"'
-                    )
-            elif "UNIQUE constraint failed: compound.compound_smiles" in str(e):
-                if warn_duplicate:
-                    mrich.warning(f'Skipping compound with existing smiles "{smiles}"')
-            elif "UNIQUE constraint failed: compound.compound_pattern_bfp" in str(e):
-                if warn_duplicate:
-                    mrich.warning(
-                        f'Skipping compound with existing pattern binary fingerprint "{smiles}"'
-                    )
-            elif "UNIQUE constraint failed: compound.compound_morgan_bfp" in str(e):
-                if warn_duplicate:
-                    mrich.warning(
-                        f'Skipping compound with existing morgan binary fingerprint "{smiles}"'
-                    )
+
+            constraints = [
+                "compound_inchikey",
+                "compound_smiles",
+                "compound_pattern_bfp",
+                "compound_morgan_bfp",
+            ]
+
+            message = str(e)
+
+            for constraint in constraints:
+
+                match self.engine:
+                    case "sqlite3":
+                        test_str = f"UNIQUE constraint failed: compound.{constraint}"
+                    case "psycopg":
+                        test_str = f'duplicate key value violates unique constraint "uc_{constraint}"'
+                    case _:
+                        raise NotImplementedError
+
+                if test_str in message:
+                    if warn_duplicate:
+                        mrich.warning(
+                            f"Skipping compound with duplicate {constraint}, {smiles=}"
+                        )
+                    self.rollback()
+                    return None
+
             else:
                 mrich.error(e)
 
@@ -816,7 +835,8 @@ class Database:
         except Exception as e:
             mrich.error(e)
 
-        compound_id = self.cursor.lastrowid
+        compound_id = self.get_lastrowid()
+
         if commit:
             self.commit()
 
@@ -934,7 +954,7 @@ class Database:
                 mrich.error(f"Path cannot be resolved: {mcol.file}{path}")
                 raise
 
-        sql = """
+        sql = f"""
         INSERT INTO pose(
             pose_inchikey, 
             pose_alias, 
@@ -946,7 +966,18 @@ class Database:
             pose_energy_score, 
             pose_distance_score
         )
-        VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+        VALUES(
+            {self.SQL_STRING_PLACEHOLDER}, 
+            {self.SQL_STRING_PLACEHOLDER}, 
+            {self.SQL_STRING_PLACEHOLDER}, 
+            {self.SQL_STRING_PLACEHOLDER}, 
+            {self.SQL_STRING_PLACEHOLDER}, 
+            {self.SQL_STRING_PLACEHOLDER}, 
+            {self.SQL_STRING_PLACEHOLDER}, 
+            {self.SQL_STRING_PLACEHOLDER}, 
+            {self.SQL_STRING_PLACEHOLDER}
+        )
+        {self.sql_return_id_str('pose')}
         """
 
         try:
@@ -966,23 +997,43 @@ class Database:
             )
 
         except self.ERROR_UNIQUE_VIOLATION as e:
-            if "UNIQUE constraint failed: pose.pose_path" in str(e):
-                if warn_duplicate:
-                    mrich.warning(f'Could not insert pose with duplicate path "{path}"')
-            elif "UNIQUE constraint failed: pose.pose_alias" in str(e):
-                if warn_duplicate:
-                    mrich.warning(
-                        f'Could not insert pose with duplicate alias "{alias}"'
-                    )
+
+            constraints = [
+                "pose_path",
+                "pose_alias",
+            ]
+
+            message = str(e)
+
+            for constraint in constraints:
+
+                match self.engine:
+                    case "sqlite3":
+                        test_str = f"UNIQUE constraint failed: pose.{constraint}"
+                    case "psycopg":
+                        test_str = f'duplicate key value violates unique constraint "uc_{constraint}"'
+                    case _:
+                        raise NotImplementedError
+
+                if test_str in message:
+                    if warn_duplicate:
+                        mrich.warning(
+                            f"Skipping pose with duplicate {constraint}, {alias=}, {path=}"
+                        )
+                    self.rollback()
+                    return None
+
             else:
                 mrich.error(e)
+
             return None
 
         except Exception as e:
             mrich.error(e)
             raise
 
-        pose_id = self.cursor.lastrowid
+        pose_id = self.get_lastrowid()
+
         if commit:
             self.commit()
 
@@ -1004,7 +1055,7 @@ class Database:
         compound: int = None,
         pose: int = None,
         commit: bool = True,
-    ) -> int:
+    ) -> None:
         """Insert an entry into the tag table.
 
         .. attention::
@@ -1014,17 +1065,15 @@ class Database:
         :param compound: associated :class:`.Compound` ID
         :param pose: associated :class:`.Pose` ID
         :param commit: commit the changes to the database (Default value = True)
-        :returns: the tag ID
-
         """
 
         assert bool(compound) ^ bool(
             pose
         ), "Exactly one of compound or pose arguments must have a value"
 
-        sql = """
+        sql = f"""
         INSERT INTO tag(tag_name, tag_compound, tag_pose)
-        VALUES(?1, ?2, ?3)
+        VALUES({self.SQL_STRING_PLACEHOLDER}, {self.SQL_STRING_PLACEHOLDER}, {self.SQL_STRING_PLACEHOLDER})
         """
 
         try:
@@ -1036,10 +1085,8 @@ class Database:
         except Exception as e:
             mrich.error(e)
 
-        tag_id = self.cursor.lastrowid
         if commit:
             self.commit()
-        return tag_id
 
     def insert_inspiration(
         self,
@@ -1377,11 +1424,7 @@ class Database:
             mrich.error(e)
             raise
 
-        match self.engine:
-            case "sqlite3":
-                target_id = self.cursor.lastrowid
-            case "psycopg":
-                target_id = self.cursor.fetchone()[0]
+        target_id = self.get_lastrowid()
 
         self.commit()
         return target_id
@@ -2112,19 +2155,23 @@ class Database:
 
         sql = f"""
         UPDATE {table}
-        SET {key} = ?
+        SET {key} = {self.SQL_STRING_PLACEHOLDER}
         WHERE {table}_id = {id};
+        {self.sql_return_id_str}
         """
 
         try:
             self.execute(sql, (value,))
-        except sqlite3.OperationalError as e:
+        except self.ERROR_UNIQUE_VIOLATION as e:
             mrich.var("sql", sql)
+            self.rollback()
             raise
 
-        id = self.cursor.lastrowid
+        id = self.get_lastrowid()
+
         if commit:
             self.commit()
+
         return id
 
     def update_all(

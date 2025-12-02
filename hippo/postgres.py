@@ -60,6 +60,26 @@ class PostgresDatabase(Database):
     );
     """
 
+    SQL_INSERT_COMPOUND = """
+    INSERT INTO compound(
+        compound_inchikey, 
+        compound_smiles, 
+        -- compound_mol, 
+        -- compound_pattern_bfp, 
+        -- compound_morgan_bfp, 
+        compound_alias
+    )
+    VALUES(
+        %(inchikey)s, 
+        %(smiles)s, 
+        -- mol_from_smiles(%(smiles)s), 
+        -- mol_pattern_bfp(mol_from_smiles(%(smiles)s), 2048), 
+        -- mol_morgan_bfp(mol_from_smiles(%(smiles)s), 2, 2048), 
+        %(alias)s
+    )
+    RETURNING compound_id;
+    """
+
     def __init__(
         self,
         animal: "HIPPO",
@@ -68,7 +88,7 @@ class PostgresDatabase(Database):
         host: str = "localhost",
         port: int = 5432,
         update_legacy: bool = False,
-        auto_compute_bfps: bool = True,
+        auto_compute_bfps: bool = False,
         create_blank: bool = True,
         check_legacy: bool = False,
         debug: bool = True,
@@ -157,6 +177,12 @@ class PostgresDatabase(Database):
         ).fetchall()
         return [n for n, in results]
 
+    @property
+    def total_changes(self) -> int:
+        """Return the current transaction ID as a proxy of sqlite's total_changes."""
+        cursor = self.execute("SELECT txid_current()")
+        return cursor.fetchone()[0]
+
     ### GENERAL SQL
 
     def connect(self, debug: bool = True) -> None:
@@ -211,8 +237,8 @@ class PostgresDatabase(Database):
         #     else:
         #         raise
         except Exception as e:
-            mrich.print(sql)
-            mrich.print(payload)
+            # mrich.print(sql)
+            # mrich.print(payload)
             raise
 
     def rollback(self) -> None:
@@ -222,6 +248,10 @@ class PostgresDatabase(Database):
     def sql_return_id_str(self, key: str) -> str:
         """Add this to SQL queries to return the entry primary key"""
         return f"RETURNING {key}_id"
+
+    def get_lastrowid(self) -> int:
+        """Get ID of last inserted row"""
+        return self.cursor.fetchone()[0]
 
     ### CREATE TABLES
 
