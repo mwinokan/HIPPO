@@ -399,7 +399,12 @@ class Database:
         self._cursor = conn.cursor()
 
     def execute(
-        self, sql, payload=None, *, retry: float | None = 1, debug: bool = False
+        self,
+        sql: str,
+        payload: tuple | list | dict | None = None,
+        *,
+        retry: float | None = 1,
+        debug: bool = False,
     ):
         """Execute arbitrary SQL with retry if database is locked."""
         if debug:
@@ -2157,7 +2162,7 @@ class Database:
         UPDATE {table}
         SET {key} = {self.SQL_STRING_PLACEHOLDER}
         WHERE {table}_id = {id};
-        {self.sql_return_id_str}
+        {self.sql_return_id_str(table)}
         """
 
         try:
