@@ -6,6 +6,7 @@ STACK = "production"
 DB = dict(
     username="postgres",
     password="hippo",
+    host="localhost",
     port=5432,
 )
 
@@ -23,7 +24,7 @@ SUBSITES = True
 ## CONFIGURE CLEANUP
 
 CLEANUP_FILES = [
-    DB,
+    # DB,
     # f"{TARGET}.tar.gz",
 ]
 

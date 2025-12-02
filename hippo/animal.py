@@ -10,7 +10,6 @@ from pathlib import Path
 from rdkit.Chem import Mol
 
 from .pose import Pose
-from .db import Database
 from .tags import TagTable
 from .target import Target
 from .compound import Compound
@@ -43,7 +42,7 @@ class HIPPO:
     def __init__(
         self,
         name: str,
-        db_path: str | Path,
+        db: str | Path | dict,
         copy_from: str | Path | None = None,
         overwrite_existing: bool = False,
         update_legacy: bool = False,
@@ -56,23 +55,38 @@ class HIPPO:
 
         mrich.var("name", name, color="arg")
 
-        if not isinstance(db_path, Path):
-            db_path = Path(db_path)
+        if isinstance(db, dict):
 
-        mrich.var("db_path", db_path, color="file")
+            ### POSTGRES
 
-        self._db_path = db_path
+            from .db import PostgresDatabase
 
-        if copy_from:
-            self._db = Database.copy_from(
-                source=copy_from,
-                destination=self.db_path,
-                animal=self,
-                update_legacy=update_legacy,
-                overwrite_existing=overwrite_existing,
-            )
-        else:
-            self._db = Database(self.db_path, animal=self, update_legacy=update_legacy)
+            self._db = PostgresDatabase(animal=self, **db)
+
+        elif not isinstance(db, Path):
+
+            ### INITIALISE SQLITE DATABASE
+
+            from .db import Database
+
+            db_path = Path(db)
+
+            mrich.var("db_path", db_path, color="file")
+
+            self._db_path = db_path
+
+            if copy_from:
+                self._db = Database.copy_from(
+                    source=copy_from,
+                    destination=self.db_path,
+                    animal=self,
+                    update_legacy=update_legacy,
+                    overwrite_existing=overwrite_existing,
+                )
+            else:
+                self._db = Database(
+                    self.db_path, animal=self, update_legacy=update_legacy
+                )
 
         self._compounds = CompoundTable(self.db)
         self._poses = PoseTable(self.db)
@@ -101,10 +115,10 @@ class HIPPO:
     @property
     def db_path(self) -> str:
         """Returns the database path"""
-        return self._db_path
+        return self.db.path
 
     @property
-    def db(self) -> Database:
+    def db(self) -> "Database":
         """Returns the Database object"""
         return self._db
 

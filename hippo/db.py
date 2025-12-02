@@ -105,8 +105,12 @@ class Database:
         if not check_legacy:
             return
 
+        self.check_schema(update=update_legacy)
+
+    def check_schema(self, update: bool = False):
+
         if "interaction" not in self.table_names:
-            if not update_legacy:
+            if not update:
                 mrich.error("This is a legacy format database (hippo-db < 0.3.23)")
                 mrich.error("Existing fingerprints will not be compatible")
                 mrich.error("Re-initialise HIPPO object with update_legacy=True to fix")
@@ -123,7 +127,7 @@ class Database:
             self.create_table_subsite_tag()
 
         if "scaffold" not in self.table_names:
-            if not update_legacy:
+            if not update:
                 mrich.error("This is a legacy format database (hippo-db < 0.3.25)")
                 mrich.error("Existing base-elab relationships will not be compatible")
                 mrich.error("Re-initialise HIPPO object with update_legacy=True to fix")
@@ -139,7 +143,7 @@ class Database:
             self.create_table_component()
 
         elif "component_amount" not in self.column_names("component"):
-            if not update_legacy:
+            if not update:
                 mrich.error("This is a legacy format database (hippo-db < 0.3.29)")
                 mrich.error("Re-initialise HIPPO object with update_legacy=True to fix")
                 raise LegacyDatabaseError("hippo-db < 0.3.29")
@@ -150,7 +154,7 @@ class Database:
             self.update_legacy_routes()
 
         if "reaction_metadata" not in self.column_names("reaction"):
-            if not update_legacy:
+            if not update:
                 mrich.error("This is a legacy format database (hippo-db < 0.3.32)")
                 mrich.error("Re-initialise HIPPO object with update_legacy=True to fix")
                 raise LegacyDatabaseError("hippo-db < 0.3.32")
@@ -161,7 +165,7 @@ class Database:
             self.update_legacy_reaction_metadata()
 
         if "pose_inspiration_score" not in self.column_names("pose"):
-            if not update_legacy:
+            if not update:
                 mrich.error("This is a legacy format database (hippo-db < 0.3.36)")
                 mrich.error("Re-initialise HIPPO object with update_legacy=True to fix")
                 raise LegacyDatabaseError("hippo-db < 0.3.36")
@@ -406,10 +410,10 @@ class Database:
 
         with mrich.loading("Creating blank database..."):
             self.create_table_compound()
+            self.create_table_pose()
             self.create_table_inspiration()
             self.create_table_reaction()
             self.create_table_reactant()
-            self.create_table_pose()
             self.create_table_tag()
             self.create_table_quote()
             self.create_table_target()
@@ -532,10 +536,6 @@ class Database:
         );
         """
 
-        ### snippet to convert python metadata dictionary with JSON
-        # json.dumps(variables).encode('utf-8')
-        # json.loads(s.decode('utf-8'))
-
         self.execute(sql)
 
     def create_table_tag(self) -> None:
@@ -548,7 +548,7 @@ class Database:
             tag_pose INTEGER,
             FOREIGN KEY (tag_compound) REFERENCES compound(compound_id),
             FOREIGN KEY (tag_pose) REFERENCES pose(pose_id),
-            CONSTRAINT UC_tag_compound UNIQUE (tag_name, tag_compound)
+            CONSTRAINT UC_tag_compound UNIQUE (tag_name, tag_compound),
             CONSTRAINT UC_tag_pose UNIQUE (tag_name, tag_pose)
         );
         """
@@ -4941,12 +4941,205 @@ class PostgresDatabase(Database):
 
     def __init__(
         self,
-        postgres_user: str,
-        postgres_password: str,
-        postgres_db: str,
+        animal: "HIPPO",
+        username: str,
+        password: str,
+        host: str = "localhost",
+        port: int = 5432,
+        update_legacy: bool = False,
+        auto_compute_bfps: bool = True,
+        create_blank: bool = True,
+        check_legacy: bool = False,
+        debug: bool = True,
     ) -> None:
+        """PostgresDatabase initialisation"""
 
-        raise NotImplementedError
+        assert isinstance(username, str)
+        assert isinstance(password, str)
+        assert isinstance(port, int)
+
+        if debug:
+            mrich.debug("hippo.PostgresDatabase.__init__()")
+
+        self._username = username
+        self._password = password
+        self._port = port
+        self._host = host
+
+        self._connection = None
+        self._cursor = None
+        self._animal = animal
+        self._auto_compute_bfps = auto_compute_bfps
+
+        if debug:
+            mrich.debug(f"PostgresDatabase.username = {self.username}")
+            mrich.debug(f"PostgresDatabase.password = {self.password}")
+            mrich.debug(f"PostgresDatabase.host = {self.host}")
+            mrich.debug(f"PostgresDatabase.port = {self.port}")
+
+        self.connect()
+
+        if not self.table_names:
+
+            if create_blank:
+                self.create_blank_db()
+            else:
+                mrich.error("Database is empty!", self.path)
+                raise ValueError(
+                    "Database is empty! Check connection or run with create_blank=True"
+                )
+
+        if not check_legacy:
+            return
+
+        self.check_schema(update=update_legacy)
+
+    ### PROPERTIES
+
+    @property
+    def path(self) -> None:
+        """PostgresDatabase path"""
+        # raise NotImplementedError("PostgresDatabase has no path")
+        return f"postgresql://{self.username}:{self.password}@{self.host}:{self.port}"
+
+    @property
+    def username(self) -> str:
+        """PostgresDatabase username"""
+        return self._username
+
+    @property
+    def password(self) -> str:
+        """PostgresDatabase password"""
+        return self._password
+
+    @property
+    def host(self) -> str:
+        """PostgresDatabase host"""
+        return self._host
+
+    @property
+    def port(self) -> int:
+        """PostgresDatabase port"""
+        return self._port
+
+    @property
+    def table_names(self) -> list[str]:
+        """List of all the table names in the database"""
+        results = self.execute(
+            """
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+            AND table_type = 'BASE TABLE';
+        """
+        ).fetchall()
+        return [n for n, in results]
+
+    ### GENERAL SQL
+
+    def connect(self, debug: bool = True) -> None:
+        """Connect to the database"""
+
+        if debug:
+            mrich.debug("hippo.PostgresDatabase.connect()")
+
+        conn = None
+
+        import psycopg
+
+        try:
+            conn = psycopg.connect(
+                user=self.username,
+                host=self.host,
+                password=self.password,
+                port=self.port,
+            )
+
+        except Exception as e:
+            mrich.error("Could not connect to", self.path)
+            mrich.error(e)
+            raise
+
+        self._connection = conn
+        self._cursor = conn.cursor()
+
+    ### CREATE TABLES
+
+    def create_table_compound(self) -> None:
+        """Create the compound table"""
+        mrich.debug("HIPPO.PostgresDatabase.create_table_compound()")
+        mrich.warning(
+            "HIPPO.PostgresDatabase.create_table_pattern_bfp(): NotImplemented(MOL)"
+        )
+
+        sql = """CREATE TABLE compound(
+            compound_id INTEGER PRIMARY KEY,
+            compound_inchikey TEXT,
+            compound_alias TEXT,
+            compound_smiles TEXT,
+            compound_base INTEGER,
+            -- compound_mol MOL,
+            compound_pattern_bfp bit(2048),
+            compound_morgan_bfp bit(2048),
+            compound_metadata TEXT,
+            FOREIGN KEY (compound_base) REFERENCES compound(compound_id),
+            CONSTRAINT UC_compound_inchikey UNIQUE (compound_inchikey),
+            CONSTRAINT UC_compound_alias UNIQUE (compound_alias),
+            CONSTRAINT UC_compound_smiles UNIQUE (compound_smiles)
+        );
+        """
+        self.execute(sql)
+
+    def create_table_pose(self) -> None:
+        """Create the pose table"""
+        mrich.debug("HIPPO.PostgresDatabase.create_table_pose()")
+        mrich.warning(
+            "HIPPO.PostgresDatabase.create_table_pattern_bfp(): NotImplemented(MOL)"
+        )
+
+        sql = """CREATE TABLE pose(
+            pose_id INTEGER PRIMARY KEY,
+            pose_inchikey TEXT,
+            pose_alias TEXT,
+            pose_smiles TEXT,
+            pose_reference INTEGER,
+            pose_path TEXT,
+            pose_compound INTEGER,
+            pose_target INTEGER,
+            -- pose_mol BLOB,
+            pose_fingerprint INTEGER,
+            pose_energy_score REAL,
+            pose_distance_score REAL,
+            pose_inspiration_score REAL,
+            pose_metadata TEXT,
+            FOREIGN KEY (pose_compound) REFERENCES compound(compound_id),
+            CONSTRAINT UC_pose_alias UNIQUE (pose_alias),
+            CONSTRAINT UC_pose_path UNIQUE (pose_path)
+        );
+        """
+
+        self.execute(sql)
+
+    def create_table_pattern_bfp(self) -> None:
+        """Create the pattern_bfp table"""
+        mrich.warning(
+            "HIPPO.PostgresDatabase.create_table_pattern_bfp(): NotImplemented"
+        )
+
+        return
+
+        mrich.debug("HIPPO.PostgresDatabase.create_table_pattern_bfp()")
+
+        sql = """
+        CREATE VIRTUAL TABLE compound_pattern_bfp 
+        USING rdtree(compound_id, fp bits(2048))
+        """
+
+        self.execute(sql)
+
+    ### METHODS
+
+    ### DUNDERS
 
 
 class LegacyDatabaseError(Exception):

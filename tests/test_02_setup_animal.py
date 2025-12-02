@@ -12,7 +12,8 @@ def test_setup_animal():
     animal = hippo.HIPPO("test", DB)
     animal.summary()
 
-    assert Path(DB).exists()
+    if isinstance(DB, str):
+        assert Path(DB).exists()
 
     animal.db.close()
 
