@@ -154,6 +154,7 @@ def calculate_interactions(
             )
 
         def calculate_interactions(pose: "Pose") -> None:
+            """Joblib wrapper for the calculation"""
             pose.calculate_interactions(force=force)
 
         tasks = []
