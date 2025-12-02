@@ -97,6 +97,7 @@ N.B. the numbered tests, e.g. `test_00_cleanup.py` need to run in sequential ord
 
 - [HIPPO/main](https://github.com/mwinokan/HIPPO/tree/main): latest stable version
 - [HIPPO/dev](https://github.com/mwinokan/HIPPO/tree/dev): @mwinokan's development branch
+- [HIPPO/postgres](https://github.com/mwinokan/HIPPO/tree/dev): @mwinokan's PostgreSQL development branch
 - [HIPPO/django_lean](https://github.com/mwinokan/HIPPO/tree/django_lean): An experimental branch implementing HIPPO as a Django web-app
 
 </details>
