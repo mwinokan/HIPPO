@@ -2,13 +2,19 @@
 TARGET = "SARS2_Nprot"
 PROPOSAL = "lb32627-93"
 STACK = "production"
-DB = "db_test.sqlite"
+
+DB = dict(
+    username="postgres",
+    password="hippo",
+    port=5432,
+)
+
 TARGET = "SARS2_Nprot"
 
 ## DISABLE TESTS
 
 CLEANUP = True
-DOWNLOAD = True
+DOWNLOAD = False
 SETUP = True
 ADD_HITS = True
 SCAFFOLDS = True
@@ -18,9 +24,9 @@ SUBSITES = True
 
 CLEANUP_FILES = [
     DB,
-    f"{TARGET}.tar.gz",
+    # f"{TARGET}.tar.gz",
 ]
 
 CLEANUP_DIRS = [
-    TARGET,
+    # TARGET,
 ]

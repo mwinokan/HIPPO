@@ -99,4 +99,30 @@ N.B. the numbered tests, e.g. `test_00_cleanup.py` need to run in sequential ord
 - [HIPPO/dev](https://github.com/mwinokan/HIPPO/tree/dev): @mwinokan's development branch
 - [HIPPO/django_lean](https://github.com/mwinokan/HIPPO/tree/django_lean): An experimental branch implementing HIPPO as a Django web-app
 
+### Local Postgres development (Mac)
+
+Install via homebrew
+
+```
+brew install postgresql@18
+```
+
+Initialise database
+
+```
+/opt/homebrew/opt/postgresql@18/bin/initdb -D /opt/homebrew/var/postgresql@18 -U postgres -W
+```
+
+Run in foreground
+
+```
+/opt/homebrew/opt/postgresql@18/bin/postgres -D /opt/homebrew/var/postgresql@18
+```
+
+Install psycopg
+
+```
+pip install psycopg[binary]
+```
+
 </details>

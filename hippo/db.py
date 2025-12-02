@@ -4930,6 +4930,25 @@ class Database:
         return f"[bold underline]{self}"
 
 
+class PostgresDatabase(Database):
+    """Wrapper to connect to a HIPPO Postgres database.
+
+    .. attention::
+
+            :class:`.PostGresDatabase` objects should not be created directly. Instead use the methods in :class:`.HIPPO` to interact with data in the database. See :doc:`getting_started` and :doc:`insert_elaborations`.
+
+    """
+
+    def __init__(
+        self,
+        postgres_user: str,
+        postgres_password: str,
+        postgres_db: str,
+    ) -> None:
+
+        raise NotImplementedError
+
+
 class LegacyDatabaseError(Exception):
     """This database is in a legacy format"""
 
