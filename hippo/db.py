@@ -54,6 +54,49 @@ class Database:
 
     """
 
+    SQL_STRING_PLACEHOLDER = "?"
+    SQL_PK_DATATYPE = "INTEGER"
+
+    ERROR_UNIQUE_VIOLATION = sqlite3.IntegrityError
+
+    SQL_CREATE_TABLE_COMPOUND = """CREATE TABLE compound(
+        compound_id INTEGER PRIMARY KEY,
+        compound_inchikey TEXT,
+        compound_alias TEXT,
+        compound_smiles TEXT,
+        compound_base INTEGER,
+        compound_mol MOL,
+        compound_pattern_bfp bits(2048),
+        compound_morgan_bfp bits(2048),
+        compound_metadata TEXT,
+        FOREIGN KEY (compound_base) REFERENCES compound(compound_id),
+        CONSTRAINT UC_compound_inchikey UNIQUE (compound_inchikey)
+        CONSTRAINT UC_compound_alias UNIQUE (compound_alias)
+        CONSTRAINT UC_compound_smiles UNIQUE (compound_smiles)
+    );
+    """
+
+    SQL_CREATE_TABLE_POSE = """CREATE TABLE pose(
+        pose_id INTEGER PRIMARY KEY,
+        pose_inchikey TEXT,
+        pose_alias TEXT,
+        pose_smiles TEXT,
+        pose_reference INTEGER,
+        pose_path TEXT,
+        pose_compound INTEGER,
+        pose_target INTEGER,
+        pose_mol BLOB,
+        pose_fingerprint BLOB,
+        pose_energy_score REAL,
+        pose_distance_score REAL,
+        pose_inspiration_score REAL,
+        pose_metadata TEXT,
+        FOREIGN KEY (pose_compound) REFERENCES compound(compound_id),
+        CONSTRAINT UC_pose_alias UNIQUE (pose_alias)
+        CONSTRAINT UC_pose_path UNIQUE (pose_path)
+    );
+    """
+
     def __init__(
         self,
         path: Path,
@@ -77,6 +120,7 @@ class Database:
         self._cursor = None
         self._animal = animal
         self._auto_compute_bfps = auto_compute_bfps
+        self._engine = "sqlite"
 
         if debug:
             mrich.debug(f"Database.path = {self.path}")
@@ -224,6 +268,11 @@ class Database:
     def path(self) -> Path:
         """Returns the path to the database file"""
         return self._path
+
+    @property
+    def engine(self) -> str:
+        """Returns the Database engine"""
+        return self._engine
 
     @property
     def in_memory(self) -> bool:
@@ -403,6 +452,11 @@ class Database:
             else:
                 raise
 
+    def rollback(self) -> None:
+        """rollback (not relevant for sqlite)"""
+        # self.connection.rollback()
+        pass
+
     ### CREATE TABLES
 
     def create_blank_db(self) -> None:
@@ -431,22 +485,8 @@ class Database:
         """Create the compound table"""
         mrich.debug("HIPPO.Database.create_table_compound()")
 
-        sql = """CREATE TABLE compound(
-            compound_id INTEGER PRIMARY KEY,
-            compound_inchikey TEXT,
-            compound_alias TEXT,
-            compound_smiles TEXT,
-            compound_base INTEGER,
-            compound_mol MOL,
-            compound_pattern_bfp bits(2048),
-            compound_morgan_bfp bits(2048),
-            compound_metadata TEXT,
-            FOREIGN KEY (compound_base) REFERENCES compound(compound_id),
-            CONSTRAINT UC_compound_inchikey UNIQUE (compound_inchikey)
-            CONSTRAINT UC_compound_alias UNIQUE (compound_alias)
-            CONSTRAINT UC_compound_smiles UNIQUE (compound_smiles)
-        );
-        """
+        sql = self.SQL_CREATE_TABLE_COMPOUND
+
         self.execute(sql)
 
     def create_table_inspiration(self) -> None:
@@ -483,8 +523,8 @@ class Database:
         """Create the reaction table"""
         mrich.debug("HIPPO.Database.create_table_reaction()")
 
-        sql = """CREATE TABLE reaction(
-            reaction_id INTEGER PRIMARY KEY,
+        sql = f"""CREATE TABLE reaction(
+            reaction_id {self.SQL_PK_DATATYPE} PRIMARY KEY,
             reaction_type TEXT,
             reaction_product INTEGER,
             reaction_product_yield REAL,
@@ -515,26 +555,7 @@ class Database:
         """Create the pose table"""
         mrich.debug("HIPPO.Database.create_table_pose()")
 
-        sql = """CREATE TABLE pose(
-            pose_id INTEGER PRIMARY KEY,
-            pose_inchikey TEXT,
-            pose_alias TEXT,
-            pose_smiles TEXT,
-            pose_reference INTEGER,
-            pose_path TEXT,
-            pose_compound INTEGER,
-            pose_target INTEGER,
-            pose_mol BLOB,
-            pose_fingerprint BLOB,
-            pose_energy_score REAL,
-            pose_distance_score REAL,
-            pose_inspiration_score REAL,
-            pose_metadata TEXT,
-            FOREIGN KEY (pose_compound) REFERENCES compound(compound_id),
-            CONSTRAINT UC_pose_alias UNIQUE (pose_alias)
-            CONSTRAINT UC_pose_path UNIQUE (pose_path)
-        );
-        """
+        sql = self.SQL_CREATE_TABLE_POSE
 
         self.execute(sql)
 
@@ -559,8 +580,8 @@ class Database:
         """Create the quote table"""
         mrich.debug("HIPPO.Database.create_table_quote()")
 
-        sql = """CREATE TABLE quote(
-            quote_id INTEGER PRIMARY KEY,
+        sql = f"""CREATE TABLE quote(
+            quote_id {self.SQL_PK_DATATYPE} PRIMARY KEY,
             quote_smiles TEXT,
             quote_amount REAL,
             quote_supplier TEXT,
@@ -582,8 +603,8 @@ class Database:
     def create_table_target(self) -> None:
         """Create the target table"""
         mrich.debug("HIPPO.Database.create_table_target()")
-        sql = """CREATE TABLE target(
-            target_id INTEGER PRIMARY KEY,
+        sql = f"""CREATE TABLE target(
+            target_id {self.SQL_PK_DATATYPE} PRIMARY KEY,
             target_name TEXT,
             target_metadata TEXT,
             CONSTRAINT UC_target UNIQUE (target_name)
@@ -595,8 +616,8 @@ class Database:
     def create_table_feature(self) -> None:
         """Create the feature table"""
         mrich.debug("HIPPO.Database.create_table_feature()")
-        sql = """CREATE TABLE feature(
-            feature_id INTEGER PRIMARY KEY,
+        sql = f"""CREATE TABLE feature(
+            feature_id {self.SQL_PK_DATATYPE} PRIMARY KEY,
             feature_family TEXT,
             feature_target INTEGER,
             feature_chain_name TEXT,
@@ -612,8 +633,8 @@ class Database:
     def create_table_route(self) -> None:
         """Create the route table"""
         mrich.debug("HIPPO.Database.create_table_route()")
-        sql = """CREATE TABLE route(
-            route_id INTEGER PRIMARY KEY,
+        sql = f"""CREATE TABLE route(
+            route_id {self.SQL_PK_DATATYPE} PRIMARY KEY,
             route_product INTEGER
         );
         """
@@ -623,8 +644,8 @@ class Database:
     def create_table_component(self) -> None:
         """Create the component table"""
         mrich.debug("HIPPO.Database.create_table_component()")
-        sql = """CREATE TABLE component(
-            component_id INTEGER PRIMARY KEY,
+        sql = f"""CREATE TABLE component(
+            component_id {self.SQL_PK_DATATYPE} PRIMARY KEY,
             component_route INTEGER,
             component_type INTEGER,
             component_ref INTEGER,
@@ -656,7 +677,7 @@ class Database:
 
         sql = f"""
         CREATE TABLE {table}(
-            interaction_id INTEGER PRIMARY KEY,
+            interaction_id {self.SQL_PK_DATATYPE} PRIMARY KEY,
             interaction_feature INTEGER NOT NULL,
             interaction_pose INTEGER NOT NULL,
             interaction_type TEXT NOT NULL,
@@ -683,8 +704,8 @@ class Database:
         """Create the subsite table"""
 
         mrich.debug("HIPPO.Database.create_table_subsite()")
-        sql = """CREATE TABLE subsite(
-            subsite_id INTEGER PRIMARY KEY,
+        sql = f"""CREATE TABLE subsite(
+            subsite_id {self.SQL_PK_DATATYPE} PRIMARY KEY,
             subsite_target INTEGER NOT NULL,
             subsite_name TEXT NOT NULL,
             subsite_metadata TEXT,
@@ -698,8 +719,8 @@ class Database:
         """Create the subsite_tag table"""
 
         mrich.debug("HIPPO.Database.create_table_subsite_tag()")
-        sql = """CREATE TABLE subsite_tag(
-            subsite_tag_id INTEGER PRIMARY KEY,
+        sql = f"""CREATE TABLE subsite_tag(
+            subsite_tag_id {self.SQL_PK_DATATYPE} PRIMARY KEY,
             subsite_tag_ref INTEGER NOT NULL,
             subsite_tag_pose INTEGER NOT NULL,
             subsite_tag_metadata TEXT,
@@ -708,6 +729,9 @@ class Database:
         """
 
         self.execute(sql)
+
+    def sql_return_id_str(self, key: str) -> str:
+        return ""
 
     ### INSERTION
 
@@ -760,7 +784,7 @@ class Database:
         try:
             self.execute(sql, (inchikey, smiles, alias))
 
-        except sqlite3.IntegrityError as e:
+        except self.ERROR_UNIQUE_VIOLATION as e:
             if "UNIQUE constraint failed: compound.compound_inchikey" in str(e):
                 if warn_duplicate:
                     mrich.warning(
@@ -936,7 +960,7 @@ class Database:
                 ),
             )
 
-        except sqlite3.IntegrityError as e:
+        except self.ERROR_UNIQUE_VIOLATION as e:
             if "UNIQUE constraint failed: pose.pose_path" in str(e):
                 if warn_duplicate:
                     mrich.warning(f'Could not insert pose with duplicate path "{path}"')
@@ -1001,7 +1025,7 @@ class Database:
         try:
             self.execute(sql, (name, compound, pose))
 
-        except sqlite3.IntegrityError as e:
+        except self.ERROR_UNIQUE_VIOLATION as e:
             return None
 
         except Exception as e:
@@ -1050,7 +1074,7 @@ class Database:
         try:
             self.execute(sql, (original, derivative))
 
-        except sqlite3.IntegrityError as e:
+        except self.ERROR_UNIQUE_VIOLATION as e:
             if warn_duplicate:
                 mrich.warning(
                     f"Skipping existing inspiration: {original=} {derivative=}"
@@ -1108,7 +1132,7 @@ class Database:
         try:
             self.execute(sql, (scaffold, superstructure))
 
-        except sqlite3.IntegrityError as e:
+        except self.ERROR_UNIQUE_VIOLATION as e:
             if warn_duplicate:
                 mrich.warning(
                     f"Skipping existing scaffold: {scaffold=} {superstructure=}"
@@ -1199,7 +1223,7 @@ class Database:
         try:
             self.execute(sql, (amount, reaction.id, compound.id))
 
-        except sqlite3.IntegrityError as e:
+        except self.ERROR_UNIQUE_VIOLATION as e:
             mrich.warning(f"Skipping existing reactant: {reaction=} {compound=}")
 
         except Exception as e:
@@ -1329,23 +1353,31 @@ class Database:
 
         """
 
-        sql = """
+        sql = f"""
         INSERT INTO target(target_name)
-        VALUES(?1)
+        VALUES({self.SQL_STRING_PLACEHOLDER})
+        {self.sql_return_id_str("target")}
         """
 
         try:
             self.execute(sql, (name,))
 
-        except sqlite3.IntegrityError as e:
+        except self.ERROR_UNIQUE_VIOLATION as e:
             if warn_duplicate:
                 mrich.warning(f"Skipping existing target with {name=}")
+            self.rollback()
             return None
 
         except Exception as e:
             mrich.error(e)
+            raise
 
-        target_id = self.cursor.lastrowid
+        match self.engine:
+            case "sqlite3":
+                target_id = self.cursor.lastrowid
+            case "psycopg":
+                target_id = self.cursor.fetchone()[0]
+
         self.commit()
         return target_id
 
@@ -1410,7 +1442,7 @@ class Database:
                 (family, target, chain_name, residue_name, residue_number, atom_names),
             )
 
-        except sqlite3.IntegrityError as e:
+        except self.ERROR_UNIQUE_VIOLATION as e:
 
             if warn_duplicate:
                 mrich.warning(str(e))
@@ -1540,7 +1572,7 @@ class Database:
                 ),
             )
 
-        except sqlite3.IntegrityError as e:
+        except self.ERROR_UNIQUE_VIOLATION as e:
 
             if "UNIQUE constraint failed: component" in str(e):
                 mrich.warning(
@@ -1681,7 +1713,7 @@ class Database:
                 ),
             )
 
-        except sqlite3.IntegrityError as e:
+        except self.ERROR_UNIQUE_VIOLATION as e:
             mrich.error(e)
             if warn_duplicate:
                 mrich.warning(
@@ -1719,7 +1751,7 @@ class Database:
         try:
             self.execute(sql, (target, name))
 
-        except sqlite3.IntegrityError as e:
+        except self.ERROR_UNIQUE_VIOLATION as e:
             mrich.warning(f"Skipping existing subsite for {target=} with {name=}")
             return None
 
@@ -1779,7 +1811,7 @@ class Database:
         try:
             self.execute(sql, (subsite_id, pose_id))
 
-        except sqlite3.IntegrityError as e:
+        except self.ERROR_UNIQUE_VIOLATION as e:
             mrich.warning(
                 f"Skipping existing subsite_tag for {subsite_id=} with {pose_id=}"
             )
@@ -4928,218 +4960,6 @@ class Database:
     def __rich__(self) -> str:
         """Representation for mrich"""
         return f"[bold underline]{self}"
-
-
-class PostgresDatabase(Database):
-    """Wrapper to connect to a HIPPO Postgres database.
-
-    .. attention::
-
-            :class:`.PostGresDatabase` objects should not be created directly. Instead use the methods in :class:`.HIPPO` to interact with data in the database. See :doc:`getting_started` and :doc:`insert_elaborations`.
-
-    """
-
-    def __init__(
-        self,
-        animal: "HIPPO",
-        username: str,
-        password: str,
-        host: str = "localhost",
-        port: int = 5432,
-        update_legacy: bool = False,
-        auto_compute_bfps: bool = True,
-        create_blank: bool = True,
-        check_legacy: bool = False,
-        debug: bool = True,
-    ) -> None:
-        """PostgresDatabase initialisation"""
-
-        assert isinstance(username, str)
-        assert isinstance(password, str)
-        assert isinstance(port, int)
-
-        if debug:
-            mrich.debug("hippo.PostgresDatabase.__init__()")
-
-        self._username = username
-        self._password = password
-        self._port = port
-        self._host = host
-
-        self._connection = None
-        self._cursor = None
-        self._animal = animal
-        self._auto_compute_bfps = auto_compute_bfps
-
-        if debug:
-            mrich.debug(f"PostgresDatabase.username = {self.username}")
-            mrich.debug(f"PostgresDatabase.password = {self.password}")
-            mrich.debug(f"PostgresDatabase.host = {self.host}")
-            mrich.debug(f"PostgresDatabase.port = {self.port}")
-
-        self.connect()
-
-        if not self.table_names:
-
-            if create_blank:
-                self.create_blank_db()
-            else:
-                mrich.error("Database is empty!", self.path)
-                raise ValueError(
-                    "Database is empty! Check connection or run with create_blank=True"
-                )
-
-        if not check_legacy:
-            return
-
-        self.check_schema(update=update_legacy)
-
-    ### PROPERTIES
-
-    @property
-    def path(self) -> None:
-        """PostgresDatabase path"""
-        # raise NotImplementedError("PostgresDatabase has no path")
-        return f"postgresql://{self.username}:{self.password}@{self.host}:{self.port}"
-
-    @property
-    def username(self) -> str:
-        """PostgresDatabase username"""
-        return self._username
-
-    @property
-    def password(self) -> str:
-        """PostgresDatabase password"""
-        return self._password
-
-    @property
-    def host(self) -> str:
-        """PostgresDatabase host"""
-        return self._host
-
-    @property
-    def port(self) -> int:
-        """PostgresDatabase port"""
-        return self._port
-
-    @property
-    def table_names(self) -> list[str]:
-        """List of all the table names in the database"""
-        results = self.execute(
-            """
-            SELECT table_name
-            FROM information_schema.tables
-            WHERE table_schema = 'public'
-            AND table_type = 'BASE TABLE';
-        """
-        ).fetchall()
-        return [n for n, in results]
-
-    ### GENERAL SQL
-
-    def connect(self, debug: bool = True) -> None:
-        """Connect to the database"""
-
-        if debug:
-            mrich.debug("hippo.PostgresDatabase.connect()")
-
-        conn = None
-
-        import psycopg
-
-        try:
-            conn = psycopg.connect(
-                user=self.username,
-                host=self.host,
-                password=self.password,
-                port=self.port,
-            )
-
-        except Exception as e:
-            mrich.error("Could not connect to", self.path)
-            mrich.error(e)
-            raise
-
-        self._connection = conn
-        self._cursor = conn.cursor()
-
-    ### CREATE TABLES
-
-    def create_table_compound(self) -> None:
-        """Create the compound table"""
-        mrich.debug("HIPPO.PostgresDatabase.create_table_compound()")
-        mrich.warning(
-            "HIPPO.PostgresDatabase.create_table_pattern_bfp(): NotImplemented(MOL)"
-        )
-
-        sql = """CREATE TABLE compound(
-            compound_id INTEGER PRIMARY KEY,
-            compound_inchikey TEXT,
-            compound_alias TEXT,
-            compound_smiles TEXT,
-            compound_base INTEGER,
-            -- compound_mol MOL,
-            compound_pattern_bfp bit(2048),
-            compound_morgan_bfp bit(2048),
-            compound_metadata TEXT,
-            FOREIGN KEY (compound_base) REFERENCES compound(compound_id),
-            CONSTRAINT UC_compound_inchikey UNIQUE (compound_inchikey),
-            CONSTRAINT UC_compound_alias UNIQUE (compound_alias),
-            CONSTRAINT UC_compound_smiles UNIQUE (compound_smiles)
-        );
-        """
-        self.execute(sql)
-
-    def create_table_pose(self) -> None:
-        """Create the pose table"""
-        mrich.debug("HIPPO.PostgresDatabase.create_table_pose()")
-        mrich.warning(
-            "HIPPO.PostgresDatabase.create_table_pattern_bfp(): NotImplemented(MOL)"
-        )
-
-        sql = """CREATE TABLE pose(
-            pose_id INTEGER PRIMARY KEY,
-            pose_inchikey TEXT,
-            pose_alias TEXT,
-            pose_smiles TEXT,
-            pose_reference INTEGER,
-            pose_path TEXT,
-            pose_compound INTEGER,
-            pose_target INTEGER,
-            -- pose_mol BLOB,
-            pose_fingerprint INTEGER,
-            pose_energy_score REAL,
-            pose_distance_score REAL,
-            pose_inspiration_score REAL,
-            pose_metadata TEXT,
-            FOREIGN KEY (pose_compound) REFERENCES compound(compound_id),
-            CONSTRAINT UC_pose_alias UNIQUE (pose_alias),
-            CONSTRAINT UC_pose_path UNIQUE (pose_path)
-        );
-        """
-
-        self.execute(sql)
-
-    def create_table_pattern_bfp(self) -> None:
-        """Create the pattern_bfp table"""
-        mrich.warning(
-            "HIPPO.PostgresDatabase.create_table_pattern_bfp(): NotImplemented"
-        )
-
-        return
-
-        mrich.debug("HIPPO.PostgresDatabase.create_table_pattern_bfp()")
-
-        sql = """
-        CREATE VIRTUAL TABLE compound_pattern_bfp 
-        USING rdtree(compound_id, fp bits(2048))
-        """
-
-        self.execute(sql)
-
-    ### METHODS
-
-    ### DUNDERS
 
 
 class LegacyDatabaseError(Exception):

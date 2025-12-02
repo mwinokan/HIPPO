@@ -59,7 +59,7 @@ class HIPPO:
 
             ### POSTGRES
 
-            from .db import PostgresDatabase
+            from .postgres import PostgresDatabase
 
             self._db = PostgresDatabase(animal=self, **db)
 
