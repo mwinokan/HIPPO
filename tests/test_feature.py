@@ -1,5 +1,4 @@
 from config import *
-from common import animal
 
 NOT_NULL_PROPERTIES = [
     "id",
