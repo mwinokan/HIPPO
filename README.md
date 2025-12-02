@@ -40,6 +40,20 @@ Or by running the full suite of tests (see Developer information)
 ## More Information
 
 <details>
+  
+<summary>Repository structure</summary>
+
+### Branches
+
+- [HIPPO/main](https://github.com/mwinokan/HIPPO/tree/main): latest stable version
+- [HIPPO/dev](https://github.com/mwinokan/HIPPO/tree/dev): @mwinokan's development branch
+- [HIPPO/postgres](https://github.com/mwinokan/HIPPO/tree/dev): @mwinokan's PostgreSQL development branch
+- [HIPPO/django_lean](https://github.com/mwinokan/HIPPO/tree/django_lean): An experimental branch implementing HIPPO as a Django web-app
+
+</details>
+
+
+<details>
 
 <summary> Information for HIPPO developers </summary>
 
@@ -92,12 +106,5 @@ pytest
 ```
 
 N.B. the numbered tests, e.g. `test_00_cleanup.py` need to run in sequential order to set up the database. Other tests can run in arbitrary order thereafter. The tests will fail if https://fragalysis.diamond.ac.uk can not provide the protein target's data, as specified in tests/config.py.
-
-### Branches
-
-- [HIPPO/main](https://github.com/mwinokan/HIPPO/tree/main): latest stable version
-- [HIPPO/dev](https://github.com/mwinokan/HIPPO/tree/dev): @mwinokan's development branch
-- [HIPPO/postgres](https://github.com/mwinokan/HIPPO/tree/dev): @mwinokan's PostgreSQL development branch
-- [HIPPO/django_lean](https://github.com/mwinokan/HIPPO/tree/django_lean): An experimental branch implementing HIPPO as a Django web-app
 
 </details>
