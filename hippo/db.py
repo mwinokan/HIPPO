@@ -1,4 +1,4 @@
-"""Sqlite database wrapper class"""
+"""SQLite database wrapper class"""
 
 import mcol
 import mrich
@@ -151,7 +151,11 @@ class Database:
 
         self.check_schema(update=update_legacy)
 
-    def check_schema(self, update: bool = False):
+    def check_schema(self, update: bool = False) -> None:
+        """Check the database for legacy schema and optionally update
+
+        :param update: update the legacy database?
+        """
 
         if "interaction" not in self.table_names:
             if not update:
@@ -731,6 +735,7 @@ class Database:
         self.execute(sql)
 
     def sql_return_id_str(self, key: str) -> str:
+        """SQL suffix to return the lastrowid (for sqlite returns an empty string)"""
         return ""
 
     ### INSERTION

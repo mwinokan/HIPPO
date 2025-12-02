@@ -1,3 +1,5 @@
+"""PostgreSQL database wrapper class using psycopg3"""
+
 import mcol
 import mrich
 
