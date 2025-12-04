@@ -881,6 +881,7 @@ class Pose:
         debug: bool = False,
         commit: bool = True,
         mutation_warnings: bool = True,
+        skip_mutated_residues: bool = True,
         delete_temp_table: bool = True,
     ) -> None:
         """Enumerate all valid interactions between this ligand and the protein
@@ -892,6 +893,7 @@ class Pose:
         :param debug: Increase verbosity for debugging
         :param commit: commit the changes to the database (Default value = True)
         :param mutation_warnings: warn when there has been a mutation in the protein (Default value = True)
+        :param skip_mutated_residues: skip protein features at mutated residues (Default value = True). If False, will attempt to use features even if residue name doesn't match.
         :param delete_temp_table: delete the temporary interaction table created during interaction resolution (Default value = True)
 
         """
@@ -988,7 +990,7 @@ class Pose:
             ### protein chain names
             chains = protein_system.chain_names
 
-            mutation_warnings = set()
+            mutation_warning_messages = set()
             mutation_count = 0
 
             # loop over protein features
@@ -1013,11 +1015,12 @@ class Pose:
                         np.linalg.norm(com - cf.position) < MUTATION_WARNING_DIST
                         for cf in comp_features
                     ):
-                        mutation_warnings.add(
+                        mutation_warning_messages.add(
                             f"{prot_residue.name} {prot_residue.number} -> {prot_feature.residue_name} {prot_feature.residue_number}"
                         )
                         mutation_count += 1
-                    continue
+                    if skip_mutated_residues:
+                        continue
 
                 ### calculate protein coordinate
                 prot_atoms = []
@@ -1152,11 +1155,16 @@ class Pose:
                             table="temp_interaction",
                         )
 
-            if mutation_warnings:
-                mrich.warning(
-                    f"Skipped {mutation_count} protein features because the residue was mutated:"
-                )
-                for mutation in mutation_warnings:
+            if mutation_warnings and mutation_warning_messages:
+                if skip_mutated_residues:
+                    mrich.warning(
+                        f"Skipped {mutation_count} protein features because the residue was mutated:"
+                    )
+                else:
+                    mrich.warning(
+                        f"Found {mutation_count} protein features at mutated residues (not skipped):"
+                    )
+                for mutation in mutation_warning_messages:
                     mrich.warning(mutation)
 
             if resolve:
