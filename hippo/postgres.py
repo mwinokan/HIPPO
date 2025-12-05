@@ -82,6 +82,22 @@ class PostgresDatabase(Database):
     RETURNING compound_id;
     """
 
+    POSE_FIELDS = [
+        "pose_id",
+        "pose_inchikey",
+        "pose_alias",
+        "pose_smiles",
+        "pose_reference",
+        "pose_path",
+        "pose_compound",
+        "pose_target",
+        "mol_to_pkl(pose_mol)",
+        "pose_fingerprint",
+        "pose_energy_score",
+        "pose_distance_score",
+        "pose_inspiration_score",
+    ]
+
     def __init__(
         self,
         animal: "HIPPO",
@@ -194,10 +210,10 @@ class PostgresDatabase(Database):
         """Get the index names"""
 
         cursor = self.execute(
-            """
+            f"""
             SELECT indexname
             FROM pg_indexes
-            WHERE schemaname = 'public';
+            WHERE schemaname = '{self.SQL_SCHEMA}';
         """
         )
 
@@ -227,6 +243,8 @@ class PostgresDatabase(Database):
                 port=self.port,
                 dbname=self.dbname,
             )
+
+            conn.execute("SET client_encoding TO 'UTF8'")
 
         except Exception as e:
             mrich.error("Could not connect to", self.path)
@@ -300,6 +318,20 @@ class PostgresDatabase(Database):
         self.execute(sql)
 
     ### METHODS
+
+    def update_pose_mol(self, pose_id: int, mol: "Chem.Mol") -> None:
+        """Update the molecule stored for a specific pose"""
+
+        from rdkit.Chem import MolToMolBlock
+
+        sql = f"""
+        UPDATE hippo.pose
+        SET pose_mol = mol_from_pkl(%s)
+        WHERE pose_id = %s;
+        """
+
+        self.execute(sql, (mol.ToBinary(), pose_id))
+        self.commit()
 
     def _clear_schema(self) -> None:
         """Empty the Database schema entirely and recreate it"""

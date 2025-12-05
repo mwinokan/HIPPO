@@ -350,7 +350,7 @@ class Pose:
         from .tools import sanitise_mol
 
         self._mol = sanitise_mol(m)
-        self.db.update(table="pose", id=self.id, key="pose_mol", value=m.ToBinary())
+        self.db.update_pose_mol(pose_id=self.id, mol=self._mol)
 
     @property
     def protonated_mol(self) -> "rdkit.Chem.Mol":

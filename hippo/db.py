@@ -28,22 +28,6 @@ CHEMICALITE_COMPOUND_PROPERTY_MAP = {
     "molecular_weight": "mol_amw",
 }
 
-POSE_FIELDS = [
-    "pose_id",
-    "pose_inchikey",
-    "pose_alias",
-    "pose_smiles",
-    "pose_reference",
-    "pose_path",
-    "pose_compound",
-    "pose_target",
-    "pose_mol",
-    "pose_fingerprint",
-    "pose_energy_score",
-    "pose_distance_score",
-    "pose_inspiration_score",
-]
-
 
 class Database:
     """Wrapper to connect to the HIPPO sqlite database.
@@ -118,6 +102,22 @@ class Database:
         :alias
     )
     """
+
+    POSE_FIELDS = [
+        "pose_id",
+        "pose_inchikey",
+        "pose_alias",
+        "pose_smiles",
+        "pose_reference",
+        "pose_path",
+        "pose_compound",
+        "pose_target",
+        "pose_mol",
+        "pose_fingerprint",
+        "pose_energy_score",
+        "pose_distance_score",
+        "pose_inspiration_score",
+    ]
 
     def __init__(
         self,
@@ -364,7 +364,7 @@ class Database:
                 mrich.debug(f"Creating {name}")
 
             self.execute(
-                f"CREATE INDEX {name} ON {self.SQL_SCHEMA_PREFIX}{table} {col_str}"
+                f"CREATE INDEX IF NOT EXISTS {name} ON {self.SQL_SCHEMA_PREFIX}{table} {col_str}"
             )
 
         if update:
@@ -1627,7 +1627,15 @@ class Database:
             feature_residue_number, 
             feature_atom_names
         )
-        VALUES(?1, ?2, ?3, ?4, ?5, ?6)
+        VALUES(
+            {self.SQL_STRING_PLACEHOLDER}, 
+            {self.SQL_STRING_PLACEHOLDER}, 
+            {self.SQL_STRING_PLACEHOLDER}, 
+            {self.SQL_STRING_PLACEHOLDER}, 
+            {self.SQL_STRING_PLACEHOLDER}, 
+            {self.SQL_STRING_PLACEHOLDER}
+        )
+        {self.sql_return_id_str('feature')}
         """
 
         atom_names = " ".join(sorted(atom_names))
@@ -1649,12 +1657,15 @@ class Database:
                 mrich.var("residue_number", residue_number)
                 mrich.var("atom_names", atom_names)
 
+            self.rollback()
+
             return None
 
         except Exception as e:
             mrich.error(e)
 
-        feature_id = self.cursor.lastrowid
+        feature_id = self.get_lastrowid()
+
         if commit:
             self.commit()
         return feature_id
@@ -1745,6 +1756,7 @@ class Database:
         sql = f"""
         INSERT INTO {self.SQL_SCHEMA_PREFIX}component(component_route, component_type, component_ref, component_amount)
         VALUES(:component_route, :component_type, :component_ref, :component_amount)
+        {self.sql_return_id_str('component')}
         """
 
         route = int(route)
@@ -1770,15 +1782,14 @@ class Database:
 
         except self.ERROR_UNIQUE_VIOLATION as e:
 
-            if "UNIQUE constraint failed: component" in str(e):
-                mrich.warning(
-                    f"Did not add existing component={ref} (type={component_type}) to {route=}"
-                )
-                return None
-            else:
-                raise
+            mrich.warning(
+                f"Did not add existing component={ref} (type={component_type}) to {route=}"
+            )
 
-        component_id = self.cursor.lastrowid
+            self.rollback()
+            return None
+
+        component_id = self.get_lastrowid()
 
         if commit:
             self.commit()
@@ -2357,13 +2368,15 @@ class Database:
         if commit:
             self.commit()
 
+    def update_pose_mol(self, pose_id: int, mol: "Chem.Mol") -> None:
+        """Update the molecule stored for a specific pose"""
+
+        self.update(table="pose", id=pose_id, key="pose_mol", value=mol.ToBinary())
+
     ### COPYING / MIGRATION
 
-    def copy_temp_interactions(self, source_db: "Database | None" = None) -> int:
-        """Copy the records from the 'temp_interaction' table to the 'interaction' table
-
-        :returns: ID of the last inserted :class:`.Interaction`
-        """
+    def copy_temp_interactions(self, source_db: "Database | None" = None) -> None:
+        """Copy the records from the 'temp_interaction' table to the 'interaction' table"""
 
         if source_db is not None:
 
@@ -2399,16 +2412,16 @@ class Database:
                 interaction_energy
             )
             VALUES(
-                ?1,
-                ?2,
-                ?3,
-                ?4,
-                ?5,
-                ?6,
-                ?7,
-                ?8,
-                ?9,
-                ?10
+                {self.SQL_STRING_PLACEHOLDER},
+                {self.SQL_STRING_PLACEHOLDER},
+                {self.SQL_STRING_PLACEHOLDER},
+                {self.SQL_STRING_PLACEHOLDER},
+                {self.SQL_STRING_PLACEHOLDER},
+                {self.SQL_STRING_PLACEHOLDER},
+                {self.SQL_STRING_PLACEHOLDER},
+                {self.SQL_STRING_PLACEHOLDER},
+                {self.SQL_STRING_PLACEHOLDER},
+                {self.SQL_STRING_PLACEHOLDER}
             )
             """
 
@@ -2443,8 +2456,6 @@ class Database:
             """
 
             cursor = self.execute(sql)
-
-        return cursor.lastrowid
 
     def copy_interactions_to_temp(self, pose_id: int) -> int:
         """Copy the records from the 'interaction' table to the 'temp_interaction' table for a given pose_id
@@ -3202,6 +3213,7 @@ class Database:
         id: int | None = None,
         inchikey: str = None,
         alias: str = None,
+        debug: bool = False,
     ) -> Pose:
         """Get a pose using one of the following fields: ['id', 'inchikey', 'alias']
 
@@ -3224,9 +3236,13 @@ class Database:
             mrich.error(f"Invalid {id=}")
             return None
 
-        query = ", ".join(POSE_FIELDS)
+        query = ", ".join(self.POSE_FIELDS)
 
         entry = self.select_where(query=query, table="pose", key="id", value=id)
+
+        if debug:
+            mrich.print(entry)
+
         pose = Pose(self, *entry)
         return pose
 
@@ -3237,7 +3253,7 @@ class Database:
     ) -> list[Pose]:
         """Get list of initialised :class:`.Pose` objects with given ID's"""
 
-        query = ", ".join(POSE_FIELDS)
+        query = ", ".join(self.POSE_FIELDS)
 
         str_ids = str(tuple(ids)).replace(",)", ")")
 
