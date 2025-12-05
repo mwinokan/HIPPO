@@ -948,6 +948,7 @@ class Pose:
                 animal=None,
                 create_blank=False,
                 check_legacy=False,
+                create_indexes=False,
                 debug=False,
             )
 

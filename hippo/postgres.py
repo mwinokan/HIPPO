@@ -91,6 +91,8 @@ class PostgresDatabase(Database):
         auto_compute_bfps: bool = False,
         create_blank: bool = True,
         check_legacy: bool = False,
+        create_indexes: bool = True,
+        update_indexes: bool = True,
         debug: bool = True,
     ) -> None:
         """PostgresDatabase initialisation"""
@@ -131,10 +133,11 @@ class PostgresDatabase(Database):
                     "Database is empty! Check connection or run with create_blank=True"
                 )
 
-        if not check_legacy:
-            return
+        if check_legacy:
+            self.check_schema(update=update_legacy)
 
-        self.check_schema(update=update_legacy)
+        if create_indexes:
+            self.create_indexes(update=update_indexes, debug=debug)
 
     ### PROPERTIES
 
@@ -176,6 +179,19 @@ class PostgresDatabase(Database):
         """
         ).fetchall()
         return [n for n, in results]
+
+    def index_names(self) -> list[str]:
+        """Get the index names"""
+
+        cursor = self.execute(
+            """
+            SELECT indexname
+            FROM pg_indexes
+            WHERE schemaname = 'public';
+        """
+        )
+
+        return [n for n, in cursor]
 
     @property
     def total_changes(self) -> int:

@@ -126,6 +126,8 @@ class Database:
         auto_compute_bfps: bool = True,
         create_blank: bool = True,
         check_legacy: bool = True,
+        create_indexes: bool = True,
+        update_indexes: bool = True,
         debug: bool = True,
     ) -> None:
         """Database initialisation"""
@@ -167,10 +169,11 @@ class Database:
             if create_blank:
                 self.create_blank_db()
 
-        if not check_legacy:
-            return
+        if check_legacy:
+            self.check_schema(update=update_legacy)
 
-        self.check_schema(update=update_legacy)
+        if create_indexes:
+            self.create_indexes(update=update_indexes, debug=debug)
 
     def check_schema(self, update: bool = False) -> None:
         """Check the database for legacy schema and optionally update
@@ -243,6 +246,127 @@ class Database:
                 mrich.warning("Updating legacy pose table...")
 
             self.update_legacy_pose_inspiration_score()
+
+    def create_indexes(self, update: bool = True, debug: bool = True) -> None:
+        """Create and optionally update indexes"""
+
+        INDEXES = [
+            ("pose", "pose_inchikey"),
+            (
+                "pose",
+                "pose_smiles",
+            ),
+            (
+                "pose",
+                "pose_reference",
+            ),
+            (
+                "pose",
+                "pose_target",
+            ),
+            (
+                "inspiration",
+                "inspiration_original",
+            ),
+            (
+                "inspiration",
+                "inspiration_derivative",
+            ),
+            (
+                "scaffold",
+                "scaffold_superstructure",
+            ),
+            (
+                "reaction",
+                "reaction_type",
+            ),
+            (
+                "reaction",
+                "reaction_product",
+            ),
+            (
+                "reactant",
+                "reactant_compound",
+            ),
+            (
+                "tag",
+                "tag_compound",
+            ),
+            (
+                "tag",
+                "tag_pose",
+            ),
+            (
+                "quote",
+                "quote_supplier",
+            ),
+            (
+                "quote",
+                "quote_catalogue",
+            ),
+            (
+                "quote",
+                "quote_entry",
+            ),
+            (
+                "quote",
+                "quote_compound",
+            ),
+            (
+                "route",
+                "route_product",
+            ),
+            # ("subsite", "subsite_name",), # not enough rows to matter?
+            (
+                "subsite_tag",
+                "subsite_tag_pose",
+            ),
+            (
+                "interaction",
+                "interaction_pose",
+            ),
+            # ("interaction", "interaction_type",), # mainly done on interaction_temp
+            (
+                "component",
+                "component_route",
+            ),
+            (
+                "component",
+                "component_ref",
+            ),
+            (
+                "component",
+                ("component_type", "component_ref", "component_route"),
+            ),
+        ]
+
+        existing = set(self.index_names())
+
+        for table, column in INDEXES:
+
+            if isinstance(column, tuple):
+                name = ["index_", table, *(c.removeprefix(table) for c in column)]
+                name = "".join(name)
+                col_str = f"({', '.join(column)})"
+
+            else:
+                assert column.startswith(table)
+                name = f"index_{column}"
+                col_str = f"({column})"
+
+            if name in existing:
+                continue
+
+            if debug:
+                mrich.debug(f"Creating {name}")
+
+            self.execute(f"CREATE INDEX {name} ON {table} {col_str}")
+
+        if update:
+            if debug:
+                mrich.debug("Updating indexes")
+            self.execute("ANALYZE")
+            self.commit()
 
     @classmethod
     def copy_from(
@@ -545,8 +669,8 @@ class Database:
         sql = """CREATE TABLE scaffold(
             scaffold_base INTEGER,
             scaffold_superstructure INTEGER,
-            FOREIGN KEY (scaffold_base) REFERENCES pose(pose_id),
-            FOREIGN KEY (scaffold_superstructure) REFERENCES pose(pose_id),
+            FOREIGN KEY (scaffold_base) REFERENCES compound(compound_id),
+            FOREIGN KEY (scaffold_superstructure) REFERENCES compound(compound_id),
             CONSTRAINT UC_scaffold UNIQUE (scaffold_base, scaffold_superstructure)
         );
         """
@@ -5000,6 +5124,19 @@ class Database:
         """Get the column names of the given table"""
         table_info = self.table_info(table)
         return [i[1] for i in table_info]
+
+    def index_names(self) -> list[str]:
+        """Get the index names"""
+
+        cursor = self.execute(
+            """
+            SELECT name
+            FROM sqlite_master
+            WHERE type = 'index';
+        """
+        )
+
+        return [n for n, in cursor]
 
     ### DUNDERS
 
