@@ -19,27 +19,29 @@ class PostgresDatabase(Database):
 
     SQL_STRING_PLACEHOLDER = "%s"
     SQL_PK_DATATYPE = "SERIAL"
+    SQL_SCHEMA = "hippo"
+    SQL_SCHEMA_PREFIX = f"{SQL_SCHEMA}."
 
     ERROR_UNIQUE_VIOLATION = psycopg.errors.UniqueViolation
 
-    SQL_CREATE_TABLE_COMPOUND = """CREATE TABLE compound(
+    SQL_CREATE_TABLE_COMPOUND = """CREATE TABLE hippo.compound(
         compound_id SERIAL PRIMARY KEY,
         compound_inchikey TEXT,
         compound_alias TEXT,
         compound_smiles TEXT,
         compound_base INTEGER,
-        -- compound_mol MOL,
+        compound_mol MOL,
         compound_pattern_bfp bit(2048),
         compound_morgan_bfp bit(2048),
         compound_metadata TEXT,
-        FOREIGN KEY (compound_base) REFERENCES compound(compound_id),
+        FOREIGN KEY (compound_base) REFERENCES hippo.compound(compound_id),
         CONSTRAINT UC_compound_inchikey UNIQUE (compound_inchikey),
         CONSTRAINT UC_compound_alias UNIQUE (compound_alias),
         CONSTRAINT UC_compound_smiles UNIQUE (compound_smiles)
     );
     """
 
-    SQL_CREATE_TABLE_POSE = """CREATE TABLE pose(
+    SQL_CREATE_TABLE_POSE = """CREATE TABLE hippo.pose(
         pose_id SERIAL PRIMARY KEY,
         pose_inchikey TEXT,
         pose_alias TEXT,
@@ -48,23 +50,23 @@ class PostgresDatabase(Database):
         pose_path TEXT,
         pose_compound INTEGER,
         pose_target INTEGER,
-        -- pose_mol BLOB,
+        pose_mol MOL,
         pose_fingerprint INTEGER,
         pose_energy_score REAL,
         pose_distance_score REAL,
         pose_inspiration_score REAL,
         pose_metadata TEXT,
-        FOREIGN KEY (pose_compound) REFERENCES compound(compound_id),
+        FOREIGN KEY (pose_compound) REFERENCES hippo.compound(compound_id),
         CONSTRAINT UC_pose_alias UNIQUE (pose_alias),
         CONSTRAINT UC_pose_path UNIQUE (pose_path)
     );
     """
 
     SQL_INSERT_COMPOUND = """
-    INSERT INTO compound(
+    INSERT INTO hippo.compound(
         compound_inchikey, 
         compound_smiles, 
-        -- compound_mol, 
+        compound_mol, 
         -- compound_pattern_bfp, 
         -- compound_morgan_bfp, 
         compound_alias
@@ -72,7 +74,7 @@ class PostgresDatabase(Database):
     VALUES(
         %(inchikey)s, 
         %(smiles)s, 
-        -- mol_from_smiles(%(smiles)s), 
+        mol_from_smiles(%(smiles)s), 
         -- mol_pattern_bfp(mol_from_smiles(%(smiles)s), 2048), 
         -- mol_morgan_bfp(mol_from_smiles(%(smiles)s), 2, 2048), 
         %(alias)s
@@ -87,12 +89,13 @@ class PostgresDatabase(Database):
         password: str,
         host: str = "localhost",
         port: int = 5432,
+        dbname: str = "hippo",
         update_legacy: bool = False,
         auto_compute_bfps: bool = False,
         create_blank: bool = True,
         check_legacy: bool = False,
         create_indexes: bool = True,
-        update_indexes: bool = True,
+        update_indexes: bool = False,
         debug: bool = True,
     ) -> None:
         """PostgresDatabase initialisation"""
@@ -114,6 +117,7 @@ class PostgresDatabase(Database):
         self._animal = animal
         self._auto_compute_bfps = auto_compute_bfps
         self._engine = "psycopg"
+        self._dbname = dbname
 
         if debug:
             mrich.debug(f"PostgresDatabase.username = {self.username}")
@@ -126,6 +130,7 @@ class PostgresDatabase(Database):
         if not self.table_names:
 
             if create_blank:
+                self.execute("CREATE SCHEMA IF NOT EXISTS hippo;")
                 self.create_blank_db()
             else:
                 mrich.error("Database is empty!", self.path)
@@ -153,6 +158,11 @@ class PostgresDatabase(Database):
         return self._username
 
     @property
+    def dbname(self) -> str:
+        """PostgresDatabase dbname"""
+        return self._dbname
+
+    @property
     def password(self) -> str:
         """PostgresDatabase password"""
         return self._password
@@ -171,10 +181,10 @@ class PostgresDatabase(Database):
     def table_names(self) -> list[str]:
         """List of all the table names in the database"""
         results = self.execute(
-            """
+            f"""
             SELECT table_name
             FROM information_schema.tables
-            WHERE table_schema = 'public'
+            WHERE table_schema = '{self.SQL_SCHEMA}'
             AND table_type = 'BASE TABLE';
         """
         ).fetchall()
@@ -215,6 +225,7 @@ class PostgresDatabase(Database):
                 host=self.host,
                 password=self.password,
                 port=self.port,
+                dbname=self.dbname,
             )
 
         except Exception as e:
@@ -289,6 +300,18 @@ class PostgresDatabase(Database):
         self.execute(sql)
 
     ### METHODS
+
+    def _clear_schema(self) -> None:
+        """Empty the Database schema entirely and recreate it"""
+
+        self.execute(
+            f"""
+            DROP SCHEMA IF EXISTS {self.SQL_SCHEMA} CASCADE;
+            CREATE SCHEMA {self.SQL_SCHEMA};
+        """
+        )
+
+        self.commit()
 
     ### DUNDERS
 

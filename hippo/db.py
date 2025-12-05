@@ -56,6 +56,7 @@ class Database:
 
     SQL_STRING_PLACEHOLDER = "?"
     SQL_PK_DATATYPE = "INTEGER"
+    SQL_SCHEMA_PREFIX = ""
 
     ERROR_UNIQUE_VIOLATION = sqlite3.IntegrityError
 
@@ -247,6 +248,8 @@ class Database:
 
             self.update_legacy_pose_inspiration_score()
 
+        self.commit()
+
     def create_indexes(self, update: bool = True, debug: bool = True) -> None:
         """Create and optionally update indexes"""
 
@@ -360,7 +363,9 @@ class Database:
             if debug:
                 mrich.debug(f"Creating {name}")
 
-            self.execute(f"CREATE INDEX {name} ON {table} {col_str}")
+            self.execute(
+                f"CREATE INDEX {name} ON {self.SQL_SCHEMA_PREFIX}{table} {col_str}"
+            )
 
         if update:
             if debug:
@@ -651,11 +656,11 @@ class Database:
         """Create the inspiration table"""
         mrich.debug("HIPPO.Database.create_table_inspiration()")
 
-        sql = """CREATE TABLE inspiration(
+        sql = f"""CREATE TABLE {self.SQL_SCHEMA_PREFIX}inspiration(
             inspiration_original INTEGER,
             inspiration_derivative INTEGER,
-            FOREIGN KEY (inspiration_original) REFERENCES pose(pose_id),
-            FOREIGN KEY (inspiration_derivative) REFERENCES pose(pose_id),
+            FOREIGN KEY (inspiration_original) REFERENCES {self.SQL_SCHEMA_PREFIX}pose(pose_id),
+            FOREIGN KEY (inspiration_derivative) REFERENCES {self.SQL_SCHEMA_PREFIX}pose(pose_id),
             CONSTRAINT UC_inspiration UNIQUE (inspiration_original, inspiration_derivative)
         );
         """
@@ -666,11 +671,11 @@ class Database:
         """Create the scaffold table"""
         mrich.debug("HIPPO.Database.create_table_scaffold()")
 
-        sql = """CREATE TABLE scaffold(
+        sql = f"""CREATE TABLE {self.SQL_SCHEMA_PREFIX}scaffold(
             scaffold_base INTEGER,
             scaffold_superstructure INTEGER,
-            FOREIGN KEY (scaffold_base) REFERENCES compound(compound_id),
-            FOREIGN KEY (scaffold_superstructure) REFERENCES compound(compound_id),
+            FOREIGN KEY (scaffold_base) REFERENCES {self.SQL_SCHEMA_PREFIX}compound(compound_id),
+            FOREIGN KEY (scaffold_superstructure) REFERENCES {self.SQL_SCHEMA_PREFIX}compound(compound_id),
             CONSTRAINT UC_scaffold UNIQUE (scaffold_base, scaffold_superstructure)
         );
         """
@@ -681,13 +686,13 @@ class Database:
         """Create the reaction table"""
         mrich.debug("HIPPO.Database.create_table_reaction()")
 
-        sql = f"""CREATE TABLE reaction(
+        sql = f"""CREATE TABLE {self.SQL_SCHEMA_PREFIX}reaction(
             reaction_id {self.SQL_PK_DATATYPE} PRIMARY KEY,
             reaction_type TEXT,
             reaction_product INTEGER,
             reaction_product_yield REAL,
             reaction_metadata TEXT,
-            FOREIGN KEY (reaction_product) REFERENCES compound(compound_id)
+            FOREIGN KEY (reaction_product) REFERENCES {self.SQL_SCHEMA_PREFIX}compound(compound_id)
         );
         """
 
@@ -697,12 +702,12 @@ class Database:
         """Create the reactant table"""
         mrich.debug("HIPPO.Database.create_table_reactant()")
 
-        sql = """CREATE TABLE reactant(
+        sql = f"""CREATE TABLE {self.SQL_SCHEMA_PREFIX}reactant(
             reactant_amount REAL,
             reactant_reaction INTEGER,
             reactant_compound INTEGER,
-            FOREIGN KEY (reactant_reaction) REFERENCES reaction(reaction_id),
-            FOREIGN KEY (reactant_compound) REFERENCES compound(compound_id),
+            FOREIGN KEY (reactant_reaction) REFERENCES {self.SQL_SCHEMA_PREFIX}reaction(reaction_id),
+            FOREIGN KEY (reactant_compound) REFERENCES {self.SQL_SCHEMA_PREFIX}compound(compound_id),
             CONSTRAINT UC_reactant UNIQUE (reactant_reaction, reactant_compound)
         );
         """
@@ -721,12 +726,12 @@ class Database:
         """Create the tag table"""
         mrich.debug("HIPPO.Database.create_table_tag()")
 
-        sql = """CREATE TABLE tag(
+        sql = f"""CREATE TABLE {self.SQL_SCHEMA_PREFIX}tag(
             tag_name TEXT,
             tag_compound INTEGER,
             tag_pose INTEGER,
-            FOREIGN KEY (tag_compound) REFERENCES compound(compound_id),
-            FOREIGN KEY (tag_pose) REFERENCES pose(pose_id),
+            FOREIGN KEY (tag_compound) REFERENCES {self.SQL_SCHEMA_PREFIX}compound(compound_id),
+            FOREIGN KEY (tag_pose) REFERENCES {self.SQL_SCHEMA_PREFIX}pose(pose_id),
             CONSTRAINT UC_tag_compound UNIQUE (tag_name, tag_compound),
             CONSTRAINT UC_tag_pose UNIQUE (tag_name, tag_pose)
         );
@@ -738,7 +743,7 @@ class Database:
         """Create the quote table"""
         mrich.debug("HIPPO.Database.create_table_quote()")
 
-        sql = f"""CREATE TABLE quote(
+        sql = f"""CREATE TABLE {self.SQL_SCHEMA_PREFIX}quote(
             quote_id {self.SQL_PK_DATATYPE} PRIMARY KEY,
             quote_smiles TEXT,
             quote_amount REAL,
@@ -751,7 +756,7 @@ class Database:
             quote_purity REAL,
             quote_date TEXT,
             quote_compound INTEGER,
-            FOREIGN KEY (quote_compound) REFERENCES compound(compound_id),
+            FOREIGN KEY (quote_compound) REFERENCES {self.SQL_SCHEMA_PREFIX}compound(compound_id),
             CONSTRAINT UC_quote UNIQUE (quote_amount, quote_supplier, quote_catalogue, quote_entry)
         );
         """
@@ -761,7 +766,7 @@ class Database:
     def create_table_target(self) -> None:
         """Create the target table"""
         mrich.debug("HIPPO.Database.create_table_target()")
-        sql = f"""CREATE TABLE target(
+        sql = f"""CREATE TABLE {self.SQL_SCHEMA_PREFIX}target(
             target_id {self.SQL_PK_DATATYPE} PRIMARY KEY,
             target_name TEXT,
             target_metadata TEXT,
@@ -774,7 +779,7 @@ class Database:
     def create_table_feature(self) -> None:
         """Create the feature table"""
         mrich.debug("HIPPO.Database.create_table_feature()")
-        sql = f"""CREATE TABLE feature(
+        sql = f"""CREATE TABLE {self.SQL_SCHEMA_PREFIX}feature(
             feature_id {self.SQL_PK_DATATYPE} PRIMARY KEY,
             feature_family TEXT,
             feature_target INTEGER,
@@ -782,7 +787,14 @@ class Database:
             feature_residue_name TEXT,
             feature_residue_number INTEGER,
             feature_atom_names TEXT,
-            CONSTRAINT UC_feature UNIQUE (feature_family, feature_target, feature_chain_name, feature_residue_number, feature_residue_name, feature_atom_names)
+            CONSTRAINT UC_feature UNIQUE (
+                feature_family, 
+                feature_target, 
+                feature_chain_name, 
+                feature_residue_number, 
+                feature_residue_name, 
+                feature_atom_names
+            )
         );
         """
 
@@ -791,9 +803,10 @@ class Database:
     def create_table_route(self) -> None:
         """Create the route table"""
         mrich.debug("HIPPO.Database.create_table_route()")
-        sql = f"""CREATE TABLE route(
+        sql = f"""CREATE TABLE {self.SQL_SCHEMA_PREFIX}route(
             route_id {self.SQL_PK_DATATYPE} PRIMARY KEY,
-            route_product INTEGER
+            route_product INTEGER,
+            FOREIGN KEY (route_product) REFERENCES {self.SQL_SCHEMA_PREFIX}compound(compound_id)
         );
         """
 
@@ -802,12 +815,13 @@ class Database:
     def create_table_component(self) -> None:
         """Create the component table"""
         mrich.debug("HIPPO.Database.create_table_component()")
-        sql = f"""CREATE TABLE component(
+        sql = f"""CREATE TABLE {self.SQL_SCHEMA_PREFIX}component(
             component_id {self.SQL_PK_DATATYPE} PRIMARY KEY,
             component_route INTEGER,
             component_type INTEGER,
             component_ref INTEGER,
             component_amount REAL,
+            FOREIGN KEY (component_route) REFERENCES {self.SQL_SCHEMA_PREFIX}route(route_id),
             CONSTRAINT UC_component UNIQUE (component_route, component_ref, component_type)
         );
         """
@@ -834,7 +848,7 @@ class Database:
             mrich.debug(f"HIPPO.Database.create_table_interaction({table=})")
 
         sql = f"""
-        CREATE TABLE {table}(
+        CREATE TABLE {self.SQL_SCHEMA_PREFIX}{table}(
             interaction_id {self.SQL_PK_DATATYPE} PRIMARY KEY,
             interaction_feature INTEGER NOT NULL,
             interaction_pose INTEGER NOT NULL,
@@ -846,6 +860,8 @@ class Database:
             interaction_distance REAL NOT NULL,
             interaction_angle REAL,
             interaction_energy REAL,
+            FOREIGN KEY (interaction_feature) REFERENCES {self.SQL_SCHEMA_PREFIX}feature(feature_id),
+            FOREIGN KEY (interaction_pose) REFERENCES {self.SQL_SCHEMA_PREFIX}pose(pose_id),
             CONSTRAINT UC_interaction UNIQUE (
                 interaction_feature, 
                 interaction_pose, 
@@ -862,11 +878,12 @@ class Database:
         """Create the subsite table"""
 
         mrich.debug("HIPPO.Database.create_table_subsite()")
-        sql = f"""CREATE TABLE subsite(
+        sql = f"""CREATE TABLE {self.SQL_SCHEMA_PREFIX}subsite(
             subsite_id {self.SQL_PK_DATATYPE} PRIMARY KEY,
             subsite_target INTEGER NOT NULL,
             subsite_name TEXT NOT NULL,
             subsite_metadata TEXT,
+            FOREIGN KEY (subsite_target) REFERENCES {self.SQL_SCHEMA_PREFIX}target(target_id),
             CONSTRAINT UC_subsite UNIQUE (subsite_target, subsite_name)
         );
         """
@@ -877,11 +894,13 @@ class Database:
         """Create the subsite_tag table"""
 
         mrich.debug("HIPPO.Database.create_table_subsite_tag()")
-        sql = f"""CREATE TABLE subsite_tag(
+        sql = f"""CREATE TABLE {self.SQL_SCHEMA_PREFIX}subsite_tag(
             subsite_tag_id {self.SQL_PK_DATATYPE} PRIMARY KEY,
             subsite_tag_ref INTEGER NOT NULL,
             subsite_tag_pose INTEGER NOT NULL,
             subsite_tag_metadata TEXT,
+            FOREIGN KEY (subsite_tag_ref) REFERENCES {self.SQL_SCHEMA_PREFIX}subsite(subsite_id),
+            FOREIGN KEY (subsite_tag_pose) REFERENCES {self.SQL_SCHEMA_PREFIX}pose(pose_id),
             CONSTRAINT UC_subsite_tag UNIQUE (subsite_tag_ref, subsite_tag_pose)
         );
         """
@@ -1001,8 +1020,8 @@ class Database:
 
         """
 
-        sql = """
-        INSERT INTO compound_pattern_bfp(compound_id, fp)
+        sql = f"""
+        INSERT INTO {self.SQL_SCHEMA_PREFIX}compound_pattern_bfp(compound_id, fp)
         VALUES(?1, ?2)
         """
 
@@ -1084,7 +1103,7 @@ class Database:
                 raise
 
         sql = f"""
-        INSERT INTO pose(
+        INSERT INTO {self.SQL_SCHEMA_PREFIX}pose(
             pose_inchikey, 
             pose_alias, 
             pose_smiles, 
@@ -1201,7 +1220,7 @@ class Database:
         ), "Exactly one of compound or pose arguments must have a value"
 
         sql = f"""
-        INSERT INTO tag(tag_name, tag_compound, tag_pose)
+        INSERT INTO {self.SQL_SCHEMA_PREFIX}tag(tag_name, tag_compound, tag_pose)
         VALUES({self.SQL_STRING_PLACEHOLDER}, {self.SQL_STRING_PLACEHOLDER}, {self.SQL_STRING_PLACEHOLDER})
         """
 
@@ -1396,8 +1415,8 @@ class Database:
         assert isinstance(compound, Compound), f"incompatible {compound=}"
         assert isinstance(reaction, Reaction), f"incompatible {reaction=}"
 
-        sql = """
-        INSERT INTO reactant(reactant_amount, reactant_reaction, reactant_compound)
+        sql = f"""
+        INSERT INTO {self.SQL_SCHEMA_PREFIX}reactant(reactant_amount, reactant_reaction, reactant_compound)
         VALUES(?1, ?2, ?3)
         """
 
@@ -1485,7 +1504,7 @@ class Database:
             date_str = "date()"
 
         sql = f"""
-        INSERT or REPLACE INTO quote(
+        INSERT or REPLACE INTO {self.SQL_SCHEMA_PREFIX}quote(
             quote_smiles,
             quote_amount,
             quote_supplier,
@@ -1535,7 +1554,7 @@ class Database:
         """
 
         sql = f"""
-        INSERT INTO target(target_name)
+        INSERT INTO {self.SQL_SCHEMA_PREFIX}target(target_name)
         VALUES({self.SQL_STRING_PLACEHOLDER})
         {self.sql_return_id_str("target")}
         """
@@ -1599,8 +1618,8 @@ class Database:
         else:
             family = "Unknown"
 
-        sql = """
-        INSERT INTO feature(
+        sql = f"""
+        INSERT INTO {self.SQL_SCHEMA_PREFIX}feature(
             feature_family, 
             feature_target, 
             feature_chain_name, 
@@ -1723,8 +1742,8 @@ class Database:
 
         """
 
-        sql = """
-        INSERT INTO component(component_route, component_type, component_ref, component_amount)
+        sql = f"""
+        INSERT INTO {self.SQL_SCHEMA_PREFIX}component(component_route, component_type, component_ref, component_amount)
         VALUES(:component_route, :component_type, :component_ref, :component_amount)
         """
 
@@ -1858,7 +1877,7 @@ class Database:
         # insertion
 
         sql = f"""
-        INSERT INTO {table}(
+        INSERT INTO {self.SQL_SCHEMA_PREFIX}{table}(
             interaction_feature,
             interaction_pose,
             interaction_type,
@@ -1920,8 +1939,8 @@ class Database:
         assert isinstance(target, int)
         assert isinstance(name, str)
 
-        sql = """
-        INSERT INTO subsite(subsite_target, subsite_name)
+        sql = f"""
+        INSERT INTO {self.SQL_SCHEMA_PREFIX}subsite(subsite_target, subsite_name)
         VALUES(?1, ?2)
         """
 
@@ -1980,8 +1999,8 @@ class Database:
 
         assert isinstance(subsite_id, int)
 
-        sql = """
-        INSERT INTO subsite_tag(subsite_tag_ref, subsite_tag_pose)
+        sql = f"""
+        INSERT INTO {self.SQL_SCHEMA_PREFIX}subsite_tag(subsite_tag_ref, subsite_tag_pose)
         VALUES(?1, ?2)
         """
 
@@ -2024,7 +2043,7 @@ class Database:
 
         """
 
-        sql = f"SELECT {query} FROM {table}"
+        sql = f"SELECT {query} FROM {self.SQL_SCHEMA_PREFIX}{table}"
 
         try:
             self.execute(sql)
@@ -2109,9 +2128,11 @@ class Database:
             where_str = key
 
         if sort:
-            sql = f"SELECT {query} FROM {table} WHERE {where_str} ORDER BY {sort}"
+            sql = f"SELECT {query} FROM {self.SQL_SCHEMA_PREFIX}{table} WHERE {where_str} ORDER BY {sort}"
         else:
-            sql = f"SELECT {query} FROM {table} WHERE {where_str}"
+            sql = (
+                f"SELECT {query} FROM {self.SQL_SCHEMA_PREFIX}{table} WHERE {where_str}"
+            )
 
         try:
             self.execute(sql)
@@ -2125,10 +2146,12 @@ class Database:
             result = self.cursor.fetchone()
 
         if not result and none == "error":
-            mrich.error(f"No entry in {table} with {where_str}")
+            mrich.error(f"No entry in {self.SQL_SCHEMA_PREFIX}{table} with {where_str}")
             return None
         elif not result and none == "exception":
-            raise ValueError(f"No entry in {table} with {where_str}")
+            raise ValueError(
+                f"No entry in {self.SQL_SCHEMA_PREFIX}{table} with {where_str}"
+            )
 
         # if not result:
         #     raise ValueError(f"No entry in {table} with {where_str}")
@@ -2207,11 +2230,11 @@ class Database:
             if isinstance(value, str):
                 value = f"'{value}'"
 
-            sql = f"DELETE FROM {table} WHERE {table}_{key}={value}"
+            sql = f"DELETE FROM {self.SQL_SCHEMA_PREFIX}{table} WHERE {table}_{key}={value}"
 
         else:
 
-            sql = f"DELETE FROM {table} WHERE {key}"
+            sql = f"DELETE FROM {self.SQL_SCHEMA_PREFIX}{table} WHERE {key}"
 
         try:
             result = self.execute(sql)
@@ -2251,7 +2274,7 @@ class Database:
         tables = ["reaction", "reactant", "route", "component"]
 
         for table in tables:
-            self.execute(f"DELETE FROM {table};")
+            self.execute(f"DELETE FROM {self.SQL_SCHEMA_PREFIX}{table};")
         self.commit()
 
     def delete_subsites(self) -> None:
@@ -2283,10 +2306,10 @@ class Database:
         """
 
         sql = f"""
-        UPDATE {table}
+        UPDATE {self.SQL_SCHEMA_PREFIX}{table}
         SET {key} = {self.SQL_STRING_PLACEHOLDER}
-        WHERE {table}_id = {id};
-        {self.sql_return_id_str(table)}
+        WHERE {table}_id = {id}
+        {self.sql_return_id_str(table)};
         """
 
         try:
@@ -2321,7 +2344,7 @@ class Database:
         """
 
         sql = f"""
-        UPDATE {table}
+        UPDATE {self.SQL_SCHEMA_PREFIX}{table}
         SET {key} = ?
         """
 
@@ -2362,8 +2385,8 @@ class Database:
             cursor = source_db.execute(sql)
             records = cursor.fetchall()
 
-            sql = """
-            INSERT OR IGNORE INTO interaction(
+            sql = f"""
+            INSERT OR IGNORE INTO {self.SQL_SCHEMA_PREFIX}interaction(
                 interaction_feature, 
                 interaction_pose, 
                 interaction_type, 
@@ -2393,8 +2416,8 @@ class Database:
 
         else:
 
-            sql = """
-            INSERT OR IGNORE INTO interaction(
+            sql = f"""
+            INSERT OR IGNORE INTO {self.SQL_SCHEMA_PREFIX}interaction(
                 interaction_feature, 
                 interaction_pose, 
                 interaction_type, 
@@ -2406,7 +2429,7 @@ class Database:
                 interaction_angle, 
                 interaction_energy
             )
-            SELECT interaction_feature, 
+            SELECT {self.SQL_SCHEMA_PREFIX}interaction_feature, 
                 interaction_pose, 
                 interaction_type, 
                 interaction_family, 
@@ -2431,7 +2454,7 @@ class Database:
 
         cursor = self.execute(
             f"""
-            INSERT OR IGNORE INTO temp_interaction(
+            INSERT OR IGNORE INTO {self.SQL_SCHEMA_PREFIX}temp_interaction(
                 interaction_feature, 
                 interaction_pose, 
                 interaction_type, 
@@ -2453,7 +2476,7 @@ class Database:
                 interaction_distance, 
                 interaction_angle, 
                 interaction_energy 
-            FROM interaction
+            FROM {self.SQL_SCHEMA_PREFIX}interaction
             WHERE interaction_pose = {pose_id}
         """
         )
@@ -2469,8 +2492,8 @@ class Database:
         mrich.debug("HIPPO.Database.migrate_legacy_scaffolds()")
 
         cursor = self.execute(
-            """
-            INSERT INTO scaffold(scaffold_base, scaffold_superstructure)
+            f"""
+            INSERT INTO {self.SQL_SCHEMA_PREFIX}scaffold(scaffold_base, scaffold_superstructure)
             SELECT compound_base, compound_id FROM compound
             WHERE compound_base IS NOT NULL
             """
@@ -2485,8 +2508,8 @@ class Database:
 
         # add column
 
-        sql = """
-        ALTER TABLE component
+        sql = f"""
+        ALTER TABLE {self.SQL_SCHEMA_PREFIX}component
         ADD component_amount REAL;
         """
 
@@ -2494,8 +2517,8 @@ class Database:
 
         # set values
 
-        sql = """
-        UPDATE component
+        sql = f"""
+        UPDATE {self.SQL_SCHEMA_PREFIX}component
         SET component_amount = :component_amount
         WHERE component_type = :component_type;
         """
@@ -2507,8 +2530,8 @@ class Database:
     def update_legacy_reaction_metadata(self) -> None:
         """Add reaction_metadata column"""
 
-        sql = """
-        ALTER TABLE reaction
+        sql = f"""
+        ALTER TABLE {self.SQL_SCHEMA_PREFIX}reaction
         ADD reaction_metadata TEXT;
         """
 
@@ -2517,8 +2540,8 @@ class Database:
     def update_legacy_pose_inspiration_score(self) -> None:
         """Add pose_inspiration_score column"""
 
-        sql = """
-        ALTER TABLE pose
+        sql = f"""
+        ALTER TABLE {self.SQL_SCHEMA_PREFIX}pose
         ADD pose_inspiration_score REAL;
         """
 
@@ -2527,9 +2550,9 @@ class Database:
     def update_compound_pattern_bfp_table(self):
         """Update the compound pattern BFP table"""
         self.execute(
-            """
-            INSERT INTO compound_pattern_bfp
-            SELECT c.compound_id, c.compound_pattern_bfp FROM compound AS c
+            f"""
+            INSERT INTO {self.SQL_SCHEMA_PREFIX}compound_pattern_bfp
+            SELECT c.compound_id, c.compound_pattern_bfp FROM {self.SQL_SCHEMA_PREFIX}compound AS c
             LEFT JOIN compound_pattern_bfp as fp
             ON c.compound_id = fp.compound_id
             WHERE fp.compound_id IS NULL
@@ -2543,9 +2566,9 @@ class Database:
 
         from collections import Counter
 
-        sql = """
-        SELECT route_id, route_product, component_ref, component_type FROM route
-        INNER JOIN component ON route_id = component_route
+        sql = f"""
+        SELECT route_id, route_product, component_ref, component_type FROM {self.SQL_SCHEMA_PREFIX}route
+        INNER JOIN {self.SQL_SCHEMA_PREFIX}component ON route_id = component_route
         """
 
         records = self.execute(sql).fetchall()
@@ -2596,8 +2619,8 @@ class Database:
 
         mrich.var("#compounds", self.count("compound"))
 
-        sql = """
-        UPDATE your_table_name
+        sql = f"""
+        UPDATE {self.SQL_SCHEMA_PREFIX}compound
         SET compound_mol = mol_from_smiles(compound_smiles);
         """
 
@@ -2614,9 +2637,9 @@ class Database:
 
         count = self.count_where(table="pose", key="mol", value="NOT null")
 
-        sql = """
+        sql = f"""
         SELECT pose_id, pose_compound, mol_to_smiles(mol_from_binary_mol(pose_mol))
-        FROM pose
+        FROM {self.SQL_SCHEMA_PREFIX}pose
         WHERE pose_mol IS NOT null
         """
 
@@ -2697,8 +2720,8 @@ class Database:
 
         if self.auto_compute_bfps:
 
-            sql = """
-            INSERT OR IGNORE INTO compound(
+            sql = f"""
+            INSERT OR IGNORE INTO {self.SQL_SCHEMA_PREFIX}compound(
                 compound_inchikey, 
                 compound_smiles, 
                 compound_mol, 
@@ -2716,8 +2739,8 @@ class Database:
 
         else:
 
-            sql = """
-            INSERT OR IGNORE INTO compound(compound_inchikey, compound_smiles, compound_mol)
+            sql = f"""
+            INSERT OR IGNORE INTO {self.SQL_SCHEMA_PREFIX}compound(compound_inchikey, compound_smiles, compound_mol)
             VALUES(?1, ?2, mol_from_smiles(?2))
             """
 
@@ -2760,8 +2783,8 @@ class Database:
 
         ### POSES
 
-        sql = """
-        INSERT OR IGNORE INTO pose(
+        sql = f"""
+        INSERT OR IGNORE INTO {self.SQL_SCHEMA_PREFIX}pose(
             pose_inchikey, 
             pose_smiles, 
             pose_alias, 
@@ -2856,10 +2879,10 @@ class Database:
 
         self.commit()
 
-        sql = """
-            INSERT OR IGNORE INTO scaffold
+        sql = f"""
+            INSERT OR IGNORE INTO {self.SQL_SCHEMA_PREFIX}scaffold
             SELECT ?1, c.compound_id 
-            FROM compound AS c, compound_pattern_bfp AS fp
+            FROM {self.SQL_SCHEMA_PREFIX}compound AS c, compound_pattern_bfp AS fp
             WHERE c.compound_id = fp.compound_id
             AND c.compound_id <> ?1
             AND mol_is_substruct(c.compound_mol, ?2)
@@ -3013,7 +3036,10 @@ class Database:
         mrich.var("#murcko scaffold relations", len(pairs))
 
         self.executemany(
-            """INSERT OR IGNORE INTO scaffold (scaffold_base, scaffold_superstructure) VALUES (?,?)""",
+            f"""
+            INSERT OR IGNORE INTO {self.SQL_SCHEMA_PREFIX}scaffold (scaffold_base, scaffold_superstructure) 
+            VALUES (?,?)
+            """,
             pairs,
         )
 
@@ -3056,10 +3082,10 @@ class Database:
     def set_derivative_subsites(self, commit: bool = True) -> None:
         """Propagate all subsite assignments from inspirations to their derivatives"""
 
-        sql = """
-        INSERT OR IGNORE INTO subsite_tag(subsite_tag_ref, subsite_tag_pose)
-        SELECT subsite_tag_ref, inspiration_derivative FROM subsite_tag
-        INNER JOIN inspiration
+        sql = f"""
+        INSERT OR IGNORE INTO {self.SQL_SCHEMA_PREFIX}subsite_tag(subsite_tag_ref, subsite_tag_pose)
+        SELECT subsite_tag_ref, inspiration_derivative FROM {self.SQL_SCHEMA_PREFIX}subsite_tag
+        INNER JOIN {self.SQL_SCHEMA_PREFIX}inspiration
         ON subsite_tag_pose = inspiration_original
         """
 
@@ -3576,7 +3602,9 @@ class Database:
         """Get a :class:`.CompoundSet` of all route products"""
         from .cset import CompoundSet
 
-        records = self.execute("SELECT DISTINCT route_product FROM route").fetchall()
+        records = self.execute(
+            f"SELECT DISTINCT route_product FROM {self.SQL_SCHEMA_PREFIX}route"
+        ).fetchall()
         if not records:
             return None
         return CompoundSet(self, [i for i, in records])
@@ -3604,7 +3632,7 @@ class Database:
     def get_compound_id_pose_ids_dict(self, cset: "CompoundSet") -> dict[int, set]:
         """Get a dictionary mapping :class:`.Compound` ID's to their associated :class:`.Pose` ID's"""
         records = self.execute(
-            f"SELECT pose_compound, pose_id FROM pose WHERE pose_compound IN {cset.str_ids}"
+            f"SELECT pose_compound, pose_id FROM {self.SQL_SCHEMA_PREFIX}pose WHERE pose_compound IN {cset.str_ids}"
         ).fetchall()
 
         d = {}
@@ -3619,7 +3647,7 @@ class Database:
     ) -> dict[int, set[str]]:
         """Get a dictionary mapping :class:`.Compound` ID's to suppliers which stock it"""
         records = self.execute(
-            f"SELECT quote_compound, quote_supplier FROM quote WHERE quote_compound IN {cset.str_ids}"
+            f"SELECT quote_compound, quote_supplier FROM {self.SQL_SCHEMA_PREFIX}quote WHERE quote_compound IN {cset.str_ids}"
         ).fetchall()
 
         d = {}
@@ -3637,7 +3665,7 @@ class Database:
         """Get a dictionary mapping :class:`.Compound` ID's to suppliers which stock it"""
 
         if cset:
-            sql = f"SELECT compound_id, compound_smiles FROM compound WHERE compound_id IN {cset.str_ids}"
+            sql = f"SELECT compound_id, compound_smiles FROM {self.SQL_SCHEMA_PREFIX}compound WHERE compound_id IN {cset.str_ids}"
 
         else:
             sql = "SELECT compound_id, compound_smiles FROM compound"
@@ -3727,12 +3755,12 @@ class Database:
 
         if (cset is not None and not fractions) or (fraction_reference is not None):
             sql = f"""
-            SELECT scaffold_superstructure, scaffold_base FROM scaffold
+            SELECT scaffold_superstructure, scaffold_base FROM {self.SQL_SCHEMA_PREFIX}scaffold
             WHERE scaffold_superstructure IN {cset.str_ids}
             """
         else:
             sql = f"""
-            SELECT scaffold_superstructure, scaffold_base FROM scaffold
+            SELECT scaffold_superstructure, scaffold_base FROM {self.SQL_SCHEMA_PREFIX}scaffold
             """
 
         records = self.execute(sql).fetchall()
@@ -3886,7 +3914,7 @@ class Database:
     def get_pose_id_interaction_ids_dict(self, pset: "PoseSet") -> dict[int, set]:
         """Get a dictionary mapping :class:`.Pose` ID's to their associated :class:`.Interaction` ID's"""
         records = self.execute(
-            f"SELECT interaction_pose, interaction_id FROM interaction WHERE interaction_pose IN {pset.str_ids}"
+            f"SELECT interaction_pose, interaction_id FROM {self.SQL_SCHEMA_PREFIX}interaction WHERE interaction_pose IN {pset.str_ids}"
         ).fetchall()
 
         d = {}
@@ -3902,7 +3930,7 @@ class Database:
         if pset:
             records = self.execute(
                 f"""
-            SELECT pose_id, pose_alias FROM pose 
+            SELECT pose_id, pose_alias FROM {self.SQL_SCHEMA_PREFIX}pose 
             WHERE pose_alias IS NOT NULL
             AND pose_id IN {pset.str_ids}"""
             ).fetchall()
@@ -3925,7 +3953,7 @@ class Database:
         if pset:
             records = self.execute(
                 f"""
-            SELECT pose_alias, pose_path FROM pose 
+            SELECT pose_alias, pose_path FROM {self.SQL_SCHEMA_PREFIX}pose 
             WHERE pose_id IN {pset.str_ids}"""
             ).fetchall()
 
@@ -3946,7 +3974,7 @@ class Database:
         if pset:
             records = self.execute(
                 f"""
-            SELECT pose_id, pose_alias FROM pose 
+            SELECT pose_id, pose_alias FROM {self.SQL_SCHEMA_PREFIX}pose 
             WHERE pose_alias IS NOT NULL
             AND pose_id IN {pset.str_ids}"""
             ).fetchall()
@@ -3969,7 +3997,7 @@ class Database:
         if pset:
             records = self.execute(
                 f"""
-            SELECT pose_id, pose_path FROM pose 
+            SELECT pose_id, pose_path FROM {self.SQL_SCHEMA_PREFIX}pose 
             WHERE pose_path IS NOT NULL
             AND pose_id IN {pset.str_ids}"""
             ).fetchall()
@@ -4048,7 +4076,7 @@ class Database:
         """Get a dictionary mapping :class:`.Pose` ID's to lists of `(interaction_type, feature_id)` tuples describing their interactions"""
 
         sql = f"""
-        SELECT DISTINCT interaction_pose, feature_id, interaction_type FROM interaction 
+        SELECT DISTINCT interaction_pose, feature_id, interaction_type FROM {self.SQL_SCHEMA_PREFIX}interaction 
         INNER JOIN feature ON interaction_feature = feature_id
         WHERE interaction_pose IN {pset.str_ids}
         """
@@ -4066,10 +4094,10 @@ class Database:
     def get_compound_id_inspiration_ids_dict(self) -> dict[int, set]:
         """Get a dictionary mapping :class:`.Compound` ID's to a set of :class:`Pose` ID's for the inspirations for the whole database"""
 
-        sql = """
-        SELECT compound_id, pose_id, inspiration_original FROM compound
-        INNER JOIN pose ON compound_id = pose_compound
-        INNER JOIN inspiration ON pose_id = inspiration_derivative
+        sql = f"""
+        SELECT compound_id, pose_id, inspiration_original FROM {self.SQL_SCHEMA_PREFIX}compound
+        INNER JOIN {self.SQL_SCHEMA_PREFIX}pose ON compound_id = pose_compound
+        INNER JOIN {self.SQL_SCHEMA_PREFIX}inspiration ON pose_id = inspiration_derivative
         """
 
         with mrich.spinner("Database.get_pose_id_interaction_ids_dict()"):
@@ -4091,16 +4119,16 @@ class Database:
 
         if pset:
             sql = f"""
-            SELECT pose_id, inspiration_original FROM pose
-            INNER JOIN inspiration ON pose_id = inspiration_derivative
+            SELECT pose_id, inspiration_original FROM {self.SQL_SCHEMA_PREFIX}pose
+            INNER JOIN {self.SQL_SCHEMA_PREFIX}inspiration ON pose_id = inspiration_derivative
             WHERE pose_id IN {pset.str_ids}
             """
 
         else:
 
-            sql = """
-            SELECT pose_id, inspiration_original FROM pose
-            INNER JOIN inspiration ON pose_id = inspiration_derivative
+            sql = f"""
+            SELECT pose_id, inspiration_original FROM {self.SQL_SCHEMA_PREFIX}pose
+            INNER JOIN {self.SQL_SCHEMA_PREFIX}inspiration ON pose_id = inspiration_derivative
             """
 
         with mrich.spinner("Database.get_pose_id_interaction_ids_dict()"):
@@ -4116,7 +4144,7 @@ class Database:
 
     def get_inspiration_tuples(self) -> list[int, int]:
         """Get a dictionary mapping :class:`.Pose` ID's to a set of :class:`Pose` ID's for the inspirations for the whole database"""
-        sql = """SELECT inspiration_original, inspiration_derivative FROM inspiration"""
+        sql = f"""SELECT inspiration_original, inspiration_derivative FROM {self.SQL_SCHEMA_PREFIX}inspiration"""
         return self.execute(sql).fetchall()
 
     def get_compound_id_obj_dict(self, cset: "CompoundSet") -> "dict[id, Compound]":
@@ -4197,7 +4225,7 @@ class Database:
         records = self.execute(
             f"""
             SELECT reaction_type, reaction_product, reaction_id, reactant_compound
-            FROM reaction INNER JOIN reactant
+            FROM {self.SQL_SCHEMA_PREFIX}reaction INNER JOIN {self.SQL_SCHEMA_PREFIX}reactant
             ON reaction_id = reactant_reaction
             WHERE reaction_product IN {str_ids}
         """
@@ -4239,7 +4267,7 @@ class Database:
                 SELECT reactant_reaction, CASE 
                     WHEN reactant_compound IN {compound_ids_str} 
                     THEN reactant_compound END AS [possible_reactant] 
-                FROM reactant
+                FROM {self.SQL_SCHEMA_PREFIX}reactant
             )
 
             , possible_reactions AS (
@@ -4336,11 +4364,11 @@ class Database:
 
         # all intermediates
         ids = self.execute(
-            """
+            f"""
             SELECT DISTINCT reaction_product 
-            FROM reaction 
-            INNER JOIN reactant 
-            ON reaction.reaction_product = reactant.reactant_compound
+            FROM {self.SQL_SCHEMA_PREFIX}reaction 
+            INNER JOIN {self.SQL_SCHEMA_PREFIX}reactant 
+            ON reaction_product = reactant_compound
             """
         ).fetchall()
         ids = [q for q, in ids]
@@ -4386,7 +4414,8 @@ class Database:
             f"""
         WITH unit_prices AS 
         (
-            SELECT quote_compound, MIN(quote_price/quote_amount) AS unit_price FROM quote 
+            SELECT quote_compound, MIN(quote_price/quote_amount) AS unit_price 
+            FROM {self.SQL_SCHEMA_PREFIX}quote 
             WHERE quote_compound IN {reactants.str_ids}
             GROUP BY quote_compound
         )
@@ -4507,9 +4536,9 @@ class Database:
     ) -> list[dict]:
         """Get a dictionary mapping scaffold :class:`.Compound` IDs to their superstructure's IDs"""
 
-        sql = """
+        sql = f"""
         SELECT scaffold_base as a, scaffold_superstructure as b, bfp_tanimoto(c.fp, d.fp) AS t
-        FROM scaffold
+        FROM {self.SQL_SCHEMA_PREFIX}scaffold
         INNER JOIN compound_pattern_bfp AS c ON a = c.compound_id
         INNER JOIN compound_pattern_bfp AS d ON b = d.compound_id
         """
@@ -4531,9 +4560,11 @@ class Database:
     ) -> set[tuple[int, int]]:
         """Get tuples of (reactant, product) :class:`.Compound` IDs"""
 
-        sql = """
-        SELECT reactant_compound, reaction_product FROM reactant
-        INNER JOIN reaction ON reactant_reaction = reaction_id
+        sql = f"""
+        SELECT reactant_compound, reaction_product 
+        FROM {self.SQL_SCHEMA_PREFIX}reactant
+        INNER JOIN {self.SQL_SCHEMA_PREFIX}reaction 
+        ON reactant_reaction = reaction_id
         """
 
         if compound_ids:
@@ -4553,8 +4584,9 @@ class Database:
     ) -> set[tuple[int, int]]:
         """Get tuples of (reactant, product) :class:`.Compound` IDs"""
 
-        sql = """
-        SELECT scaffold_base, scaffold_superstructure FROM scaffold
+        sql = f"""
+        SELECT scaffold_base, scaffold_superstructure 
+        FROM {self.SQL_SCHEMA_PREFIX}scaffold
         """
 
         if compound_ids:
@@ -4594,14 +4626,14 @@ class Database:
             if fast:
                 sql = f"""
                 SELECT compound.compound_id, compound.compound_inchikey 
-                FROM compound, compound_pattern_bfp AS bfp 
-                WHERE compound.compound_id = bfp.compound_id 
+                FROM {self.SQL_SCHEMA_PREFIX}compound, compound_pattern_bfp AS bfp 
+                WHERE {self.SQL_SCHEMA_PREFIX}compound.compound_id = {self.SQL_SCHEMA_PREFIX}bfp.compound_id 
                 AND mol_is_substruct(compound.compound_mol, {func}(?))
                 """
 
             else:
                 sql = f"""
-                SELECT compound_id, compound_inchikey FROM compound 
+                SELECT compound_id, compound_inchikey FROM {self.SQL_SCHEMA_PREFIX}compound 
                 WHERE mol_is_substruct(compound_mol, {func}(?))
                 """
 
@@ -4670,7 +4702,7 @@ class Database:
             sql = f"""
             WITH subset AS (
                 SELECT compound_id, fp
-                FROM compound
+                FROM {self.SQL_SCHEMA_PREFIX}compound
                 JOIN compound_pattern_bfp USING (compound_id)
                 WHERE compound_id IN {subset.str_ids}
             )
@@ -4688,7 +4720,7 @@ class Database:
             sql = f"""
             WITH subset AS (
                 SELECT compound_id, mol_{fp}_bfp(compound_mol, {morgan_radius}, {bits}) AS fp
-                FROM compound
+                FROM {self.SQL_SCHEMA_PREFIX}compound
                 WHERE compound_id IN {subset.str_ids}
             )
             
@@ -4705,7 +4737,7 @@ class Database:
             sql = f"""
             WITH subset AS (
                 SELECT compound_id, mol_{fp}_bfp(compound_mol, {bits}) AS fp
-                FROM compound
+                FROM {self.SQL_SCHEMA_PREFIX}compound
                 WHERE compound_id IN {subset.str_ids}
             )
             
@@ -4758,7 +4790,7 @@ class Database:
                 SELECT compound_id, 
                        bfp_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), 
                        mol_pattern_bfp(compound.compound_mol, 2048)) as t 
-                FROM compound 
+                FROM {self.SQL_SCHEMA_PREFIX}compound 
                 JOIN compound_pattern_bfp AS mfp 
                 USING(compound_id) 
                 WHERE mfp.compound_id
@@ -4782,7 +4814,7 @@ class Database:
                 SELECT compound_id, 
                        bfp_tanimoto(mol_pattern_bfp(mol_from_smiles(?1), 2048), 
                        mol_pattern_bfp(compound.compound_mol, 2048)) as t 
-                FROM compound 
+                FROM {self.SQL_SCHEMA_PREFIX}compound 
                 JOIN compound_pattern_bfp AS mfp 
                 USING(compound_id) 
                 WHERE mfp.compound_id
@@ -4847,7 +4879,7 @@ class Database:
         pairs = self.execute(
             f"""
             SELECT {table}_id, {table}_metadata 
-            FROM {table} 
+            FROM {self.SQL_SCHEMA_PREFIX}{table} 
             WHERE {table}_metadata LIKE '%"{key}": "%'
             """
         ).fetchall()
@@ -4871,7 +4903,7 @@ class Database:
 
         """
 
-        sql = f"SELECT COUNT(1) FROM {table};"
+        sql = f"SELECT COUNT(1) FROM {self.SQL_SCHEMA_PREFIX}{table};"
         self.execute(sql)
         return self.cursor.fetchone()[0]
 
@@ -4893,7 +4925,7 @@ class Database:
         else:
             where_str = key
 
-        sql = f"SELECT COUNT(1) FROM {table} WHERE {where_str};"
+        sql = f"SELECT COUNT(1) FROM {self.SQL_SCHEMA_PREFIX}{table} WHERE {where_str};"
         self.execute(sql)
         return self.cursor.fetchone()[0]
 
@@ -5094,7 +5126,7 @@ class Database:
 
         column_names = self.column_names(table)
 
-        self.execute(f"SELECT * FROM {table}")
+        self.execute(f"SELECT * FROM {self.SQL_SCHEMA_PREFIX}{table}")
 
         for record in self.cursor:
             d = {}
@@ -5117,7 +5149,7 @@ class Database:
 
         """
 
-        self.execute(f"PRAGMA table_info({table})")
+        self.execute(f"PRAGMA table_info({self.SQL_SCHEMA_PREFIX}{table})")
         return self.cursor.fetchall()
 
     def column_names(self, table: str) -> list[str]:
