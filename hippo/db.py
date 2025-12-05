@@ -103,6 +103,33 @@ class Database:
     )
     """
 
+    SQL_BULK_INSERT_INTERACTIONS = """
+    INSERT OR IGNORE INTO interaction(
+        interaction_feature, 
+        interaction_pose, 
+        interaction_type, 
+        interaction_family, 
+        interaction_atom_ids, 
+        interaction_prot_coord, 
+        interaction_lig_coord, 
+        interaction_distance, 
+        interaction_angle, 
+        interaction_energy
+    )
+    VALUES(
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?
+    )
+    """
+
     POSE_FIELDS = [
         "pose_id",
         "pose_inchikey",
@@ -2398,34 +2425,7 @@ class Database:
             cursor = source_db.execute(sql)
             records = cursor.fetchall()
 
-            sql = f"""
-            INSERT OR IGNORE INTO {self.SQL_SCHEMA_PREFIX}interaction(
-                interaction_feature, 
-                interaction_pose, 
-                interaction_type, 
-                interaction_family, 
-                interaction_atom_ids, 
-                interaction_prot_coord, 
-                interaction_lig_coord, 
-                interaction_distance, 
-                interaction_angle, 
-                interaction_energy
-            )
-            VALUES(
-                {self.SQL_STRING_PLACEHOLDER},
-                {self.SQL_STRING_PLACEHOLDER},
-                {self.SQL_STRING_PLACEHOLDER},
-                {self.SQL_STRING_PLACEHOLDER},
-                {self.SQL_STRING_PLACEHOLDER},
-                {self.SQL_STRING_PLACEHOLDER},
-                {self.SQL_STRING_PLACEHOLDER},
-                {self.SQL_STRING_PLACEHOLDER},
-                {self.SQL_STRING_PLACEHOLDER},
-                {self.SQL_STRING_PLACEHOLDER}
-            )
-            """
-
-            cursor = self.executemany(sql, records)
+            cursor = self.executemany(self.SQL_BULK_INSERT_INTERACTIONS, records)
 
         else:
 

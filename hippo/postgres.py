@@ -82,6 +82,34 @@ class PostgresDatabase(Database):
     RETURNING compound_id;
     """
 
+    SQL_BULK_INSERT_INTERACTIONS = """
+    INSERT INTO interaction(
+        interaction_feature, 
+        interaction_pose, 
+        interaction_type, 
+        interaction_family, 
+        interaction_atom_ids, 
+        interaction_prot_coord, 
+        interaction_lig_coord, 
+        interaction_distance, 
+        interaction_angle, 
+        interaction_energy
+    )
+    VALUES(
+        %s,
+        %s,
+        %s,
+        %s,
+        %s,
+        %s,
+        %s,
+        %s,
+        %s,
+        %s
+    )
+    ON CONFLICT ON CONSTRAINT UC_interaction DO NOTHING
+    """
+
     POSE_FIELDS = [
         "pose_id",
         "pose_inchikey",
