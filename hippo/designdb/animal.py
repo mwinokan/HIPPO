@@ -95,6 +95,8 @@ class HIPPO:
         aligned_directory: str | Path,
         tags: list | None = None,
         skip: list | None = None,
+        check_rmsd: bool = False,
+        rmsd_threshold: float = 1.0,
         # debug: bool = False,
         # load_pose_mols: bool = False,
     ) -> pd.DataFrame:
@@ -184,6 +186,8 @@ class HIPPO:
                     skip_records=skip,
                     compound_tag_list=tags,
                     metadata_file=metadata_csv,
+                    check_rmsd=check_rmsd,
+                    rmsd_threshold=rmsd_threshold,
                 )
         except Exception as exc:
             logger.error(exc, exc_info=True)
@@ -217,6 +221,8 @@ class HIPPO:
         convert_floats: bool = True,
         skip_equal_dict: dict | None = None,
         skip_not_equal_dict: dict | None = None,
+        check_rmsd: bool = False,
+        rmsd_threshold: float = 1.0,
     ) -> None:
         """Add posed virtual hits from an SDF into the database.
 
@@ -309,6 +315,8 @@ class HIPPO:
                     convert_floats=convert_floats,
                     field_warning=warn,
                     inspiration_map=inspiration_map,
+                    check_rmsd=check_rmsd,
+                    rmsd_threshold=rmsd_threshold,
                 )
         except Exception as exc:
             logger.error(exc, exc_info=True)

@@ -7,7 +7,6 @@ from typing import Any
 import molparse as mp
 import mrich
 import pandas as pd
-from designdb.chem import InvalidChemistryError, UnsupportedChemistryError, check_chemistry
 from designdb.components.compound import Ingredient
 from designdb.components.recipe import Recipe, Route
 from designdb.models import (
@@ -31,6 +30,7 @@ from designdb.utils import (
     remove_other_ligands,
     sanitise_smiles,
 )
+from designdb.utils_chem import InvalidChemistryError, UnsupportedChemistryError, check_chemistry
 from designdb.utils_frag import UnsupportedFragalysisLongcodeError, parse_observation_longcode
 from django.db import connection
 from numpy import isnan
@@ -306,6 +306,8 @@ class IngestionService:
         skip_records: list[str],
         compound_tag_list: list[str],
         metadata_file: Path | str,
+        check_rmsd: bool = False,
+        rmsd_threshold: float = 1.0,
     ) -> IngestionBatchResult:
 
         # this is now strictly for loading frag data. cannot switch inner funcs easily
@@ -368,6 +370,8 @@ class IngestionService:
                 metadata=metadata,
                 inchikey=inchikey,
                 smiles=smiles,
+                check_rmsd=check_rmsd,
+                rmsd_threshold=rmsd_threshold,
             )
             if pose_created:
                 result.poses_created += 1
@@ -407,6 +411,8 @@ class IngestionService:
         skip_not_equal,
         convert_floats: bool = True,
         field_warning=None,
+        check_rmsd: bool = False,
+        rmsd_threshold: float = 1.0,
     ) -> IngestionBatchResult:
         result = IngestionBatchResult()
 
@@ -520,6 +526,8 @@ class IngestionService:
                 inchikey=inchikey,
                 smiles=smiles,
                 reference=reference,
+                check_rmsd=check_rmsd,
+                rmsd_threshold=rmsd_threshold,
             )
             if pose_created:
                 result.poses_created += 1

@@ -10,6 +10,7 @@ import rdkit
 # from rdkit.Chem import inchi
 from designdb.models import CompoundModel, PoseModel, PoseTagModel, TargetModel
 from designdb.utils import normalize_string_list
+from designdb.utils_chem import get_best_rmsd
 from designdb.utils_frag import GENERATED_TAG_COLS, META_IGNORE_COLS
 from django.db.models import Q
 # from mypackage.services.compound import CompoundService
@@ -46,6 +47,8 @@ class PoseService:
         inchikey: str,
         smiles: str,
         reference: int | None = None,
+        check_rmsd: bool = False,
+        rmsd_threshold: float = 1.0,
     ):
 
         try:
@@ -60,6 +63,21 @@ class PoseService:
             pose.save()
             created = False
         except PoseModel.DoesNotExist:
+            if check_rmsd:
+                for existing in PoseModel.objects.filter(compound=compound, target=target):
+                    try:
+                        rmsd = get_best_rmsd(mol, existing.pose_mol)
+                        if rmsd < rmsd_threshold:
+                            logger.warning(
+                                'Pose RMSD %.3f Å below threshold %.3f Å, skipping duplicate (alias=%s)',
+                                rmsd,
+                                rmsd_threshold,
+                                existing.pose_alias,
+                            )
+                            return existing, False
+                    except Exception:
+                        logger.warning('RMSD calculation failed for pose pk=%s', existing.pk)
+
             pose = PoseModel(
                 compound=compound,
                 target=target,
