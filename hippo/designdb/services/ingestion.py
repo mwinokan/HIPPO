@@ -10,7 +10,6 @@ import pandas as pd
 from designdb.components.compound import Ingredient
 from designdb.components.recipe import Recipe, Route
 from designdb.models import (
-    ComponentModel,
     CompoundModel,
     PoseModel,
     ReactantModel,
@@ -809,9 +808,6 @@ class IngestionService:
 
         elif scaffold_route:
             ### SUPPLEMENT THE SCAFFOLD ROWS FROM KNOWN ROUTE
-
-            mrich.var('DEBUG reaction_ids in ComponentModel', list(ComponentModel.objects.filter(route=scaffold_route._id, component_type=1).values_list('component_ref', flat=True)))
-            mrich.var('DEBUG ReactionModel PKs', list(ReactionModel.objects.values_list('pk', flat=True)))
 
             assert scaffold_route.num_reactions == 1
 
