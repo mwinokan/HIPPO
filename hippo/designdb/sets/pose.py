@@ -20,6 +20,8 @@ from designdb.models import (
     CompoundModel,
     InspirationModel,
     InteractionModel,
+    PoseMethodJunctionModel,
+    PoseMethodModel,
     PoseModel,
     PoseTagJunctionModel,
     PoseTagModel,
@@ -27,7 +29,9 @@ from designdb.models import (
     SubsiteTagModel,
     TargetModel,
 )
+from designdb.services.subsite import SubsiteService
 from designdb.sets.interaction import InteractionSet
+from designdb.settings import DEFAULT_POSE_METHODS
 from designdb.utils import ScoreSubquery, normalize_string_list
 from designdb.utils_frag import generate_header
 from django.conf import settings
@@ -289,15 +293,18 @@ class PoseSet:
         self,
         *,
         tag: str = None,
+        pose_method: str = None,
         target: int = None,
         subsite: int = None,
     ) -> 'PoseSet':
-        """Filter poses by a given tag, SubsiteModel ID, or target ID. See
-        :meth:`.PoseSet.get_by_tag`, :meth:`.PoseSet.get_by_target`, amd
-        :meth:`.PoseSet.get_by_subsite`"""
+        """Filter poses by a given tag, pose method name, SubsiteModel ID, or target ID. See
+        :meth:`.PoseSet.get_by_tag`, :meth:`.PoseSet.get_by_method`,
+        :meth:`.PoseSet.get_by_target`, and :meth:`.PoseSet.get_by_subsite`"""
 
         if tag:
             return self.get_by_tag(tag)
+        elif pose_method:
+            return self.get_by_method(pose_method)
         elif target:
             return self.get_by_target(target=TargetModel.objects.get(pk=target))
         elif subsite:
@@ -350,6 +357,14 @@ class PoseSet:
             return PoseSet(self._queryset.filter(has_tag=False))
         else:
             return PoseSet(self._queryset.filter(has_tag=True))
+
+    def get_by_method(self, method: str) -> 'PoseSet':
+        """Get all poses associated with a given pose method name."""
+        return PoseSet(
+            self._queryset.filter(
+                methods__pose_method_name=method,
+            )
+        )
 
     def get_by_metadata(
         self, key: str, value: str | None = None, debug: bool = False
@@ -688,6 +703,10 @@ class PoseSet:
 
         return PoseSet(qs, name=name)
 
+    def set_subsites_from_metadata_field(self, field: str = 'CanonSites alias') -> None:
+        """Create and assign subsite entries from a pose metadata field."""
+        SubsiteService.set_subsites_from_metadata_field(self._queryset, field)
+
     # def get_best_placed_poses_per_compound(self):
     #     """Choose the best placed pose (best distance_score) grouped by compound"""
 
@@ -801,29 +820,6 @@ class PoseSet:
             pose.save()
         self._queryset = PoseModel.objects.filter(pk__in=self._queryset.values('pk'))
 
-    def set_subsites_from_metadata_field(self, field='CanonSites alias') -> None:
-        """Create and assign subsite entries from a metadata field
-
-        :param field: the metadata field to use
-
-        """
-        for pose in self._queryset:
-            metadata = json.loads(pose.payload)
-            key = metadata.get(field)
-            if not key:
-                mrich.warning(field, 'not in metadata pose_id=', pose_id)
-                continue
-
-            # I'm still not entirely clear can you really have
-            # posesets from different target, if not, and it really
-            # seems that not, this should be a single subsite
-            subsite, _ = SubsiteModel.get_or_create(
-                target=pose.target, subsite_name=key
-            )
-            subsite_tag = SubsiteTagModel(subsite=subsite, pose=pose)
-            subsite_tag.save()
-
-        self._queryset = PoseModel.objects.filter(pk__in=self._queryset.values('pk'))
 
     # TODO: implement scores
     # def calculate_inspiration_scores(
@@ -1490,7 +1486,7 @@ class PoseSet:
 
             for pose in self._queryset:
                 assert pose.pose_alias
-                assert pose.tags.filter(pose_tag_name='hits').exists()
+                assert pose.methods.filter(pose_method_name__in=DEFAULT_POSE_METHODS).exists()
 
                 if aligned_files_dir:
                     mol = str(pose.mol_path)

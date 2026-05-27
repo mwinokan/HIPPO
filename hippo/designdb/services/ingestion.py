@@ -11,6 +11,7 @@ from designdb.components.compound import Ingredient
 from designdb.components.recipe import Recipe, Route
 from designdb.models import (
     CompoundModel,
+    PoseMethodModel,
     PoseModel,
     ReactantModel,
     ReactionModel,
@@ -43,14 +44,14 @@ from rdkit.Chem import PandasTools
 # from .validation.compound import ValidationError, validate_compound_data
 
 SDF_XCAv2_PATTERN = re.compile(
-    r'^.*-.\d{4}_._\d*_\d_.*-.\d{4}\+.\+\d*\+\d_ligand\.sdf$'
+    r'^[^.]*-.\d{4}_._\d*_\d_.*-.\d{4}\+.\+\d*\+\d_ligand\.sdf$'
 )
 SDF_XCAV3_PATTERN = re.compile(
-    r'^.*-.\d{4}_._\d*_._\d_.*-.\d{4}\+.\+\d*\+.\+\d_ligand\.sdf$'
+    r'^[^.]*-.\d{4}_._\d*_._\d_.*-.\d{4}\+.\+\d*\+.\+\d_ligand\.sdf$'
 )
 
 
-SDF_FRAGALYSIS_PATTERN = re.compile(r'^.*\d{4}[a-z].sdf$')
+SDF_FRAGALYSIS_PATTERN = re.compile(r'^[^.].*\d{4}[a-z].sdf$')
 PDBID_PATTERN = re.compile(r'^[A-Za-z0-9]{4}-[a-z].sdf$')
 
 
@@ -99,12 +100,12 @@ def parse_pdb_mp(pdb_path: Path, residue: int, chain: str) -> str:
 def iter_fs_fragalysis(root_path, skip_records):
     assert skip_records is not None, '"None" passed instead as skip_records'
 
-    for dset_path in list(sorted(root_path.glob('*'))):
+    for dset_path in list(sorted(root_path.glob('[!.]*'))):
         if dset_path.name in skip_records:
             continue
 
         sdfs = []
-        for sdf_path in dset_path.glob('*.sdf'):
+        for sdf_path in dset_path.glob('[!.]*.sdf'):
             sdf_name = sdf_path.name
 
             if (
@@ -132,7 +133,7 @@ def iter_fs_fragalysis(root_path, skip_records):
 
         pdbs = [
             p
-            for p in dset_path.glob('*.pdb')
+            for p in dset_path.glob('[!.]*.pdb')
             if '_ligand' not in p.name
             and '_apo' not in p.name
             and '_hippo' not in p.name
@@ -157,7 +158,7 @@ def iter_fs_xca(root_path, skip):
 
         sdfs = []
 
-        for sdf_path in sorted(dset_path.glob('*.sdf')):
+        for sdf_path in sorted(dset_path.glob('[!.]*.sdf')):
             sdf_name = sdf_path.name
 
             # TODO: switch between patterns??
@@ -306,6 +307,7 @@ class IngestionService:
         skip_records: list[str],
         compound_tag_list: list[str],
         metadata_file: Path | str,
+        pose_methods: list[PoseMethodModel] | None = None,
         check_rmsd: bool = False,
         rmsd_threshold: float = 1.0,
     ) -> IngestionBatchResult:
@@ -378,17 +380,11 @@ class IngestionService:
 
             pose.tags.add(*pose_tags)
 
+            if pose_methods:
+                pose.methods.add(*pose_methods)
+
             # it seems fragalysis data is not expected to contain
             # scores
-
-            # in original code. what's that for?
-            # what I can think of is previously existing pose without mol
-            # if load_pose_mols:
-            #     try:
-            #         pose.mol
-            #     except Exception as e:
-            #         mrich.error('Could not load molecule', pose)
-            #         mrich.error(e)
 
         return result
 

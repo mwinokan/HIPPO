@@ -63,20 +63,10 @@ class PoseService:
             pose.save()
             created = False
         except PoseModel.DoesNotExist:
-            if check_rmsd:
-                for existing in PoseModel.objects.filter(compound=compound, target=target):
-                    try:
-                        rmsd = get_best_rmsd(mol, existing.pose_mol)
-                        if rmsd < rmsd_threshold:
-                            logger.warning(
-                                'Pose RMSD %.3f Å below threshold %.3f Å, skipping duplicate (alias=%s)',
-                                rmsd,
-                                rmsd_threshold,
-                                existing.pose_alias,
-                            )
-                            return existing, False
-                    except Exception:
-                        logger.warning('RMSD calculation failed for pose pk=%s', existing.pk)
+            if check_rmsd and (
+                duplicate := cls.find_rmsd_duplicate(mol, compound, target, rmsd_threshold)
+            ):
+                return duplicate, False
 
             pose = PoseModel(
                 compound=compound,
@@ -98,6 +88,29 @@ class PoseService:
         #     pass
 
         return pose, created
+
+    @classmethod
+    def find_rmsd_duplicate(
+        cls,
+        mol: 'Chem.rdchem.Mol',
+        compound: 'CompoundModel',
+        target: 'TargetModel',
+        rmsd_threshold: float,
+    ) -> 'PoseModel | None':
+        for existing in PoseModel.objects.filter(compound=compound, target=target):
+            try:
+                rmsd = get_best_rmsd(mol, existing.pose_mol)
+                if rmsd < rmsd_threshold:
+                    logger.warning(
+                        'Pose RMSD %.3f Å below threshold %.3f Å, skipping duplicate (alias=%s)',
+                        rmsd,
+                        rmsd_threshold,
+                        existing.pose_alias,
+                    )
+                    return existing
+            except Exception:
+                logger.warning('RMSD calculation failed for pose pk=%s', existing.pk)
+        return None
 
     @classmethod
     def create_from_record(

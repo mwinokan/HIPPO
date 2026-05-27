@@ -9,10 +9,13 @@ import mrich
 import pandas as pd
 from django.db import transaction
 
-from .models import CompoundModel, PoseModel, TargetModel
+from .models import CompoundModel, PoseMethodModel, PoseModel, TargetModel
 from .services.ingestion import IngestionBatchResult, IngestionService
+from .services.method import MethodService
+from .services.subsite import SubsiteService
 from .sets.compound import CompoundSet
 from .sets.pose import PoseSet
+from .settings import DEFAULT_POSE_METHODS
 from .utils import make_warn_once_per_key
 
 logger = logging.getLogger(__name__)
@@ -94,6 +97,7 @@ class HIPPO:
         metadata_csv: str | Path,
         aligned_directory: str | Path,
         tags: list | None = None,
+        pose_methods: list[str] | None = None,
         skip: list | None = None,
         check_rmsd: bool = False,
         rmsd_threshold: float = 1.0,
@@ -124,7 +128,8 @@ class HIPPO:
 
         assert aligned_directory, 'aligned_directory must be provided'
         skip = skip or []
-        tags = tags or ['hits']
+        tags = tags or []
+        pose_methods = pose_methods or DEFAULT_POSE_METHODS
 
         if not isinstance(aligned_directory, Path):
             aligned_directory = Path(aligned_directory)
@@ -178,6 +183,16 @@ class HIPPO:
 
         mrich.var('data_format', data_format)
 
+        pose_method_objs = []
+        for name in pose_methods:
+            obj = PoseMethodModel.objects.filter(pose_method_name=name).first()
+            if obj is None:
+                raise ValueError(
+                    f"Pose method '{name}' not found. "
+                    "Call register_pose_method() first."
+                )
+            pose_method_objs.append(obj)
+
         try:
             with transaction.atomic():
                 result: IngestionBatchResult = IngestionService.ingest_filesystem(
@@ -186,6 +201,7 @@ class HIPPO:
                     skip_records=skip,
                     compound_tag_list=tags,
                     metadata_file=metadata_csv,
+                    pose_methods=pose_method_objs,
                     check_rmsd=check_rmsd,
                     rmsd_threshold=rmsd_threshold,
                 )
@@ -443,3 +459,34 @@ class HIPPO:
             logger.error(exc, exc_info=True)
             # TODO: handle gracefully
             raise Exception from exc
+
+    def set_derivative_subsites(self) -> None:
+        """Propagate subsite assignments from inspiration poses to their derivatives."""
+        SubsiteService.set_derivative_subsites()
+
+    def register_enumeration_method(self, name: str, version: str, description: str = ''):
+        """Register an enumeration method, or retrieve it if already registered."""
+        return MethodService.register_enumeration_method(name, version, description)
+
+    def register_pose_method(self, name: str, version: str, description: str = ''):
+        """Register a pose method, or retrieve it if already registered."""
+        return MethodService.register_pose_method(name, version, description)
+
+    def register_scoring_method(self, name: str, version: str, description: str = ''):
+        """Register a scoring method, or retrieve it if already registered."""
+        return MethodService.register_scoring_method(name, version, description)
+
+    @property
+    def enumeration_methods(self):
+        """All registered enumeration methods."""
+        return MethodService.get_enumeration_methods()
+
+    @property
+    def pose_methods(self):
+        """All registered pose methods."""
+        return MethodService.get_pose_methods()
+
+    @property
+    def scoring_methods(self):
+        """All registered scoring methods."""
+        return MethodService.get_scoring_methods()
