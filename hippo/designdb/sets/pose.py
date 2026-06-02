@@ -20,19 +20,37 @@ from designdb.models import (
     CompoundModel,
     InspirationModel,
     InteractionModel,
+    PoseMethodJunctionModel,
+    PoseMethodModel,
     PoseModel,
     PoseTagJunctionModel,
     PoseTagModel,
+    ScoreValueModel,
     SubsiteModel,
     SubsiteTagModel,
     TargetModel,
 )
+from designdb.services.subsite import SubsiteService
 from designdb.sets.interaction import InteractionSet
+from designdb.settings import DEFAULT_POSE_METHODS
 from designdb.utils import ScoreSubquery, normalize_string_list
 from designdb.utils_frag import generate_header
 from django.conf import settings
 from django.db import IntegrityError
-from django.db.models import Exists, OuterRef, Q, QuerySet, Subquery
+from django.db.models import (
+    Exists,
+    F,
+    FloatField,
+    Max,
+    Min,
+    OuterRef,
+    Q,
+    QuerySet,
+    Subquery,
+    Window,
+)
+from django.db.models.fields.json import KeyTextTransform
+from django.db.models.functions import Cast
 from IPython.display import display
 from ipywidgets import (
     BoundedIntText,
@@ -289,15 +307,18 @@ class PoseSet:
         self,
         *,
         tag: str = None,
+        pose_method: str = None,
         target: int = None,
         subsite: int = None,
     ) -> 'PoseSet':
-        """Filter poses by a given tag, SubsiteModel ID, or target ID. See
-        :meth:`.PoseSet.get_by_tag`, :meth:`.PoseSet.get_by_target`, amd
-        :meth:`.PoseSet.get_by_subsite`"""
+        """Filter poses by a given tag, pose method name, SubsiteModel ID, or target ID. See
+        :meth:`.PoseSet.get_by_tag`, :meth:`.PoseSet.get_by_method`,
+        :meth:`.PoseSet.get_by_target`, and :meth:`.PoseSet.get_by_subsite`"""
 
         if tag:
             return self.get_by_tag(tag)
+        elif pose_method:
+            return self.get_by_method(pose_method)
         elif target:
             return self.get_by_target(target=TargetModel.objects.get(pk=target))
         elif subsite:
@@ -350,6 +371,14 @@ class PoseSet:
             return PoseSet(self._queryset.filter(has_tag=False))
         else:
             return PoseSet(self._queryset.filter(has_tag=True))
+
+    def get_by_method(self, method: str) -> 'PoseSet':
+        """Get all poses associated with a given pose method name."""
+        return PoseSet(
+            self._queryset.filter(
+                methods__pose_method_name=method,
+            )
+        )
 
     def get_by_metadata(
         self, key: str, value: str | None = None, debug: bool = False
@@ -426,6 +455,8 @@ class PoseSet:
         tags: bool = False,
         expand_tags: bool = False,
         subsites: bool = False,
+        scoring_methods: list[tuple[str, str]] | None = None,
+        pose_method: bool = False,
         # skip_no_mol=True, reference: str = "name", mol: bool = False, **kwargs
     ) -> 'pandas.DataFrame':
         """Get a DataFrame of the poses in this set.
@@ -460,7 +491,7 @@ class PoseSet:
         flags = {
             name: locals()[name]
             for name in sig.parameters
-            if name not in ('self', 'debug', 'expand_tags', 'expand_metadata')
+            if name not in ('self', 'debug', 'expand_tags', 'expand_metadata', 'scoring_methods')
         }
         # need id in output
         flags['id'] = True
@@ -547,6 +578,11 @@ class PoseSet:
                 # JsonGroupArray('subsites__subsite_name',
                 #     filter=Q(subsites__isnull=False),),
             ),
+            'pose_method': (
+                'pose_method',
+                'pose_method_names',
+                ArrayAgg('methods__pose_method_name', distinct=True),
+            ),
         }
 
         annotations = {
@@ -554,6 +590,22 @@ class PoseSet:
         }
         values = [v[1] for k, v in fields.items() if flags.get(k, False)]
         columns = {v[1]: v[0] for k, v in fields.items() if flags.get(k, False)}
+
+        for method_name, version in (scoring_methods or []):
+            score_sq = Subquery(
+                ScoreValueModel.objects.filter(
+                    pose=OuterRef('pk'),
+                    compound=OuterRef('compound'),
+                    scoring_method__method_name=method_name,
+                    scoring_method__method_version=version,
+                ).annotate(
+                    score_val=Cast(KeyTextTransform('score', 'score'), output_field=FloatField())
+                ).values('score_val')[:1],
+                output_field=FloatField(),
+            )
+            annotations[method_name] = score_sq
+            values.append(method_name)
+            columns[method_name] = method_name
 
         print('df values', values)
         print('df columns', columns)
@@ -688,21 +740,47 @@ class PoseSet:
 
         return PoseSet(qs, name=name)
 
-    # def get_best_placed_poses_per_compound(self):
-    #     """Choose the best placed pose (best distance_score) grouped by compound"""
+    def set_subsites_from_metadata_field(self, field: str = 'CanonSites alias') -> None:
+        """Create and assign subsite entries from a pose metadata field."""
+        SubsiteService.set_subsites_from_metadata_field(self._queryset, field)
 
-    #     sql = f"""
-    #     SELECT pose_id, MIN(pose_distance_score)
-    #     FROM {self.db.SQL_SCHEMA_PREFIX}pose
-    #     WHERE pose_id IN {self.str_ids}
-    #     GROUP BY pose_compound
-    #     """
+    def get_best_scoring_poses_per_compound(
+        self,
+        scoring_method: str,
+        version: str | None = None,
+        inverse: bool = False,
+    ) -> 'PoseSet':
+        """Return one pose per compound with the best score for the given scoring method.
 
-    #     cursor = self.db.execute(sql)
+        :param scoring_method: ``ScoringMethodModel.method_name`` to rank by
+        :param version: ``ScoringMethodModel.method_version`` — required when multiple
+            versions of the same method exist
+        :param inverse: if ``True``, higher score is better (default: lower is better)
+        """
+        score_num = Cast(KeyTextTransform('score', 'score'), output_field=FloatField())
+        agg = Max('score_num') if inverse else Min('score_num')
 
-    #     ids = [i for i, _ in cursor]
+        filters = {'scoring_method__method_name': scoring_method}
+        if version is not None:
+            filters['scoring_method__method_version'] = version
 
-    #     return PoseSet(self._queryset)
+        best_pose_ids = (
+            ScoreValueModel.objects
+            .filter(pose__in=self._queryset, **filters)
+            .annotate(score_num=score_num)
+            .annotate(
+                compound_best=Window(
+                    expression=agg,
+                    partition_by=['compound_id'],
+                )
+            )
+            .filter(score_num=F('compound_best'))
+            .values_list('pose_id', flat=True)
+            .distinct()
+        )
+
+        return PoseSet(PoseModel.objects.filter(pk__in=best_pose_ids))
+
 
     # def filter(
     #     self,
@@ -801,29 +879,6 @@ class PoseSet:
             pose.save()
         self._queryset = PoseModel.objects.filter(pk__in=self._queryset.values('pk'))
 
-    def set_subsites_from_metadata_field(self, field='CanonSites alias') -> None:
-        """Create and assign subsite entries from a metadata field
-
-        :param field: the metadata field to use
-
-        """
-        for pose in self._queryset:
-            metadata = json.loads(pose.payload)
-            key = metadata.get(field)
-            if not key:
-                mrich.warning(field, 'not in metadata pose_id=', pose_id)
-                continue
-
-            # I'm still not entirely clear can you really have
-            # posesets from different target, if not, and it really
-            # seems that not, this should be a single subsite
-            subsite, _ = SubsiteModel.get_or_create(
-                target=pose.target, subsite_name=key
-            )
-            subsite_tag = SubsiteTagModel(subsite=subsite, pose=pose)
-            subsite_tag.save()
-
-        self._queryset = PoseModel.objects.filter(pk__in=self._queryset.values('pk'))
 
     # TODO: implement scores
     # def calculate_inspiration_scores(
@@ -1091,14 +1146,11 @@ class PoseSet:
                 'derivative_pose',
             )
 
-            if not values.exists():
-                mrich.debug('no inspirations, quitting')
-                logger.warning('no inspirations, quitting')
-                return
-
-            poses = PoseSet(PoseModel.objects.filter(pk__in=values))
-
-            mrich.debug(len(poses), 'remaining after skipping null inspirations')
+            if values.exists():
+                poses = PoseSet(PoseModel.objects.filter(pk__in=values))
+                mrich.debug(len(poses), 'remaining after skipping null inspirations')
+            else:
+                logger.warning('no inspirations found; per-pose fallback will set inspiration to self')
 
         if not poses:
             # huh?
@@ -1164,7 +1216,7 @@ class PoseSet:
             pose_df['subsites'] = pose_df['subsites'].apply(fix_subsites)
 
         if tags:
-            pose_df['tags'] = pose_df['tags'].apply(lambda x: ','.join(x))
+            pose_df['tags'] = pose_df['tags'].apply(lambda x: ','.join(v for v in x if v is not None))
 
         # pose_df['ref_mols'] = inspiration_strs
         pose_df['ref_mols'] = 'inspiration_strs'
@@ -1490,7 +1542,7 @@ class PoseSet:
 
             for pose in self._queryset:
                 assert pose.pose_alias
-                assert pose.tags.filter(pose_tag_name='hits').exists()
+                assert pose.methods.filter(pose_method_name__in=DEFAULT_POSE_METHODS).exists()
 
                 if aligned_files_dir:
                     mol = str(pose.mol_path)

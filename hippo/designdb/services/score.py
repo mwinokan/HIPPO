@@ -43,19 +43,24 @@ class ScoreService:
         *,
         pose: PoseModel,
         record: dict[str, str | float],
+        score_method_map: dict[str, ScoringMethodModel] | None = None,
     ):
+        if score_method_map:
+            scores = {col: record[col] for col in score_method_map if col in record}
+        else:
+            # FIXME: this because don't know how to select
+            scores = {k: v for k, v in record.items() if k.lower().find('score') >= 0}
 
-        # FIXME: this because don't know how to select
-        scores = {k: v for k, v in record.items() if k.lower().find('score') >= 0}
-
-        for method_name, score_value in scores.items():
-            try:
-                method = self.scoring_methods[method_name]
-            except KeyError:
-                # there's so many more fields, should I really be creating them?
-                method, _ = ScoringMethodModel.objects.get_or_create(
-                    method_name=method_name,
-                )
+        for col_or_method_name, score_value in scores.items():
+            if score_method_map:
+                method = score_method_map[col_or_method_name]
+            else:
+                try:
+                    method = self.scoring_methods[col_or_method_name]
+                except KeyError:
+                    method, _ = ScoringMethodModel.objects.get_or_create(
+                        method_name=col_or_method_name,
+                    )
 
             score = ScoreValueModel(
                 pose=pose,

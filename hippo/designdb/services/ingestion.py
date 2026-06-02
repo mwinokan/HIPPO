@@ -11,10 +11,13 @@ from designdb.components.compound import Ingredient
 from designdb.components.recipe import Recipe, Route
 from designdb.models import (
     CompoundModel,
+    EnumerationMethodModel,
+    PoseMethodModel,
     PoseModel,
     ReactantModel,
     ReactionModel,
     ScaffoldModel,
+    ScoringMethodModel,
     TargetModel,
 )
 from designdb.services.compound import CompoundService, CompoundTagService
@@ -43,14 +46,14 @@ from rdkit.Chem import PandasTools
 # from .validation.compound import ValidationError, validate_compound_data
 
 SDF_XCAv2_PATTERN = re.compile(
-    r'^.*-.\d{4}_._\d*_\d_.*-.\d{4}\+.\+\d*\+\d_ligand\.sdf$'
+    r'^[^.]*-.\d{4}_._\d*_\d_.*-.\d{4}\+.\+\d*\+\d_ligand\.sdf$'
 )
 SDF_XCAV3_PATTERN = re.compile(
-    r'^.*-.\d{4}_._\d*_._\d_.*-.\d{4}\+.\+\d*\+.\+\d_ligand\.sdf$'
+    r'^[^.]*-.\d{4}_._\d*_._\d_.*-.\d{4}\+.\+\d*\+.\+\d_ligand\.sdf$'
 )
 
 
-SDF_FRAGALYSIS_PATTERN = re.compile(r'^.*\d{4}[a-z].sdf$')
+SDF_FRAGALYSIS_PATTERN = re.compile(r'^[^.].*\d{4}[a-z].sdf$')
 PDBID_PATTERN = re.compile(r'^[A-Za-z0-9]{4}-[a-z].sdf$')
 
 
@@ -99,12 +102,12 @@ def parse_pdb_mp(pdb_path: Path, residue: int, chain: str) -> str:
 def iter_fs_fragalysis(root_path, skip_records):
     assert skip_records is not None, '"None" passed instead as skip_records'
 
-    for dset_path in list(sorted(root_path.glob('*'))):
+    for dset_path in list(sorted(root_path.glob('[!.]*'))):
         if dset_path.name in skip_records:
             continue
 
         sdfs = []
-        for sdf_path in dset_path.glob('*.sdf'):
+        for sdf_path in dset_path.glob('[!.]*.sdf'):
             sdf_name = sdf_path.name
 
             if (
@@ -132,7 +135,7 @@ def iter_fs_fragalysis(root_path, skip_records):
 
         pdbs = [
             p
-            for p in dset_path.glob('*.pdb')
+            for p in dset_path.glob('[!.]*.pdb')
             if '_ligand' not in p.name
             and '_apo' not in p.name
             and '_hippo' not in p.name
@@ -157,7 +160,7 @@ def iter_fs_xca(root_path, skip):
 
         sdfs = []
 
-        for sdf_path in sorted(dset_path.glob('*.sdf')):
+        for sdf_path in sorted(dset_path.glob('[!.]*.sdf')):
             sdf_name = sdf_path.name
 
             # TODO: switch between patterns??
@@ -306,6 +309,7 @@ class IngestionService:
         skip_records: list[str],
         compound_tag_list: list[str],
         metadata_file: Path | str,
+        pose_methods: list[PoseMethodModel] | None = None,
         check_rmsd: bool = False,
         rmsd_threshold: float = 1.0,
     ) -> IngestionBatchResult:
@@ -378,17 +382,11 @@ class IngestionService:
 
             pose.tags.add(*pose_tags)
 
+            if pose_methods:
+                pose.methods.add(*pose_methods)
+
             # it seems fragalysis data is not expected to contain
             # scores
-
-            # in original code. what's that for?
-            # what I can think of is previously existing pose without mol
-            # if load_pose_mols:
-            #     try:
-            #         pose.mol
-            #     except Exception as e:
-            #         mrich.error('Could not load molecule', pose)
-            #         mrich.error(e)
 
         return result
 
@@ -400,6 +398,9 @@ class IngestionService:
         target,
         compound_tag_list: list[str],
         pose_tag_list: list[str],
+        enumeration_method_obj: 'EnumerationMethodModel | None' = None,
+        pose_method_obj: PoseMethodModel | None = None,
+        score_method_map: dict[str, 'ScoringMethodModel'] | None = None,
         mol_col: str,
         name_col: str,
         inspiration_col: str | None = None,
@@ -495,6 +496,8 @@ class IngestionService:
                 # inchikey=sane_inchikey,
             )
             compound.tags.add(*compound_tags)
+            if enumeration_method_obj is not None:
+                compound.enumeration_methods.add(enumeration_method_obj)
             if compound_created:
                 result.compounds_created += 1
 
@@ -533,8 +536,14 @@ class IngestionService:
                 result.poses_created += 1
 
             pose.tags.add(*pose_tags)
+            if pose_method_obj is not None:
+                pose.methods.add(pose_method_obj)
             pose.inspirations.add(*PoseModel.objects.filter(pk__in=pose_inspirations))
-            scorer.add_scores_from_record(pose=pose, record=r)
+
+            if score_method_map:
+                scorer.add_scores_from_record(pose=pose, record=r, score_method_map=score_method_map)
+            else:
+                scorer.add_scores_from_record(pose=pose, record=r)
 
         # re-enable trigger and populate matview
         cursor.execute(
@@ -682,6 +691,98 @@ class IngestionService:
 
                 if pick_first:
                     break
+
+        return df
+
+    @classmethod
+    def ingest_enamine_real_routes(
+        cls,
+        csv_path: str | Path,
+        do_check_chemistry: bool = True,
+        register_routes: bool = True,
+    ):
+        df = pd.read_csv(csv_path)
+        steps = len([col for col in df.columns if 'product_step' in col])
+
+        for i, row in mrich.track(df.iterrows(), total=len(df)):
+            mrich.set_progress_field('i', i)
+            mrich.set_progress_field('n', len(df))
+
+            d = row.to_dict()
+
+            reactions = ReactionSet()
+            reactants = IngredientSet()
+            intermediates = IngredientSet()
+            products = IngredientSet()
+
+            product = None
+            try:
+                for step_id in range(1, steps + 1):
+                    r1_smiles = d.get(f'reactant_step{step_id}')
+                    if not r1_smiles or (isinstance(r1_smiles, float) and isnan(r1_smiles)):
+                        continue
+
+                    reaction_type = d[f'reaction_name_step{step_id}']
+                    product = CompoundService.get_by_smiles(smiles=d['smiles'])
+
+                    mrich.print(i, step_id, reaction_type, product)
+
+                    reactant_smiles = [r1_smiles]
+                    r2_smiles = d.get(f'reactant2_step{step_id}')
+                    if r2_smiles and not (isinstance(r2_smiles, float) and isnan(r2_smiles)):
+                        reactant_smiles.append(r2_smiles)
+
+                    reaction, _ = ReactionModel.objects.get_or_create(
+                        reaction_type=reaction_type,
+                        product_compound=product,
+                    )
+
+                    rs = []
+                    for smiles in reactant_smiles:
+                        reactant_comp, _ = CompoundService.create(smiles=smiles)
+                        reactant, _ = ReactantModel.objects.get_or_create(
+                            compound=reactant_comp,
+                            reaction=reaction,
+                        )
+                        rs.append(reactant.pk)
+
+                    if do_check_chemistry and not check_chemistry(reaction_type, rs, product):
+                        raise InvalidChemistryError(
+                            f'{reaction_type=}, {rs=}, {product.id=}',
+                        )
+
+                    for r_id in rs:
+                        if r_id in reactants:
+                            intermediates.add(compound_id=r_id, amount=1)
+                        else:
+                            reactants.add(compound_id=r_id, amount=1)
+
+                    reactions.add(reaction)
+
+            except InvalidChemistryError:
+                continue
+            except UnsupportedChemistryError:
+                mrich.warning('Skipping unsupported chemistry:', reaction_type)
+                continue
+            except Exception:
+                mrich.error('Uncaught error with row', i)
+                raise
+
+            if product is None:
+                continue
+
+            products.add(Ingredient.from_compound(product, amount=1))
+
+            recipe = Recipe(
+                reactions=reactions,
+                reactants=reactants,
+                intermediates=intermediates,
+                products=products,
+            )
+
+            if register_routes:
+                route, _ = RouteService.create_from_recipe(recipe=recipe)
+                mrich.success('registered route', route.pk)
 
         return df
 
