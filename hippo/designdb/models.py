@@ -274,9 +274,11 @@ class PoseModel(BaseModel):
     )
     # unlike others, this wasn't clearly defined as m2m. may not want
     # to keep it
+    # through_fields: the calling pose is the derivative, the added pose is the original
     inspirations = models.ManyToManyField(
         'self',
         through='InspirationModel',
+        through_fields=('derivative_pose', 'original_pose'),
         symmetrical=False,
     )
 

@@ -9,9 +9,17 @@ import mrich
 import pandas as pd
 from django.db import transaction
 
-from .models import CompoundModel, PoseMethodModel, PoseModel, TargetModel
+from .models import (
+    CompoundModel,
+    EnumerationMethodModel,
+    PoseMethodModel,
+    PoseModel,
+    ScoringMethodModel,
+    TargetModel,
+)
 from .services.ingestion import IngestionBatchResult, IngestionService
 from .services.method import MethodService
+from .services.route import RouteService
 from .services.subsite import SubsiteService
 from .sets.compound import CompoundSet
 from .sets.pose import PoseSet
@@ -229,6 +237,10 @@ class HIPPO:
         inspirations: list[int] | PoseSet | None = None,
         compound_tags: None | list[str] = None,
         pose_tags: None | list[str] = None,
+        enumeration_method: tuple[str, str] | None = None,
+        pose_method: tuple[str, str] | None = None,
+        score_cols: list[str] | None = None,
+        scoring_methods: list[tuple[str, str]] | None = None,
         mol_col: str = 'ROMol',
         name_col: str = 'ID',
         inspiration_col: str = 'ref_mols',
@@ -287,6 +299,11 @@ class HIPPO:
         if not isinstance(path, Path):
             path = Path(path)
 
+        if name_col is None:
+            raise ValueError(
+                "name_col cannot be None. Provide the SDF column name that contains pose identifiers."
+            )
+
         skip_equal_dict = skip_equal_dict or {}
         skip_not_equal_dict = skip_not_equal_dict or {}
 
@@ -311,6 +328,45 @@ class HIPPO:
         if inspiration_map is None:
             inspiration_map = {}
 
+        enumeration_method_obj = None
+        if enumeration_method is not None:
+            name, version = enumeration_method
+            enumeration_method_obj = EnumerationMethodModel.objects.filter(
+                enum_name=name, enum_version=version
+            ).first()
+            if enumeration_method_obj is None:
+                raise ValueError(
+                    f"Enumeration method '{name}' v{version} not found. "
+                    "Call register_enumeration_method() first."
+                )
+
+        pose_method_obj = None
+        if pose_method is not None:
+            name, version = pose_method
+            pose_method_obj = PoseMethodModel.objects.filter(
+                pose_method_name=name, pose_method_version=version
+            ).first()
+            if pose_method_obj is None:
+                raise ValueError(
+                    f"Pose method '{name}' v{version} not found. "
+                    "Call register_pose_method() first."
+                )
+
+        score_method_map = {}
+        if score_cols and scoring_methods:
+            if len(score_cols) != len(scoring_methods):
+                raise ValueError('score_cols and scoring_methods must be the same length')
+            for col, (method_name, method_version) in zip(score_cols, scoring_methods):
+                obj = ScoringMethodModel.objects.filter(
+                    method_name=method_name, method_version=method_version
+                ).first()
+                if obj is None:
+                    raise ValueError(
+                        f"Scoring method '{method_name}' v{method_version} not found. "
+                        "Call register_scoring_method() first."
+                    )
+                score_method_map[col] = obj
+
         warn = make_warn_once_per_key()
 
         try:
@@ -320,6 +376,9 @@ class HIPPO:
                     target=self.target,
                     compound_tag_list=compound_tags,
                     pose_tag_list=pose_tags,
+                    enumeration_method_obj=enumeration_method_obj,
+                    pose_method_obj=pose_method_obj,
+                    score_method_map=score_method_map,
                     mol_col=mol_col,
                     name_col=name_col,
                     inspiration_col=inspiration_col,
@@ -383,6 +442,31 @@ class HIPPO:
             logger.error(exc, exc_info=True)
             # TODO: handle gracefully
             raise Exception from exc
+
+    def add_enamine_real_routes(
+        self,
+        csv_path: str | Path,
+        check_chemistry: bool = True,
+        register_routes: bool = True,
+    ) -> pd.DataFrame:
+        """Add synthesis routes from an Enamine REAL CSV export"""
+
+        try:
+            with transaction.atomic():
+                result = IngestionService.ingest_enamine_real_routes(
+                    csv_path=csv_path,
+                    do_check_chemistry=check_chemistry,
+                    register_routes=register_routes,
+                )
+        except Exception as exc:
+            logger.error(exc, exc_info=True)
+            raise Exception from exc
+
+        return result
+
+    def prune_duplicate_routes(self) -> int:
+        """Remove duplicate routes from the database"""
+        return RouteService.prune_duplicate_routes()
 
     def add_syndirella_elabs(
         self,

@@ -25,6 +25,7 @@ from designdb.models import (
     PoseModel,
     PoseTagJunctionModel,
     PoseTagModel,
+    ScoreValueModel,
     SubsiteModel,
     SubsiteTagModel,
     TargetModel,
@@ -36,7 +37,20 @@ from designdb.utils import ScoreSubquery, normalize_string_list
 from designdb.utils_frag import generate_header
 from django.conf import settings
 from django.db import IntegrityError
-from django.db.models import Exists, OuterRef, Q, QuerySet, Subquery
+from django.db.models import (
+    Exists,
+    F,
+    FloatField,
+    Max,
+    Min,
+    OuterRef,
+    Q,
+    QuerySet,
+    Subquery,
+    Window,
+)
+from django.db.models.fields.json import KeyTextTransform
+from django.db.models.functions import Cast
 from IPython.display import display
 from ipywidgets import (
     BoundedIntText,
@@ -441,6 +455,8 @@ class PoseSet:
         tags: bool = False,
         expand_tags: bool = False,
         subsites: bool = False,
+        scoring_methods: list[tuple[str, str]] | None = None,
+        pose_method: bool = False,
         # skip_no_mol=True, reference: str = "name", mol: bool = False, **kwargs
     ) -> 'pandas.DataFrame':
         """Get a DataFrame of the poses in this set.
@@ -475,7 +491,7 @@ class PoseSet:
         flags = {
             name: locals()[name]
             for name in sig.parameters
-            if name not in ('self', 'debug', 'expand_tags', 'expand_metadata')
+            if name not in ('self', 'debug', 'expand_tags', 'expand_metadata', 'scoring_methods')
         }
         # need id in output
         flags['id'] = True
@@ -562,6 +578,11 @@ class PoseSet:
                 # JsonGroupArray('subsites__subsite_name',
                 #     filter=Q(subsites__isnull=False),),
             ),
+            'pose_method': (
+                'pose_method',
+                'pose_method_names',
+                ArrayAgg('methods__pose_method_name', distinct=True),
+            ),
         }
 
         annotations = {
@@ -569,6 +590,22 @@ class PoseSet:
         }
         values = [v[1] for k, v in fields.items() if flags.get(k, False)]
         columns = {v[1]: v[0] for k, v in fields.items() if flags.get(k, False)}
+
+        for method_name, version in (scoring_methods or []):
+            score_sq = Subquery(
+                ScoreValueModel.objects.filter(
+                    pose=OuterRef('pk'),
+                    compound=OuterRef('compound'),
+                    scoring_method__method_name=method_name,
+                    scoring_method__method_version=version,
+                ).annotate(
+                    score_val=Cast(KeyTextTransform('score', 'score'), output_field=FloatField())
+                ).values('score_val')[:1],
+                output_field=FloatField(),
+            )
+            annotations[method_name] = score_sq
+            values.append(method_name)
+            columns[method_name] = method_name
 
         print('df values', values)
         print('df columns', columns)
@@ -707,21 +744,43 @@ class PoseSet:
         """Create and assign subsite entries from a pose metadata field."""
         SubsiteService.set_subsites_from_metadata_field(self._queryset, field)
 
-    # def get_best_placed_poses_per_compound(self):
-    #     """Choose the best placed pose (best distance_score) grouped by compound"""
+    def get_best_scoring_poses_per_compound(
+        self,
+        scoring_method: str,
+        version: str | None = None,
+        inverse: bool = False,
+    ) -> 'PoseSet':
+        """Return one pose per compound with the best score for the given scoring method.
 
-    #     sql = f"""
-    #     SELECT pose_id, MIN(pose_distance_score)
-    #     FROM {self.db.SQL_SCHEMA_PREFIX}pose
-    #     WHERE pose_id IN {self.str_ids}
-    #     GROUP BY pose_compound
-    #     """
+        :param scoring_method: ``ScoringMethodModel.method_name`` to rank by
+        :param version: ``ScoringMethodModel.method_version`` — required when multiple
+            versions of the same method exist
+        :param inverse: if ``True``, higher score is better (default: lower is better)
+        """
+        score_num = Cast(KeyTextTransform('score', 'score'), output_field=FloatField())
+        agg = Max('score_num') if inverse else Min('score_num')
 
-    #     cursor = self.db.execute(sql)
+        filters = {'scoring_method__method_name': scoring_method}
+        if version is not None:
+            filters['scoring_method__method_version'] = version
 
-    #     ids = [i for i, _ in cursor]
+        best_pose_ids = (
+            ScoreValueModel.objects
+            .filter(pose__in=self._queryset, **filters)
+            .annotate(score_num=score_num)
+            .annotate(
+                compound_best=Window(
+                    expression=agg,
+                    partition_by=['compound_id'],
+                )
+            )
+            .filter(score_num=F('compound_best'))
+            .values_list('pose_id', flat=True)
+            .distinct()
+        )
 
-    #     return PoseSet(self._queryset)
+        return PoseSet(PoseModel.objects.filter(pk__in=best_pose_ids))
+
 
     # def filter(
     #     self,
@@ -1087,14 +1146,11 @@ class PoseSet:
                 'derivative_pose',
             )
 
-            if not values.exists():
-                mrich.debug('no inspirations, quitting')
-                logger.warning('no inspirations, quitting')
-                return
-
-            poses = PoseSet(PoseModel.objects.filter(pk__in=values))
-
-            mrich.debug(len(poses), 'remaining after skipping null inspirations')
+            if values.exists():
+                poses = PoseSet(PoseModel.objects.filter(pk__in=values))
+                mrich.debug(len(poses), 'remaining after skipping null inspirations')
+            else:
+                logger.warning('no inspirations found; per-pose fallback will set inspiration to self')
 
         if not poses:
             # huh?
@@ -1160,7 +1216,7 @@ class PoseSet:
             pose_df['subsites'] = pose_df['subsites'].apply(fix_subsites)
 
         if tags:
-            pose_df['tags'] = pose_df['tags'].apply(lambda x: ','.join(x))
+            pose_df['tags'] = pose_df['tags'].apply(lambda x: ','.join(v for v in x if v is not None))
 
         # pose_df['ref_mols'] = inspiration_strs
         pose_df['ref_mols'] = 'inspiration_strs'
