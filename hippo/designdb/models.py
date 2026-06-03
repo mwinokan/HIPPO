@@ -91,11 +91,35 @@ class BaseModel(models.Model):
         default_related_name = '%(class)ss'
 
 
+class Project(BaseModel):
+    project_name = models.TextField(null=False, unique=True)
+    open_to_public = models.BooleanField(default=False)
+
+    class Meta(BaseModel.Meta):
+        db_table = 'projects'
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    'project_name',
+                ],
+                name='uc_project',
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.project_name}"
+
+
 class TargetModel(BaseModel):
     id = models.BigAutoField(primary_key=True)
     external_target_id = models.BigIntegerField(null=True, blank=True)
     target_name = models.TextField()
     target_metadata = models.TextField(null=True, blank=True)
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.RESTRICT,
+        db_column='project_id',
+    )
 
     class Meta(BaseModel.Meta):
         db_table = 'targets'

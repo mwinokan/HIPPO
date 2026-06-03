@@ -14,6 +14,7 @@ from .models import (
     EnumerationMethodModel,
     PoseMethodModel,
     PoseModel,
+    Project,
     ScoringMethodModel,
     TargetModel,
 )
@@ -38,10 +39,19 @@ class HIPPO:
     def __init__(
         self,
         target_name: str,
+        target_access_string: str,
     ) -> None:
 
+        # TODO: with working db, hippo shouldn't be creating projects
+        project, _ = Project.objects.get_or_create(
+            project_name=target_access_string,
+        )
+
         # TODO: user- or project based targets
-        self._target, _ = TargetModel.objects.get_or_create(target_name=target_name)
+        self._target, _ = TargetModel.objects.get_or_create(
+            target_name=target_name,
+            project=project,
+        )
 
         # TODO: the way this worked previously was it gave the HIPPO
         # instance full access to the pose table. When working with

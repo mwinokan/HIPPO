@@ -6,6 +6,8 @@ import django
 import mrich
 from django.conf import settings
 
+from .ta_auth_connector import get_auth_target_access
+
 # fix path
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
@@ -55,8 +57,10 @@ def configure_django(db_config, manage_models: bool):
 
 
 def load_hippo(
-    target_name: str,
     *,
+    target_name: str,
+    target_access_string: str,
+    username: str,
     db: str | Path | dict | None = None,
     # copy_from: str | Path | None = None,
     # overwrite_existing: bool = False,
@@ -69,6 +73,15 @@ def load_hippo(
 
     mrich.bold('Creating HIPPO animal')
     mrich.var('target_name', target_name, color='arg')
+
+    tas_list = get_auth_target_access(username)
+
+    # mock response until auth pod is externally accessible
+    tas_list = ('lb18145-1')
+
+    if not target_access_string in tas_list:
+        mrich.error(f'User {username} does not have access to {target_access_string}')
+        return
 
     if db is None:
         # populate from env
@@ -119,7 +132,7 @@ def load_hippo(
         # import .testmodule
     from designdb.animal import HIPPO
 
-    animal = HIPPO(target_name)
+    animal = HIPPO(target_name, target_access_string)
 
     mrich.success('Initialised animal', f'{target_name}')
     return animal

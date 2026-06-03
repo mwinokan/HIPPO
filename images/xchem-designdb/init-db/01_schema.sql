@@ -24,11 +24,21 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 -- TABLES (ordered by FK dependencies)
 -- =========================================================
 
+CREATE TABLE IF NOT EXISTS designdb.projects (
+    id BIGSERIAL PRIMARY KEY,
+    project_name TEXT NOT NULL,
+    open_to_public BOOLEAN NOT NULL DEFAULT FALSE,
+    created_on TIMESTAMPTZ DEFAULT now(),
+    updated_on TIMESTAMPTZ DEFAULT now(),
+    CONSTRAINT uc_project UNIQUE (project_name)
+);
+
 CREATE TABLE IF NOT EXISTS designdb.targets (
     id BIGSERIAL PRIMARY KEY, --Internal ID inserted when registering target via Fragalysis
     external_target_id BIGINT, -- ID of this target in the external database (Scarab link)
     target_name TEXT NOT NULL, --Insert from HIPPO codebase. Must be a link to Scarab protein production target
     target_metadata TEXT, -- Not populated by code
+    project_id BIGINT NOT NULL REFERENCES designdb.projects (id) ON DELETE RESTRICT,
     created_on TIMESTAMPTZ DEFAULT now(),
     updated_on TIMESTAMPTZ DEFAULT now(),
     CONSTRAINT uc_target UNIQUE (target_name)
