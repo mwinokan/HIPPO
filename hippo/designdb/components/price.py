@@ -103,6 +103,14 @@ class Price:
 
     ### DUNDERS
 
+    def __bool__(self) -> bool:
+        """A null Price is falsy; a real (priced) Price is truthy.
+
+        Recipe selection relies on ``if recipe.get_price()`` to drop unpriced
+        solutions, so this must reflect :attr:`.Price.is_null`.
+        """
+        return not self.is_null
+
     def __str__(self) -> str:
         """Unformatted string representation"""
         if self.currency is None:

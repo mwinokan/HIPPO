@@ -425,7 +425,8 @@ class Compound:
             )
 
         if permitted_reactions:
-            reaction_ids = [i for i in reaction_ids if i in permitted_reactions]
+            permitted_ids = set(permitted_reactions.ids)
+            reaction_ids = [i for i in reaction_ids if i in permitted_ids]
 
         rset = ReactionSet(reaction_ids)
         if not as_reactant and not permitted_reactions:
@@ -1077,18 +1078,18 @@ class Ingredient:
             to raise print an error.
         """
 
-        query = Q(compound=self.compound)
+        qs = CataloguePriceModel.objects.filter(compounds=self.compound)
 
         if supplier:
-            query &= Q(quote_supplier=supplier)
+            qs = qs.filter(supplier=supplier)
 
         if min_amount:
-            query &= Q(quote_amount__gte=min_amount)
+            qs = qs.filter(amount__gte=min_amount)
 
         if max_lead_time:
-            query &= Q(quote_lead_time__lte=max_lead_time)
+            qs = qs.filter(lead_time__lte=max_lead_time)
 
-        return CataloguePriceModel.objects.filter(query).order_by('quote_price').first()
+        return qs.order_by('price').first()
 
     ### PROPERTIES
 
@@ -1100,12 +1101,12 @@ class Ingredient:
     @property
     def id(self) -> int:
         """Returns the ID of the associated :class:`.Compound`"""
-        return self._compound_id
+        return self._compound.id
 
     @property
     def compound_id(self) -> int:
         """Returns the ID of the associated :class:`.Compound`"""
-        return self._compound_id
+        return self._compound.id
 
     @property
     def quote(self) -> int:

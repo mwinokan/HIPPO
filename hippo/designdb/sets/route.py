@@ -80,6 +80,8 @@ class RouteSet:
 
         """
 
+        from designdb.components.recipe import Route
+
         self = cls.__new__(cls)
 
         if data is None:
@@ -88,7 +90,7 @@ class RouteSet:
         new_data = {}
         for d in mrich.track(data['routes'].values(), prefix='Loading Routes...'):
             route_id = d['id']
-            new_data[route_id] = RouteModel.from_json(db=db, path=None, data=d)
+            new_data[route_id] = Route.from_json(path=None, data=d)
 
         self._data = new_data
         self._cluster_map = None
@@ -106,8 +108,13 @@ class RouteSet:
 
     @property
     def db(self):
-        """Get associated database"""
-        return self._db
+        """Deprecated: the modern ORM RouteSet has no associated ``db`` handle.
+
+        Raises to surface any remaining legacy ``self.db`` callers explicitly.
+        """
+        raise NotImplementedError(
+            'RouteSet no longer holds a `db` handle; use the Django ORM directly'
+        )
 
     @property
     def routes(self) -> 'list[Route]':
@@ -158,61 +165,25 @@ class RouteSet:
             to a set of :class:`.RouteModel` ID's to their superstructures.
         """
 
-        if self._cluster_map is None:
-            # get route mapping
-            pairs = self.db.select_where(
-                query='route_product, route_id',
-                key=f'route_id IN {self.str_ids}',
-                table='route',
-                multiple=True,
-            )
-
-            route_map = {route_product: route_id for route_product, route_id in pairs}
-
-            # group compounds by cluster
-            compound_clusters = self.db.get_compound_cluster_dict(cset=self.products)
-
-            # create the map
-            self._cluster_map = {}
-            for cluster, compounds in compound_clusters.items():
-                self._cluster_map[cluster] = []
-                for compound in compounds:
-                    route_id = route_map.get(compound, None)
-                    if not route_id:
-                        continue
-                    self._cluster_map[cluster].append(route_id)
-
-                if not self._cluster_map[cluster]:
-                    del self._cluster_map[cluster]
-
-        return self._cluster_map
+        # NOTE: scaffold-cluster grouping depends on the not-yet-ported
+        # `get_compound_cluster_dict` machinery. This property is only consumed by
+        # `balanced_pop`, which in turn is only used by the (out-of-scope) rgen
+        # RandomRecipeSelectionGenerator. Port alongside rgen.
+        raise NotImplementedError(
+            'RouteSet.cluster_map requires the unported compound-clustering helper '
+            '(get_compound_cluster_dict); port it together with the rgen subsystem'
+        )
 
     ### METHODS
 
     def copy(self) -> 'RouteSet':
         """Copy this RouteSet"""
-        return RouteSet(self.db, self.data.values())
-
-    def set_db_pointers(self, db: 'Database') -> None:
-        """
-
-        :param db:
-
-        """
-        self._db = db
-        for route in self.data.values():
-            route._db = db
-
-    # def clear_db_pointers(self):
-    #     """ """
-    #     self._db = None
-    #     for route in self.data.values():
-    #         route._db = None
+        return RouteSet(list(self.data.values()))
 
     def get_dict(self):
         """Get serialisable dictionary"""
 
-        data = dict(db=str(self.db), routes={})
+        data = dict(routes={})
 
         # populate with routes
         for route_id, route in self.data.items():
@@ -221,48 +192,41 @@ class RouteSet:
         return data
 
     def prune_unavailable(self, suppliers: list[str]):
-        """Remove routes that don't have all reactants available from given suppliers"""
+        """Remove routes that don't have all reactants available from given suppliers.
 
-        suppliers_str = str(tuple(suppliers)).replace(',)', ')')
-
-        sql = f"""
-        WITH possible_reactants AS (
-            SELECT quote_compound, COUNT(
-                CASE
-                    WHEN quote_supplier IN {suppliers_str} THEN 1
-                END) AS [count_valid]
-            FROM {self.db.SQL_SCHEMA_PREFIX}quote
-            GROUP BY quote_compound
-        ),
-
-        route_reactants AS (
-            SELECT route_id, route_product,
-            COUNT(
-                CASE
-                    WHEN count_valid = 0 THEN 1
-                    WHEN count_valid IS NULL THEN 1
-                END)
-            AS [count_unavailable] FROM {self.db.SQL_SCHEMA_PREFIX}route
-            INNER JOIN {self.db.SQL_SCHEMA_PREFIX}component
-            ON component_route = route_id
-            LEFT JOIN possible_reactants ON quote_compound = component_ref
-            WHERE component_type = 2
-            GROUP BY route_id
-        )
-
-        SELECT route_id FROM route_reactants
-        WHERE count_unavailable = 0
-        AND route_id IN {self.str_ids}
+        Keeps only routes where every reactant component (``component_type == 2``)
+        has at least one catalogue price from one of the given ``suppliers``.
         """
 
-        route_ids = self.db.execute(sql).fetchall()
+        from designdb.models import CataloguePriceCompoundJunctionModel
 
-        route_ids = [i for (i,) in route_ids]
+        # compound IDs quotable from the permitted suppliers
+        quotable = set(
+            CataloguePriceCompoundJunctionModel.objects.filter(
+                catalogue_price__supplier__in=list(suppliers),
+            ).values_list('compound_id', flat=True)
+        )
+
+        # reactant components grouped by route
+        reactant_rows = ComponentModel.objects.filter(
+            route_id__in=list(self.ids),
+            component_type=2,
+        ).values_list('route_id', 'component_ref')
+
+        route_reactants: dict[int, set[int]] = {}
+        for route_id, ref in reactant_rows:
+            route_reactants.setdefault(route_id, set()).add(ref)
+
+        kept = [
+            route_id
+            for route_id, reactants in route_reactants.items()
+            if reactants <= quotable
+        ]
 
         mrich.var('#routes before pruning', len(self))
-        mrich.var('#routes after pruning', len(route_ids))
+        mrich.var('#routes after pruning', len(kept))
 
-        return RouteSet.from_ids(self.db, route_ids)
+        return RouteSet.from_ids(kept)
 
     def pop_id(self) -> int:
         """Pop the last route from the set and return it's id"""

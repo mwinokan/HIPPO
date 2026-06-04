@@ -139,9 +139,11 @@ class Reaction:
 
         :param amount: amount in mg
         """
-        from .recipe import Recipe  # local to break circular import
+        # convenience bridge to the service layer (local import keeps the
+        # component -> service dependency out of the module import graph)
+        from designdb.services.recipe import RecipeService
 
-        return Recipe.from_reaction(
+        return RecipeService.from_reaction(
             self._instance,
             amount=amount,
             debug=debug,
