@@ -38,6 +38,10 @@ def configure_django(db_config, manage_models: bool):
             },
         }
 
+    # fix for SynchronousOnlyOperation when working in notebooks. safe
+    # to use for now
+    os.environ.setdefault('DJANGO_ALLOW_ASYNC_UNSAFE', 'true')
+
     settings.configure(
         INSTALLED_APPS=[
             'designdb.apps.DesigndbConfig',
