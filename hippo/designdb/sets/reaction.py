@@ -277,13 +277,14 @@ class ReactionSet:
 
         :param amounts: float or list/generator of product amounts in mg,
             (Default value = 1.0)
-        :param kwargs: keyword arguments are passed on to :meth:`.Recipe.from_reactions:
+        :param kwargs: keyword arguments are passed on to
+            :meth:`.RecipeService.from_reactions`
 
         """
-        # avoiding circular imports
-        from designdb.components.recipe import Recipe
+        # convenience bridge to the service layer
+        from designdb.services.recipe import RecipeService
 
-        return Recipe.from_reactions(reactions=self, amounts=1, **kwargs)
+        return RecipeService.from_reactions(reactions=self, amount=amounts, **kwargs)
 
     def summary(self) -> None:
         """Print a summary of the Reactions"""
@@ -300,6 +301,11 @@ class ReactionSet:
         return self._name
 
     @property
+    def queryset(self):
+        """Returns the underlying Django queryset"""
+        return self._queryset
+
+    @property
     def indices(self) -> list[int]:
         """Returns the ids of reactions in this set"""
         return self._queryset.values_list('pk', flat=True)
@@ -307,7 +313,7 @@ class ReactionSet:
     @property
     def ids(self) -> list[int]:
         """Returns the ids of reactions in this set"""
-        return self._indices
+        return list(self.indices)
 
     @property
     def types(self) -> list[str]:

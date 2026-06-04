@@ -71,11 +71,9 @@ class RDKitMolField(models.TextField):
 
 
 if settings.MANAGE_MODELS:
-    # sqlite3, rdkit field types not available
-    # shouldn't this be binary as well?
-    pass
-
-    # from .models import RDKitMolField as MolField
+    # sqlite3: the RDKit cartridge field types are unavailable, fall back to the
+    # plain-text RDKitMolField shim defined above.
+    MolField = RDKitMolField
 else:
     from django_rdkit.models import MolField
 

@@ -26,8 +26,11 @@ class RouteService:
         # are you joking?? reactants and intermediates are all of the
         # sudden components
 
-        # reactions
+        # component_type encoding (see Route.get_route): 1=reaction, 2=reactant,
+        # 3=intermediate
         components = []
+
+        # reactions
         components.extend(
             [
                 ComponentModel(route=route, component_type=1, component_ref=ref.pk)
@@ -35,20 +38,12 @@ class RouteService:
             ],
         )
 
-        # this part needs data from ingredient df, which I don't have
-        # and is not implemented
-
         # reactants
-        # for ref, amount in recipe.reactants.id_amount_pairs:
-        #     self.insert_component(
-        #         component_type=2, ref=ref, route=route_id, amount=amount, commit=False
-        #     )
-
         components.extend(
             [
                 ComponentModel(
                     route=route,
-                    component_type=1,
+                    component_type=2,
                     component_ref=ref,
                     component_amount=amount,
                 )
@@ -56,17 +51,12 @@ class RouteService:
             ],
         )
 
-        # # intermediates
-        # for ref, amount in recipe.intermediates.id_amount_pairs:
-        #     self.insert_component(
-        #         component_type=3, ref=ref, route=route_id, amount=amount, commit=False
-        #     )
-
+        # intermediates
         components.extend(
             [
                 ComponentModel(
                     route=route,
-                    component_type=1,
+                    component_type=3,
                     component_ref=ref,
                     component_amount=amount,
                 )

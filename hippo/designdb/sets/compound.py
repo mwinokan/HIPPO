@@ -269,13 +269,21 @@ class CompoundSet:
         """Representation for mrich"""
         return f'[bold underline]{self}'
 
-    def __contains__(self, other: CompoundModel | int):
-        """Check if compound or ingredient is a member of this set"""
+    def __contains__(self, other: 'CompoundModel | int | Ingredient'):
+        """Check if a compound or ingredient is a member of this set"""
         match other:
             case CompoundModel():
-                ik = other.pk
+                pk = other.pk
             case int():
                 pk = other
+            case _:
+                # Ingredient (or anything exposing a compound id)
+                pk = getattr(other, 'compound_id', None)
+                if pk is None:
+                    pk = getattr(other, 'id', None)
+
+        if pk is None:
+            return False
 
         return self._queryset.filter(pk=pk).exists()
 
@@ -790,13 +798,13 @@ class CompoundSet:
     ):
         """Generate the :class:`.Recipe` to make these compounds.
 
-        See :meth:`.Recipe.from_compounds`
+        See :meth:`.RecipeService.from_compounds`
         """
 
-        # avoiding circular imports
-        from designdb.components.recipe import Recipe
+        # convenience bridge to the service layer
+        from designdb.services.recipe import RecipeService
 
-        return Recipe.from_compounds(
+        return RecipeService.from_compounds(
             self,
             amount=amount,
             debug=debug,
@@ -820,80 +828,52 @@ class CompoundSet:
 
         """
 
-        if 'route' not in self.db.table_names:
-            mrich.error('route table not in Database')
-            raise NotImplementedError
+        from designdb.models import ComponentModel, RouteModel
+
+        from .route import RouteSet
+
+        base_qs = RouteModel.objects.filter(product_compound_id__in=list(self.ids))
 
         if permitted_reactions is not None:
-            sql = f"""
-            SELECT route_id, route_product, component_ref
-            FROM {self.db.SQL_SCHEMA_PREFIX}route
-            INNER JOIN {self.db.SQL_SCHEMA_PREFIX}component
-            ON route_id = component_route
-            WHERE route_product IN {self.str_ids}
-            AND component_type = 1
-            """
-
-            permitted_reactions = set(permitted_reactions.ids)
+            permitted = set(permitted_reactions.ids)
 
             if debug:
                 mrich.debug('Querying database for routes')
-            records = self.db.execute(sql).fetchall()
 
-            if debug:
-                mrich.debug('Assembling route dictionary')
+            # reaction components (component_type == 1) grouped per route
+            rows = ComponentModel.objects.filter(
+                route__in=base_qs,
+                component_type=1,
+            ).values_list('route_id', 'component_ref')
 
-            routes = {}
-            for route_id, route_product, reaction_id in records:
-                if route_id not in routes:
-                    routes[route_id] = dict(product=route_product, reactions=set())
-                assert routes[route_id]['product'] == route_product
-                routes[route_id]['reactions'].add(reaction_id)
+            route_reactions: dict[int, set[int]] = {}
+            for route_id, reaction_id in rows:
+                route_reactions.setdefault(route_id, set()).add(reaction_id)
 
             if debug:
                 mrich.debug('Checking availability')
 
-            available_routes = set()
-            for route_id, route_dict in routes.items():
-                product = route_dict['product']
-                assert product in self
-                reactions = route_dict['reactions']
-                if all(r in permitted_reactions for r in reactions):
-                    available_routes.add(route_id)
-
-            if return_ids:
-                return list(available_routes)
-
-            routes = [
-                self.db.get_route(id=route_id)
-                for route_id in mrich.track(available_routes, prefix='Getting routes')
+            available_routes = [
+                route_id
+                for route_id, reactions in route_reactions.items()
+                if reactions <= permitted
             ]
 
-        else:
-            sql = f"""
-            SELECT route_id FROM {self.db.SQL_SCHEMA_PREFIX}route
-            WHERE route_product IN {self.str_ids}
-            """
-
-            if debug:
-                mrich.debug('Querying database for routes')
-            records = self.db.execute(sql).fetchall()
-
             if return_ids:
-                return [i for (i,) in records]
+                return available_routes
 
-            routes = [
-                self.db.get_route(id=route_id)
-                for (route_id,) in mrich.track(records, prefix='Getting routes')
-            ]
+            return RouteSet.from_ids(available_routes)
 
-        from .route import RouteSet
+        route_ids = list(base_qs.values_list('id', flat=True))
 
-        return RouteSet(self.db, routes)
+        if return_ids:
+            return route_ids
+
+        return RouteSet.from_ids(route_ids)
 
     def copy(self) -> 'CompoundSet':
         """Returns a copy of this set"""
-        return CompoundSet(self.db, self.ids)
+        return CompoundSet(self.ids)
 
     def shuffled(self) -> 'CompoundSet':
         """Returns a randomised copy of this set"""
@@ -2225,13 +2205,13 @@ class IngredientSet:
             qs = CataloguePriceModel.objects.filter(pk__in=quote_ids)
 
             if supplier:
-                qs = qs.filter(quote_supplier=supplier)
+                qs = qs.filter(supplier=supplier)
 
             if qs.exists():
                 prices = [
                     Price(
-                        amount=k.quote_amount,
-                        currency=k.quote_currency,
+                        amount=k.price,
+                        currency=k.currency,
                     )
                     for k in qs
                 ]
