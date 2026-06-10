@@ -72,7 +72,7 @@ class PoseService:
                 compound=compound,
                 target=target,
                 pose_alias=alias,
-                pose_path=path,
+                protein_link=path,
                 pose_inchikey=inchikey,  # SQLITE_RELIC
                 pose_smiles=smiles,  # SQLITE_RELIC
                 pose_metadata=json.dumps(metadata),
@@ -126,7 +126,7 @@ class PoseService:
         pose, created = PoseModel.objects.get_or_create(
             compound=compound,
             target=target,
-            pose_path=path,
+            protein_link=path,
             reference=reference,
         )
         return pose, created
