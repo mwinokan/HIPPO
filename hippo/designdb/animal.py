@@ -2,6 +2,8 @@
 
 import logging
 import re
+import shutil
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 
@@ -17,6 +19,7 @@ from .models import (
     ScoringMethodModel,
     TargetModel,
 )
+from .services.download import DownloadService
 from .services.ingestion import IngestionBatchResult, IngestionService
 from .services.method import MethodService
 from .services.route import RouteService
@@ -27,6 +30,11 @@ from .settings import DEFAULT_POSE_METHODS
 from .utils import make_warn_once_per_key
 
 logger = logging.getLogger(__name__)
+
+# Root directory under which Fragalysis downloads are extracted, laid out as
+# data/downloads/<project_name>/<target_name>. The whole tree is wiped on each
+# HIPPO instantiation so a session never works with superseded data.
+DOWNLOADS_DIR = Path('data') / 'downloads'
 
 
 class HIPPO:
@@ -42,6 +50,19 @@ class HIPPO:
 
         # TODO: user- or project based targets
         self._target, _ = TargetModel.objects.get_or_create(target_name=target_name)
+
+        # apo_desolv download state (see _ensure_apo_desolv_files); the download
+        # is performed lazily, at most once per instance
+        self._apo_desolv_path: Path | None = None
+        self._apo_desolv_downloaded_at: datetime | None = None
+
+        # Wipe any previous downloads so this session always fetches fresh data
+        # (Fragalysis downloads can be superseded server-side). Downloads are
+        # confined to DOWNLOADS_DIR specifically so this never touches other
+        # data/ contents.
+        if DOWNLOADS_DIR.is_dir():
+            logger.debug('Wiping previous downloads at %s', DOWNLOADS_DIR)
+            shutil.rmtree(DOWNLOADS_DIR)
 
         # TODO: the way this worked previously was it gave the HIPPO
         # instance full access to the pose table. When working with
@@ -98,6 +119,76 @@ class HIPPO:
     def num_poses(self) -> int:
         """Total number of Poses in the Database"""
         return self.poses.count()
+
+    def _ensure_apo_desolv_files(
+        self, auth_token: str | None = None, stack: str = 'production'
+    ) -> Path:
+        """Ensure this target's apo-desolvated PDB files are available locally.
+
+        Downloads the ``apo_desolv`` structures for this target's observations
+        from Fragalysis (via :class:`.DownloadService`) and returns the path to
+        the extracted directory. The download is performed at most once per
+        instance (the resolved path is cached on the instance). Previous
+        downloads are wiped on :class:`.HIPPO` instantiation, so a fresh instance
+        always re-fetches the latest data.
+
+        Everything needed for the request is taken from this animal: the target
+        name and project (target access string) from :attr:`.target`, and the
+        observation shortcodes from the ``pose_alias`` of this target's poses.
+
+        .. note::
+            This is a HIPPO-level helper, intended to be called from user-facing
+            :class:`.HIPPO` methods the first time PDB files are needed. It's not
+            expected to be called from the components or services layer. This
+            method won't be necessary once HIPPO functions as a web service as
+            intended.
+
+        :param auth_token: optional Fragalysis ``sessionid``; otherwise the
+            ``FRAGALYSIS_AUTH_TOKEN`` environment variable is used
+        :param stack: Fragalysis stack to download from, a key into
+            :data:`.STACK_URLS` (e.g. ``'production'``, ``'staging'``,
+            ``'localhost'``); defaults to ``'production'``
+        :returns: path to the extracted download directory
+        """
+
+        # already resolved during this session?
+        if self._apo_desolv_path is not None and self._apo_desolv_path.exists():
+            return self._apo_desolv_path
+
+        target_name = self._target.target_name
+        project_name = self._target.project.project_name
+
+        # downloads are laid out as data/downloads/<project_name>/<target_name>;
+        # DownloadService extracts into destination/<target_name>, so we pass
+        # data/downloads/<project_name> as the destination
+        destination = DOWNLOADS_DIR / project_name
+
+        # observation shortcodes to request, from the database
+        proteins = list(
+            PoseModel.objects.filter(target=self._target)
+            .exclude(pose_alias__isnull=True)
+            .exclude(pose_alias='')
+            .values_list('pose_alias', flat=True)
+            .distinct()
+        )
+        if not proteins:
+            raise ValueError(
+                f'No pose aliases found for target {target_name!r}; '
+                'cannot determine which structures to download'
+            )
+
+        path = DownloadService.download_target(
+            target_name=target_name,
+            target_access_string=project_name,
+            proteins=','.join(proteins),
+            stack=stack,
+            auth_token=auth_token,
+            destination=destination,
+        )
+
+        self._apo_desolv_path = path
+        self._apo_desolv_downloaded_at = datetime.now()
+        return path
 
     def add_hits(
         self,

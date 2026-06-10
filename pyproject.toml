@@ -42,6 +42,7 @@ dependencies = [
     "neo4j>=6.1.0",
     "gemmi>=0.7.5",
     "mrich>=1.0",
+    "requests>=2.32",
     "pdbfixer>=1.12.0",
     # Max's hippo depends on this. cannot install with uv, comes from conda
     # "chemicalite==2024.5.1",

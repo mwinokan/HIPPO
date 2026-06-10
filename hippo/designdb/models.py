@@ -232,7 +232,7 @@ class PoseModel(BaseModel):
     pose_smiles = models.TextField(null=True, blank=True)
 
     pose_reference = models.IntegerField(null=True, blank=True)
-    pose_path = models.TextField(null=True, blank=True)
+    protein_link = models.TextField(null=True, blank=True)
 
     compound = models.ForeignKey(
         CompoundModel,
@@ -296,14 +296,14 @@ class PoseModel(BaseModel):
         indexes = [
             models.Index(fields=['compound'], name='idx_pose_compound_id'),
             models.Index(fields=['target'], name='idx_pose_target_id'),
-            models.Index(fields=['pose_path'], name='idx_pose_path'),
+            models.Index(fields=['protein_link'], name='idx_protein_link'),
             models.Index(fields=['created_on'], name='idx_pose_created'),
         ]
 
     @property
     def mol_path(self) -> Path | None:
         """Get Path to molecule file"""
-        path = Path(self.pose_path)
+        path = Path(self.protein_link)
         if path.name.endswith('.pdb'):
             mol_path = path.parent / path.name.replace('_hippo.pdb', '.pdb').replace(
                 '.pdb', '_ligand.mol'
@@ -324,7 +324,7 @@ class PoseModel(BaseModel):
     @property
     def apo_path(self) -> Path | None:
         """Get path to apo protein file"""
-        path = Path(self.pose_path)
+        path = Path(self.protein_link)
         if path.name.endswith('.pdb'):
             apo_path = path.parent / path.name.replace('_hippo.pdb', '.pdb').replace(
                 '.pdb', '_apo-desolv.pdb'

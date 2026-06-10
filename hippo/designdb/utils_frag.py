@@ -188,6 +188,8 @@ def find_observation_longcode_matches(
 STACK_URLS = {
     'production': 'https://fragalysis.diamond.ac.uk',
     'staging': 'https://fragalysis.xchem.diamond.ac.uk',
+    # testing
+    'localhost': 'http://localhost:8080',
 }
 
 
