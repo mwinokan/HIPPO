@@ -1360,9 +1360,16 @@ class PoseSet:
             for ref_alias in pose_df['ref_pdb'].values:
                 source_path = Path(lookup[ref_alias])
 
-                apo_path = source_path.parent / source_path.name.replace(
-                    '_hippo.pdb', '.pdb'
-                ).replace('.pdb', '_apo-desolv.pdb')
+                stem = source_path.name.replace('_hippo.pdb', '.pdb')
+                # current Fragalysis protein-file naming
+                apo_path = source_path.parent / stem.replace('.pdb', '_delig-desolv.pdb')
+                # DEPRECATED(apo-naming): fall back to pre-'delig' naming if present,
+                # remove once all data uses 'delig'
+                legacy_path = source_path.parent / stem.replace(
+                    '.pdb', '_apo-desolv.pdb'
+                )
+                if not apo_path.exists() and legacy_path.exists():
+                    apo_path = legacy_path
 
                 if not apo_path.exists():
                     sys = mp.parse(source_path).protein_system

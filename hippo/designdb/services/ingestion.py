@@ -137,8 +137,11 @@ def iter_fs_fragalysis(root_path, skip_records):
             p
             for p in dset_path.glob('[!.]*.pdb')
             if '_ligand' not in p.name
-            and '_apo' not in p.name
+            and '_delig' not in p.name  # current Fragalysis protein-file naming
             and '_hippo' not in p.name
+            # DEPRECATED(apo-naming): pre-'delig' Fragalysis naming, remove once
+            # all data uses 'delig'
+            and '_apo' not in p.name
         ]
 
         if not len(pdbs) == 1:
@@ -882,7 +885,10 @@ class IngestionService:
         (template_path,) = template_paths
         template_path = Path(template_path)
         mrich.var('template_path', template_path)
-        base_name = template_path.name.removesuffix('.pdb').removesuffix('_apo-desolv')
+        base_name = template_path.name.removesuffix('.pdb').removesuffix('_delig-desolv')
+        # DEPRECATED(apo-naming): pre-'delig' Fragalysis naming, remove once all
+        # data uses 'delig'
+        base_name = base_name.removesuffix('_apo-desolv')
         # reference = self.poses[base_name]
 
         # TODO: error handling

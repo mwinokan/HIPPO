@@ -138,6 +138,10 @@ celerybeat.pid
 .venv
 env/
 venv/
+
+# Local docker-compose overrides (per-developer, not shared)
+docker-compose.override.yaml
+docker-compose.override.yml
 ENV/
 env.bak/
 venv.bak/

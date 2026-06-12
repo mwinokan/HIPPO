@@ -147,9 +147,13 @@ SUPPORTED_CHEMISTRY = {
 }
 
 
-def get_best_rmsd(mol1: Chem.rdchem.Mol, mol2: Chem.rdchem.Mol) -> float:
-    """Return the minimum RMSD between two molecules after optimal rigid-body alignment."""
-    return rdMolAlign.GetBestRMS(mol1, mol2)
+def get_rmsd(mol1: Chem.rdchem.Mol, mol2: Chem.rdchem.Mol) -> float:
+    """Return the RMSD between two molecules.
+
+    NB! after discussion in #2094, *do not* align structures. They
+    are already expected to be in the correct coordinate system.
+    """
+    return rdMolAlign.CalcRMS(mol1, mol2)
 
 
 def check_reaction_types(types: list[str]) -> None:

@@ -2,7 +2,6 @@
 
 import logging
 import re
-import shutil
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -33,9 +32,23 @@ from .utils import make_warn_once_per_key
 logger = logging.getLogger(__name__)
 
 # Root directory under which Fragalysis downloads are extracted, laid out as
-# data/downloads/<project_name>/<target_name>. The whole tree is wiped on each
-# HIPPO instantiation so a session never works with superseded data.
+# data/downloads/<project_name>/<target_name>.
 DOWNLOADS_DIR = Path('data') / 'downloads'
+
+# Fragalysis download flags requested when fetching the full hit data for a
+# target (see HIPPO._ensure_hit_data). Everything else stays False.
+HIT_DATA_FLAGS = (
+    'apo_file',
+    'bound_file',
+    'apo_solv_file',
+    'apo_desolv_file',
+    'ligand_pdb',
+    'ligand_sdf',
+    'ligand_smiles',
+    'sdf_info',
+    'smiles_info',
+    'metadata_info',
+)
 
 
 class HIPPO:
@@ -61,18 +74,12 @@ class HIPPO:
             project=project,
         )
 
-        # apo_desolv download state (see _ensure_apo_desolv_files); the download
-        # is performed lazily, at most once per instance
+        # Download state (see _ensure_hit_data / _ensure_apo_desolv_files). The
+        # full hit data persists on disk and is reused across sessions; the
+        # apo_desolv subset is re-downloaded once per instance to stay fresh.
+        self._hit_data_path: Path | None = None
         self._apo_desolv_path: Path | None = None
         self._apo_desolv_downloaded_at: datetime | None = None
-
-        # Wipe any previous downloads so this session always fetches fresh data
-        # (Fragalysis downloads can be superseded server-side). Downloads are
-        # confined to DOWNLOADS_DIR specifically so this never touches other
-        # data/ contents.
-        if DOWNLOADS_DIR.is_dir():
-            logger.debug('Wiping previous downloads at %s', DOWNLOADS_DIR)
-            shutil.rmtree(DOWNLOADS_DIR)
 
         # TODO: the way this worked previously was it gave the HIPPO
         # instance full access to the pose table. When working with
@@ -130,6 +137,61 @@ class HIPPO:
         """Total number of Poses in the Database"""
         return self.poses.count()
 
+    def _ensure_hit_data(
+        self, auth_token: str | None = None, stack: str = 'production'
+    ) -> Path:
+        """Ensure this target's full crystallographic hit data is available locally.
+
+        Downloads the target's Fragalysis data (all observations) from the stack
+        via :class:`.DownloadService` and returns the path to the extracted
+        directory (``data/downloads/<project>/<target>``). The requested file
+        types are :data:`.HIT_DATA_FLAGS` (apo/bound/ligand/sdf/smiles/metadata).
+
+        Unlike :meth:`._ensure_apo_desolv_files`, this data **persists**: if a
+        previous full download is already on disk it is reused without
+        re-fetching (detected by the presence of ``metadata.csv``, which an
+        apo_desolv-only download does not produce).
+
+        .. note::
+            HIPPO-level helper, intended to be called from user-facing
+            :class:`.HIPPO` methods (e.g. :meth:`.add_hits`). It must not be
+            called from the components or services layer.
+
+        :param auth_token: optional Fragalysis ``sessionid``; otherwise the
+            ``FRAGALYSIS_AUTH_TOKEN`` environment variable is used
+        :param stack: Fragalysis stack to download from, a key into
+            :data:`.STACK_URLS`; defaults to ``'production'``
+        :returns: path to the extracted download directory
+        """
+
+        target_name = self._target.target_name
+        project_name = self._target.project.project_name
+
+        destination = DOWNLOADS_DIR / project_name
+        target_dir = destination / target_name
+
+        # reuse an existing full download (metadata.csv distinguishes it from an
+        # apo_desolv-only download, which has no metadata.csv)
+        if (target_dir / 'metadata.csv').is_file() and (
+            target_dir / 'aligned_files'
+        ).is_dir():
+            mrich.print('Using existing hit data download', target_dir)
+            self._hit_data_path = target_dir
+            return target_dir
+
+        path = DownloadService.download_target(
+            target_name=target_name,
+            target_access_string=project_name,
+            proteins='',  # all observations (no poses exist yet to filter by)
+            stack=stack,
+            auth_token=auth_token,
+            destination=destination,
+            **{flag: True for flag in HIT_DATA_FLAGS},
+        )
+
+        self._hit_data_path = path
+        return path
+
     def _ensure_apo_desolv_files(
         self, auth_token: str | None = None, stack: str = 'production'
     ) -> Path:
@@ -138,9 +200,11 @@ class HIPPO:
         Downloads the ``apo_desolv`` structures for this target's observations
         from Fragalysis (via :class:`.DownloadService`) and returns the path to
         the extracted directory. The download is performed at most once per
-        instance (the resolved path is cached on the instance). Previous
-        downloads are wiped on :class:`.HIPPO` instantiation, so a fresh instance
-        always re-fetches the latest data.
+        instance and re-fetched each instance (overwriting any on-disk
+        apo_desolv files) so a fresh instance always works with current data. If
+        the full hit data was already downloaded this instance (via
+        :meth:`._ensure_hit_data`), that is reused since it already includes
+        fresh apo_desolv files.
 
         Everything needed for the request is taken from this animal: the target
         name and project (target access string) from :attr:`.target`, and the
@@ -163,6 +227,12 @@ class HIPPO:
 
         # already resolved during this session?
         if self._apo_desolv_path is not None and self._apo_desolv_path.exists():
+            return self._apo_desolv_path
+
+        # the full hit data downloaded this instance already includes fresh
+        # apo_desolv files, so reuse it instead of re-downloading the subset
+        if self._hit_data_path is not None and self._hit_data_path.exists():
+            self._apo_desolv_path = self._hit_data_path
             return self._apo_desolv_path
 
         target_name = self._target.target_name
@@ -203,8 +273,10 @@ class HIPPO:
     def add_hits(
         self,
         *,
-        metadata_csv: str | Path,
-        aligned_directory: str | Path,
+        metadata_csv: str | Path | None = None,
+        aligned_directory: str | Path | None = None,
+        auth_token: str | None = None,
+        stack: str = 'production',
         tags: list | None = None,
         pose_methods: list[str] | None = None,
         skip: list | None = None,
@@ -215,27 +287,38 @@ class HIPPO:
     ) -> pd.DataFrame:
         """Crystallographic hits from a Fragalysis download or XChemAlign alignment.
 
-        For a Fragalysis download `aligned_directory` and `metadata_csv`
-        should point to the `aligned_files` and `metadata.csv` at the
-        root of the extracted download.
-        For an XChemAlign dataset the `aligned_directory`
-        should point to the `aligned_files`.
+        Provide both `metadata_csv` and `aligned_directory` to load existing
+        local data (for a Fragalysis download these point to the `metadata.csv`
+        and `aligned_files` at the root of the extracted download; for an
+        XChemAlign dataset `aligned_directory` points to the `aligned_files`).
+        Omit both to download this target's data from the Fragalysis stack first
+        (see :meth:`._ensure_hit_data`).
 
-        :param target_name: Name of this protein :class:`.TargetModel`
-        :param metadata_csv: Path to the metadata.csv from the Fragalysis download
+        :param metadata_csv: Path to the metadata.csv (omit to download)
         :param aligned_directory: Path to the aligned_files directory
-            from the Fragalysis download
+            (omit to download)
+        :param auth_token: optional Fragalysis ``sessionid`` for the download
+            (otherwise ``FRAGALYSIS_AUTH_TOKEN`` is used)
+        :param stack: Fragalysis stack to download from (default ``'production'``)
         :param skip: optional list of observation names to skip
-        :param debug: bool:  (Default value = False)
         :returns: a DataFrame of metadata
 
         """
 
-        ### Process arguments
-        # NB! meta not required when loading XCA data
-        assert metadata_csv, 'metadata.csv required'
+        ### Resolve the data source
+        # Path-driven: provide both metadata_csv and aligned_directory to load
+        # existing local data, or omit both to download the target's data from
+        # the Fragalysis stack (always Fragalysis-type).
+        if metadata_csv is None and aligned_directory is None:
+            hit_dir = self._ensure_hit_data(auth_token=auth_token, stack=stack)
+            aligned_directory = hit_dir / 'aligned_files'
+            metadata_csv = hit_dir / 'metadata.csv'
+        elif metadata_csv is None or aligned_directory is None:
+            raise ValueError(
+                'Provide both metadata_csv and aligned_directory to use existing '
+                'data, or neither to download from the stack.'
+            )
 
-        assert aligned_directory, 'aligned_directory must be provided'
         skip = skip or []
         tags = tags or []
         pose_methods = pose_methods or DEFAULT_POSE_METHODS
@@ -244,6 +327,20 @@ class HIPPO:
             aligned_directory = Path(aligned_directory)
 
         mrich.var('aligned_directory', aligned_directory)
+
+        ### Validate inputs early with clear messages. A wrong/mismatched target
+        # name usually yields an aligned_directory (often derived from the target
+        # name) that doesn't exist or has no recognizable observation
+        # subdirectories; without these checks that surfaces later as a confusing
+        # "Unexpected mixed data format" assertion. We rely only on the aligned
+        # data structure here -- not on the directory name, and not on the
+        # presence of metadata (which is optional, e.g. for XChemAlign data).
+        target_name = self.target.target_name
+        if not aligned_directory.is_dir():
+            raise NotADirectoryError(
+                f'aligned_directory not found: {aligned_directory}. Check the path '
+                f'matches the data for target {target_name!r}.'
+            )
 
         ### Determine data format
 
@@ -262,7 +359,13 @@ class HIPPO:
                 """name"""
                 return self.name
 
-        subdirs = list(aligned_directory.glob('*'))
+        subdirs = [p for p in aligned_directory.glob('*') if p.is_dir()]
+        if not subdirs:
+            raise ValueError(
+                f'No observation subdirectories found in {aligned_directory}. Is the '
+                'path correct and the download extracted? A wrong target name (here '
+                f'{target_name!r}) often points add_hits at an empty/missing directory.'
+            )
 
         SUBDIR_PATTERN_FRAGALYSIS = re.compile(r'^.*\d{4}[a-z]$')
         SUBDIR_PATTERN_XCA = re.compile(r'^.*-.\d{4}$')
@@ -273,9 +376,20 @@ class HIPPO:
         xca_subdirs_present = any(
             SUBDIR_PATTERN_XCA.match(subdir.name) for subdir in subdirs
         )
-        assert fragalysis_subdirs_present ^ xca_subdirs_present, (
-            'Unexpected mixed data format'
-        )
+
+        # distinguish the two failure modes the old XOR assertion conflated
+        if fragalysis_subdirs_present and xca_subdirs_present:
+            raise ValueError(
+                'Mixed Fragalysis and XChemAlign observation directories in '
+                f'{aligned_directory}; expected a single consistent format.'
+            )
+        if not (fragalysis_subdirs_present or xca_subdirs_present):
+            examples = ', '.join(p.name for p in subdirs[:3])
+            raise ValueError(
+                'Could not recognise any Fragalysis or XChemAlign observation '
+                f'directories in {aligned_directory} (e.g. {examples}). Check that '
+                f'the data matches target {target_name!r}.'
+            )
 
         if fragalysis_subdirs_present:
             data_format = DataFormat.Fragalysis_v2

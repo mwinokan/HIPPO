@@ -347,15 +347,20 @@ class PoseModel(BaseModel):
 
     @property
     def apo_path(self) -> Path | None:
-        """Get path to apo protein file"""
+        """Get path to the apo (de-liganded, desolvated) protein file"""
         path = Path(self.protein_link)
         if path.name.endswith('.pdb'):
-            apo_path = path.parent / path.name.replace('_hippo.pdb', '.pdb').replace(
-                '.pdb', '_apo-desolv.pdb'
-            )
-            if not apo_path.exists():
-                return None
-            return apo_path
+            stem = path.name.replace('_hippo.pdb', '.pdb')
+            # current Fragalysis protein-file naming
+            apo_path = path.parent / stem.replace('.pdb', '_delig-desolv.pdb')
+            if apo_path.exists():
+                return apo_path
+            # DEPRECATED(apo-naming): pre-'delig' Fragalysis naming, remove once
+            # all data uses 'delig'
+            legacy_path = path.parent / stem.replace('.pdb', '_apo-desolv.pdb')
+            if legacy_path.exists():
+                return legacy_path
+            return None
         else:
             raise NotImplementedError
 

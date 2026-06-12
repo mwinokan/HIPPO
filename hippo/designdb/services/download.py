@@ -77,6 +77,12 @@ DEFAULT_FLAG = 'apo_desolv_file'
 # (connect timeout, read timeout) in seconds.
 DEFAULT_TIMEOUT = (30, 1800)
 
+# Short timeout for the best-effort CSRF-priming GET. It hits a normal page just
+# to obtain the csrftoken cookie, so it must fail fast (e.g. on a backend-only
+# deployment that doesn't serve the frontend landing page) rather than block on
+# the long download read timeout.
+CSRF_TIMEOUT = (10, 10)
+
 # Task-status polling. The POST only *triggers* archive creation and returns a
 # task status URL; we poll it until the task reaches a terminal state and a
 # file_url becomes available.
@@ -178,7 +184,6 @@ class DownloadService:
                 'or pass an explicit url'
             )
 
-        auth_token = auth_token or os.environ.get('FRAGALYSIS_AUTH_TOKEN')
 
         destination = Path(destination) if destination else Path.cwd()
         destination.mkdir(parents=True, exist_ok=True)
@@ -207,8 +212,18 @@ class DownloadService:
                 }
             )
 
-            # set the csrftoken cookie
-            session.get(landing_page_url, timeout=timeout)
+            # Best-effort: prime the csrftoken cookie by hitting a normal page.
+            # Use a short timeout and tolerate failure so a backend-only stack
+            # that doesn't serve the landing page fails fast instead of hanging
+            # on the long download read timeout. If no token is obtained we still
+            # proceed; a CSRF-enforcing server would then return a clear error.
+            try:
+                session.get(landing_page_url, timeout=CSRF_TIMEOUT)
+            except requests.RequestException as exc:
+                mrich.warning(
+                    f'Could not reach {landing_page_url} to obtain a CSRF token '
+                    f'({exc}); proceeding without it.'
+                )
             csrftoken = session.cookies.get('csrftoken', None)
             if csrftoken:
                 session.headers.update({'X-CSRFToken': csrftoken})
