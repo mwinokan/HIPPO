@@ -526,7 +526,7 @@ class PoseSet:
                     ).values('pose_alias')[0:1]
                 ),
             ),
-            'path': ('pose_path', 'pose_path', None),
+            'path': ('protein_link', 'protein_link', None),
             'mol': ('mol', 'pose_mol', None),
             'energy_score': (
                 'energy_score',
@@ -1354,7 +1354,7 @@ class PoseSet:
 
             references = self.references
             # lookup = self.db.get_pose_alias_path_dict(references)
-            lookup = {k.pose_alias: k.pose_path for k in self._queryset}
+            lookup = {k.pose_alias: k.protein_link for k in self._queryset}
 
             zips = set()
             for ref_alias in pose_df['ref_pdb'].values:

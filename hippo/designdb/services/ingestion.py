@@ -377,6 +377,10 @@ class IngestionService:
                 metadata=metadata,
                 inchikey=inchikey,
                 smiles=smiles,
+                # the first method is the uniqueness/producing method; create()
+                # associates it. add_hits may request additional method tags,
+                # which are associated below.
+                pose_method=pose_methods[0] if pose_methods else None,
                 check_rmsd=check_rmsd,
                 rmsd_threshold=rmsd_threshold,
             )
@@ -385,8 +389,8 @@ class IngestionService:
 
             pose.tags.add(*pose_tags)
 
-            if pose_methods:
-                pose.methods.add(*pose_methods)
+            if pose_methods and len(pose_methods) > 1:
+                pose.methods.add(*pose_methods[1:])
 
             # it seems fragalysis data is not expected to contain
             # scores
@@ -532,6 +536,7 @@ class IngestionService:
                 inchikey=inchikey,
                 smiles=smiles,
                 reference=reference,
+                pose_method=pose_method_obj,
                 check_rmsd=check_rmsd,
                 rmsd_threshold=rmsd_threshold,
             )
@@ -539,8 +544,6 @@ class IngestionService:
                 result.poses_created += 1
 
             pose.tags.add(*pose_tags)
-            if pose_method_obj is not None:
-                pose.methods.add(pose_method_obj)
             pose.inspirations.add(*PoseModel.objects.filter(pk__in=pose_inspirations))
 
             if score_method_map:

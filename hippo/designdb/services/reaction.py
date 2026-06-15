@@ -9,6 +9,24 @@ logger = logging.getLogger(__name__)
 
 
 class ReactionService:
+    @staticmethod
+    def reactant_compound_ids() -> set[int]:
+        """Return compound IDs that are reactants of at least one reaction and not
+        a product of any (i.e. leaf reactants / purchasable building blocks).
+
+        Mirrors the legacy ``CompoundSet.reactants`` (reactant compounds minus
+        compounds that are a reaction product).
+        """
+        reactant_ids = set(
+            ReactantModel.objects.values_list('compound_id', flat=True).distinct()
+        )
+        product_ids = set(
+            ReactionModel.objects.values_list(
+                'product_compound_id', flat=True
+            ).distinct()
+        )
+        return reactant_ids - product_ids
+
     @classmethod
     def create_from_lists(
         cls,

@@ -22,6 +22,8 @@ from .models import (
 from .services.download import DownloadService
 from .services.ingestion import IngestionBatchResult, IngestionService
 from .services.method import MethodService
+from .services.quote import QuoteService
+from .services.reaction import ReactionService
 from .services.route import RouteService
 from .services.subsite import SubsiteService
 from .sets.compound import CompoundSet
@@ -133,9 +135,55 @@ class HIPPO:
         return CompoundSet(CompoundModel.compound_filter.all())
 
     @property
+    def reactants(self) -> CompoundSet:
+        """Compounds that are reactants of a reaction and not a product of any
+        (leaf reactants / purchasable building blocks)."""
+        return CompoundSet(list(ReactionService.reactant_compound_ids()))
+
+    @property
     def num_poses(self) -> int:
         """Total number of Poses in the Database"""
         return self.poses.count()
+
+    def quote_compounds(
+        self, compounds: 'CompoundSet | None' = None
+    ) -> tuple[CompoundSet, CompoundSet]:
+        """Report which compounds have catalogue quotes.
+
+        In the modern DesignDB catalogue prices live in the same database and are
+        linked to compounds automatically (the DB matches the registration hash
+        and populates ``compound_catalogue_map``). This therefore no longer
+        transfers quotes from a separate catalogue animal — it reports, for the
+        current database, which compounds are quoted (have at least one linked
+        catalogue price) and which are not.
+
+        :param compounds: optional :class:`.CompoundSet` to restrict to; defaults
+            to all compounds in the database
+        :returns: ``(quoted, unquoted)`` :class:`.CompoundSet` objects
+        """
+        if compounds is None:
+            compounds = self.compounds
+        elif not isinstance(compounds, CompoundSet):
+            raise TypeError(
+                f'compounds must be a CompoundSet or None, got {type(compounds)}'
+            )
+
+        quoted_ids, unquoted_ids = QuoteService.partition_quoted(compounds.ids)
+
+        mrich.var('#quoted compounds', len(quoted_ids))
+        mrich.var('#unquoted compounds', len(unquoted_ids))
+
+        return CompoundSet(list(quoted_ids)), CompoundSet(list(unquoted_ids))
+
+    def quote_reactants(self) -> tuple[CompoundSet, CompoundSet]:
+        """Report which reactant compounds have catalogue quotes.
+
+        Convenience wrapper around :meth:`.quote_compounds` restricted to the
+        animal's reactants (see :attr:`.reactants`).
+
+        :returns: ``(quoted, unquoted)`` :class:`.CompoundSet` objects
+        """
+        return self.quote_compounds(self.reactants)
 
     def _ensure_hit_data(
         self, auth_token: str | None = None, stack: str = 'production'
@@ -546,40 +594,43 @@ class HIPPO:
         enumeration_method_obj = None
         if enumeration_method is not None:
             name, version = enumeration_method
-            enumeration_method_obj = EnumerationMethodModel.objects.filter(
-                enum_name=name, enum_version=version
-            ).first()
-            if enumeration_method_obj is None:
+            try:
+                enumeration_method_obj = EnumerationMethodModel.objects.get(
+                    enum_name=name, enum_version=version
+                )
+            except EnumerationMethodModel.DoesNotExist:
                 raise ValueError(
                     f"Enumeration method '{name}' v{version} not found. "
-                    "Call register_enumeration_method() first."
-                )
+                    'Call register_enumeration_method() first.'
+                ) from None
 
         pose_method_obj = None
         if pose_method is not None:
             name, version = pose_method
-            pose_method_obj = PoseMethodModel.objects.filter(
-                pose_method_name=name, pose_method_version=version
-            ).first()
-            if pose_method_obj is None:
+            try:
+                pose_method_obj = PoseMethodModel.objects.get(
+                    pose_method_name=name, pose_method_version=version
+                )
+            except PoseMethodModel.DoesNotExist:
                 raise ValueError(
                     f"Pose method '{name}' v{version} not found. "
-                    "Call register_pose_method() first."
-                )
+                    'Call register_pose_method() first.'
+                ) from None
 
         score_method_map = {}
         if score_cols and scoring_methods:
             if len(score_cols) != len(scoring_methods):
                 raise ValueError('score_cols and scoring_methods must be the same length')
             for col, (method_name, method_version) in zip(score_cols, scoring_methods):
-                obj = ScoringMethodModel.objects.filter(
-                    method_name=method_name, method_version=method_version
-                ).first()
-                if obj is None:
+                try:
+                    obj = ScoringMethodModel.objects.get(
+                        method_name=method_name, method_version=method_version
+                    )
+                except ScoringMethodModel.DoesNotExist:
                     raise ValueError(
                         f"Scoring method '{method_name}' v{method_version} not found. "
-                        "Call register_scoring_method() first."
-                    )
+                        'Call register_scoring_method() first.'
+                    ) from None
                 score_method_map[col] = obj
 
         warn = make_warn_once_per_key()
