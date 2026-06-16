@@ -150,13 +150,6 @@ class HIPPO:
     ) -> tuple[CompoundSet, CompoundSet]:
         """Report which compounds have catalogue quotes.
 
-        In the modern DesignDB catalogue prices live in the same database and are
-        linked to compounds automatically (the DB matches the registration hash
-        and populates ``compound_catalogue_map``). This therefore no longer
-        transfers quotes from a separate catalogue animal — it reports, for the
-        current database, which compounds are quoted (have at least one linked
-        catalogue price) and which are not.
-
         :param compounds: optional :class:`.CompoundSet` to restrict to; defaults
             to all compounds in the database
         :returns: ``(quoted, unquoted)`` :class:`.CompoundSet` objects
@@ -192,8 +185,7 @@ class HIPPO:
 
         Downloads the target's Fragalysis data (all observations) from the stack
         via :class:`.DownloadService` and returns the path to the extracted
-        directory (``data/downloads/<project>/<target>``). The requested file
-        types are :data:`.HIT_DATA_FLAGS` (apo/bound/ligand/sdf/smiles/metadata).
+        directory (``data/downloads/<project>/<target>``).
 
         Unlike :meth:`._ensure_apo_desolv_files`, this data **persists**: if a
         previous full download is already on disk it is reused without
