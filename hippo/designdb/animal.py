@@ -24,10 +24,12 @@ from .services.ingestion import IngestionBatchResult, IngestionService
 from .services.method import MethodService
 from .services.quote import QuoteService
 from .services.reaction import ReactionService
+from .services.recipe import RecipeService
 from .services.route import RouteService
 from .services.subsite import SubsiteService
-from .sets.compound import CompoundSet
+from .sets.compound import CompoundSet, IngredientSet
 from .sets.pose import PoseSet
+from .sets.reaction import ReactionSet
 from .settings import DEFAULT_POSE_METHODS
 from .utils import make_warn_once_per_key
 
@@ -51,6 +53,52 @@ HIT_DATA_FLAGS = (
     'smiles_info',
     'metadata_info',
 )
+
+
+class RecipeManager:
+    """Client-side accessor for building recipes, bound to a :class:`.HIPPO`.
+
+    Groups the recipe-construction entry points and delegates to the
+    :class:`.RecipeService` (backend), keeping recipe construction on the
+    user-facing client surface (``animal.recipes.from_*``) instead of exposing
+    the component/service layers directly. This is also the seam where target /
+    auth scoping will be attached once the client/backend split lands.
+
+    Access it via :attr:`.HIPPO.recipes`.
+    """
+
+    def __init__(self, animal: 'HIPPO') -> None:
+        self._animal = animal
+
+    def from_compounds(self, compounds: CompoundSet, **kwargs):
+        """Build recipe(s) to synthesise a :class:`.CompoundSet`.
+
+        See :meth:`.RecipeService.from_compounds` for keyword arguments.
+        """
+        if not isinstance(compounds, CompoundSet):
+            raise TypeError(f'compounds must be a CompoundSet, got {type(compounds)}')
+        return RecipeService.from_compounds(compounds, **kwargs)
+
+    def from_reactions(self, reactions: ReactionSet, **kwargs):
+        """Build recipe(s) from a :class:`.ReactionSet`.
+
+        See :meth:`.RecipeService.from_reactions` for keyword arguments.
+        """
+        if not isinstance(reactions, ReactionSet):
+            raise TypeError(f'reactions must be a ReactionSet, got {type(reactions)}')
+        return RecipeService.from_reactions(reactions, **kwargs)
+
+    def from_reactants(self, reactants: 'CompoundSet | IngredientSet', **kwargs):
+        """Build the maximal recipe reachable from a set of reactants.
+
+        See :meth:`.RecipeService.from_reactants` for keyword arguments.
+        """
+        if not isinstance(reactants, (CompoundSet, IngredientSet)):
+            raise TypeError(
+                'reactants must be a CompoundSet or IngredientSet, '
+                f'got {type(reactants)}'
+            )
+        return RecipeService.from_reactants(reactants, **kwargs)
 
 
 class HIPPO:
@@ -139,6 +187,11 @@ class HIPPO:
         """Compounds that are reactants of a reaction and not a product of any
         (leaf reactants / purchasable building blocks)."""
         return CompoundSet(list(ReactionService.reactant_compound_ids()))
+
+    @property
+    def recipes(self) -> RecipeManager:
+        """Client-side accessor for building recipes (see :class:`.RecipeManager`)."""
+        return RecipeManager(self)
 
     @property
     def num_poses(self) -> int:

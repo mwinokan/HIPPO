@@ -299,8 +299,8 @@ class CompoundSet:
         self._queryset = self._queryset.annotate(
             has_tag=Exists(
                 CompoundTagJunctionModel.objects.filter(
-                    pose=OuterRef('pk'),
-                    pose_tag__pose_tag_name=tag,
+                    compound=OuterRef('pk'),
+                    compound_tag__compound_tag_name=tag,
                 ),
             ),
         )
@@ -1072,26 +1072,24 @@ class CompoundSet:
         *,
         supplier: str = 'any',
     ) -> 'CompoundSet':
-        """Get all member compounds that have a quote from given supplier
+        """Get all member compounds that have a catalogue quote.
 
-        :param supplier: supplier name (Default value = 'any')
+        Quotes live in ``catalogue_prices`` and are linked to compounds via the
+        ``compound_catalogue_map`` junction (see :class:`.QuoteService`).
 
+        :param supplier: restrict to this supplier, or ``'any'`` (default)
         """
 
-        if supplier == 'any':
-            key = f'quote_compound IN {self.str_ids}'
-        else:
-            key = f'quote_compound IN {self.str_ids} AND quote_supplier = "{supplier}"'
+        from designdb.models import CataloguePriceCompoundJunctionModel
 
-        ids = self.db.select_where(
-            table='quote',
-            query='DISTINCT quote_compound',
-            key=key,
-            multiple=True,
+        qs = CataloguePriceCompoundJunctionModel.objects.filter(
+            compound_id__in=list(self.ids)
         )
+        if supplier != 'any':
+            qs = qs.filter(catalogue_price__supplier=supplier)
 
-        ids = [i for (i,) in ids]
-        return CompoundSet(self.db, ids)
+        quoted = set(qs.values_list('compound_id', flat=True).distinct())
+        return CompoundSet([i for i in self.ids if i in quoted])
 
     def get_unquoted(
         self,

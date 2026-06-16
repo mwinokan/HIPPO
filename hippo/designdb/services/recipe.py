@@ -435,7 +435,9 @@ class RecipeService:
             mrich.print('Picking cheapest from', len(priced), 'options')
             if not priced:
                 mrich.error("0 recipes with prices, can't choose cheapest")
-                return solutions
+                # fall back to the first (unpriced) solution so the return type
+                # stays a single Recipe, consistent with pick_first / the priced path
+                return solutions[0]
             return sorted(priced, key=lambda r: r.price)[0]
 
         return solutions

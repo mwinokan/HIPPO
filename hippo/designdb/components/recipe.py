@@ -19,6 +19,7 @@ from designdb.models import ComponentModel, CompoundModel, ReactionModel, RouteM
 from designdb.sets.compound import CompoundSet, IngredientSet
 from designdb.sets.reaction import ReactionSet
 
+from .compound import Ingredient
 from .reaction import Reaction
 
 
@@ -985,10 +986,14 @@ class Route(Recipe):
         return self
 
     @classmethod
-    def get_route(cls, *, id: int, debug: bool = False) -> 'Route':
+    def get_route(
+        cls, *, id: int, get_quote: bool = True, debug: bool = False
+    ) -> 'Route':
         """Fetch a :class:`.RouteModel` stored in the database and wrap it.
 
         :param id: the ID of the :class:`.RouteModel` to retrieve
+        :param get_quote: fetch catalogue quotes for the reactants so the route is
+            priced (mirrors :meth:`.RecipeService.from_reaction`), defaults to ``True``
         :param debug: increase verbosity for debugging
         """
 
@@ -1024,16 +1029,30 @@ class Route(Recipe):
         if debug:
             mrich.var('components', qs)
 
-        def _ingredients(ids, amounts):
-            """Build an IngredientSet, returning an empty one for no ids."""
-            if not ids:
-                return IngredientSet()
-            return IngredientSet.from_compounds(ids=ids, amount=amounts)
+        def _ingredients(ids, amounts, quote=False):
+            """Build an IngredientSet, returning an empty one for no ids.
 
+            When ``quote`` is set, each ingredient fetches its cheapest catalogue
+            quote (via the ``compound_catalogue_map`` junction) so the route can be
+            priced; otherwise ingredients are left unquoted.
+            """
+            iset = IngredientSet()
+            for cid, amount in zip(ids, amounts):
+                iset.add(
+                    Ingredient.from_compound(
+                        compound=CompoundModel.objects.get(pk=cid),
+                        amount=amount,
+                        get_quote=quote,
+                    )
+                )
+            return iset
+
+        # products are made, not purchased, so they are never quoted
         products = IngredientSet.from_compounds(
             ids=[route.product_compound_id], amount=1
         )
-        reactants = _ingredients(reactant_ids, reactant_amounts)
+        # reactants are the building blocks that get bought -> fetch quotes
+        reactants = _ingredients(reactant_ids, reactant_amounts, quote=get_quote)
         intermediates = _ingredients(intermediate_ids, intermediate_amounts)
 
         reactions = ReactionSet(reaction_ids)
