@@ -24,11 +24,21 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 -- TABLES (ordered by FK dependencies)
 -- =========================================================
 
+CREATE TABLE IF NOT EXISTS designdb.projects (
+    id BIGSERIAL PRIMARY KEY,
+    project_name TEXT NOT NULL,
+    open_to_public BOOLEAN NOT NULL DEFAULT FALSE,
+    created_on TIMESTAMPTZ DEFAULT now(),
+    updated_on TIMESTAMPTZ DEFAULT now(),
+    CONSTRAINT uc_project UNIQUE (project_name)
+);
+
 CREATE TABLE IF NOT EXISTS designdb.targets (
     id BIGSERIAL PRIMARY KEY, --Internal ID inserted when registering target via Fragalysis
     external_target_id BIGINT, -- ID of this target in the external database (Scarab link)
     target_name TEXT NOT NULL, --Insert from HIPPO codebase. Must be a link to Scarab protein production target
     target_metadata TEXT, -- Not populated by code
+    project_id BIGINT NOT NULL REFERENCES designdb.projects (id) ON DELETE RESTRICT,
     created_on TIMESTAMPTZ DEFAULT now(),
     updated_on TIMESTAMPTZ DEFAULT now(),
     CONSTRAINT uc_target UNIQUE (target_name)
@@ -72,7 +82,7 @@ CREATE TABLE IF NOT EXISTS designdb.poses (
     pose_alias TEXT,
     pose_smiles TEXT, -- Populated by RDKit cartridge trigger from pose_mol (do not insert by code). LR - necessary because will contain defined stereochemistry - should these be canonicalised? Is it done by codebase from pose.mol? Could be done by RDkit cartridge.
     pose_reference INTEGER,
-    pose_path TEXT,
+    protein_link TEXT,
     compound_id BIGINT NOT NULL REFERENCES designdb.compounds (id) ON DELETE RESTRICT,
     target_id BIGINT NOT NULL REFERENCES designdb.targets (id) ON DELETE RESTRICT,
     pose_mol rdkit.mol, -- Insert by codebase. Trigger populates pose_inchikey and pose_smiles via cartridge.
@@ -87,7 +97,7 @@ CREATE TABLE IF NOT EXISTS designdb.poses (
     created_on TIMESTAMPTZ DEFAULT now(),
     updated_on TIMESTAMPTZ DEFAULT now()
     -- CONSTRAINT uc_pose_alias UNIQUE (pose_alias), -- Removed
-    -- CONSTRAINT uc_pose_path UNIQUE (pose_path) -- Removed
+    -- CONSTRAINT uc_protein_link UNIQUE (protein_link) -- Removed
 );
 
 CREATE TABLE IF NOT EXISTS designdb.subsite_tags (
@@ -471,7 +481,7 @@ CREATE INDEX IF NOT EXISTS idx_reaction_created ON designdb.reactions(created_on
 
 CREATE INDEX IF NOT EXISTS idx_pose_compound_id ON designdb.poses(compound_id);
 CREATE INDEX IF NOT EXISTS idx_pose_target_id ON designdb.poses(target_id);
-CREATE INDEX IF NOT EXISTS idx_pose_path ON designdb.poses(pose_path);
+CREATE INDEX IF NOT EXISTS idx_protein_link ON designdb.poses(protein_link);
 CREATE INDEX IF NOT EXISTS idx_pose_created ON designdb.poses(created_on);
 
 CREATE INDEX IF NOT EXISTS idx_score_values_pose_id ON designdb.score_values(pose_id);

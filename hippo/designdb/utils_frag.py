@@ -1,5 +1,7 @@
 """Functions for interfacing with Fragalysis data"""
 
+import os
+import re
 from dataclasses import dataclass, fields
 
 import mrich
@@ -87,55 +89,84 @@ def generate_header(
 
 @dataclass
 class LongcodeRecord:
-    target: str
-    crystal: str
+    crystal: str  # full crystal token, e.g. A71EV2A-x0152
+    protein_name: str  # e.g. A71EV2A
     chain: str
     residue_number: int
     version: int
+    altloc: str | None = None
+
+
+# Current Fragalysis longcode format. The code combines two sites
+# (e.g. A71EV2A-x0152_A_147_0_1_A71EV2A-x0526+A+147+0+1__LIG); we parse only the
+# first (underscore-separated) site and ignore the second (plus-separated) one.
+# First-site groups: crystal token, then chain_resnum_altloc_version.
+_LONGCODE_RE = re.compile(
+    r'(.*)_'  # crystal token, e.g. A71EV2A-x0152
+    r'([A-Za-z]+_[0-9]+_[A-Za-z0-9]+_[0-9]+)_'  # chain_resnum_altloc_version
+    r'.*\+[A-Za-z]+\+[0-9]+\+[A-Za-z0-9]+\+[0-9]+'  # second site (ignored)
+    r'_.LIG'
+)
+
+# DEPRECATED(longcode-altloc): pre-altloc Fragalysis longcode format
+# (e.g. D68EV3CPROB-x0455_A_209_1_7gp9+A+201+1__LIG, no altloc group). Remove this
+# regex and its branch in parse_observation_longcode once all data uses the
+# current format above.
+_LONGCODE_RE_LEGACY = re.compile(
+    r'(.*)_([A-Za-z]_[0-9]*_[0-9])_(.*)\+([A-Za-z]\+[0-9]*\+[0-9])_.LIG'
+)
+
+# Split a crystal token (e.g. A71EV2A-x0152) into protein name and crystal id.
+_CRYSTAL_RE = re.compile(r'(.*)-(\w[0-9]{4})')
 
 
 def parse_observation_longcode(longcode: str) -> LongcodeRecord:
-    """Parse a Fragalysis longcode and try to extract the following information:
+    """Parse a Fragalysis observation longcode (first site only).
 
-    - TargetModel name (target)
-    - Crystal/dataset code (crystal)
+    Extracts:
+
+    - Crystal token (crystal), e.g. ``A71EV2A-x0152``
+    - Protein name (protein_name), e.g. ``A71EV2A``
     - Chain letter (chain)
     - Residue number (residue_number)
+    - Altloc (altloc; ``None`` for the older format)
     - Version number (version)
-
-    :returns: dictionary of the above keys in parentheses
     """
 
-    import re
+    altloc = None
 
-    match = re.search(
-        r'(.*)_([A-z]_[0-9]*_[0-9])_(.*)\+([A-z]\+[0-9]*\+[0-9])_.LIG', longcode
-    )
-
-    if not match:
-        raise UnsupportedFragalysisLongcodeError(longcode)
-
-    cryst_str, lig_str, _, _ = match.groups()
-
-    chain, residue_number, version = lig_str.split('_')
+    match = _LONGCODE_RE.search(longcode)
+    if match:
+        cryst_str = match.group(1)
+        chain, residue_number, altloc, version = match.group(2).split('_')
+    else:
+        # DEPRECATED(longcode-altloc): pre-altloc format had no altloc group;
+        # remove this branch (and _LONGCODE_RE_LEGACY) once all data uses the
+        # current format.
+        match = _LONGCODE_RE_LEGACY.search(longcode)
+        if not match:
+            raise UnsupportedFragalysisLongcodeError(longcode)
+        cryst_str = match.group(1)
+        chain, residue_number, version = match.group(2).split('_')
+        # end DEPRECATED(longcode-altloc)
 
     residue_number = int(residue_number)
     version = int(version)
 
-    if match := re.search(r'(.*)-(\w[0-9]{4})', cryst_str):
-        target_name = match.group(0)
-        crystal = match.group(1)
-
+    if m := _CRYSTAL_RE.search(cryst_str):
+        crystal = m.group(0)  # full token, e.g. A71EV2A-x0152
+        protein_name = m.group(1)  # e.g. A71EV2A
     else:
-        target_name = ''
         crystal = cryst_str
+        protein_name = ''
 
     return LongcodeRecord(
-        target=target_name,
         crystal=crystal,
+        protein_name=protein_name,
         chain=chain,
         residue_number=residue_number,
         version=version,
+        altloc=altloc,
     )
 
 
@@ -188,7 +219,23 @@ def find_observation_longcode_matches(
 STACK_URLS = {
     'production': 'https://fragalysis.diamond.ac.uk',
     'staging': 'https://fragalysis.xchem.diamond.ac.uk',
+    # testing
+    'localhost': 'http://localhost:8080',
 }
+
+# Developers can add or override stacks via the environment without editing this
+# shared file. Each ``HIPPO_STACK_URL_<NAME>`` variable becomes the ``<name>``
+# stack (lower-cased), e.g. set in your (gitignored) .env:
+#     HIPPO_STACK_URL_DOCKERHOST=http://host.docker.internal:8080
+# then use stack='dockerhost'.
+_STACK_URL_ENV_PREFIX = 'HIPPO_STACK_URL_'
+STACK_URLS.update(
+    {
+        key[len(_STACK_URL_ENV_PREFIX) :].lower(): value
+        for key, value in os.environ.items()
+        if key.startswith(_STACK_URL_ENV_PREFIX) and value
+    }
+)
 
 
 class UnsupportedFragalysisLongcodeError(NotImplementedError):

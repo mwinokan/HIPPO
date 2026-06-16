@@ -8,9 +8,9 @@ import mrich
 import pandas as pd
 import rdkit
 # from rdkit.Chem import inchi
-from designdb.models import CompoundModel, PoseModel, PoseTagModel, TargetModel
+from designdb.models import CompoundModel, PoseMethodModel, PoseModel, PoseTagModel, TargetModel
 from designdb.utils import normalize_string_list
-from designdb.utils_chem import get_best_rmsd
+from designdb.utils_chem import get_rmsd
 from designdb.utils_frag import GENERATED_TAG_COLS, META_IGNORE_COLS
 from django.db.models import Q
 # from mypackage.services.compound import CompoundService
@@ -47,47 +47,57 @@ class PoseService:
         inchikey: str,
         smiles: str,
         reference: int | None = None,
+        pose_method: 'PoseMethodModel | None' = None,
         check_rmsd: bool = False,
         rmsd_threshold: float = 1.0,
     ):
+        qs = PoseModel.objects.filter(
+            target=target,
+            compound=compound,
+            pose_alias=alias,
+        )
+        if pose_method:
+            qs = qs.filter(methods=pose_method)
 
+        # (target, compound, pose_alias, method) should identify one pose
         try:
-            pose = PoseModel.objects.get(
-                target=target,
-                compound=compound,
-                pose_alias=alias,
-            )
-            # default is to overwrite metadata. what about other props?
-            # also, shoulnd't this be JSON?
-            pose.metadata = metadata
-            pose.save()
-            created = False
+            existing = qs.get()
         except PoseModel.DoesNotExist:
-            if check_rmsd and (
-                duplicate := cls.find_rmsd_duplicate(mol, compound, target, rmsd_threshold)
-            ):
-                return duplicate, False
+            existing = None
+        else:
+            # overwrite metadata on the matching pose
+            existing.pose_metadata = json.dumps(metadata)
+            existing.save()
+            return existing, False
 
-            pose = PoseModel(
-                compound=compound,
-                target=target,
-                pose_alias=alias,
-                pose_path=path,
-                pose_inchikey=inchikey,  # SQLITE_RELIC
-                pose_smiles=smiles,  # SQLITE_RELIC
-                pose_metadata=json.dumps(metadata),
-                pose_mol=mol,
-                # pose_mol=Chem.MolToMolBlock(mol),
-                rdkit_version=rdkit.__version__,
-                inchi_version=Chem.inchi.GetInchiVersion(),
-                pose_reference=reference,
+        if check_rmsd and (
+            duplicate := cls.find_rmsd_duplicate(
+                mol, compound, target, rmsd_threshold, pose_method=pose_method
             )
-            pose.save()
-            created = True
-        # except MultipleObjectsReturned:
-        #     pass
+        ):
+            return duplicate, False
 
-        return pose, created
+        pose = PoseModel(
+            compound=compound,
+            target=target,
+            pose_alias=alias,
+            protein_link=path,
+            pose_inchikey=inchikey,  # SQLITE_RELIC
+            pose_smiles=smiles,  # SQLITE_RELIC
+            pose_metadata=json.dumps(metadata),
+            pose_mol=mol,
+            # pose_mol=Chem.MolToMolBlock(mol),
+            rdkit_version=rdkit.__version__,
+            inchi_version=Chem.inchi.GetInchiVersion(),
+            pose_reference=reference,
+        )
+        pose.save()
+
+        # associate the method here so subsequent loads dedup correctly
+        if pose_method is not None:
+            pose.methods.add(pose_method)
+
+        return pose, True
 
     @classmethod
     def find_rmsd_duplicate(
@@ -96,10 +106,15 @@ class PoseService:
         compound: 'CompoundModel',
         target: 'TargetModel',
         rmsd_threshold: float,
+        pose_method: 'PoseMethodModel | None' = None,
     ) -> 'PoseModel | None':
-        for existing in PoseModel.objects.filter(compound=compound, target=target):
+        # only compare against poses produced by the same method
+        candidates = PoseModel.objects.filter(compound=compound, target=target)
+        if pose_method is not None:
+            candidates = candidates.filter(methods=pose_method)
+        for existing in candidates:
             try:
-                rmsd = get_best_rmsd(mol, existing.pose_mol)
+                rmsd = get_rmsd(mol, existing.pose_mol)
                 if rmsd < rmsd_threshold:
                     logger.warning(
                         'Pose RMSD %.3f Å below threshold %.3f Å, skipping duplicate (alias=%s)',
@@ -126,7 +141,7 @@ class PoseService:
         pose, created = PoseModel.objects.get_or_create(
             compound=compound,
             target=target,
-            pose_path=path,
+            protein_link=path,
             reference=reference,
         )
         return pose, created

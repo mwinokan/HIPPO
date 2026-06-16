@@ -89,11 +89,35 @@ class BaseModel(models.Model):
         default_related_name = '%(class)ss'
 
 
+class Project(BaseModel):
+    project_name = models.TextField(null=False, unique=True)
+    open_to_public = models.BooleanField(default=False)
+
+    class Meta(BaseModel.Meta):
+        db_table = 'projects'
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    'project_name',
+                ],
+                name='uc_project',
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.project_name}"
+
+
 class TargetModel(BaseModel):
     id = models.BigAutoField(primary_key=True)
     external_target_id = models.BigIntegerField(null=True, blank=True)
     target_name = models.TextField()
     target_metadata = models.TextField(null=True, blank=True)
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.RESTRICT,
+        db_column='project_id',
+    )
 
     class Meta(BaseModel.Meta):
         db_table = 'targets'
@@ -232,7 +256,7 @@ class PoseModel(BaseModel):
     pose_smiles = models.TextField(null=True, blank=True)
 
     pose_reference = models.IntegerField(null=True, blank=True)
-    pose_path = models.TextField(null=True, blank=True)
+    protein_link = models.TextField(null=True, blank=True)
 
     compound = models.ForeignKey(
         CompoundModel,
@@ -296,14 +320,14 @@ class PoseModel(BaseModel):
         indexes = [
             models.Index(fields=['compound'], name='idx_pose_compound_id'),
             models.Index(fields=['target'], name='idx_pose_target_id'),
-            models.Index(fields=['pose_path'], name='idx_pose_path'),
+            models.Index(fields=['protein_link'], name='idx_protein_link'),
             models.Index(fields=['created_on'], name='idx_pose_created'),
         ]
 
     @property
     def mol_path(self) -> Path | None:
         """Get Path to molecule file"""
-        path = Path(self.pose_path)
+        path = Path(self.protein_link)
         if path.name.endswith('.pdb'):
             mol_path = path.parent / path.name.replace('_hippo.pdb', '.pdb').replace(
                 '.pdb', '_ligand.mol'
@@ -323,15 +347,20 @@ class PoseModel(BaseModel):
 
     @property
     def apo_path(self) -> Path | None:
-        """Get path to apo protein file"""
-        path = Path(self.pose_path)
+        """Get path to the apo (de-liganded, desolvated) protein file"""
+        path = Path(self.protein_link)
         if path.name.endswith('.pdb'):
-            apo_path = path.parent / path.name.replace('_hippo.pdb', '.pdb').replace(
-                '.pdb', '_apo-desolv.pdb'
-            )
-            if not apo_path.exists():
-                return None
-            return apo_path
+            stem = path.name.replace('_hippo.pdb', '.pdb')
+            # current Fragalysis protein-file naming
+            apo_path = path.parent / stem.replace('.pdb', '_delig-desolv.pdb')
+            if apo_path.exists():
+                return apo_path
+            # DEPRECATED(apo-naming): pre-'delig' Fragalysis naming, remove once
+            # all data uses 'delig'
+            legacy_path = path.parent / stem.replace('.pdb', '_apo-desolv.pdb')
+            if legacy_path.exists():
+                return legacy_path
+            return None
         else:
             raise NotImplementedError
 
