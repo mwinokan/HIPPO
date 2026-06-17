@@ -1114,6 +1114,11 @@ class Ingredient:
         return self._quote
 
     @property
+    def quote_id(self) -> int | None:
+        """ID of the associated quote (:class:`.CataloguePriceModel`), or None."""
+        return self._quote.id if self._quote is not None else None
+
+    @property
     def price(self) -> Price:
         """Returns the price from the associated quote, or a null Price if
         unavailable."""

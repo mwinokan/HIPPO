@@ -299,8 +299,8 @@ class CompoundSet:
         self._queryset = self._queryset.annotate(
             has_tag=Exists(
                 CompoundTagJunctionModel.objects.filter(
-                    pose=OuterRef('pk'),
-                    pose_tag__pose_tag_name=tag,
+                    compound=OuterRef('pk'),
+                    compound_tag__compound_tag_name=tag,
                 ),
             ),
         )
@@ -2299,10 +2299,7 @@ class IngredientSet:
             compound_id = ingredient.compound.pk
             amount = ingredient.amount
 
-            if (q := ingredient.quote) and not ingredient.quote_id:
-                # I don't understand the logic for this. it's always
-                # true now. what was the meaning of storing id?
-                mrich.warning(f'Losing quote! {ingredient.quote=}')
+            q = ingredient.quote
 
             supplier = ingredient.supplier
             max_lead_time = ingredient.max_lead_time
