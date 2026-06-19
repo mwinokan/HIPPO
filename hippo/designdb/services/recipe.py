@@ -14,8 +14,9 @@ from itertools import product
 import mrich
 from designdb.components.compound import Compound
 from designdb.components.reaction import DEFAULT_PRODUCT_YIELD, Reaction
-from designdb.models import CompoundModel, ReactionModel, RouteModel
+from designdb.models import CompoundModel, InspirationModel, PoseModel, ReactionModel, RouteModel
 from designdb.sets.compound import CompoundSet, IngredientSet
+from designdb.sets.pose import PoseSet
 from designdb.sets.reaction import ReactionSet
 
 
@@ -616,17 +617,141 @@ class RecipeService:
         )
 
     @staticmethod
-    def write_product_csv(recipe: 'Recipe', file, return_df: bool = False):
-        """Detailed product-selection CSV.
+    def write_product_csv(
+        recipe: 'Recipe', file, return_df: bool = False
+    ) -> 'DataFrame | None':
+        """Detailed CSV output including product information for selection/synthesis.
 
-        Not yet ported: depends on unported Pose machinery
-        (``get_compound_id_pose_ids_dict``, ``get_compound_id_inspiration_ids_dict``,
-        ``PoseSet`` construction from IDs). Port alongside the Pose subsystem.
+        One row per product compound: identifiers, required amount, associated poses,
+        tags, upstream route/reaction/reactant dependencies, scaffold series, and
+        inspiration pose names.
+
+        :param recipe: the :class:`.Recipe` whose products to report
+        :param file: output CSV path
+        :param return_df: also return the assembled ``DataFrame``
         """
-        raise NotImplementedError(
-            'write_product_csv requires unported Pose/inspiration lookups; port '
-            'alongside the Pose subsystem'
-        )
+
+        from pandas import DataFrame
+
+        routes = RecipeService.get_routes(recipe)
+
+        product_ids = list(recipe.products.compound_ids)
+
+        # compound_id -> set of associated pose IDs
+        pose_map: dict[int, set] = {}
+        for comp_id, pose_id in PoseModel.objects.filter(
+            compound_id__in=product_ids
+        ).values_list('compound_id', 'id'):
+            pose_map.setdefault(comp_id, set()).add(pose_id)
+
+        # compound_id -> set of inspiration (original) pose IDs, scoped to the
+        # product compounds and their scaffolds (the inspiration fallback needs both)
+        scaffold_ids = set()
+        for product in recipe.products:
+            # Ingredient.__getattr__ delegates to the CompoundModel (ORM), so wrap
+            # in the Compound component to reach component-level properties
+            if scaffolds := Compound(product.compound).scaffolds:
+                scaffold_ids.update(scaffolds.ids)
+        needed_ids = set(product_ids) | scaffold_ids
+
+        inspiration_map: dict[int, set] = {}
+        for comp_id, original_pose_id in InspirationModel.objects.filter(
+            derivative_pose__compound_id__in=needed_ids
+        ).values_list('derivative_pose__compound_id', 'original_pose_id'):
+            inspiration_map.setdefault(comp_id, set()).add(original_pose_id)
+
+        data = []
+
+        for product in mrich.track(
+            recipe.products, prefix='Constructing product DataFrame'
+        ):
+            # wrap in the Compound component for component-level properties
+            # (Ingredient.__getattr__ delegates to the CompoundModel ORM instead)
+            comp = Compound(product.compound)
+
+            d = dict(
+                hippo_id=product.compound_id,
+                smiles=comp.smiles,
+                inchikey=comp.inchikey,
+                required_amount_mg=product.amount,
+            )
+
+            upstream_routes = []
+            upstream_reaction_ids = []
+
+            for route in routes:
+                if route.product_compound.id == product.compound_id:
+                    upstream_routes.append(route)
+                    upstream_reaction_ids += route.reactions.ids
+
+            if not upstream_routes:
+                mrich.error('No upstream routes for', product)
+                continue
+
+            if not upstream_reaction_ids:
+                mrich.error('No upstream reactions for', product)
+                continue
+
+            upstream_reactions = ReactionSet(list(set(upstream_reaction_ids)))
+
+            # scaffold series: the product's scaffolds, or itself if it is one
+            if scaffolds := comp.scaffolds:
+                scaffold_series, is_scaffold = scaffolds.ids, False
+            else:
+                scaffold_series, is_scaffold = [product.compound_id], True
+
+            poses = pose_map.get(product.compound_id, set())
+
+            d['num_poses'] = len(poses)
+            d['poses'] = poses
+            d['tags'] = comp.tags
+            d['num_routes'] = len(upstream_routes)
+            d['num_reaction_steps'] = {len(r.reactions) for r in upstream_routes}
+            d['reaction_dependencies'] = upstream_reactions.ids
+            d['reactant_dependencies'] = set(
+                sum((route.reactants.ids for route in upstream_routes), [])
+            )
+            d['route_ids'] = [route.id for route in upstream_routes]
+            d['chemistry_types'] = ', '.join(t for t in upstream_reactions.types if t)
+            d['is_scaffold'] = is_scaffold
+            d['scaffold_series'] = scaffold_series
+
+            # inspiration pose IDs, with fallback to the scaffold / metadata
+            inspirations = inspiration_map.get(product.compound_id, None)
+
+            if not inspirations and not is_scaffold:
+                scaffold = Compound(comp.scaffolds[0])
+                inspirations = inspiration_map.get(scaffold.id, None)
+
+                scaffold_meta = scaffold.metadata or {}
+                if not inspirations and 'inspiration_pose_ids' in scaffold_meta:
+                    inspirations = scaffold_meta['inspiration_pose_ids']
+
+            product_meta = comp.metadata or {}
+            if (
+                not inspirations
+                and is_scaffold
+                and 'inspiration_pose_ids' in product_meta
+            ):
+                inspirations = product_meta['inspiration_pose_ids']
+
+            if inspirations:
+                inspiration_poses = PoseSet(
+                    PoseModel.objects.filter(pk__in=list(inspirations))
+                )
+                d['inspirations'] = ', '.join(inspiration_poses.names)
+            else:
+                d['inspirations'] = ''
+
+            data.append(d)
+
+        df = DataFrame(data)
+        mrich.writing(file)
+        df.to_csv(file, index=False)
+
+        if return_df:
+            return df
+        return None
 
     @staticmethod
     def to_syndirella(recipe: 'Recipe', out_key, poses, *, separate: bool = False):

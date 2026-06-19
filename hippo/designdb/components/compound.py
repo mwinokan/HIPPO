@@ -28,6 +28,7 @@ from rdkit.Chem.rdMolDescriptors import CalcMolFormula, CalcNumRings
 from rdkit.Chem.Scaffolds import MurckoScaffold
 
 from .price import Price
+from .quote import Quote
 
 
 class Compound:
@@ -900,17 +901,37 @@ class Ingredient:
         self,
         compound: CompoundModel,  # or CatalogueCompoundModel?
         amount: float,
-        quote: CataloguePriceModel,
+        quote: 'Quote | CataloguePriceModel | int | None' = None,
         max_lead_time: float | None = None,
         supplier: str | None = None,
     ):
-        """Ingredient initialisation"""
+        """Ingredient initialisation
+
+        ``quote`` may be a :class:`.Quote`, a :class:`.CataloguePriceModel`, a quote
+        ID (``int``), or ``None``. When only an ID (or nothing) is stored, the quote
+        is resolved lazily on first access via :attr:`.quote` -- which re-quotes the
+        catalogue (estimating a price if no pack is large enough).
+        """
 
         self._compound = compound
-        self._quote = quote
         self._amount = amount
         self._max_lead_time = max_lead_time
         self._supplier = supplier
+
+        # `_quote` holds a resolved Quote component (or None); `_quote_id` holds a
+        # persisted quote ID awaiting lazy resolution. Estimated quotes have no ID
+        # and so are always carried as a resolved `_quote` object.
+        self._quote = None
+        self._quote_id = None
+
+        if isinstance(quote, Quote):
+            self._quote = quote
+            self._quote_id = quote.id
+        elif isinstance(quote, CataloguePriceModel):
+            self._quote = Quote(quote)
+            self._quote_id = quote.pk
+        elif quote is not None:
+            self._quote_id = int(quote)
 
     def __str__(self) -> str:
         """Plain string representation"""
@@ -1040,17 +1061,27 @@ class Ingredient:
         if max_lead_time:
             qs = qs.filter(lead_time__lte=max_lead_time)
 
-        if min_amount:
-            qs = qs.filter(amount__gte=min_amount)
+        estimate = None
 
-            if not qs.exists():
+        if min_amount:
+            suitable = qs.filter(amount__gte=min_amount)
+
+            if suitable.exists():
+                qs = suitable
+            else:
+                # no single pack is large enough -> estimate by scaling the biggest
+                # available pack's unit price (mirrors legacy Quote.combination)
                 mrich.debug(
                     f'No quote available for C{compound.pk} with amount >='
                     f' {min_amount} mg. Estimating price...'
                 )
+                estimate = Quote.estimate(min_amount, [Quote(m) for m in qs])
 
         if pick_cheapest:
-            return qs.order_by('price').first()
+            if estimate is not None:
+                return estimate
+            cheapest = qs.order_by('price').first()
+            return Quote(cheapest) if cheapest is not None else None
 
         if df:
             return pd.DataFrame(qs.values()).drop(columns='compound')
@@ -1109,22 +1140,45 @@ class Ingredient:
         return self._compound.id
 
     @property
-    def quote(self) -> int:
-        """Returns the ID of the associated :class:`.Quote`"""
+    def quote(self) -> 'Quote | None':
+        """The associated :class:`.Quote`, resolved lazily.
+
+        If a persisted quote ID is stored it is fetched; otherwise the catalogue is
+        re-quoted for this ingredient's amount (estimating a price if no single pack
+        is large enough). Returns ``None`` if no quote can be found or estimated.
+        """
+        if self._quote is None:
+            if self._quote_id:
+                self._quote = Quote(CataloguePriceModel.objects.get(pk=self._quote_id))
+            else:
+                self._quote = Ingredient.get_quotes(
+                    compound=self._compound,
+                    min_amount=self._amount,
+                    supplier=self._supplier,
+                    max_lead_time=self._max_lead_time,
+                    pick_cheapest=True,
+                    none='quiet',
+                )
+                if self._quote is not None:
+                    self._quote_id = self._quote.id
         return self._quote
 
     @property
     def quote_id(self) -> int | None:
-        """ID of the associated quote (:class:`.CataloguePriceModel`), or None."""
-        return self._quote.id if self._quote is not None else None
+        """ID of the associated quote, or ``None`` (estimated/unquoted)."""
+        if self._quote_id is not None:
+            return self._quote_id
+        quote = self.quote
+        return quote.id if quote is not None else None
 
     @property
     def price(self) -> Price:
         """Returns the price from the associated quote, or a null Price if
         unavailable."""
-        if self._quote is None:
+        quote = self.quote
+        if quote is None:
             return Price.null()
-        return Price(self._quote.price, self._quote.currency)
+        return quote.as_price
 
     @property
     def max_lead_time(self) -> float:
@@ -1138,18 +1192,12 @@ class Ingredient:
 
     @amount.setter
     def amount(self, a) -> None:
-        """Set the amount and fetch updated :class:`.Quote`s"""
-
-        quote = self.get_cheapest_quote_id(
-            min_amount=a,
-            max_lead_time=self._max_lead_time,
-            supplier=self._supplier,
-            none='quiet',
-        )
-
-        self._quote = quote
+        """Set the amount, invalidating the cached quote so it is re-quoted (and
+        re-estimated if needed) for the new amount on next access."""
 
         self._amount = a
+        self._quote = None
+        self._quote_id = None
 
     @property
     def compound(self) -> CompoundModel:

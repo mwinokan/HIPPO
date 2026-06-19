@@ -188,18 +188,22 @@ class PoseSet:
         return self._queryset.count()
 
     def __iter__(self):
-        """Iterate through poses in this set"""
-        return iter(self._queryset)
+        """Iterate through poses in this set as :class:`.Pose` components"""
+        from designdb.components.pose import Pose
+
+        return (Pose(p) for p in self._queryset)
 
     def __getitem__(
         self,
         key: int | slice,
-    ) -> 'PoseModel | PoseSet':
+    ) -> 'Pose | PoseSet':
         """Get poses or subsets thereof from this set
 
         :param key: integer index or slice of indices
 
         """
+        from designdb.components.pose import Pose
+
         match key:
             case int():
                 try:
@@ -208,7 +212,7 @@ class PoseSet:
                     mrich.error(f'list index out of range: {key=} for {self}')
                     raise PoseModel.DoesNotExist from exc
 
-                return pose
+                return Pose(pose)
 
             case slice():
                 return PoseSet(PoseModel.objects.filter(pk__in=key))
@@ -2138,21 +2142,18 @@ class PoseSet:
         return self.get_by_references(self).values_list('pk', flat=True)
 
     @property
-    def inspiration_sets(self) -> list[set[int]]:
-        """Return a list of unique sets of inspiration :class:`.PoseModel` IDs"""
+    def inspiration_sets(self) -> set[tuple[int, ...]]:
+        """Return the unique sets of inspiration :class:`.PoseModel` IDs"""
 
-        pairs = InspirationModel.objects.filter(derivative_pose__in=self._queryset)
-        data = {}
-        for p in pairs:
-            if p.derivative_pose not in data:
-                data[p.derivative_pose] = set()
-            data[p.derivative_pose].add(p.original_pose)
+        # group original (inspiration) pose IDs by derivative pose ID -- use the
+        # FK ids (sortable ints, no extra queries) rather than the model objects
+        data: dict[int, set[int]] = {}
+        for deriv_id, orig_id in InspirationModel.objects.filter(
+            derivative_pose__in=self._queryset
+        ).values_list('derivative_pose_id', 'original_pose_id'):
+            data.setdefault(deriv_id, set()).add(orig_id)
 
-        data = {k: tuple(sorted(list(v))) for k, v in data.items()}
-
-        unique = set(data.values())
-
-        return unique
+        return {tuple(sorted(v)) for v in data.values()}
 
     @property
     def num_inspiration_sets(self) -> int:
@@ -2242,7 +2243,11 @@ class PoseSet:
     @property
     def num_subsites(self) -> int:
         """Count the number of subsites that poses in this set come into contact with"""
-        return SubsiteModel.objects.filter(pose__in=self._queryset).distinct().count()
+        return (
+            SubsiteModel.objects.filter(posemodels__in=self._queryset)
+            .distinct()
+            .count()
+        )
 
     @property
     def subsite_balance(self) -> float:

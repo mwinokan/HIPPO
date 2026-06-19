@@ -308,7 +308,7 @@ class ReactionSet:
     @property
     def indices(self) -> list[int]:
         """Returns the ids of reactions in this set"""
-        return self._queryset.values_list('pk', flat=True)
+        return list(self._queryset.values_list('pk', flat=True))
 
     @property
     def ids(self) -> list[int]:
@@ -317,8 +317,10 @@ class ReactionSet:
 
     @property
     def types(self) -> list[str]:
-        """Returns the types of reactions in this set"""
-        return self._queryset.values('reaction_type').distinct()
+        """Returns the unique reaction types in this set"""
+        return list(
+            self._queryset.values_list('reaction_type', flat=True).distinct()
+        )
 
     @property
     def num_types(self) -> int:

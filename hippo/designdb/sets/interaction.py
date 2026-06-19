@@ -117,43 +117,13 @@ class InteractionSet:
         :returns: an :class:`.InteractionSet`
         """
 
-        self = cls.__new__(cls)
-
-        db = db or pose.db
-
-        ### get the ID's
-
-        from .pose import PoseSet
-
-        if isinstance(pose, PoseSet):
-            # check if all poses have fingerprints
-            (has_invalid_fps,) = db.select_where(
-                query='COUNT(1)',
-                table='pose',
-                key=f'pose_id IN {pose.str_ids} AND pose_fingerprint = 0',
-            )
-
-            if has_invalid_fps:
-                mrich.warning(f'{has_invalid_fps} Poses have not been fingerprinted')
-
-            sql = f"""
-            SELECT interaction_id FROM {db.SQL_SCHEMA_PREFIX}{table}
-            WHERE interaction_pose IN {pose.str_ids}
-            """
-
+        # ``pose`` may be a PoseSet (has ``.ids``) or a single Pose/PoseModel
+        if hasattr(pose, 'ids'):
+            qs = InteractionModel.objects.filter(pose_id__in=list(pose.ids))
         else:
-            sql = f"""
-            SELECT interaction_id FROM {db.SQL_SCHEMA_PREFIX}{table}
-            WHERE interaction_pose = {pose.id}
-            """
+            qs = InteractionModel.objects.filter(pose_id=pose.id)
 
-        ids = db.execute(sql).fetchall()
-
-        ids = [i for (i,) in ids]
-
-        self.__init__(db, ids, table=table)
-
-        return self
+        return cls(list(qs.values_list('id', flat=True)))
 
     @classmethod
     def all(
@@ -394,18 +364,9 @@ class InteractionSet:
 
     @property
     def num_features(self) -> int:
-        """Count the funmber of protein :class:`.FeatureModel`s with which interactions
-        are formed"""
-
-        (count,) = self.db.execute(
-            f"""
-        SELECT COUNT(DISTINCT interaction_feature)
-        FROM {self.db.SQL_SCHEMA_PREFIX}{self.table}
-        WHERE interaction_id IN {self.str_ids}
-        """
-        ).fetchone()
-
-        return count
+        """Count the number of protein :class:`.FeatureModel`\\ s with which
+        interactions are formed"""
+        return self._qs.values('feature').distinct().count()
 
     @property
     def avg_num_interactions_per_feature(self) -> float:

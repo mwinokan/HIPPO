@@ -12,8 +12,11 @@ from designdb.models import (
     CompoundModel,
     CompoundTagJunctionModel,
     CompoundTagModel,
+    PoseModel,
     ReactantModel,
     ReactionModel,
+    RouteModel,
+    ScaffoldModel,
 )
 from django.db.models import Exists, OuterRef, Q
 from pandas import DataFrame, concat, isna
@@ -936,66 +939,57 @@ class CompoundSet:
 
         """
 
-        data = []
-
-        query = ['compound_id']
-
-        if smiles:
-            query.append('compound_smiles')
-
-        if inchikey:
-            query.append('compound_inchikey')
-
-        if alias:
-            query.append('compound_alias')
-
         if mol:
-            query.append('mol_to_binary_mol(compound_mol)')
+            raise NotImplementedError(
+                'get_df(mol=True) depended on the RDKit cartridge '
+                '(mol_to_binary_mol); not yet ported'
+            )
 
+        ids = list(self.ids)
+
+        # base columns straight off the CompoundModel rows
+        fields = ['id']
+        if smiles:
+            fields.append('compound_smiles')
+        if inchikey:
+            fields.append('compound_inchikey')
+        if alias:
+            fields.append('compound_alias')
         if metadata:
-            query.append('compound_metadata')
-
-        query = ', '.join(query)
-
-        sql = f"""
-        SELECT {query}
-        FROM {self.db.SQL_SCHEMA_PREFIX}compound
-        WHERE compound_id IN {self.str_ids}
-        """
+            fields.append('compound_metadata')
 
         if debug:
             mrich.debug('querying...')
-        records = self.db.execute(sql).fetchall()
 
-        if debug:
-            generator = mrich.track(records)
-        else:
-            generator = records
+        rows = {
+            r['id']: r
+            for r in CompoundModel.objects.filter(pk__in=ids).values(*fields)
+        }
 
-        for row in generator:
-            row = list(row)
+        data = []
+        for cid in ids:
+            row = rows.get(cid)
+            if row is None:
+                continue
 
-            d = dict(id=row.pop(0))
+            d = dict(id=cid)
 
             if smiles:
-                d['smiles'] = row.pop(0)
+                d['smiles'] = row['compound_smiles']
 
             if inchikey:
-                d['inchikey'] = row.pop(0)
+                d['inchikey'] = row['compound_inchikey']
 
             if alias:
-                d['alias'] = row.pop(0)
+                d['alias'] = row['compound_alias']
 
-            if mol:
-                d['mol'] = Mol(row.pop(0))
-
-            if metadata and (meta_str := row.pop(0)):
-                meta_dict = loads(meta_str)
+            # compound_metadata is JSON stored in a TextField
+            if metadata and (meta_str := row['compound_metadata']):
+                meta_dict = json.loads(meta_str)
 
                 if expand_metadata:
                     for k, v in meta_dict.items():
                         d[k] = v
-
                 else:
                     d['metadata'] = meta_dict
 
@@ -1003,65 +997,83 @@ class CompoundSet:
 
         df = DataFrame(data)
 
+        if not data:
+            return df
+
         if poses or num_poses:
             if debug:
                 mrich.debug('adding pose column')
 
-            lookup = self.db.get_compound_id_pose_ids_dict(self)
+            lookup: dict[int, set] = {}
+            for cid, pid in PoseModel.objects.filter(
+                compound_id__in=ids
+            ).values_list('compound_id', 'id'):
+                lookup.setdefault(cid, set()).add(pid)
+
             if poses:
-                df['poses'] = df['id'].apply(lambda x: lookup.get(x, {}))
+                df['poses'] = df['id'].apply(lambda x: lookup.get(x, set()))
             if num_poses:
-                df['num_poses'] = df['id'].apply(lambda x: len(lookup.get(x, {})))
+                df['num_poses'] = df['id'].apply(lambda x: len(lookup.get(x, set())))
 
-        if num_reactant or num_reactions:
+        if num_reactant:
             if debug:
-                mrich.debug('adding reaction columns')
-            tuples = self.db.get_reactant_product_tuples(self.ids, deduplicated=False)
+                mrich.debug('adding num_reactant column')
+            counts: dict[int, int] = {}
+            for cid in ReactantModel.objects.filter(
+                compound_id__in=ids
+            ).values_list('compound_id', flat=True):
+                counts[cid] = counts.get(cid, 0) + 1
+            df['num_reactant'] = df['id'].apply(lambda x: counts.get(x, 0))
 
-            if num_reactant:
-                lookup = {}
-                for r, p in tuples:
-                    lookup.setdefault(r, 0)
-                    lookup[r] += 1
-                df['num_reactant'] = df['id'].apply(lambda x: lookup.get(x, 0))
-
-            if num_reactions:
-                lookup = {}
-                for r, p in tuples:
-                    lookup.setdefault(p, 0)
-                    lookup[p] += 1
-                df['num_reactions'] = df['id'].apply(lambda x: lookup.get(x, 0))
-
-        if scaffolds or elabs:
+        if num_reactions:
             if debug:
-                mrich.debug('adding scaffold columns')
-            tuples = self.db.get_scaffold_tuples(self.ids)
+                mrich.debug('adding num_reactions column')
+            counts = {}
+            for cid in ReactionModel.objects.filter(
+                product_compound_id__in=ids
+            ).values_list('product_compound_id', flat=True):
+                counts[cid] = counts.get(cid, 0) + 1
+            df['num_reactions'] = df['id'].apply(lambda x: counts.get(x, 0))
 
-            if scaffolds:
-                lookup = {}
-                for b, e in tuples:
-                    lookup.setdefault(e, set())
-                    lookup[e].add(b)
-                df['scaffolds'] = df['id'].apply(lambda x: lookup.get(x, set()))
+        if scaffolds:
+            if debug:
+                mrich.debug('adding scaffolds column')
+            lookup = {}
+            for sup_id, base_id in ScaffoldModel.objects.filter(
+                superstructure_compound_id__in=ids
+            ).values_list('superstructure_compound_id', 'base_compound_id'):
+                lookup.setdefault(sup_id, set()).add(base_id)
+            df['scaffolds'] = df['id'].apply(lambda x: lookup.get(x, set()))
 
-            if elabs:
-                lookup = {}
-                for b, e in tuples:
-                    lookup.setdefault(b, set())
-                    lookup[b].add(e)
-                df['elabs'] = df['id'].apply(lambda x: lookup.get(x, set()))
+        if elabs:
+            if debug:
+                mrich.debug('adding elabs column')
+            lookup = {}
+            for base_id, sup_id in ScaffoldModel.objects.filter(
+                base_compound_id__in=ids
+            ).values_list('base_compound_id', 'superstructure_compound_id'):
+                lookup.setdefault(base_id, set()).add(sup_id)
+            df['elabs'] = df['id'].apply(lambda x: lookup.get(x, set()))
 
         if tags:
             if debug:
                 mrich.debug('adding tag column')
-            lookup = self.db.get_compound_tag_dict()
-            df['tags'] = df['id'].apply(lambda x: lookup.get(x, {}))
+            lookup = {}
+            for cid, name in CompoundTagJunctionModel.objects.filter(
+                compound_id__in=ids
+            ).values_list('compound_id', 'compound_tag__compound_tag_name'):
+                lookup.setdefault(cid, set()).add(name)
+            df['tags'] = df['id'].apply(lambda x: lookup.get(x, set()))
 
         if routes:
             if debug:
                 mrich.debug('adding route column')
-            lookup = self.db.get_product_id_routes_dict()
-            df['routes'] = df['id'].apply(lambda x: lookup.get(x, {}))
+            lookup = {}
+            for pid, rid in RouteModel.objects.filter(
+                product_compound_id__in=ids
+            ).values_list('product_compound_id', 'id'):
+                lookup.setdefault(pid, set()).add(rid)
+            df['routes'] = df['id'].apply(lambda x: lookup.get(x, set()))
 
         df = df.set_index('id')
 
@@ -2194,26 +2206,30 @@ class IngredientSet:
 
         pairs = {i: q for i, q in enumerate(self.df['quote_id'])}
 
-        quote_ids = [q for q in pairs.values() if q is not None and not isnan(q)]
+        # coerce to int: df values may be stored as float/object (pandas)
+        quote_ids = [int(q) for q in pairs.values() if q is not None and not isna(q)]
 
         if debug:
             mrich.debug('quote_ids', quote_ids)
 
         if quote_ids:
-            qs = CataloguePriceModel.objects.filter(pk__in=quote_ids)
+            qs = CataloguePriceModel.objects.filter(pk__in=set(quote_ids))
 
             if supplier:
                 qs = qs.filter(supplier=supplier)
 
             if qs.exists():
-                prices = [
-                    Price(
-                        amount=k.price,
-                        currency=k.currency,
-                    )
-                    for k in qs
-                ]
-                quoted = sum(prices, Price.null())
+                # map pk -> Price, then sum over quote_ids so that ingredients
+                # sharing the same catalogue row are counted with multiplicity
+                # (filter(pk__in=...) collapses duplicates to one row each)
+                price_by_id = {
+                    k.pk: Price(amount=k.price, currency=k.currency) for k in qs
+                }
+                quoted = Price.null()
+                for q in quote_ids:
+                    price = price_by_id.get(q)
+                    if price is not None:
+                        quoted += price
             else:
                 quoted = Price.null()
                 self.df['quote_id'] = None
@@ -2225,7 +2241,7 @@ class IngredientSet:
         if debug:
             mrich.debug('quoted', quoted)
 
-        unquoted = [i for i, q in pairs.items() if q is None or isnan(q)]
+        unquoted = [i for i, q in pairs.items() if q is None or isna(q)]
 
         unquoted_price = Price.null()
 
@@ -2387,7 +2403,7 @@ class IngredientSet:
 
         q_id = series['quote_id']
 
-        if isinstance(q_id, float) and isnan(q_id):
+        if isinstance(q_id, float) and isna(q_id):
             q_id = None
 
         return Ingredient(

@@ -10,6 +10,7 @@ import mrich
 import pandas as pd
 from django.db import transaction
 
+from .components.recipe import Recipe
 from .models import (
     CompoundModel,
     EnumerationMethodModel,
@@ -20,16 +21,23 @@ from .models import (
     TargetModel,
 )
 from .services.download import DownloadService
+from .services.generation import (
+    RandomRecipeGenerator,
+    RandomRecipeSelectionGenerator,
+    RandomSelectionGenerator,
+)
 from .services.ingestion import IngestionBatchResult, IngestionService
 from .services.method import MethodService
 from .services.quote import QuoteService
 from .services.reaction import ReactionService
 from .services.recipe import RecipeService
 from .services.route import RouteService
+from .services.scoring import Scorer
 from .services.subsite import SubsiteService
 from .sets.compound import CompoundSet, IngredientSet
 from .sets.pose import PoseSet
 from .sets.reaction import ReactionSet
+from .sets.route import RouteSet
 from .settings import DEFAULT_POSE_METHODS
 from .utils import make_warn_once_per_key
 
@@ -100,6 +108,192 @@ class RecipeManager:
             )
         return RecipeService.from_reactants(reactants, **kwargs)
 
+    def from_json(self, path, **kwargs) -> 'Recipe':
+        """Load a serialised :class:`.Recipe` from a JSON file.
+
+        See :meth:`.Recipe.from_json` for keyword arguments (``data``,
+        ``clear_quotes``, ``debug``).
+        """
+        return Recipe.from_json(path, **kwargs)
+
+
+class IngredientManager:
+    """Client-side accessor for building :class:`.IngredientSet`\\ s, bound to a
+    :class:`.HIPPO`.
+
+    Mirrors :class:`.RecipeManager`: keeps :class:`.IngredientSet` construction on
+    the user-facing client surface (``animal.ingredients.from_*``) instead of
+    exposing the set layer directly. This is also the seam where target / auth
+    scoping will be attached once the client/backend split lands.
+
+    Access it via :attr:`.HIPPO.ingredients`.
+    """
+
+    def __init__(self, animal: 'HIPPO') -> None:
+        self._animal = animal
+
+    def from_compounds(self, compounds: 'CompoundSet | None' = None, **kwargs):
+        """Build an :class:`.IngredientSet` from a :class:`.CompoundSet` (or IDs).
+
+        See :meth:`.IngredientSet.from_compounds` for keyword arguments.
+        """
+        if compounds is not None and not isinstance(compounds, CompoundSet):
+            raise TypeError(f'compounds must be a CompoundSet, got {type(compounds)}')
+        return IngredientSet.from_compounds(compounds=compounds, **kwargs)
+
+
+class RouteManager:
+    """Client-side accessor for building :class:`.RouteSet`\\ s, bound to a
+    :class:`.HIPPO`.
+
+    Mirrors :class:`.RecipeManager` / :class:`.IngredientManager`: keeps
+    :class:`.RouteSet` construction on the user-facing client surface
+    (``animal.routes.from_*``) instead of exposing the set layer directly. This is
+    also the seam where target / auth scoping will be attached once the
+    client/backend split lands.
+
+    Access it via :attr:`.HIPPO.routes`.
+    """
+
+    def __init__(self, animal: 'HIPPO') -> None:
+        self._animal = animal
+
+    def from_product_ids(self, ids: 'CompoundSet | list[int]', *, progress=True):
+        """Build a :class:`.RouteSet` of stored routes to the given products.
+
+        :param ids: product :class:`.CompoundModel` IDs (or a :class:`.CompoundSet`)
+        :param progress: show a progress bar while building
+        """
+        if isinstance(ids, CompoundSet):
+            ids = ids.ids
+        return RouteSet.from_product_ids(ids, progress=progress)
+
+
+class ScorerManager:
+    """Client-side accessor for recipe scoring, bound to a :class:`.HIPPO`.
+
+    Mirrors the other managers: keeps :class:`.Scorer` construction on the
+    user-facing client surface (``animal.scorers.*``) instead of exposing the
+    service directly. The :class:`.Scorer` loads recipes from a directory of
+    ``Recipe_*.json`` files (as written by the generators) -- no ``db`` needed.
+
+    Access it via :attr:`.HIPPO.scorers`.
+    """
+
+    def __init__(self, animal: 'HIPPO') -> None:
+        self._animal = animal
+
+    def default(self, directory, **kwargs) -> Scorer:
+        """Create a :class:`.Scorer` with the default attributes.
+
+        See :meth:`.Scorer.default` for keyword arguments (``skip``,
+        ``load_cache``, ``allowed_poses``, ``out_key``, ...).
+        """
+        return Scorer.default(directory, **kwargs)
+
+    def create(self, directory, **kwargs) -> Scorer:
+        """Create a :class:`.Scorer` with explicit attributes.
+
+        See :class:`.Scorer` for keyword arguments.
+        """
+        return Scorer(directory, **kwargs)
+
+
+class GeneratorManager:
+    """Client-side accessor for the random recipe / selection generators, bound to
+    a :class:`.HIPPO`.
+
+    Mirrors :class:`.RecipeManager` / :class:`.IngredientManager` /
+    :class:`.RouteManager`: keeps generator construction on the user-facing client
+    surface (``animal.generators.*``) and validates inputs before delegating to the
+    backend generators in :mod:`designdb.services.generation`. Generators are
+    in-memory: their ``generate(...)`` returns a :class:`.Recipe`.
+
+    Access it via :attr:`.HIPPO.generators`.
+    """
+
+    def __init__(self, animal: 'HIPPO') -> None:
+        self._animal = animal
+
+    @staticmethod
+    def _check(route_pool, compounds) -> None:
+        if route_pool is not None and not isinstance(route_pool, RouteSet):
+            raise TypeError(f'route_pool must be a RouteSet, got {type(route_pool)}')
+        if compounds is not None and not isinstance(compounds, CompoundSet):
+            raise TypeError(f'compounds must be a CompoundSet, got {type(compounds)}')
+
+    def random_recipe(
+        self,
+        *,
+        out_key: str,
+        route_pool=None,
+        suppliers=None,
+        max_lead_time=None,
+        start_with=None,
+    ) -> RandomRecipeGenerator:
+        """A generator that samples synthetic :class:`.Route`\\ s.
+
+        :param out_key: base path/key for the generator's output files
+        """
+        self._check(route_pool, None)
+        return RandomRecipeGenerator(
+            out_key=out_key,
+            route_pool=route_pool,
+            suppliers=suppliers,
+            max_lead_time=max_lead_time,
+            start_with=start_with,
+        )
+
+    def random_selection(
+        self,
+        *,
+        out_key: str,
+        compounds=None,
+        suppliers=None,
+        amount: float = 1.0,
+        max_lead_time=None,
+        start_with=None,
+    ) -> RandomSelectionGenerator:
+        """A generator that samples (catalogue) compound selections.
+
+        :param out_key: base path/key for the generator's output files
+        """
+        self._check(None, compounds)
+        return RandomSelectionGenerator(
+            out_key=out_key,
+            compounds=compounds,
+            suppliers=suppliers,
+            amount=amount,
+            max_lead_time=max_lead_time,
+            start_with=start_with,
+        )
+
+    def random_recipe_selection(
+        self,
+        *,
+        out_key: str,
+        route_pool=None,
+        compounds=None,
+        suppliers=None,
+        amount: float = 1.0,
+        max_lead_time=None,
+        start_with=None,
+    ) -> RandomRecipeSelectionGenerator:
+        """A generator combining routes and compound selections.
+
+        :param out_key: base path/key for the generator's output files
+        """
+        self._check(route_pool, compounds)
+        return RandomRecipeSelectionGenerator(
+            out_key=out_key,
+            route_pool=route_pool,
+            compounds=compounds,
+            suppliers=suppliers,
+            amount=amount,
+            max_lead_time=max_lead_time,
+            start_with=start_with,
+        )
+
 
 class HIPPO:
     """Entry-point class of the xchem-hippo package.
@@ -111,6 +305,9 @@ class HIPPO:
         self,
         target_name: str,
         target_access_string: str,
+        *,
+        stack: str = 'production',
+        auth_token: str | None = None,
     ) -> None:
 
         # TODO: with working db, hippo shouldn't be creating projects
@@ -124,12 +321,35 @@ class HIPPO:
             project=project,
         )
 
+        # Fragalysis stack / auth used for any downloads triggered by this
+        # instance (see _ensure_hit_data / _ensure_apo_desolv_files).
+        self._stack = stack
+        self._auth_token = auth_token
+
         # Download state (see _ensure_hit_data / _ensure_apo_desolv_files). The
         # full hit data persists on disk and is reused across sessions; the
         # apo_desolv subset is re-downloaded once per instance to stay fresh.
         self._hit_data_path: Path | None = None
         self._apo_desolv_path: Path | None = None
         self._apo_desolv_downloaded_at: datetime | None = None
+
+        # Download policy: instantiation triggers no download on a *first* run
+        # (the full hit data, including apo_desolv proteins, is fetched by the
+        # first add_hits against a remote stack). On *re-instantiation* of the
+        # same target/project -- detected by a persisted full download already on
+        # disk -- only the protein (apo_desolv) files are refreshed here, so a new
+        # session always has current PDBs for interaction calculations.
+        target_dir = DOWNLOADS_DIR / project.project_name / target_name
+        if (target_dir / 'metadata.csv').is_file() and (
+            target_dir / 'aligned_files'
+        ).is_dir():
+            try:
+                self._ensure_apo_desolv_files(
+                    auth_token=self._auth_token, stack=self._stack
+                )
+            except ValueError as e:
+                # no poses in the DB yet -> can't tell which structures to fetch
+                mrich.warning(f'Skipping apo_desolv refresh on init: {e}')
 
         # TODO: the way this worked previously was it gave the HIPPO
         # instance full access to the pose table. When working with
@@ -192,6 +412,29 @@ class HIPPO:
     def recipes(self) -> RecipeManager:
         """Client-side accessor for building recipes (see :class:`.RecipeManager`)."""
         return RecipeManager(self)
+
+    @property
+    def ingredients(self) -> IngredientManager:
+        """Client-side accessor for building IngredientSets (see
+        :class:`.IngredientManager`)."""
+        return IngredientManager(self)
+
+    @property
+    def routes(self) -> RouteManager:
+        """Client-side accessor for building RouteSets (see
+        :class:`.RouteManager`)."""
+        return RouteManager(self)
+
+    @property
+    def generators(self) -> GeneratorManager:
+        """Client-side accessor for the random recipe/selection generators (see
+        :class:`.GeneratorManager`)."""
+        return GeneratorManager(self)
+
+    @property
+    def scorers(self) -> ScorerManager:
+        """Client-side accessor for recipe scoring (see :class:`.ScorerManager`)."""
+        return ScorerManager(self)
 
     @property
     def num_poses(self) -> int:
@@ -369,7 +612,7 @@ class HIPPO:
         metadata_csv: str | Path | None = None,
         aligned_directory: str | Path | None = None,
         auth_token: str | None = None,
-        stack: str = 'production',
+        stack: str | None = None,
         tags: list | None = None,
         pose_methods: list[str] | None = None,
         skip: list | None = None,
@@ -402,6 +645,12 @@ class HIPPO:
         # Path-driven: provide both metadata_csv and aligned_directory to load
         # existing local data, or omit both to download the target's data from
         # the Fragalysis stack (always Fragalysis-type).
+        # fall back to the stack/auth configured at instantiation
+        if stack is None:
+            stack = self._stack
+        if auth_token is None:
+            auth_token = self._auth_token
+
         if metadata_csv is None and aligned_directory is None:
             hit_dir = self._ensure_hit_data(auth_token=auth_token, stack=stack)
             aligned_directory = hit_dir / 'aligned_files'
