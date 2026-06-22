@@ -1,10 +1,7 @@
-"""Constants for protein-ligand interaction detection (fingerprinting).
+"""Constants for protein-ligand interaction detection.
 
-The feature families and complementary-feature / interaction-type maps are
-re-exported from ``molparse`` (the single source of truth). The distance/angle
-cutoffs live here, ported from the legacy ``hippo`` ``pose`` module.
-
-Used by :class:`.InteractionService` and the :class:`.Pose` component.
+Feature families and the complementary-feature / interaction-type maps are
+re-exported from ``molparse``; the distance/angle cutoffs are defined here.
 """
 
 from molparse.rdkit.features import COMPLEMENTARY_FEATURES, FEATURE_FAMILIES, INTERACTION_TYPES

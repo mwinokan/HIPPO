@@ -1,691 +1,269 @@
-"""Classes for working with sets of interactions"""
+"""Sets of protein-ligand interactions (ORM-backed).
+
+An :class:`.InteractionSet` wraps a set of :class:`.InteractionModel` rows (via a
+Django queryset). Construct it through :meth:`.PoseModel.interactions` /
+:meth:`.PoseSet.interactions` or the factories here.
+
+Interaction *detection* and duplicate *resolution* live in
+:class:`.InteractionService` (``services/interaction.py``); this module is just the
+read/aggregate surface over already-stored interactions.
+"""
 
 import mcol
 import mrich
 from designdb.models import InteractionModel
+from django.db.models import Count
 
-
-class InteractionTable:
-    """Class representing all :class:`.InteractionModel` objects in the 'interaction'
-    table of the :class:`.Database`.
-
-    .. attention::
-
-            :class:`.InteractionTable` objects should not be created directly. Instead
-            use the :meth:`.HIPPO.interactions` property.
-
-    """
-
-    def __init__(self, db: 'Database', table: str = 'interaction') -> None:
-        """InteractionTable initialisation"""
-
-        self._db = db
-        self._df = None
-        self._table = table
-
-    ### PROPERTIES
-
-    @property
-    def db(self) -> 'Database':
-        """Returns the associated :class:`.Database`"""
-        return self._db
-
-    @property
-    def table(self) -> str:
-        """Returns the name of the :class:`.Database` table"""
-        return self._table
-
-    @property
-    def df(self) -> 'pandas.DataFrame':
-        """DataFrame representation of the interactions
-
-        :returns: a ``pandas.Dataframe`` of the interactions
-
-        """
-
-        if self._df is None:
-            records = self.db.select_all_where(
-                table='interaction', key='interaction_id > 0', multiple=True
-            )
-            df = df_from_interaction_records(self.db, records)
-            self._df = df
-
-        return self._df
-
-    ### DUNDERS
-
-    def __len__(self) -> int:
-        """The total number of interactions"""
-        return self.db.count(self.table)
-
-    def __str__(self) -> str:
-        """Unformatted command-line representation"""
-        return f'{{I × {len(self)}}}'
-
-    def __repr__(self) -> str:
-        """ANSI formatted command-line representation"""
-        return f'{mcol.bold}{mcol.underline}{self}{mcol.unbold}{mcol.ununderline}'
-
-    def __rich__(self) -> str:
-        """Rich formatted command-line representation"""
-        return f'[bold underline]{self}'
+# `df` columns: ORM field (model / joined feature) -> output column name
+_DF_COLUMNS = {
+    'id': 'id',
+    'feature_id': 'feature_id',
+    'pose_id': 'pose_id',
+    'feature__target_id': 'target_id',
+    'interaction_type': 'type',
+    'feature__feature_family': 'prot_family',
+    'interaction_family': 'lig_family',
+    'feature__feature_residue_name': 'residue_name',
+    'feature__feature_residue_number': 'residue_number',
+    'feature__feature_chain_name': 'chain_name',
+    'interaction_distance': 'distance',
+    'interaction_angle': 'angle',
+    'interaction_energy': 'energy',
+    'interaction_prot_coord': 'prot_coord',
+    'interaction_lig_coord': 'lig_coord',
+    'feature__feature_atom_name': 'prot_atoms',
+    'interaction_atom_id': 'lig_atoms',
+}
 
 
 class InteractionSet:
-    """Class representing a subset of the :class:`.InteractionModel` objects in the
-    'interaction' table of the :class:`.Database`.
+    """A set of :class:`.InteractionModel` rows.
 
     .. attention::
 
-            :class:`.InteractionSet` objects should not be created directly. Instead
-            use :meth:`.PoseModel.interactions`, or :meth:`.PoseSet.interactions`
-            methods.
-
+            Not constructed directly -- use :meth:`.PoseModel.interactions` /
+            :meth:`.PoseSet.interactions`, or the factory classmethods here.
     """
 
-    def __init__(
-        self,
-        indices: list = None,
-    ) -> None:
-        """InteractionSet initialisation"""
-
+    def __init__(self, indices: list | None = None) -> None:
+        """InteractionSet initialisation from a list of :class:`.InteractionModel` IDs"""
         indices = indices or []
-
         if not isinstance(indices, list):
             indices = list(indices)
-
-        indices = [int(i) for i in indices]
-
-        self._indices = sorted(list(set(indices)))
+        self._indices = sorted({int(i) for i in indices})
         self._df = None
-        self._qs = InteractionModel.objects.filter(pk__in=indices)
+        self._qs = InteractionModel.objects.filter(pk__in=self._indices)
 
     ### FACTORIES
 
     @classmethod
-    def from_pose(
-        cls,
-        pose: 'PoseModel | PoseSet',
-        table: str = 'interaction',
-        db: 'Database | None' = None,
-    ) -> 'InteractionSet':
-        """Construct a :class:`.InteractionSet` from one or more poses.
+    def from_pose(cls, pose: 'PoseModel | PoseSet') -> 'InteractionSet':
+        """Construct from one or more poses.
 
-        :param pose: a :class:`.PoseModel` or :class:`.PoseSet` object
-        :param table: Database table name
-        :param db: Use this instead of PoseModel's Database
-        :returns: an :class:`.InteractionSet`
+        :param pose: a :class:`.PoseSet` (has ``.ids``) or a single
+            :class:`.Pose`/:class:`.PoseModel` (has ``.id``)
         """
-
-        # ``pose`` may be a PoseSet (has ``.ids``) or a single Pose/PoseModel
         if hasattr(pose, 'ids'):
             qs = InteractionModel.objects.filter(pose_id__in=list(pose.ids))
         else:
             qs = InteractionModel.objects.filter(pose_id=pose.id)
-
         return cls(list(qs.values_list('id', flat=True)))
 
     @classmethod
-    def all(
-        cls,
-    ) -> 'InteractionSet':
-        """Construct a :class:`.InteractionSet` for all interactions in the table.
-
-        :returns: an :class:`.InteractionSet`
-
-        """
-
-        # bit of a round-trip
-        ids = InteractionModel.objects.values_list('pk', flat=True)
-        self = cls.__new__(cls)
-        self.__init__(ids)
-
-        return self
+    def all(cls) -> 'InteractionSet':
+        """Construct an :class:`.InteractionSet` for every interaction in the table."""
+        return cls(list(InteractionModel.objects.values_list('pk', flat=True)))
 
     @classmethod
     def from_residue(
         cls,
-        db: 'Database',
         residue_number: int,
-        chain: None | str = None,
+        chain: str | None = None,
         target: 'TargetModel | int' = 1,
     ) -> 'InteractionSet':
-        """Get the set of interactions for a given residue number (and chain)
+        """Interactions formed with a given protein residue (and optionally chain).
 
-        :param db: HIPPO :class:`.Database`
         :param residue_number: the residue number
-        :param chain: the chain name / letter, defaults to any chain
-        :param target: the protein :class:`.TargetModel` object or ID, defaults to
-            first target in database
-        :returns: a :class:`.InteractionSet` object
+        :param chain: the chain name, or ``None`` for any chain
+        :param target: the :class:`.TargetModel` or its ID (defaults to ``1``)
         """
-
         from designdb.models import TargetModel
-
-        self = cls.__new__(cls)
 
         if isinstance(target, TargetModel):
             target = target.id
 
-        sql = f"""
-        SELECT interaction_id FROM {self.db.SQL_SCHEMA_PREFIX}{self.table}
-        INNER JOIN {self.db.SQL_SCHEMA_PREFIX}feature
-        ON interaction_feature = feature_id
-        WHERE feature_target = {target}
-        AND feature_residue_number = {residue_number}
-        """
-
+        qs = InteractionModel.objects.filter(
+            feature__target_id=target,
+            feature__feature_residue_number=residue_number,
+        )
         if chain:
-            sql += f' AND feature_chain_name = "{chain}"'
+            qs = qs.filter(feature__feature_chain_name=chain)
 
-        ids = db.execute(sql).fetchall()
-
-        ids = [i for (i,) in ids]
-
-        self.__init__(db, ids)
-
-        return self
+        return cls(list(qs.values_list('id', flat=True)))
 
     ### PROPERTIES
 
     @property
+    def queryset(self):
+        """The underlying :class:`.InteractionModel` queryset"""
+        return self._qs
+
+    @property
     def indices(self) -> list[int]:
-        """Returns the ids of interactions in this set"""
+        """:class:`.InteractionModel` IDs in this set"""
         return self._indices
 
     @property
     def ids(self) -> list[int]:
-        """Returns the ids of interactions in this set"""
+        """:class:`.InteractionModel` IDs in this set"""
         return self._indices
 
     @property
     def types(self) -> list[str]:
-        """Returns the ids of interactions in this set"""
-        records = self.db.select_where(
-            query='interaction_type',
-            table=self.table,
-            key=f'interaction_id IN {self.str_ids}',
-            multiple=True,
-        )
-        return [r for (r,) in records]
-
-    @property
-    def db(self) -> 'Database':
-        """The associated HIPPO :class:`.Database`"""
-        return self._db
-
-    @property
-    def table(self) -> str:
-        """Get the name of the database table"""
-        return self._table
-
-    @property
-    def str_ids(self) -> str:
-        """Return an SQL formatted tuple string of the :class:`.InteractionModel` IDs"""
-        return str(tuple(self.ids)).replace(',)', ')')
+        """Distinct interaction types in this set"""
+        return list(self._qs.values_list('interaction_type', flat=True).distinct())
 
     @property
     def feature_ids(self) -> list[int]:
-        """Return a list of :class:`.FeatureModel` ID's"""
-        records = self.db.select_where(
-            query='DISTINCT interaction_feature',
-            table=self.table,
-            key=f'interaction_id IN {self.str_ids}',
-            multiple=True,
-        )
-        return [r for (r,) in records]
-
-    @property
-    def classic_fingerprint(self) -> dict:
-        """Classic HIPPO fingerprint dictionary, mapping protein
-        :class:`.FeatureModel` ID's to the number of corresponding ligand features
-        (from any :class:`.PoseModel`)"""
-        return self.get_classic_fingerprint()
+        """Distinct :class:`.FeatureModel` IDs interacted with"""
+        return list(self._qs.values_list('feature_id', flat=True).distinct())
 
     @property
     def df(self) -> 'pandas.DataFrame':
-        """DataFrame representation of the interactions
-
-        :returns: a ``pandas.Dataframe`` of the interactions
-
-        """
-
+        """DataFrame of the interactions, one row each."""
         if self._df is None:
-            records = self.db.select_all_where(
-                table=self.table,
-                key=f'interaction_id IN {self.str_ids}',
-                multiple=True,
-            )
-            df = df_from_interaction_records(self.db, records)
-            self._df = df
+            from pandas import DataFrame
 
+            rows = list(self._qs.values(*_DF_COLUMNS))
+            df = DataFrame(rows)
+            if not df.empty:
+                df = df.rename(columns=_DF_COLUMNS)
+            self._df = df
         return self._df
 
     @property
+    def _feature_counts(self) -> dict[int, int]:
+        """Map of :class:`.FeatureModel` ID -> number of interactions with it"""
+        return {
+            row['feature']: row['n']
+            for row in self._qs.values('feature').annotate(n=Count('id'))
+        }
+
+    @property
+    def classic_fingerprint(self) -> dict:
+        """Classic HIPPO fingerprint: :class:`.FeatureModel` ID -> interaction count."""
+        return self.get_classic_fingerprint()
+
+    @property
     def residue_number_chain_pairs(self) -> list[tuple]:
-        """Get a list of ``(residue_number, chain_name)`` tuples"""
-
-        sql = f"""
-        SELECT DISTINCT feature_residue_number, feature_chain_name
-        FROM {self.db.SQL_SCHEMA_PREFIX}{self.table}
-        INNER JOIN {self.db.SQL_SCHEMA_PREFIX}feature
-        ON feature_id = interaction_feature
-        WHERE interaction_id IN {self.str_ids}
-        """
-
-        return self.db.execute(sql).fetchall()
-
-    @property
-    def avg_num_residues_per_pose(self) -> list[tuple]:
-        """Get a list of ``(residue_number, chain_name)`` tuples"""
-
-        sql = f"""
-        SELECT DISTINCT interaction_pose, feature_residue_number, feature_chain_name
-        FROM {self.db.SQL_SCHEMA_PREFIX}{self.table}
-        INNER JOIN {self.db.SQL_SCHEMA_PREFIX}feature
-        ON feature_id = interaction_feature
-        WHERE interaction_id IN {self.str_ids}
-        """
-
-        records = self.db.execute(sql).fetchall()
-
-        from collections import defaultdict
-
-        from numpy import mean
-
-        d = defaultdict(set)
-
-        for pose_id, res_num, chain_name in records:
-            d[pose_id].add((res_num, chain_name))
-
-        return mean(list(len(v) for v in d.values()))
-
-    @property
-    def avg_num_interactions_per_pose(self) -> list[tuple]:
-        """Get a list of ``(residue_number, chain_name)`` tuples"""
-
-        sql = f"""
-        SELECT interaction_pose FROM {self.db.SQL_SCHEMA_PREFIX}{self.table}
-        WHERE interaction_id IN {self.str_ids}
-        """
-
-        records = self.db.execute(sql).fetchall()
-
-        from collections import defaultdict
-
-        from numpy import mean
-
-        d = defaultdict(int)
-
-        for (pose_id,) in records:
-            d[pose_id] += 1
-
-        return mean(list(d.values()))
-
-    @property
-    def avg_num_interaction_type_residue_pairs_per_pose(self) -> list[tuple]:
-        """Get a list of ``(residue_number, chain_name)`` tuples"""
-
-        sql = f"""
-        SELECT DISTINCT interaction_pose, interaction_type,
-        feature_residue_number, feature_chain_name
-        FROM {self.db.SQL_SCHEMA_PREFIX}{self.table}
-        INNER JOIN {self.db.SQL_SCHEMA_PREFIX}feature
-        ON feature_id = interaction_feature
-        WHERE interaction_id IN {self.str_ids}
-        """
-
-        records = self.db.execute(sql).fetchall()
-
-        from collections import defaultdict
-
-        from numpy import mean
-
-        d = defaultdict(set)
-
-        for pose_id, type, res_num, chain_name in records:
-            d[pose_id].add((res_num, type, chain_name))
-
-        return mean(list(len(v) for v in d.values()))
+        """Distinct ``(residue_number, chain_name)`` pairs"""
+        return list(
+            self._qs.values_list(
+                'feature__feature_residue_number', 'feature__feature_chain_name'
+            ).distinct()
+        )
 
     @property
     def type_residue_number_chain_triples(self) -> list[tuple]:
-        """Get a list of ``(interaction_type, residue_number, chain_name)`` tuples"""
+        """Distinct ``(interaction_type, residue_number, chain_name)`` triples"""
+        return list(
+            self._qs.values_list(
+                'interaction_type',
+                'feature__feature_residue_number',
+                'feature__feature_chain_name',
+            ).distinct()
+        )
 
-        sql = f"""
-        SELECT DISTINCT interaction_type, feature_residue_number, feature_chain_name
-        FROM {self.db.SQL_SCHEMA_PREFIX}{self.table}
-        INNER JOIN {self.db.SQL_SCHEMA_PREFIX}feature
-        ON feature_id = interaction_feature
-        WHERE interaction_id IN {self.str_ids}
-        """
+    @property
+    def avg_num_residues_per_pose(self) -> float:
+        """Mean number of distinct ``(residue, chain)`` contacts per pose"""
+        from collections import defaultdict
 
-        return self.db.execute(sql).fetchall()
+        from numpy import mean
+
+        d: dict[int, set] = defaultdict(set)
+        for pose_id, res_num, chain in self._qs.values_list(
+            'pose_id',
+            'feature__feature_residue_number',
+            'feature__feature_chain_name',
+        ):
+            d[pose_id].add((res_num, chain))
+        return mean([len(v) for v in d.values()]) if d else 0
+
+    @property
+    def avg_num_interactions_per_pose(self) -> float:
+        """Mean number of interactions per pose"""
+        from collections import defaultdict
+
+        from numpy import mean
+
+        d: dict[int, int] = defaultdict(int)
+        for (pose_id,) in self._qs.values_list('pose_id'):
+            d[pose_id] += 1
+        return mean(list(d.values())) if d else 0
+
+    @property
+    def avg_num_interaction_type_residue_pairs_per_pose(self) -> float:
+        """Mean number of distinct ``(residue, type, chain)`` contacts per pose"""
+        from collections import defaultdict
+
+        from numpy import mean
+
+        d: dict[int, set] = defaultdict(set)
+        for pose_id, itype, res_num, chain in self._qs.values_list(
+            'pose_id',
+            'interaction_type',
+            'feature__feature_residue_number',
+            'feature__feature_chain_name',
+        ):
+            d[pose_id].add((res_num, itype, chain))
+        return mean([len(v) for v in d.values()]) if d else 0
 
     @property
     def num_features(self) -> int:
-        """Count the number of protein :class:`.FeatureModel`\\ s with which
-        interactions are formed"""
+        """Number of distinct protein :class:`.FeatureModel`\\ s interacted with"""
         return self._qs.values('feature').distinct().count()
 
     @property
     def avg_num_interactions_per_feature(self) -> float:
-        """Average number of interactions formed with each protein
-        :class:`.FeatureModel`"""
+        """Mean number of interactions formed with each protein feature"""
+        from numpy import mean
 
-        (count,) = self.db.execute(
-            f"""
-        WITH counts AS
-        (
-            SELECT interaction_feature, COUNT(1) AS count
-            FROM {self.db.SQL_SCHEMA_PREFIX}{self.table}
-            WHERE interaction_id IN {self.str_ids}
-            GROUP BY interaction_feature
-        )
-
-        SELECT AVG(count) FROM counts
-        """
-        ).fetchone()
-
-        return count
+        counts = list(self._feature_counts.values())
+        return mean(counts) if counts else 0
 
     @property
     def per_feature_count_hirsch(self) -> float:
-        """A measure for how evenly protein :class:`.FeatureModel`s are being
-        interacted with"""
-
-        counts = self.db.execute(
-            f"""
-        SELECT interaction_feature, COUNT(1) AS count
-        FROM {self.db.SQL_SCHEMA_PREFIX}{self.table}
-        WHERE interaction_id IN {self.str_ids}
-        GROUP BY interaction_feature
-        """
-        ).fetchall()
-
-        counts = [count for f_id, count in counts]
-
-        # return -std(counts)
-
+        """h-index-like measure of how evenly features are interacted with"""
         from hirsch import hirsch
 
-        if not counts:
-            return 0
-
-        return hirsch(counts)
+        counts = list(self._feature_counts.values())
+        return hirsch(counts) if counts else 0
 
     ### METHODS
 
-    def summary(
-        self,
-        families: bool = False,
-    ) -> None:
-        """Print a summary of this :class:`.InteractionSet`"""
-
-        mrich.header(self)
-
-        for interaction in self:
-            # print(interaction)
-
-            # mrich.var(f'{interaction.family_str}', f'{interaction.distance:.1f}')
-            s = f'{interaction.description}'
-
-            if families:
-                s += f' {interaction.feature.family} ~ {interaction.family}'
-
-            mrich.var(s, f'{interaction.distance:.1f}', 'Å')
-
     def get_classic_fingerprint(self) -> dict:
-        """Classic HIPPO fingerprint dictionary, mapping protein
-        :class:`.FeatureModel` ID's to the number of corresponding ligand features
-        (from any :class:`.PoseModel`)"""
+        """Classic HIPPO fingerprint: :class:`.FeatureModel` ID -> interaction count."""
+        return dict(self._feature_counts)
 
-        pairs = self.db.execute(
-            f"""
-        SELECT interaction_feature, COUNT(1)
-        FROM {self.db.SQL_SCHEMA_PREFIX}{self.table}
-        WHERE interaction_id IN {self.str_ids}
-        GROUP BY interaction_feature
-        """
-        ).fetchall()
-
-        return {f: c for f, c in pairs}
-
-    def resolve(
-        self,
-        debug: bool = False,
-        commit: bool = True,
-        feature_cache: dict | None = None,
-        # table: str = 'interaction',
-    ) -> 'InteractionSet':
-        """Resolve into predicted key interactions. In place modification.
-
-        :param debug: Increased verbosity for debugging (Default value = False)
-        :param commit: commit the changes (Default value = True)
-        :param feature_cache: lookup dictionary for feature data
-        :returns: a filtered :class:`.InteractionSet`
-        """
-
-        keep_list = []
-
-        table = self.table
-
-        # get feature cache
-
-        feature_cache = feature_cache or {
-            i: self.db.get_feature(id=i) for i in self.feature_ids
-        }
-
-        ### H-Bonds (closest)
-
-        sql = f"""
-        SELECT interaction_id, MIN(interaction_distance)
-        FROM {self.db.SQL_SCHEMA_PREFIX}{table}
-        WHERE interaction_id IN {self.str_ids}
-        AND interaction_type = "Hydrogen Bond"
-        GROUP BY interaction_atom_ids
-        """
-
-        records = self.db.execute(sql).fetchall()
-        ids = [a for a, b in records]
-        keep_list += ids
-
-        ### pi-stacking (closest)
-
-        sql = f"""
-        SELECT interaction_id, MIN(interaction_distance)
-        FROM {self.db.SQL_SCHEMA_PREFIX}{table}
-        WHERE interaction_id IN {self.str_ids}
-        AND interaction_type = "π-stacking"
-        GROUP BY interaction_feature
-        """
-        # INNER JOIN feature
-        # ON feature_id = interaction_feature
-        # GROUP BY feature_atom_names
-        # GROUP BY interaction_atom_ids
-
-        records = self.db.execute(sql).fetchall()
-        ids = [a for a, b in records]
-        keep_list += ids
-
-        ### pi-cation (closest)
-
-        sql = f"""
-        SELECT interaction_id, MIN(interaction_distance)
-        FROM {self.db.SQL_SCHEMA_PREFIX}{table}
-        WHERE interaction_id IN {self.str_ids}
-        AND interaction_type = "π-cation"
-        GROUP BY interaction_atom_ids
-        """
-        # GROUP BY interaction_atom_ids
-
-        records = self.db.execute(sql).fetchall()
-        ids = [a for a, b in records]
-        keep_list += ids
-
-        ### electrostatic (closest)
-
-        sql = f"""
-        SELECT interaction_id, MIN(interaction_distance)
-        FROM {self.db.SQL_SCHEMA_PREFIX}{table}
-        WHERE interaction_id IN {self.str_ids}
-        AND interaction_type = "Electrostatic"
-        GROUP BY interaction_atom_ids
-        """
-        # GROUP BY interaction_atom_ids
-
-        records = self.db.execute(sql).fetchall()
-        ids = [a for a, b in records]
-        keep_list += ids
-
-        ### sulfur-sulfur (all)
-
-        sql = f"""
-        SELECT interaction_id
-        FROM {self.db.SQL_SCHEMA_PREFIX}{table}
-        WHERE interaction_id IN {self.str_ids}
-        AND interaction_type = "Sulfur-Sulfur"
-        """
-
-        records = self.db.execute(sql).fetchall()
-        ids = [a for (a,) in records]
-        keep_list += ids
-
-        ### hydrophobic
-
-        sql = f"""
-        SELECT interaction_id, interaction_distance
-        FROM {self.db.SQL_SCHEMA_PREFIX}{table}
-        WHERE interaction_id IN {self.str_ids}
-        AND interaction_type = "Hydrophobic"
-        """
-
-        records = self.db.execute(sql).fetchall()
-        ids = [a for a, b in records]
-        subset = InteractionSet(self.db, ids, table=table)
-
-        # aggregate lumped
-
-        hydrophobic_interactions_in_lumped = {}
-        lumped_hydrophobic_in_lumped_lumped = {}
-
-        for interaction in subset:
-            feature = feature_cache[interaction.feature_id]
-
-            families = (feature.family, interaction.family)
-
-            if families == ('LumpedHydrophobe', 'Hydrophobe'):
-                for name in feature.atom_names.split():
-                    key = (name, interaction.atom_ids[0])
-                    if key not in hydrophobic_interactions_in_lumped:
-                        hydrophobic_interactions_in_lumped[key] = []
-                    hydrophobic_interactions_in_lumped[key].append(interaction.id)
-
-            elif families == ('Hydrophobe', 'LumpedHydrophobe'):
-                for atom_id in interaction.atom_ids:
-                    key = (feature.atom_names, atom_id)
-                    if key not in hydrophobic_interactions_in_lumped:
-                        hydrophobic_interactions_in_lumped[key] = []
-                    hydrophobic_interactions_in_lumped[key].append(interaction.id)
-
-            elif families == ('LumpedHydrophobe', 'LumpedHydrophobe'):
-                for name in feature.atom_names.split():
-                    for atom_id in interaction.atom_ids:
-                        key = (name, atom_id)
-                        if key not in hydrophobic_interactions_in_lumped:
-                            hydrophobic_interactions_in_lumped[key] = []
-                        hydrophobic_interactions_in_lumped[key].append(interaction.id)
-
-                key = feature.atom_names
-                lumped_hydrophobic_in_lumped_lumped[key] = tuple(interaction.atom_ids)
-
-        keep_hydrophobic_ids = set(subset.ids)
-        rev_hydrophobic_in_lumped_lumped = {
-            v: k for k, v in lumped_hydrophobic_in_lumped_lumped.items()
-        }
-
-        # modify keep list by those covered in lumped
-
-        for interaction in subset:
-            feature = feature_cache[interaction.feature_id]
-
-            families = (feature.family, interaction.family)
-
-            if families == ('Hydrophobe', 'Hydrophobe'):
-                key = (feature.atom_names, interaction.atom_ids[0])
-
-                if key in hydrophobic_interactions_in_lumped:
-                    keep_hydrophobic_ids -= set([interaction.id])
-
-            elif families == ('LumpedHydrophobe', 'Hydrophobe'):
-                key = feature.atom_names
-
-                if key in lumped_hydrophobic_in_lumped_lumped:
-                    atom_id = interaction.atom_ids[0]
-                    value = lumped_hydrophobic_in_lumped_lumped[key]
-                    if atom_id in value:
-                        keep_hydrophobic_ids -= set([interaction.id])
-
-            elif families == ('Hydrophobe', 'LumpedHydrophobe'):
-                key = tuple(interaction.atom_ids)
-
-                if key in rev_hydrophobic_in_lumped_lumped:
-                    atom_name = feature.atom_names
-                    value = rev_hydrophobic_in_lumped_lumped[key]
-
-                    if atom_name in value:
-                        keep_hydrophobic_ids -= set([interaction.id])
-
-        keep_list += list(keep_hydrophobic_ids)
-
-        ### cull non-keepers
-
-        cull_list = set(self.ids) - set(keep_list)
-        cull_iset = InteractionSet(self.db, cull_list)
-        self.db.delete_where(
-            table=table,
-            key=f'interaction_id IN {cull_iset.str_ids}',
-            commit=commit,
-        )
-        self._indices = sorted(list(set(keep_list)))
-
-        ### revisit hydrophobes
-
-        # for a given protein feature, choose the closest interaction
-
-        cull_list = []
-
-        hydrophobic_keeper_iset = InteractionSet(self.db, keep_hydrophobic_ids)
-
-        sql = f"""
-        SELECT interaction_id, MIN(interaction_distance)
-        FROM {self.db.SQL_SCHEMA_PREFIX}{table}
-        WHERE interaction_id IN {hydrophobic_keeper_iset.str_ids}
-        GROUP BY interaction_feature
-        """
-
-        records = self.db.execute(sql).fetchall()
-        ids = [a for a, b in records]
-
-        cull_list = set(hydrophobic_keeper_iset.ids) - set(ids)
-        cull_iset = InteractionSet(self.db, cull_list)
-        self.db.delete_where(
-            table=table,
-            key=f'interaction_id IN {cull_iset.str_ids}',
-            commit=commit,
-        )
-        self._indices = sorted(list(set(keep_list) - cull_list))
-
-        ### Summary
-
-        # if debug:
-        #     self.summary()
+    def summary(self, families: bool = False) -> None:
+        """Print a summary of this :class:`.InteractionSet`"""
+        mrich.header(self)
+        for i in self._qs.select_related('feature'):
+            feature = i.feature
+            s = (
+                f'{i.interaction_type} '
+                f'{feature.feature_residue_name}{feature.feature_residue_number}'
+            )
+            if families:
+                s += f' {feature.feature_family} ~ {i.interaction_family}'
+            mrich.var(s, f'{i.interaction_distance:.1f}', 'Å')
 
     ### DUNDERS
 
     def __len__(self) -> int:
         """The number of interactions in this set"""
-        return len(self.indices)
+        return len(self._indices)
 
     def __str__(self) -> str:
         """Unformatted command-line representation"""
@@ -700,85 +278,15 @@ class InteractionSet:
         return f'[bold underline]{self}'
 
     def __iter__(self):
-        """Iterate through interactions in this set"""
-        return iter(
-            self.db.get_interaction(id=i, table=self.table) for i in self.indices
-        )
+        """Iterate through the :class:`.InteractionModel` rows in this set"""
+        return iter(self._qs)
 
     def __getitem__(self, key) -> 'InteractionModel | InteractionSet':
-        """Get interaction or subsets thereof from this set"""
+        """Index by position (int) or slice"""
         match key:
             case int():
-                index = self.indices[key]
-                return self.db.get_interaction(id=index, table=self.table)
-
+                return InteractionModel.objects.get(pk=self._indices[key])
             case slice():
-                indices = self.indices[key]
-                return InteractionSet(self.db, indices, table=self.table)
-
+                return InteractionSet(self._indices[key])
             case _:
                 raise NotImplementedError
-
-
-def df_from_interaction_records(
-    db: 'Database',
-    records: list[tuple],
-) -> 'pandas.DataFrame':
-    """Construct a dataframe from the 'interaction' table records"""
-
-    import json
-
-    from pandas import DataFrame
-
-    data = []
-    for record in records:
-        (
-            id,
-            feature_id,
-            pose_id,
-            type,
-            family,
-            atom_ids,
-            prot_coord,
-            lig_coord,
-            distance,
-            angle,
-            energy,
-        ) = record
-
-        feature = db.get_feature(id=feature_id)
-
-        d = dict(id=id)
-
-        d['feature_id'] = feature_id
-        d['pose_id'] = pose_id
-        d['target_id'] = feature.target
-
-        # d['type'] = INTERACTION_TYPES[(feature.family, family)]
-        d['type'] = type
-
-        d['prot_family'] = feature.family
-        d['lig_family'] = family
-
-        d['residue_name'] = feature.residue_name
-        d['residue_number'] = feature.residue_number
-        d['chain_name'] = feature.chain_name
-
-        d['distance'] = distance
-        d['angle'] = angle
-        d['energy'] = energy
-
-        d['prot_coord'] = json.loads(prot_coord)
-        d['lig_coord'] = json.loads(lig_coord)
-
-        d['prot_atoms'] = feature.atom_names
-        d['lig_atoms'] = atom_ids
-
-        d['backbone'] = feature.backbone
-        d['sidechain'] = feature.sidechain
-
-        data.append(d)
-
-    df = DataFrame.from_records(data=data)
-
-    return df

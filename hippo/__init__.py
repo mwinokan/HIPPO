@@ -12,7 +12,7 @@ def __getattr__(name):
     pending the client-exposure design (see RecipeManager discussion).
     """
     if name == 'IngredientSet':
-        from designdb.sets.compound import IngredientSet
+        from designdb.sets.ingredient import IngredientSet
 
         return IngredientSet
     raise AttributeError(f'module {__name__!r} has no attribute {name!r}')

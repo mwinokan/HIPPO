@@ -1,10 +1,8 @@
 """Component wrapping a catalogue price (quote).
 
-A :class:`.Quote` wraps a :class:`.CataloguePriceModel` row, exposing its price,
-amount, supplier, etc. in a convenient form. It can also represent an *estimated*
-quote (see :meth:`.Quote.estimate`) that is **not** backed by a saved database row
--- used when no single catalogue pack covers the required amount, mirroring the
-legacy ``Quote.combination`` behaviour.
+A :class:`.Quote` wraps a :class:`.CataloguePriceModel` row. It can also be an
+*estimated* quote (see :meth:`.Quote.estimate`), not backed by a saved row, for
+when no single catalogue pack covers the required amount.
 """
 
 import mcol
@@ -31,14 +29,13 @@ class Quote:
     def estimate(cls, required_amount: float, quotes: 'list[Quote]') -> 'Quote | None':
         """Estimate a quote for ``required_amount`` when no single pack is big enough.
 
-        Mirrors the legacy ``Quote.combination``: take the biggest available pack and
-        scale its unit price linearly to the required amount. The returned quote wraps
-        an *unsaved* :class:`.CataloguePriceModel` (``id is None``).
+        Scales the biggest available pack's unit price to the required amount; the
+        returned quote wraps an *unsaved* :class:`.CataloguePriceModel` (``id is None``).
 
         :param required_amount: amount in ``mg``
         :param quotes: available :class:`.Quote` packs to scale from
-        :returns: an estimated :class:`.Quote`, or ``None`` if there is nothing to
-            scale from (no pack with a usable amount and price)
+        :returns: the estimated :class:`.Quote`, or ``None`` if there's nothing usable
+            to scale from
         """
 
         usable = [q for q in quotes if q.amount and q.price is not None]

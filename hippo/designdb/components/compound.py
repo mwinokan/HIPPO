@@ -517,9 +517,8 @@ class Compound:
     ):
         """Get :class:`.Recipe` objects that result in this compound.
         See :meth:`.Recipe.from_compounds`"""
+        from designdb.recipe import Recipe
         from designdb.sets.compound import CompoundSet
-
-        from .recipe import Recipe
 
         return Recipe.from_compounds(
             CompoundSet([self._instance.pk]),
@@ -1087,40 +1086,6 @@ class Ingredient:
             return pd.DataFrame(qs.values()).drop(columns='compound')
 
         return qs
-
-    ### METHODS
-
-    def get_cheapest_quote_id(
-        self,
-        min_amount: float | None = None,
-        supplier: str | None = None,
-        max_lead_time: float | None = None,
-    ) -> int | None:
-        """
-        Query quotes associated to this ingredient, and return the cheapest
-
-        :param min_amount: Only return quotes with amounts greater than this,
-            defaults to ``None``
-        :param supplier: Only return quotes with the given supplier, defaults to
-            ``None``
-        :param max_lead_time: Only return quotes with lead times less than this
-            (in days), defaults to ``None``
-        :param none: Define the behaviour when no quotes are found. Choose `error`
-            to raise print an error.
-        """
-
-        qs = CataloguePriceModel.objects.filter(compounds=self.compound)
-
-        if supplier:
-            qs = qs.filter(supplier=supplier)
-
-        if min_amount:
-            qs = qs.filter(amount__gte=min_amount)
-
-        if max_lead_time:
-            qs = qs.filter(lead_time__lte=max_lead_time)
-
-        return qs.order_by('price').first()
 
     ### PROPERTIES
 

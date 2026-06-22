@@ -1,22 +1,9 @@
-"""Service layer: recipe scoring.
+"""Recipe scoring (user entry point: ``animal.scorers``).
 
-Ported from the legacy ``scoring`` module and modernised:
-
-* **No legacy ``Database`` coupling.** Recipes are loaded from a directory of
-  ``Recipe_*.json`` files via the modern :class:`.RecipeSet` (which already
-  supports directory loading), and the per-recipe child sets (compounds / poses /
-  interactions / pose-metadata) are pre-fetched via the ORM rather than legacy
-  ``db.get_*`` helpers.
-* Output filenames use ``out_key`` (no sqlite path); the score cache is written to
-  ``{out_key}.json``.
-
-A :class:`.Scorer` evaluates a set of recipes against weighted :class:`.Attribute`
-/ :class:`.CustomAttribute` objects; each attribute value is converted to a
-percentile (0-1) and combined by weight. User entry point: ``animal.scorers``.
-
-.. attention::
-    This is a faithful but **unverified** port; check scores/plots against real
-    generated recipes.
+A :class:`.Scorer` loads recipes from a directory of ``Recipe_*.json`` files and
+evaluates them against weighted :class:`.Attribute` / :class:`.CustomAttribute`
+objects: each attribute value is converted to a percentile (0-1) and combined by
+weight. The score cache is written to ``{out_key}.json``.
 """
 
 import json
@@ -25,8 +12,8 @@ from pathlib import Path
 import mrich
 import numpy as np
 import pandas as pd
-from designdb.components.recipe import Recipe, RecipeSet
 from designdb.models import InteractionModel, PoseModel, ScaffoldModel
+from designdb.recipe import Recipe, RecipeSet
 from designdb.sets.compound import CompoundSet
 from designdb.sets.interaction import InteractionSet
 from designdb.sets.pose import PoseSet

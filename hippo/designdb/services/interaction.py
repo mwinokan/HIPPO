@@ -1,25 +1,9 @@
-"""Service for computing protein-ligand interaction fingerprints.
+"""Protein-ligand interaction fingerprinting.
 
-Owns interaction detection for a :class:`.Pose`: extracting protein features
-(populating :class:`.FeatureModel`), running the geometric detector, resolving
-duplicate / less-significant interactions, and populating
-:class:`.InteractionModel`.
-
-Ported from the legacy ``Pose.calculate_interactions`` / ``Target.calculate_features``
-/ ``InteractionSet.resolve``. Two deliberate deviations from legacy:
-
-* Protein features are taken directly from *this pose's* ``protein_system`` (which
-  carries the geometry) and the matching :class:`.FeatureModel` row is
-  get-or-created for its ID -- rather than a target-wide feature cache plus a
-  chain/residue re-lookup. This drops the legacy mutation-mismatch handling
-  (features always match the structure they came from).
-* Resolution runs in-memory (legacy used an in-memory SQLite temp table).
-
-.. attention::
-    Geometry/resolution logic is a faithful but **unverified** port; it needs
-    checking against real protein structures.
-
-Layering: ``services -> components``. Entry point: :meth:`.Pose.calculate_interactions`.
+Detects interactions for a :class:`.Pose`: extracts protein features (populating
+:class:`.FeatureModel`), runs the geometric detector, resolves duplicate
+interactions, and populates :class:`.InteractionModel`. Protein features come from
+the pose's own ``protein_system``. Entry point: :meth:`.Pose.calculate_interactions`.
 """
 
 import json
@@ -273,7 +257,7 @@ class InteractionService:
 
     @staticmethod
     def _resolve(candidates: list[dict], debug: bool = False) -> list[dict]:
-        """Cull duplicate / less-significant interactions (port of the legacy rules).
+        """Cull duplicate / less-significant interactions.
 
         Keeps, per interaction type: the closest interaction per ligand-atom group
         (Hydrogen Bond, π-cation, Electrostatic), the closest per protein feature

@@ -1,12 +1,8 @@
-"""Service layer that owns Recipe construction and DB traversal.
+"""Recipe construction and DB traversal.
 
-This is the canonical home for the orchestration logic that builds
-:class:`.Recipe` objects from reactions/compounds/reactants. The :class:`.Recipe`
-component itself is a lean aggregate; its ``from_*`` classmethods are deprecated
-shims that delegate here (see ``components/recipe.py``).
-
-Layering: ``services -> recipe -> sets -> components``. This module may import
-from every lower layer.
+Builds :class:`.Recipe` objects from reactions/compounds/reactants. The
+:class:`.Recipe` aggregate itself is lean; its ``from_*`` classmethods are
+deprecated shims that delegate here.
 """
 
 from itertools import product
@@ -15,7 +11,8 @@ import mrich
 from designdb.components.compound import Compound
 from designdb.components.reaction import DEFAULT_PRODUCT_YIELD, Reaction
 from designdb.models import CompoundModel, InspirationModel, PoseModel, ReactionModel, RouteModel
-from designdb.sets.compound import CompoundSet, IngredientSet
+from designdb.sets.compound import CompoundSet
+from designdb.sets.ingredient import IngredientSet
 from designdb.sets.pose import PoseSet
 from designdb.sets.reaction import ReactionSet
 
@@ -57,7 +54,7 @@ class RecipeService:
         :param get_ingredient_quotes: get quotes for product ingredients
         """
 
-        from designdb.components.recipe import Recipe
+        from designdb.recipe import Recipe
 
         assert isinstance(reaction, ReactionModel)
         reaction_c = Reaction(reaction)
@@ -294,7 +291,7 @@ class RecipeService:
             reactions on the fly
         """
 
-        from designdb.components.recipe import Route
+        from designdb.recipe import Route
 
         assert isinstance(compounds, CompoundSet)
 
@@ -605,16 +602,8 @@ class RecipeService:
 
     @staticmethod
     def write_reactant_csv(recipe: 'Recipe', file, reaction_type_counts=True, **kwargs):
-        """Detailed reactant-purchasing CSV.
-
-        Not yet ported: depends on the legacy quote-dataframe assembly
-        (``db.get_quote_df``) and raw component/route SQL. Port together with the
-        quoting subsystem.
-        """
-        raise NotImplementedError(
-            'write_reactant_csv requires the unported quote-dataframe / downstream '
-            'route lookups; port alongside the quoting subsystem'
-        )
+        """Detailed reactant-purchasing CSV. Not implemented."""
+        raise NotImplementedError('write_reactant_csv is not implemented')
 
     @staticmethod
     def write_product_csv(
@@ -755,38 +744,22 @@ class RecipeService:
 
     @staticmethod
     def to_syndirella(recipe: 'Recipe', out_key, poses, *, separate: bool = False):
-        """Generate Syndirella elaboration inputs from this recipe.
-
-        Not yet ported: depends on unported Pose machinery (reference/template
-        handling, ``get_pose_id_alias_dict``, inspiration SDF export).
-        """
-        raise NotImplementedError(
-            'RecipeService.to_syndirella requires unported Pose machinery '
-            '(templates, alias/inspiration lookups); port alongside the Pose subsystem'
-        )
+        """Generate Syndirella elaboration inputs from this recipe. Not implemented."""
+        raise NotImplementedError('RecipeService.to_syndirella is not implemented')
 
     @staticmethod
     def register_missing_routes(
         recipe: 'Recipe', missing_only: bool = True, supplier: str = 'Enamine'
     ) -> None:
         """Calculate and register missing routes to the products of ``recipe``.
-
-        Not yet ported: depends on the unported
-        ``CompoundSet.register_missing_routes`` / route-registration helpers.
-        """
-        raise NotImplementedError(
-            'register_missing_routes depends on the unported route-registration '
-            'helpers (CompoundSet.register_missing_routes / db.register_route)'
-        )
+        Not implemented."""
+        raise NotImplementedError('register_missing_routes is not implemented')
 
     ### HELPERS
 
     @staticmethod
     def _possible_reaction_ids(compound_ids: set[int]) -> list[int]:
-        """Return reaction IDs whose every reactant is in ``compound_ids``.
-
-        ORM replacement for the legacy ``db.get_possible_reaction_ids``.
-        """
+        """Return reaction IDs whose every reactant is in ``compound_ids``."""
         from designdb.models import ReactantModel
 
         compound_ids = set(compound_ids)

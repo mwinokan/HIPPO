@@ -8,7 +8,6 @@ import molparse as mp
 import mrich
 import pandas as pd
 from designdb.components.compound import Ingredient
-from designdb.components.recipe import Recipe, Route
 from designdb.models import (
     CompoundModel,
     EnumerationMethodModel,
@@ -20,12 +19,13 @@ from designdb.models import (
     ScoringMethodModel,
     TargetModel,
 )
+from designdb.recipe import Recipe, Route
 from designdb.services.compound import CompoundService, CompoundTagService
 from designdb.services.pose import PoseService, PoseTagService
+from designdb.services.pose_score import ScoreService
 from designdb.services.reaction import ReactionService
 from designdb.services.route import RouteService
-from designdb.services.score import ScoreService
-from designdb.sets.compound import IngredientSet
+from designdb.sets.ingredient import IngredientSet
 from designdb.sets.reaction import ReactionSet
 from designdb.utils import (
     SanitisationError,

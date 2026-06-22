@@ -1,20 +1,9 @@
-"""Service layer: random recipe / selection generators.
+"""Random recipe / selection generators (user entry point: ``animal.generators``).
 
-Ported from the legacy ``rgen`` module and modernised:
-
-* **No legacy ``Database`` coupling.** The modern :class:`.Recipe` / :class:`.Route`
-  / :class:`.IngredientSet` / :class:`.Price` are self-contained (ORM-backed), so
-  the generators take pools + config only -- no ``db`` / ``db.path``. As there is no
-  database path to derive output filenames from, ``out_key`` is now **required**.
-* **File output is preserved.** Each :meth:`generate` writes the generated recipe to
-  ``{recipe_dir}/Recipe_<hash>.json`` (via :meth:`.Recipe.write_json`), and each
-  generator dumps its state to ``{out_key}_<gen>.json`` on construction -- matching
-  legacy behaviour. ``generate`` also returns the :class:`.Recipe` so callers may
-  collect them in memory.
-* The three legacy generators share one add-within-budget loop here
-  (:func:`_generate_recipe`) rather than duplicating it.
-
-Layering: ``services -> components/sets``. User entry point: ``animal.generators``.
+``generate()`` returns a :class:`.Recipe` and writes it to
+``{recipe_dir}/Recipe_<hash>.json``; generator state is dumped to
+``{out_key}_<gen>.json`` on construction. ``out_key`` is required (it names the
+output files).
 """
 
 import json
@@ -22,8 +11,8 @@ from pathlib import Path
 
 import mrich
 from designdb.components.price import Price
-from designdb.components.recipe import Recipe, Route
-from designdb.sets.compound import IngredientSet
+from designdb.recipe import Recipe, Route
+from designdb.sets.ingredient import IngredientSet
 from designdb.sets.route import RouteSet
 from designdb.utils import dt_hash
 
@@ -287,7 +276,7 @@ class RandomRecipeGenerator(_GeneratorBase):
         """Generate a random recipe of routes within ``budget`` (also written to disk)."""
         if balance_clusters:
             raise NotImplementedError(
-                'balance_clusters requires route clustering, which is not yet ported'
+                'balance_clusters requires route clustering, which is not implemented'
             )
         budget = Price(budget, currency)
         recipe, stats = _generate_recipe(

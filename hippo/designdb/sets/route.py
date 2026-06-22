@@ -39,7 +39,7 @@ class RouteSet:
 
         # avoiding circular reference
         # avoiding name conflict
-        from designdb.components.recipe import Route
+        from designdb.recipe import Route
 
         routes = [Route.get_route(id=r) for r in ids]
 
@@ -80,7 +80,7 @@ class RouteSet:
 
         """
 
-        from designdb.components.recipe import Route
+        from designdb.recipe import Route
 
         self = cls.__new__(cls)
 

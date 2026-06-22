@@ -5,8 +5,8 @@ import logging
 from collections import Counter
 
 import mrich
-from designdb.components.recipe import Recipe
 from designdb.models import ComponentModel, RouteModel
+from designdb.recipe import Recipe
 
 logger = logging.getLogger(__name__)
 
