@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import mrich
+
 # from django.db.models import indexes
 from django.conf import settings
 from django.db import models
@@ -105,7 +106,7 @@ class Project(BaseModel):
         ]
 
     def __str__(self) -> str:
-        return f"{self.project_name}"
+        return f'{self.project_name}'
 
 
 class TargetModel(BaseModel):

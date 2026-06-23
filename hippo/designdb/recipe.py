@@ -9,6 +9,8 @@ The ``from_*`` and export methods on :class:`.Recipe` are **deprecated shims** t
 delegate to it (see the ``DEPRECATED`` banner below) via a local import.
 """
 
+from typing import TYPE_CHECKING
+
 import mcol
 import mrich
 from designdb.components.compound import Ingredient
@@ -17,6 +19,16 @@ from designdb.models import ComponentModel, CompoundModel, ReactionModel, RouteM
 from designdb.sets.compound import CompoundSet
 from designdb.sets.ingredient import IngredientSet
 from designdb.sets.reaction import ReactionSet
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    import pandas
+    from designdb.components.price import Price
+    from designdb.sets.interaction import InteractionSet
+    from designdb.sets.pose import PoseSet
+    from designdb.sets.route import RouteSet
+    from plotly import graph_objects
 
 
 class Recipe:
@@ -1010,7 +1022,7 @@ class Route(Recipe):
             priced; otherwise ingredients are left unquoted.
             """
             iset = IngredientSet()
-            for cid, amount in zip(ids, amounts):
+            for cid, amount in zip(ids, amounts, strict=False):
                 iset.add(
                     Ingredient.from_compound(
                         compound=CompoundModel.objects.get(pk=cid),
@@ -1150,9 +1162,7 @@ class RecipeSet:
         """Get a dataframe of recipe dictionaries. See :meth:`.Recipe.get_dict`."""
         from pandas import DataFrame
 
-        data = [
-            recipe.get_dict(timestamp=False, **kwargs) for recipe in self
-        ]
+        data = [recipe.get_dict(timestamp=False, **kwargs) for recipe in self]
         return DataFrame(data)
 
     def items(self) -> 'list[tuple[str, Recipe]]':

@@ -88,7 +88,9 @@ class RouteService:
             route_fingerprints[route_id][1].add((comp_ref, comp_type))
 
         # freeze the sets so they're hashable
-        frozen = {rid: (fp[0], frozenset(fp[1])) for rid, fp in route_fingerprints.items()}
+        frozen = {
+            rid: (fp[0], frozenset(fp[1])) for rid, fp in route_fingerprints.items()
+        }
 
         mrich.var('#routes', len(frozen))
 

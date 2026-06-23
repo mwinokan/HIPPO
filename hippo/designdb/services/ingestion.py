@@ -33,13 +33,22 @@ from designdb.utils import (
     remove_other_ligands,
     sanitise_smiles,
 )
-from designdb.utils_chem import InvalidChemistryError, UnsupportedChemistryError, check_chemistry
-from designdb.utils_frag import UnsupportedFragalysisLongcodeError, parse_observation_longcode
+from designdb.utils_chem import (
+    InvalidChemistryError,
+    UnsupportedChemistryError,
+    check_chemistry,
+)
+from designdb.utils_frag import (
+    UnsupportedFragalysisLongcodeError,
+    parse_observation_longcode,
+)
 from django.db import connection
 from numpy import isnan
 from pandas import read_pickle
+
 # from mypackage.services.compound import CompoundService
 from rdkit import Chem
+
 # from rdkit.Chem import inchi
 from rdkit.Chem import PandasTools
 
@@ -479,7 +488,7 @@ class IngestionService:
             if not smiles:
                 smiles = mp.rdkit.mol_to_smiles(r[mol_col])
             try:
-                sane_smiles = sanitise_smiles(
+                sanitise_smiles(
                     smiles,
                     sanitisation_failed='error',
                     radical='warning',
@@ -547,7 +556,9 @@ class IngestionService:
             pose.inspirations.add(*PoseModel.objects.filter(pk__in=pose_inspirations))
 
             if score_method_map:
-                scorer.add_scores_from_record(pose=pose, record=r, score_method_map=score_method_map)
+                scorer.add_scores_from_record(
+                    pose=pose, record=r, score_method_map=score_method_map
+                )
             else:
                 scorer.add_scores_from_record(pose=pose, record=r)
 
@@ -725,7 +736,9 @@ class IngestionService:
             try:
                 for step_id in range(1, steps + 1):
                     r1_smiles = d.get(f'reactant_step{step_id}')
-                    if not r1_smiles or (isinstance(r1_smiles, float) and isnan(r1_smiles)):
+                    if not r1_smiles or (
+                        isinstance(r1_smiles, float) and isnan(r1_smiles)
+                    ):
                         continue
 
                     reaction_type = d[f'reaction_name_step{step_id}']
@@ -735,7 +748,9 @@ class IngestionService:
 
                     reactant_smiles = [r1_smiles]
                     r2_smiles = d.get(f'reactant2_step{step_id}')
-                    if r2_smiles and not (isinstance(r2_smiles, float) and isnan(r2_smiles)):
+                    if r2_smiles and not (
+                        isinstance(r2_smiles, float) and isnan(r2_smiles)
+                    ):
                         reactant_smiles.append(r2_smiles)
 
                     reaction, _ = ReactionModel.objects.get_or_create(
@@ -752,7 +767,9 @@ class IngestionService:
                         )
                         rs.append(reactant.pk)
 
-                    if do_check_chemistry and not check_chemistry(reaction_type, rs, product):
+                    if do_check_chemistry and not check_chemistry(
+                        reaction_type, rs, product
+                    ):
                         raise InvalidChemistryError(
                             f'{reaction_type=}, {rs=}, {product.id=}',
                         )
@@ -838,7 +855,7 @@ class IngestionService:
                 for step in range(num_steps):
                     step += 1
                     matches = df[f'{step}_flag'].apply(
-                        lambda x: flag in x if x is not None else False
+                        lambda x, flag=flag: flag in x if x is not None else False
                     )
                     mrich.print(
                         'Filtering out',
@@ -888,7 +905,9 @@ class IngestionService:
         (template_path,) = template_paths
         template_path = Path(template_path)
         mrich.var('template_path', template_path)
-        base_name = template_path.name.removesuffix('.pdb').removesuffix('_delig-desolv')
+        base_name = template_path.name.removesuffix('.pdb').removesuffix(
+            '_delig-desolv'
+        )
         # DEPRECATED(apo-naming): pre-'delig' Fragalysis naming, remove once all
         # data uses 'delig'
         base_name = base_name.removesuffix('_apo-desolv')
@@ -994,7 +1013,7 @@ class IngestionService:
             }
 
             df[inchikey_col] = df[smiles_col].apply(
-                lambda x: orig_smiles_to_inchikey.get(x)
+                lambda x, m=orig_smiles_to_inchikey: m.get(x)
             )
 
             # get associated IDs
@@ -1003,7 +1022,7 @@ class IngestionService:
                 for k in CompoundModel.objects.filter(compound_smiles__in=unique_smiles)
             }
             df[compound_id_col] = df[inchikey_col].apply(
-                lambda x: compound_inchikey_id_dict.get(x)
+                lambda x, m=compound_inchikey_id_dict: m.get(x)
             )
 
         # bulk register reactions
@@ -1121,9 +1140,9 @@ class IngestionService:
             if require_intra_geometry_pass:
                 mrich.var(
                     '#poses !intra_geometry_pass',
-                    len(df[df['intra_geometry_pass'] == False]),
+                    len(df[df['intra_geometry_pass'] == False]),  # noqa: E712
                 )
-                ok = ok[ok['intra_geometry_pass'] == True]
+                ok = ok[ok['intra_geometry_pass'] == True]  # noqa: E712
 
             if max_energy_score is not None:
                 mrich.var(

@@ -179,9 +179,11 @@ class _GeneratorBase:
         data['suppliers'] = self._suppliers
         data['starting_recipe'] = self._starting_recipe.get_dict(serialise_price=True)
         mrich.writing(self._data_path)
-        json.dump(data, open(self._data_path, 'wt'), indent=4)
+        json.dump(data, open(self._data_path, 'w'), indent=4)
 
-    def _write_recipe(self, recipe: 'Recipe', budget: 'Price', stats: dict, params: dict):
+    def _write_recipe(
+        self, recipe: 'Recipe', budget: 'Price', stats: dict, params: dict
+    ):
         """Write a generated recipe to ``{recipe_dir}/Recipe_<hash>.json``."""
         out_file = self._recipe_dir / f'Recipe_{dt_hash()}.json'
         metadict = {
@@ -273,7 +275,8 @@ class RandomRecipeGenerator(_GeneratorBase):
         permitted_clusters=None,
         debug: bool = False,
     ) -> 'Recipe':
-        """Generate a random recipe of routes within ``budget`` (also written to disk)."""
+        """Generate a random recipe of routes within ``budget``
+        (also written to disk)."""
         if balance_clusters:
             raise NotImplementedError(
                 'balance_clusters requires route clustering, which is not implemented'
@@ -346,7 +349,8 @@ class RandomSelectionGenerator(_GeneratorBase):
         shuffle: bool = True,
         debug: bool = False,
     ) -> 'Recipe':
-        """Generate a random compound selection within ``budget`` (also written to disk)."""
+        """Generate a random compound selection within ``budget``
+        (also written to disk)."""
         if max_iter is None:
             max_iter = max_compounds * 3
         budget = Price(budget, currency)
@@ -386,7 +390,10 @@ class RandomRecipeSelectionGenerator(_GeneratorBase):
         self._starting_recipe = start_with or Recipe()
 
         self._setup_io(
-            out_key, '_rsgen.json', '_recipes_and_selections', skip_directory_creation=False
+            out_key,
+            '_rsgen.json',
+            '_recipes_and_selections',
+            skip_directory_creation=False,
         )
 
         # inner generators build the pools and dump their own state files; they do
@@ -428,7 +435,8 @@ class RandomRecipeSelectionGenerator(_GeneratorBase):
         shuffle: bool = True,
         debug: bool = False,
     ) -> 'Recipe':
-        """Generate a random recipe of routes + compound selections (also written to disk)."""
+        """Generate a random recipe of routes + compound selections
+        (also written to disk)."""
         budget = Price(budget, currency)
         recipe, stats = _generate_recipe(
             self._starting_recipe,

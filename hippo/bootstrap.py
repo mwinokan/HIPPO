@@ -83,9 +83,9 @@ def load_hippo(
     tas_list = get_auth_target_access(username)
 
     # mock response until auth pod is externally accessible
-    tas_list = ('lb18145-1')
+    tas_list = 'lb18145-1'
 
-    if not target_access_string in tas_list:
+    if target_access_string not in tas_list:
         mrich.error(f'User {username} does not have access to {target_access_string}')
         return
 

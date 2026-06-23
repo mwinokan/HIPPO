@@ -7,12 +7,20 @@ from pathlib import Path
 import mrich
 import pandas as pd
 import rdkit
+
 # from rdkit.Chem import inchi
-from designdb.models import CompoundModel, PoseMethodModel, PoseModel, PoseTagModel, TargetModel
+from designdb.models import (
+    CompoundModel,
+    PoseMethodModel,
+    PoseModel,
+    PoseTagModel,
+    TargetModel,
+)
 from designdb.utils import normalize_string_list
 from designdb.utils_chem import get_rmsd
 from designdb.utils_frag import GENERATED_TAG_COLS, META_IGNORE_COLS
 from django.db.models import Q
+
 # from mypackage.services.compound import CompoundService
 from rdkit import Chem
 
@@ -117,7 +125,8 @@ class PoseService:
                 rmsd = get_rmsd(mol, existing.pose_mol)
                 if rmsd < rmsd_threshold:
                     logger.warning(
-                        'Pose RMSD %.3f Å below threshold %.3f Å, skipping duplicate (alias=%s)',
+                        'Pose RMSD %.3f Å below threshold %.3f Å, '
+                        'skipping duplicate (alias=%s)',
                         rmsd,
                         rmsd_threshold,
                         existing.pose_alias,

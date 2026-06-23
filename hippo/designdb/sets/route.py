@@ -1,9 +1,15 @@
 import json
+from typing import TYPE_CHECKING
 
 import mcol
 import mrich
 from designdb.models import ComponentModel, RouteModel
 from designdb.sets.compound import CompoundSet
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from designdb.recipe import Route
 
 
 class RouteSet:

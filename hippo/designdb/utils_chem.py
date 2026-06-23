@@ -1,11 +1,15 @@
 """functions for validating chemistry"""
 
 import logging
+from typing import TYPE_CHECKING
 
 import mrich
 from designdb.models import CompoundModel
 from rdkit import Chem
 from rdkit.Chem import rdMolAlign
+
+if TYPE_CHECKING:
+    from designdb.sets.compound import CompoundSet
 
 """
 
@@ -271,8 +275,6 @@ def check_atomtype_diff(
     debug: bool = False,
 ) -> bool:
     """check atomtypes"""
-
-    check_type = 'atomtype'
 
     # get values
     reac = reactants.atomtype_dict

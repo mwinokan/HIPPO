@@ -63,13 +63,17 @@ def plot_interaction_punchcard(
         plot_data[x] = plot_data[['residue_name', 'residue_number']].agg(
             lambda r: ' '.join(str(i) for i in r), axis=1
         )
-        sort_key = lambda v: v[1]
+
+        def sort_key(v):
+            return v[1]
     else:
         x = 'chain_res_name_number_str'
         plot_data[x] = plot_data[['chain_name', 'residue_name', 'residue_number']].agg(
             lambda r: ' '.join(str(i) for i in r), axis=1
         )
-        sort_key = lambda v: (v[2], v[1])
+
+        def sort_key(v):
+            return (v[2], v[1])
 
     title = 'Interaction Punch-Card'
     if title_prefix:

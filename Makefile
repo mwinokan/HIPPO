@@ -11,7 +11,6 @@ help:
 	@echo "  make lint      Run ruff lint"
 	@echo "  make format    Run ruff format"
 	@echo "  make typecheck Run mypy"
-	@echo "  make isort     Run isort"
 	@echo "  make check     Run all checks"
 	@echo "  make test      Run tests"
 	@echo "  make ci        Simulate CI run"
@@ -29,9 +28,6 @@ format:
 
 typecheck:
 	uv run pre-commit run mypy --all-files
-
-isort:
-	uv run pre-commit run isort --all-files
 
 check:
 	uv run pre-commit run --all-files

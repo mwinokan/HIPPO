@@ -4,7 +4,11 @@ Feature families and the complementary-feature / interaction-type maps are
 re-exported from ``molparse``; the distance/angle cutoffs are defined here.
 """
 
-from molparse.rdkit.features import COMPLEMENTARY_FEATURES, FEATURE_FAMILIES, INTERACTION_TYPES
+from molparse.rdkit.features import (
+    COMPLEMENTARY_FEATURES,
+    FEATURE_FAMILIES,
+    INTERACTION_TYPES,
+)
 
 # maximum centroid-centroid distance (Angstrom) for each interaction type
 INTERACTION_CUTOFF = {

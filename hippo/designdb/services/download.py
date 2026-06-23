@@ -16,7 +16,6 @@ flags can still be overridden per call via keyword arguments.
 Adapted and hardened from the ``downloader.py`` prototype.
 """
 
-import os
 import tarfile
 import time
 import zipfile
@@ -183,7 +182,6 @@ class DownloadService:
                 f'Unknown stack {stack!r}; choose from {sorted(STACK_URLS)} '
                 'or pass an explicit url'
             )
-
 
         destination = Path(destination) if destination else Path.cwd()
         destination.mkdir(parents=True, exist_ok=True)

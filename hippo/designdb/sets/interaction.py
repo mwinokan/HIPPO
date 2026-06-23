@@ -9,10 +9,17 @@ Interaction *detection* and duplicate *resolution* live in
 read/aggregate surface over already-stored interactions.
 """
 
+from typing import TYPE_CHECKING
+
 import mcol
 import mrich
 from designdb.models import InteractionModel
 from django.db.models import Count
+
+if TYPE_CHECKING:
+    import pandas
+    from designdb.models import PoseModel, TargetModel
+    from designdb.sets.pose import PoseSet
 
 # `df` columns: ORM field (model / joined feature) -> output column name
 _DF_COLUMNS = {
@@ -46,7 +53,8 @@ class InteractionSet:
     """
 
     def __init__(self, indices: list | None = None) -> None:
-        """InteractionSet initialisation from a list of :class:`.InteractionModel` IDs"""
+        """InteractionSet initialisation from a list of
+        :class:`.InteractionModel` IDs"""
         indices = indices or []
         if not isinstance(indices, list):
             indices = list(indices)

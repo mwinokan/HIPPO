@@ -30,7 +30,8 @@ class Quote:
         """Estimate a quote for ``required_amount`` when no single pack is big enough.
 
         Scales the biggest available pack's unit price to the required amount; the
-        returned quote wraps an *unsaved* :class:`.CataloguePriceModel` (``id is None``).
+        returned quote wraps an *unsaved* :class:`.CataloguePriceModel`
+        (``id is None``).
 
         :param required_amount: amount in ``mg``
         :param quotes: available :class:`.Quote` packs to scale from

@@ -10,13 +10,20 @@ import mrich
 import pandas as pd
 from django.db import transaction
 
-from .client import GeneratorManager, IngredientManager, RecipeManager, RouteManager, ScorerManager
+from .client import (
+    GeneratorManager,
+    IngredientManager,
+    RecipeManager,
+    RouteManager,
+    ScorerManager,
+)
 from .models import (
     CompoundModel,
     EnumerationMethodModel,
     PoseMethodModel,
     PoseModel,
     Project,
+    RouteModel,
     ScoringMethodModel,
     TargetModel,
 )
@@ -491,7 +498,7 @@ class HIPPO:
             if obj is None:
                 raise ValueError(
                     f"Pose method '{name}' not found. "
-                    "Call register_pose_method() first."
+                    'Call register_pose_method() first.'
                 )
             pose_method_objs.append(obj)
 
@@ -595,7 +602,8 @@ class HIPPO:
 
         if name_col is None:
             raise ValueError(
-                "name_col cannot be None. Provide the SDF column name that contains pose identifiers."
+                'name_col cannot be None. Provide the SDF column name that '
+                'contains pose identifiers.'
             )
 
         skip_equal_dict = skip_equal_dict or {}
@@ -651,8 +659,12 @@ class HIPPO:
         score_method_map = {}
         if score_cols and scoring_methods:
             if len(score_cols) != len(scoring_methods):
-                raise ValueError('score_cols and scoring_methods must be the same length')
-            for col, (method_name, method_version) in zip(score_cols, scoring_methods):
+                raise ValueError(
+                    'score_cols and scoring_methods must be the same length'
+                )
+            for col, (method_name, method_version) in zip(
+                score_cols, scoring_methods, strict=False
+            ):
                 try:
                     obj = ScoringMethodModel.objects.get(
                         method_name=method_name, method_version=method_version
@@ -739,6 +751,8 @@ class HIPPO:
             logger.error(exc, exc_info=True)
             # TODO: handle gracefully
             raise Exception from exc
+
+        return result
 
     def add_enamine_real_routes(
         self,
@@ -845,7 +859,9 @@ class HIPPO:
         """Propagate subsite assignments from inspiration poses to their derivatives."""
         SubsiteService.set_derivative_subsites()
 
-    def register_enumeration_method(self, name: str, version: str, description: str = ''):
+    def register_enumeration_method(
+        self, name: str, version: str, description: str = ''
+    ):
         """Register an enumeration method, or retrieve it if already registered."""
         return MethodService.register_enumeration_method(name, version, description)
 

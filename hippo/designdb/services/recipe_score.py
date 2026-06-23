@@ -6,7 +6,6 @@ objects: each attribute value is converted to a percentile (0-1) and combined by
 weight. The score cache is written to ``{out_key}.json``.
 """
 
-import json
 from pathlib import Path
 
 import mrich
@@ -149,7 +148,10 @@ class Attribute:
         return self.weight * self.unweighted(recipe)
 
     def __str__(self) -> str:
-        return f'{self._type}("{self.key}", weight={self.weight:.2f}, inverse={self.inverse})'
+        return (
+            f'{self._type}("{self.key}", weight={self.weight:.2f}, '
+            f'inverse={self.inverse})'
+        )
 
     def __repr__(self) -> str:
         import mcol
@@ -243,9 +245,7 @@ class Scorer:
 
         self = cls.__new__(cls)
 
-        standard = [
-            k for k, v in DEFAULT_ATTRIBUTES.items() if v['type'] == 'standard'
-        ]
+        standard = [k for k, v in DEFAULT_ATTRIBUTES.items() if v['type'] == 'standard']
 
         self.__init__(
             directory=directory,
@@ -331,7 +331,7 @@ class Scorer:
             ws = [ws] * self.num_attributes
         ws = list(ws)
         wsum = sum(abs(w) for w in ws) or 1.0
-        for a, w in zip(self.attributes, ws):
+        for a, w in zip(self.attributes, ws, strict=False):
             a.weight = w / wsum
 
     @property
@@ -385,7 +385,7 @@ class Scorer:
 
     def get_sorted_df(self) -> 'pd.DataFrame':
         """Score cache sorted by descending score."""
-        self.scores
+        _ = self.scores
         return self._data.sort_values(by='score', ascending=False)
 
     def top_keys(self, n: int) -> list[str]:
@@ -405,7 +405,7 @@ class Scorer:
             mrich.error('Only two keys supported')
             return None
 
-        self.scores
+        _ = self.scores
 
         df = self._data.drop(
             columns=['compound_ids', 'pose_ids', 'interaction_ids', 'pose_metadata']
@@ -443,9 +443,7 @@ class Scorer:
             df.at[recipe.hash, 'compound_ids'] = recipe.combined_compound_ids
 
         # compound -> pose IDs
-        all_compound_ids = set().union(
-            *(set(ids) for ids in df['compound_ids'] if ids)
-        )
+        all_compound_ids = set().union(*(set(ids) for ids in df['compound_ids'] if ids))
         mrich.debug(f'Getting poses for {len(all_compound_ids)} compounds')
         compound_pose_map: dict[int, set] = {}
         for c_id, p_id in PoseModel.objects.filter(
@@ -484,9 +482,9 @@ class Scorer:
         mrich.debug(f'Getting metadata for {len(all_pose_ids)} poses')
         metadata_map: dict[int, dict] = {}
         if all_pose_ids:
-            for p_id, meta in PoseModel.objects.filter(
-                pk__in=all_pose_ids
-            ).values_list('id', 'pose_metadata'):
+            for p_id, meta in PoseModel.objects.filter(pk__in=all_pose_ids).values_list(
+                'id', 'pose_metadata'
+            ):
                 metadata_map[p_id] = meta or {}
 
         mrich.debug('Populating _data["pose_metadata"]...')

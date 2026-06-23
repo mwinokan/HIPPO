@@ -4,7 +4,12 @@ import re
 import mrich
 import rdkit
 from designdb.models import CompoundModel, CompoundTagModel
-from designdb.utils import registration_hash_tautomer_insensitive, sanitise_smiles, superparent
+from designdb.utils import (
+    registration_hash_tautomer_insensitive,
+    sanitise_smiles,
+    superparent,
+)
+
 # from mypackage.services.compound import CompoundService
 from rdkit import Chem
 

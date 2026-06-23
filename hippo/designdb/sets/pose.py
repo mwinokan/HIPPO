@@ -20,8 +20,6 @@ from designdb.models import (
     CompoundModel,
     InspirationModel,
     InteractionModel,
-    PoseMethodJunctionModel,
-    PoseMethodModel,
     PoseModel,
     PoseTagJunctionModel,
     PoseTagModel,
@@ -35,7 +33,7 @@ from designdb.settings import DEFAULT_POSE_METHODS
 from designdb.utils import ScoreSubquery, normalize_string_list
 from designdb.utils_frag import generate_header
 from django.conf import settings
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Exists, FloatField, OuterRef, Q, QuerySet, Subquery
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Cast
@@ -51,8 +49,10 @@ from ipywidgets import (
 )
 from molparse.rdkit import draw_grid, draw_mols
 from pandas import DataFrame
+
 # from mypackage.services.compound import CompoundService
 from rdkit import Chem
+
 # from rdkit.Chem import inchi
 from rdkit.Chem import PandasTools, SDWriter
 
@@ -60,6 +60,13 @@ if settings.MANAGE_MODELS:
     from designdb.utils import JsonGroupArray as ArrayAgg
 else:
     from django.contrib.postgres.aggregates import ArrayAgg
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pandas
+    from designdb.components.pose import Pose
+    from designdb.sets.compound import CompoundSet
 
 
 # from .validation.compound import ValidationError, validate_compound_data
@@ -303,7 +310,8 @@ class PoseSet:
         target: int = None,
         subsite: int = None,
     ) -> 'PoseSet':
-        """Filter poses by a given tag, pose method name, SubsiteModel ID, or target ID. See
+        """Filter poses by a given tag, pose method name, SubsiteModel ID, or
+        target ID. See
         :meth:`.PoseSet.get_by_tag`, :meth:`.PoseSet.get_by_method`,
         :meth:`.PoseSet.get_by_target`, and :meth:`.PoseSet.get_by_subsite`"""
 
@@ -330,7 +338,7 @@ class PoseSet:
         return PoseSet(
             PoseModel.objects.filter(
                 pk__in=InspirationModel.objects.filter(
-                    derivative_pose__in=self._queryset,
+                    derivative_pose__in=poseset._queryset,
                 ).values(
                     'original_pose',
                 ),
@@ -383,7 +391,7 @@ class PoseSet:
             regardless of value (Default value = None)
 
         """
-        results = self.db.select_where(
+        results = self.db.select_where(  # noqa: F841  # TODO(legacy-self.db): port to ORM
             query='pose_id, pose_metadata',
             key=f'pose_id IN {self.str_ids}',
             table='pose',
@@ -483,7 +491,14 @@ class PoseSet:
         flags = {
             name: locals()[name]
             for name in sig.parameters
-            if name not in ('self', 'debug', 'expand_tags', 'expand_metadata', 'scoring_methods')
+            if name
+            not in (
+                'self',
+                'debug',
+                'expand_tags',
+                'expand_metadata',
+                'scoring_methods',
+            )
         }
         # need id in output
         flags['id'] = True
@@ -581,16 +596,20 @@ class PoseSet:
         values = [v[1] for k, v in fields.items() if flags.get(k, False)]
         columns = {v[1]: v[0] for k, v in fields.items() if flags.get(k, False)}
 
-        for method_name, version in (scoring_methods or []):
+        for method_name, version in scoring_methods or []:
             score_sq = Subquery(
                 ScoreValueModel.objects.filter(
                     pose=OuterRef('pk'),
                     compound=OuterRef('compound'),
                     scoring_method__method_name=method_name,
                     scoring_method__method_version=version,
-                ).annotate(
-                    score_val=Cast(KeyTextTransform('score', 'score'), output_field=FloatField())
-                ).values('score_val')[:1],
+                )
+                .annotate(
+                    score_val=Cast(
+                        KeyTextTransform('score', 'score'), output_field=FloatField()
+                    )
+                )
+                .values('score_val')[:1],
                 output_field=FloatField(),
             )
             annotations[method_name] = score_sq
@@ -631,7 +650,7 @@ class PoseSet:
 
             # build boolean columns
             for tag in all_tags:
-                df[tag] = df['tags'].apply(lambda tags: tag in tags)
+                df[tag] = df['tags'].apply(lambda tags, tag=tag: tag in tags)
 
             df = df.drop(columns=['tags'])
 
@@ -736,7 +755,8 @@ class PoseSet:
         version: str | None = None,
         inverse: bool = False,
     ) -> 'PoseSet':
-        """Return one pose per compound with the best score for the given scoring method.
+        """Return one pose per compound with the best score for the given
+        scoring method.
 
         :param scoring_method: ``ScoringMethodModel.method_name`` to rank by
         :param version: ``ScoringMethodModel.method_version`` — required when multiple
@@ -769,7 +789,6 @@ class PoseSet:
 
         best_pose_ids = [pose_id for pose_id, _ in best.values()]
         return PoseSet(PoseModel.objects.filter(pk__in=best_pose_ids))
-
 
     # def filter(
     #     self,
@@ -867,7 +886,6 @@ class PoseSet:
             pose.pose_metadata = metadata
             pose.save()
         self._queryset = PoseModel.objects.filter(pk__in=self._queryset.values('pk'))
-
 
     # TODO: implement scores
     # def calculate_inspiration_scores(
@@ -1030,7 +1048,7 @@ class PoseSet:
                 longcode_lookup[i] = metadata.get(name_col, None)
 
             values = []
-            for i, row in df.iterrows():
+            for _, row in df.iterrows():
                 values.append(longcode_lookup[row['id']])
 
             df[name_col] = values
@@ -1136,7 +1154,10 @@ class PoseSet:
                 poses = PoseSet(PoseModel.objects.filter(pk__in=values))
                 mrich.debug(len(poses), 'remaining after skipping null inspirations')
             else:
-                logger.warning('no inspirations found; per-pose fallback will set inspiration to self')
+                logger.warning(
+                    'no inspirations found; per-pose fallback will set '
+                    'inspiration to self'
+                )
 
         if not poses:
             # huh?
@@ -1176,7 +1197,6 @@ class PoseSet:
             PoseModel.objects.filter(pk__in=ref_ids).values_list('pk', 'pose_alias')
         )
 
-        inspiration_strs = []
         # for i, row in pose_df.iterrows():
         #     strs = []
         #     for i in normalize_string_list(row['inspiration_ids']):
@@ -1200,7 +1220,9 @@ class PoseSet:
             pose_df['subsites'] = pose_df['subsites'].apply(fix_subsites)
 
         if tags:
-            pose_df['tags'] = pose_df['tags'].apply(lambda x: ','.join(v for v in x if v is not None))
+            pose_df['tags'] = pose_df['tags'].apply(
+                lambda x: ','.join(v for v in x if v is not None)
+            )
 
         # pose_df['ref_mols'] = inspiration_strs
         pose_df['ref_mols'] = 'inspiration_strs'
@@ -1349,13 +1371,17 @@ class PoseSet:
             for ref_alias in pose_df['ref_pdb'].values:
                 source = lookup.get(ref_alias)
                 if not source:
-                    mrich.warning(f'No protein file for reference {ref_alias!r}; skipping')
+                    mrich.warning(
+                        f'No protein file for reference {ref_alias!r}; skipping'
+                    )
                     continue
                 source_path = Path(source)
 
                 stem = source_path.name.replace('_hippo.pdb', '.pdb')
                 # current Fragalysis protein-file naming
-                apo_path = source_path.parent / stem.replace('.pdb', '_delig-desolv.pdb')
+                apo_path = source_path.parent / stem.replace(
+                    '.pdb', '_delig-desolv.pdb'
+                )
                 # DEPRECATED(apo-naming): fall back to pre-'delig' naming if present,
                 # remove once all data uses 'delig'
                 legacy_path = source_path.parent / stem.replace(
@@ -1385,8 +1411,6 @@ class PoseSet:
 
         # create the header molecule
 
-        df_cols = set(pose_df.columns)
-
         header = generate_header(
             # self[0],   # <- what does that do??
             self._queryset.first(),
@@ -1398,8 +1422,6 @@ class PoseSet:
             extras=extras,
             metadata=metadata,
         )
-
-        header_cols = set(header.GetPropNames())
 
         # # empty properties
         # pose_df["generation_date"] = [None] * len(pose_df)
@@ -1421,8 +1443,6 @@ class PoseSet:
 
         if sort_by:
             pose_df = pose_df.sort_values(by=sort_by, ascending=not sort_reverse)
-
-        fields = []
 
         mrich.writing(out_path)
 
@@ -1459,7 +1479,7 @@ class PoseSet:
 
         from pathlib import Path
 
-        for i, (ref_id, poses) in enumerate(self.split_by_reference().items()):
+        for ref_id, poses in self.split_by_reference().items():
             ref_pose = PoseModel.objects.get(id=ref_id)
             ref_name = ref_pose.pose_alias or ref_id
 
@@ -1481,7 +1501,7 @@ class PoseSet:
             commands.append('set surface_color, white')
             commands.append('set transparency,  0.4')
 
-            for j, (insp_ids, poses) in enumerate(
+            for j, (insp_ids, poses) in enumerate(  # noqa: B020  # TODO(legacy-self.db): port to ORM
                 poses.split_by_inspirations().items()
             ):
                 inspirations = PoseSet(self.db, insp_ids)
@@ -1542,7 +1562,9 @@ class PoseSet:
 
             for pose in self._queryset:
                 assert pose.pose_alias
-                assert pose.methods.filter(pose_method_name__in=DEFAULT_POSE_METHODS).exists()
+                assert pose.methods.filter(
+                    pose_method_name__in=DEFAULT_POSE_METHODS
+                ).exists()
 
                 if aligned_files_dir:
                     mol = str(pose.mol_path)
@@ -1668,7 +1690,7 @@ class PoseSet:
         ### Write CSV
 
         if separate:
-            for i, row in df.iterrows():
+            for _, row in df.iterrows():
                 csv_name = out_dir / f'{row["compound_set"]}_syndirella_input.csv'
                 mrich.writing(csv_name)
                 row.to_frame().T.to_csv(csv_name, index=False)
@@ -1844,7 +1866,7 @@ class PoseSet:
         mols = [p.mol for p in self]
 
         drawing = draw_mols(mols)
-        # display(drawing)
+        display(drawing)
 
     def grid(self) -> None:
         """Draw a grid of all contained molecules"""
@@ -2000,7 +2022,7 @@ class PoseSet:
 
         # calculate modal interactions
 
-        for i, cluster in psets.items():
+        for cluster in psets.values():
             mrich.var(cluster.name, len(cluster), unit='poses')
 
             df = cluster.interactions.df
@@ -2263,7 +2285,7 @@ class PoseSet:
         return SubsiteModel.objects.filter(
             pk__in=SubsiteTagModel.objects.filter(
                 pose__in=self._queryset,
-            ).values(subsite),
+            ).values('subsite'),
         ).values_list('pk', flat=True)
 
     @property

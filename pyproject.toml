@@ -63,7 +63,6 @@ dev = [
     "mypy>=1.19",
     "commitizen>=4.13.5,<5",
     "pre-commit>=4.5.1",
-    "isort>=8.0.1",
 ]
 
 [tool.commitizen]
@@ -95,7 +94,7 @@ target-version = "py313"
 exclude = [
   "tests",
   "migrations",
-  "hippo",
+  # "hippo",
   "hippo_legacy",
 ]
 force-exclude = true
@@ -119,14 +118,9 @@ quote-style = "single"
 exclude = [
     "migrations",
     "tests",
-    "hippo",
+    # "hippo",
     "hippo_legacy",
 ]
-
-[tool.isort]
-profile = "hug"
-src_paths = ["src", "tests"]
-
 
 [tool.uv.sources]
 django-rdkit = { git = "https://github.com/rdkit/django-rdkit" }

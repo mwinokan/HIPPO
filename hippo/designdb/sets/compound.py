@@ -1,14 +1,14 @@
 import json
 from collections.abc import Callable
 from pathlib import Path
+from statistics import mean
+from typing import TYPE_CHECKING
 
 import mcol
 import mrich
 import pandas as pd
 from designdb.components.compound import Ingredient
-from designdb.components.price import Price
 from designdb.models import (
-    CataloguePriceModel,
     CompoundModel,
     CompoundTagJunctionModel,
     CompoundTagModel,
@@ -19,12 +19,20 @@ from designdb.models import (
     ScaffoldModel,
 )
 from django.db.models import Exists, OuterRef, Q
-from pandas import DataFrame, concat, isna
+from pandas import DataFrame
 from rdkit import Chem
+
 # from rdkit.Chem import inchi
 from rdkit.Chem import Mol
 
 from ..utils import registration_hash_tautomer_insensitive, superparent
+
+if TYPE_CHECKING:
+    import plotly.graph_objects as go
+    from designdb.sets.ingredient import IngredientSet
+    from designdb.sets.pose import PoseSet
+    from designdb.sets.reaction import ReactionSet
+    from designdb.sets.route import RouteSet
 
 
 class CompoundSet:
@@ -129,7 +137,7 @@ class CompoundSet:
                 index = self.indices[key]
                 try:
                     return CompoundModel.objects.get(id=index)
-                except CompoundModel.DoesNotExist:
+                except CompoundModel.DoesNotExist as exc:
                     raise CompoundModel.DoesNotExist from exc
 
             case slice():
@@ -526,6 +534,7 @@ class CompoundSet:
 
         """
 
+        from IPython.display import display
         from molparse.rdkit import draw_grid
 
         data = [(str(c), c.mol) for c in self]
@@ -964,8 +973,7 @@ class CompoundSet:
             mrich.debug('querying...')
 
         rows = {
-            r['id']: r
-            for r in CompoundModel.objects.filter(pk__in=ids).values(*fields)
+            r['id']: r for r in CompoundModel.objects.filter(pk__in=ids).values(*fields)
         }
 
         data = []
@@ -1007,9 +1015,9 @@ class CompoundSet:
                 mrich.debug('adding pose column')
 
             lookup: dict[int, set] = {}
-            for cid, pid in PoseModel.objects.filter(
-                compound_id__in=ids
-            ).values_list('compound_id', 'id'):
+            for cid, pid in PoseModel.objects.filter(compound_id__in=ids).values_list(
+                'compound_id', 'id'
+            ):
                 lookup.setdefault(cid, set()).add(pid)
 
             if poses:
@@ -1021,9 +1029,9 @@ class CompoundSet:
             if debug:
                 mrich.debug('adding num_reactant column')
             counts: dict[int, int] = {}
-            for cid in ReactantModel.objects.filter(
-                compound_id__in=ids
-            ).values_list('compound_id', flat=True):
+            for cid in ReactantModel.objects.filter(compound_id__in=ids).values_list(
+                'compound_id', flat=True
+            ):
                 counts[cid] = counts.get(cid, 0) + 1
             df['num_reactant'] = df['id'].apply(lambda x: counts.get(x, 0))
 
@@ -1511,7 +1519,7 @@ class CompoundSet:
 
         mrich.var('#compounds', len(self))
 
-        for i, c in mrich.track(enumerate(self), total=len(self)):
+        for c in mrich.track(self, total=len(self)):
             try:
                 reactions = c.reactions
             except Exception as e:
@@ -1579,7 +1587,6 @@ class CompoundSet:
     @property
     def mols(self) -> 'list[Chem.Mol]':
         """Returns the molecules of child compounds"""
-        from rdkit.Chem import Mol
 
         result = self.db.select_where(
             query='mol_to_binary_mol(compound_mol)',
@@ -1730,7 +1737,7 @@ class CompoundSet:
         INNER JOIN nums
         ON comp_id = compound_id
         WHERE compound_id IN {self.str_ids}
-        """
+        """  # noqa: F841  # TODO(legacy-self.db): port to ORM
 
         (avg,) = self.db.execute().fetchone()
 

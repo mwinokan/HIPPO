@@ -6,15 +6,29 @@ deprecated shims that delegate here.
 """
 
 from itertools import product
+from typing import TYPE_CHECKING
 
 import mrich
 from designdb.components.compound import Compound
 from designdb.components.reaction import DEFAULT_PRODUCT_YIELD, Reaction
-from designdb.models import CompoundModel, InspirationModel, PoseModel, ReactionModel, RouteModel
+from designdb.models import (
+    CompoundModel,
+    InspirationModel,
+    PoseModel,
+    ReactionModel,
+    RouteModel,
+)
 from designdb.sets.compound import CompoundSet
 from designdb.sets.ingredient import IngredientSet
 from designdb.sets.pose import PoseSet
 from designdb.sets.reaction import ReactionSet
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from designdb.recipe import Recipe
+    from designdb.sets.route import RouteSet
+    from pandas import DataFrame
 
 
 class RecipeService:
@@ -186,7 +200,9 @@ class RecipeService:
             if not priced:
                 mrich.error("0 recipes with prices, can't choose cheapest")
                 return recipes
-            sorted_recipes = sorted(priced, key=lambda r: r.get_price(supplier=supplier))
+            sorted_recipes = sorted(
+                priced, key=lambda r: r.get_price(supplier=supplier)
+            )
             if debug:
                 for recipe in recipes:
                     mrich.debug(f'{recipe}, {recipe.price}')
@@ -319,9 +335,9 @@ class RecipeService:
 
             if use_routes:
                 route_ids = list(
-                    RouteModel.objects.filter(
-                        product_compound__id=comp.id
-                    ).values_list('id', flat=True)
+                    RouteModel.objects.filter(product_compound__id=comp.id).values_list(
+                        'id', flat=True
+                    )
                 )
                 if not route_ids:
                     mrich.error('No routes to', comp)
@@ -480,9 +496,9 @@ class RecipeService:
             possible_reactions |= set(reaction_ids)
 
             product_ids = list(
-                ReactionModel.objects.filter(
-                    pk__in=reaction_ids
-                ).values_list('product_compound_id', flat=True)
+                ReactionModel.objects.filter(pk__in=reaction_ids).values_list(
+                    'product_compound_id', flat=True
+                )
             )
 
             n_prev = len(all_reactants)
@@ -636,10 +652,10 @@ class RecipeService:
         # compound_id -> set of inspiration (original) pose IDs, scoped to the
         # product compounds and their scaffolds (the inspiration fallback needs both)
         scaffold_ids = set()
-        for product in recipe.products:
+        for prod in recipe.products:
             # Ingredient.__getattr__ delegates to the CompoundModel (ORM), so wrap
             # in the Compound component to reach component-level properties
-            if scaffolds := Compound(product.compound).scaffolds:
+            if scaffolds := Compound(prod.compound).scaffolds:
                 scaffold_ids.update(scaffolds.ids)
         needed_ids = set(product_ids) | scaffold_ids
 
@@ -651,34 +667,34 @@ class RecipeService:
 
         data = []
 
-        for product in mrich.track(
+        for prod in mrich.track(
             recipe.products, prefix='Constructing product DataFrame'
         ):
             # wrap in the Compound component for component-level properties
             # (Ingredient.__getattr__ delegates to the CompoundModel ORM instead)
-            comp = Compound(product.compound)
+            comp = Compound(prod.compound)
 
             d = dict(
-                hippo_id=product.compound_id,
+                hippo_id=prod.compound_id,
                 smiles=comp.smiles,
                 inchikey=comp.inchikey,
-                required_amount_mg=product.amount,
+                required_amount_mg=prod.amount,
             )
 
             upstream_routes = []
             upstream_reaction_ids = []
 
             for route in routes:
-                if route.product_compound.id == product.compound_id:
+                if route.product_compound.id == prod.compound_id:
                     upstream_routes.append(route)
                     upstream_reaction_ids += route.reactions.ids
 
             if not upstream_routes:
-                mrich.error('No upstream routes for', product)
+                mrich.error('No upstream routes for', prod)
                 continue
 
             if not upstream_reaction_ids:
-                mrich.error('No upstream reactions for', product)
+                mrich.error('No upstream reactions for', prod)
                 continue
 
             upstream_reactions = ReactionSet(list(set(upstream_reaction_ids)))
@@ -687,9 +703,9 @@ class RecipeService:
             if scaffolds := comp.scaffolds:
                 scaffold_series, is_scaffold = scaffolds.ids, False
             else:
-                scaffold_series, is_scaffold = [product.compound_id], True
+                scaffold_series, is_scaffold = [prod.compound_id], True
 
-            poses = pose_map.get(product.compound_id, set())
+            poses = pose_map.get(prod.compound_id, set())
 
             d['num_poses'] = len(poses)
             d['poses'] = poses
@@ -706,7 +722,7 @@ class RecipeService:
             d['scaffold_series'] = scaffold_series
 
             # inspiration pose IDs, with fallback to the scaffold / metadata
-            inspirations = inspiration_map.get(product.compound_id, None)
+            inspirations = inspiration_map.get(prod.compound_id, None)
 
             if not inspirations and not is_scaffold:
                 scaffold = Compound(comp.scaffolds[0])

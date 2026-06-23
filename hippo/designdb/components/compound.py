@@ -2,6 +2,7 @@
 
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import mcol
 import mrich
@@ -18,7 +19,8 @@ from designdb.models import (
     ReactionModel,
     ScaffoldModel,
 )
-from django.db.models import Exists, OuterRef, Q
+from django.db.models import Exists, OuterRef
+from IPython.display import display
 from molparse.atomtypes import formula_to_atomtype_dict
 from molparse.rdkit import draw_highlighted_mol, draw_mcs
 from molparse.rdkit.classify import classify_mol
@@ -29,6 +31,12 @@ from rdkit.Chem.Scaffolds import MurckoScaffold
 
 from .price import Price
 from .quote import Quote
+
+if TYPE_CHECKING:
+    from designdb.animal import HIPPO
+    from designdb.sets.compound import CompoundSet
+    from designdb.sets.pose import PoseSet
+    from designdb.sets.reaction import ReactionSet
 
 
 class Compound:

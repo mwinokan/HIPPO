@@ -1,10 +1,20 @@
 """Reaction component."""
 
+from typing import TYPE_CHECKING
+
 import mcol
 import mrich
-from designdb.models import CataloguePriceCompoundJunctionModel, CompoundModel, ReactionModel
+from designdb.models import (
+    CataloguePriceCompoundJunctionModel,
+    CompoundModel,
+    ReactionModel,
+)
 
 from .compound import Compound
+
+if TYPE_CHECKING:
+    from designdb.recipe import Recipe
+    from designdb.sets.reaction import ReactionSet
 
 DEFAULT_REACTANT_AMOUNT = 1.0
 DEFAULT_PRODUCT_YIELD = 1.0

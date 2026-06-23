@@ -99,7 +99,7 @@ class IngredientSet:
     def __add__(self, other):
         """Add another  :class:`.IngredientSet` this set"""
 
-        for i, row in other._data.iterrows():
+        for _, row in other._data.iterrows():
             self.add(
                 compound_id=row.compound_id,
                 amount=row.amount,

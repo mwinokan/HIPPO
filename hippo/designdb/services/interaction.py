@@ -159,7 +159,6 @@ class InteractionService:
         candidates: list[dict] = []
 
         for prot_feature in protein_system.get_protein_features():
-
             prot_family = prot_feature.family
 
             if prot_family not in COMPLEMENTARY_FEATURES:
@@ -173,7 +172,6 @@ class InteractionService:
             feature_id = InteractionService._protein_feature_id(target, prot_feature)
 
             for complementary_family in COMPLEMENTARY_FEATURES[prot_family]:
-
                 interaction_type = INTERACTION_TYPES[
                     (prot_family, complementary_family)
                 ]
@@ -181,7 +179,6 @@ class InteractionService:
                 for lig_feature in comp_features_by_family.get(
                     complementary_family, []
                 ):
-
                     lig_pos = np.asarray(lig_feature.position)
                     distance = float(np.linalg.norm(lig_pos - prot_coord))
                     angle = None
@@ -285,17 +282,13 @@ class InteractionService:
             lambda c: c['type'] == 'Hydrogen Bond', lambda c: tuple(c['atom_ids'])
         )
         keep_min_per(lambda c: c['type'] == 'π-stacking', lambda c: c['feature_id'])
-        keep_min_per(
-            lambda c: c['type'] == 'π-cation', lambda c: tuple(c['atom_ids'])
-        )
+        keep_min_per(lambda c: c['type'] == 'π-cation', lambda c: tuple(c['atom_ids']))
         keep_min_per(
             lambda c: c['type'] == 'Electrostatic', lambda c: tuple(c['atom_ids'])
         )
 
         # Sulfur-Sulfur: keep all
-        keep.update(
-            c['_idx'] for c in candidates if c['type'] == 'Sulfur-Sulfur'
-        )
+        keep.update(c['_idx'] for c in candidates if c['type'] == 'Sulfur-Sulfur')
 
         # Hydrophobic: de-duplicate lumped vs. single hydrophobes
         hydrophobic = [c for c in candidates if c['type'] == 'Hydrophobic']
@@ -310,9 +303,9 @@ class InteractionService:
                     covered.setdefault((name, c['atom_ids'][0]), []).append(c['_idx'])
             elif families == ('Hydrophobe', 'LumpedHydrophobe'):
                 for atom_id in c['atom_ids']:
-                    covered.setdefault(
-                        (c['feature_atom_name'], atom_id), []
-                    ).append(c['_idx'])
+                    covered.setdefault((c['feature_atom_name'], atom_id), []).append(
+                        c['_idx']
+                    )
             elif families == ('LumpedHydrophobe', 'LumpedHydrophobe'):
                 for name in names:
                     for atom_id in c['atom_ids']:
