@@ -15,13 +15,11 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v6
-    - name: Set up Python
-      uses: actions/setup-python@v6
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
       with:
-        python-version: "3.10"
-    - name: Configure pre-commit
-      run: |
-        pip install --upgrade pip
-        pip install pre-commit==4.5.1
+        enable-cache: true
+    - name: Install dependencies
+      run: uv sync --frozen
     - name: Repeat pre-commit
-      run: pre-commit run --all-files
+      run: uv run pre-commit run --all-files

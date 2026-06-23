@@ -20,8 +20,6 @@ from designdb.models import (
     CompoundModel,
     InspirationModel,
     InteractionModel,
-    PoseMethodJunctionModel,
-    PoseMethodModel,
     PoseModel,
     PoseTagJunctionModel,
     PoseTagModel,
@@ -30,25 +28,13 @@ from designdb.models import (
     SubsiteTagModel,
     TargetModel,
 )
-from designdb.services.subsite import SubsiteService
 from designdb.sets.interaction import InteractionSet
 from designdb.settings import DEFAULT_POSE_METHODS
 from designdb.utils import ScoreSubquery, normalize_string_list
 from designdb.utils_frag import generate_header
 from django.conf import settings
-from django.db import IntegrityError
-from django.db.models import (
-    Exists,
-    F,
-    FloatField,
-    Max,
-    Min,
-    OuterRef,
-    Q,
-    QuerySet,
-    Subquery,
-    Window,
-)
+from django.db import IntegrityError, transaction
+from django.db.models import Exists, FloatField, OuterRef, Q, QuerySet, Subquery
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Cast
 from IPython.display import display
@@ -63,8 +49,10 @@ from ipywidgets import (
 )
 from molparse.rdkit import draw_grid, draw_mols
 from pandas import DataFrame
+
 # from mypackage.services.compound import CompoundService
 from rdkit import Chem
+
 # from rdkit.Chem import inchi
 from rdkit.Chem import PandasTools, SDWriter
 
@@ -72,6 +60,13 @@ if settings.MANAGE_MODELS:
     from designdb.utils import JsonGroupArray as ArrayAgg
 else:
     from django.contrib.postgres.aggregates import ArrayAgg
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pandas
+    from designdb.components.pose import Pose
+    from designdb.sets.compound import CompoundSet
 
 
 # from .validation.compound import ValidationError, validate_compound_data
@@ -188,18 +183,22 @@ class PoseSet:
         return self._queryset.count()
 
     def __iter__(self):
-        """Iterate through poses in this set"""
-        return iter(self._queryset)
+        """Iterate through poses in this set as :class:`.Pose` components"""
+        from designdb.components.pose import Pose
+
+        return (Pose(p) for p in self._queryset)
 
     def __getitem__(
         self,
         key: int | slice,
-    ) -> 'PoseModel | PoseSet':
+    ) -> 'Pose | PoseSet':
         """Get poses or subsets thereof from this set
 
         :param key: integer index or slice of indices
 
         """
+        from designdb.components.pose import Pose
+
         match key:
             case int():
                 try:
@@ -208,7 +207,7 @@ class PoseSet:
                     mrich.error(f'list index out of range: {key=} for {self}')
                     raise PoseModel.DoesNotExist from exc
 
-                return pose
+                return Pose(pose)
 
             case slice():
                 return PoseSet(PoseModel.objects.filter(pk__in=key))
@@ -311,7 +310,8 @@ class PoseSet:
         target: int = None,
         subsite: int = None,
     ) -> 'PoseSet':
-        """Filter poses by a given tag, pose method name, SubsiteModel ID, or target ID. See
+        """Filter poses by a given tag, pose method name, SubsiteModel ID, or
+        target ID. See
         :meth:`.PoseSet.get_by_tag`, :meth:`.PoseSet.get_by_method`,
         :meth:`.PoseSet.get_by_target`, and :meth:`.PoseSet.get_by_subsite`"""
 
@@ -338,7 +338,7 @@ class PoseSet:
         return PoseSet(
             PoseModel.objects.filter(
                 pk__in=InspirationModel.objects.filter(
-                    derivative_pose__in=self._queryset,
+                    derivative_pose__in=poseset._queryset,
                 ).values(
                     'original_pose',
                 ),
@@ -391,7 +391,7 @@ class PoseSet:
             regardless of value (Default value = None)
 
         """
-        results = self.db.select_where(
+        results = self.db.select_where(  # noqa: F841  # TODO(legacy-self.db): port to ORM
             query='pose_id, pose_metadata',
             key=f'pose_id IN {self.str_ids}',
             table='pose',
@@ -491,12 +491,17 @@ class PoseSet:
         flags = {
             name: locals()[name]
             for name in sig.parameters
-            if name not in ('self', 'debug', 'expand_tags', 'expand_metadata', 'scoring_methods')
+            if name
+            not in (
+                'self',
+                'debug',
+                'expand_tags',
+                'expand_metadata',
+                'scoring_methods',
+            )
         }
         # need id in output
         flags['id'] = True
-
-        print('input flags', flags)
 
         # alias and name both point to same thing. prefer 'name'
         if flags.get('name', False):
@@ -591,33 +596,30 @@ class PoseSet:
         values = [v[1] for k, v in fields.items() if flags.get(k, False)]
         columns = {v[1]: v[0] for k, v in fields.items() if flags.get(k, False)}
 
-        for method_name, version in (scoring_methods or []):
+        for method_name, version in scoring_methods or []:
             score_sq = Subquery(
                 ScoreValueModel.objects.filter(
                     pose=OuterRef('pk'),
                     compound=OuterRef('compound'),
                     scoring_method__method_name=method_name,
                     scoring_method__method_version=version,
-                ).annotate(
-                    score_val=Cast(KeyTextTransform('score', 'score'), output_field=FloatField())
-                ).values('score_val')[:1],
+                )
+                .annotate(
+                    score_val=Cast(
+                        KeyTextTransform('score', 'score'), output_field=FloatField()
+                    )
+                )
+                .values('score_val')[:1],
                 output_field=FloatField(),
             )
             annotations[method_name] = score_sq
             values.append(method_name)
             columns[method_name] = method_name
 
-        print('df values', values)
-        print('df columns', columns)
         qs = self._queryset.annotate(**annotations).values(*values)
 
-        print('queryset', self._queryset.count(), self._queryset)
-
         df = pd.DataFrame(qs)
-        print(df)
-        print('df columns from df before', df.columns)
         df = df.rename(columns=columns)
-        print('df columns from df after', df.columns)
         df = df.set_index('id')
 
         if alias:
@@ -648,7 +650,7 @@ class PoseSet:
 
             # build boolean columns
             for tag in all_tags:
-                df[tag] = df['tags'].apply(lambda tags: tag in tags)
+                df[tag] = df['tags'].apply(lambda tags, tag=tag: tag in tags)
 
             df = df.drop(columns=['tags'])
 
@@ -742,6 +744,9 @@ class PoseSet:
 
     def set_subsites_from_metadata_field(self, field: str = 'CanonSites alias') -> None:
         """Create and assign subsite entries from a pose metadata field."""
+        # local import: keeps this upward set -> service call off the module graph
+        from designdb.services.subsite import SubsiteService
+
         SubsiteService.set_subsites_from_metadata_field(self._queryset, field)
 
     def get_best_scoring_poses_per_compound(
@@ -750,7 +755,8 @@ class PoseSet:
         version: str | None = None,
         inverse: bool = False,
     ) -> 'PoseSet':
-        """Return one pose per compound with the best score for the given scoring method.
+        """Return one pose per compound with the best score for the given
+        scoring method.
 
         :param scoring_method: ``ScoringMethodModel.method_name`` to rank by
         :param version: ``ScoringMethodModel.method_version`` — required when multiple
@@ -758,29 +764,31 @@ class PoseSet:
         :param inverse: if ``True``, higher score is better (default: lower is better)
         """
         score_num = Cast(KeyTextTransform('score', 'score'), output_field=FloatField())
-        agg = Max('score_num') if inverse else Min('score_num')
 
         filters = {'scoring_method__method_name': scoring_method}
         if version is not None:
             filters['scoring_method__method_version'] = version
 
-        best_pose_ids = (
-            ScoreValueModel.objects
-            .filter(pose__in=self._queryset, **filters)
+        rows = (
+            ScoreValueModel.objects.filter(pose__in=self._queryset, **filters)
             .annotate(score_num=score_num)
-            .annotate(
-                compound_best=Window(
-                    expression=agg,
-                    partition_by=['compound_id'],
-                )
-            )
-            .filter(score_num=F('compound_best'))
-            .values_list('pose_id', flat=True)
-            .distinct()
+            .values_list('compound_id', 'pose_id', 'score_num')
         )
 
-        return PoseSet(PoseModel.objects.filter(pk__in=best_pose_ids))
+        # keep exactly one pose per compound (the best score; ties broken by
+        # first-seen), rather than every pose tied for the best
+        best: dict[int, tuple[int, float]] = {}
+        for compound_id, pose_id, score in rows:
+            if score is None:
+                continue
+            current = best.get(compound_id)
+            if current is None or (
+                score > current[1] if inverse else score < current[1]
+            ):
+                best[compound_id] = (pose_id, score)
 
+        best_pose_ids = [pose_id for pose_id, _ in best.values()]
+        return PoseSet(PoseModel.objects.filter(pk__in=best_pose_ids))
 
     # def filter(
     #     self,
@@ -855,30 +863,29 @@ class PoseSet:
         # problem. with every evaluation and refretch some attributes
         # may be lost. how can this be kept clean?
 
-    # unused? the original method didn't save object
     def append_to_metadata(
         self,
         key,
         value,
     ) -> None:
-        """Append a specific item to list-like values associated with a given key for
-        all member's metadata dictionaries
+        """Append ``value`` to the list at ``key`` in every member's metadata dict.
 
-        :param key: the :class:`.Metadata` key to match
+        :param key: the metadata key to match (created as a new list if absent)
         :param value: the value to append to the list
-
         """
         for pose in self._queryset:
-            # metadata = json.loads(pose.payload)
-            metadata = pose.pose_metadata
-            try:
-                metadata.append(key, value)
-            except AttributeError:
-                mrich.error(f'Could not append to metadata {key=}. Not a list?')
-
+            metadata = pose.pose_metadata or {}
+            existing = metadata.get(key)
+            if existing is None:
+                metadata[key] = [value]
+            elif isinstance(existing, list):
+                existing.append(value)
+            else:
+                mrich.error(f'Could not append to metadata {key=}: not a list')
+                continue
+            pose.pose_metadata = metadata
             pose.save()
         self._queryset = PoseModel.objects.filter(pk__in=self._queryset.values('pk'))
-
 
     # TODO: implement scores
     # def calculate_inspiration_scores(
@@ -1027,9 +1034,6 @@ class PoseSet:
             **kwargs,
         )
 
-        print('what do I have for name col', name_col)
-        print(df.columns)
-
         if name_col not in ['name', 'alias', 'inchikey', 'id']:
             # try getting name from metadata
             records = self._queryset.values('id', 'pose_metadata')
@@ -1044,7 +1048,7 @@ class PoseSet:
                 longcode_lookup[i] = metadata.get(name_col, None)
 
             values = []
-            for i, row in df.iterrows():
+            for _, row in df.iterrows():
                 values.append(longcode_lookup[row['id']])
 
             df[name_col] = values
@@ -1150,21 +1154,18 @@ class PoseSet:
                 poses = PoseSet(PoseModel.objects.filter(pk__in=values))
                 mrich.debug(len(poses), 'remaining after skipping null inspirations')
             else:
-                logger.warning('no inspirations found; per-pose fallback will set inspiration to self')
+                logger.warning(
+                    'no inspirations found; per-pose fallback will set '
+                    'inspiration to self'
+                )
 
         if not poses:
             # huh?
             poses = PoseSet(self._queryset)
 
         mrich.var('#poses', len(poses))
-        logger.debug('about to create df')
-        # get the dataframe of poses
 
         # TODO: this should not go through the df
-
-        # Scope issue - this code expect access to all poses in the db
-        self._queryset = PoseModel.objects.all()
-
         pose_df = poses.get_df(
             mol=True,
             inspiration_ids=True,
@@ -1188,11 +1189,14 @@ class PoseSet:
 
         pose_df = pose_df.reset_index()
 
-        # fix inspirations and reference column (comma separated aliases)
+        # fix inspirations and reference column (comma separated aliases).
+        # reference poses may lie outside this set, so look up exactly the
+        # referenced pose IDs rather than scanning the whole table.
+        ref_ids = {r for r in pose_df['reference_id'].tolist() if r is not None}
+        lookup = dict(
+            PoseModel.objects.filter(pk__in=ref_ids).values_list('pk', 'pose_alias')
+        )
 
-        lookup = {k.pk: k.pose_alias for k in self._queryset}
-
-        inspiration_strs = []
         # for i, row in pose_df.iterrows():
         #     strs = []
         #     for i in normalize_string_list(row['inspiration_ids']):
@@ -1216,11 +1220,13 @@ class PoseSet:
             pose_df['subsites'] = pose_df['subsites'].apply(fix_subsites)
 
         if tags:
-            pose_df['tags'] = pose_df['tags'].apply(lambda x: ','.join(v for v in x if v is not None))
+            pose_df['tags'] = pose_df['tags'].apply(
+                lambda x: ','.join(v for v in x if v is not None)
+            )
 
         # pose_df['ref_mols'] = inspiration_strs
         pose_df['ref_mols'] = 'inspiration_strs'
-        pose_df['ref_pdb'] = pose_df['reference_id'].apply(lambda x: lookup[x])
+        pose_df['ref_pdb'] = pose_df['reference_id'].apply(lambda x: lookup.get(x))
 
         # add compound identifier column (inchikey?)
 
@@ -1352,17 +1358,30 @@ class PoseSet:
             pdb_dir.mkdir(exist_ok=True)
             zip_path = Path(out_path).parent / f'{out_key}_refs.zip'
 
-            references = self.references
-            # lookup = self.db.get_pose_alias_path_dict(references)
-            lookup = {k.pose_alias: k.protein_link for k in self._queryset}
+            # ref_pdb holds reference pose aliases that may lie outside this set,
+            # so look them up directly (alias -> protein PDB path)
+            ref_aliases = {a for a in pose_df['ref_pdb'].tolist() if a is not None}
+            lookup = dict(
+                PoseModel.objects.filter(pose_alias__in=ref_aliases).values_list(
+                    'pose_alias', 'protein_link'
+                )
+            )
 
             zips = set()
             for ref_alias in pose_df['ref_pdb'].values:
-                source_path = Path(lookup[ref_alias])
+                source = lookup.get(ref_alias)
+                if not source:
+                    mrich.warning(
+                        f'No protein file for reference {ref_alias!r}; skipping'
+                    )
+                    continue
+                source_path = Path(source)
 
                 stem = source_path.name.replace('_hippo.pdb', '.pdb')
                 # current Fragalysis protein-file naming
-                apo_path = source_path.parent / stem.replace('.pdb', '_delig-desolv.pdb')
+                apo_path = source_path.parent / stem.replace(
+                    '.pdb', '_delig-desolv.pdb'
+                )
                 # DEPRECATED(apo-naming): fall back to pre-'delig' naming if present,
                 # remove once all data uses 'delig'
                 legacy_path = source_path.parent / stem.replace(
@@ -1392,8 +1411,6 @@ class PoseSet:
 
         # create the header molecule
 
-        df_cols = set(pose_df.columns)
-
         header = generate_header(
             # self[0],   # <- what does that do??
             self._queryset.first(),
@@ -1405,8 +1422,6 @@ class PoseSet:
             extras=extras,
             metadata=metadata,
         )
-
-        header_cols = set(header.GetPropNames())
 
         # # empty properties
         # pose_df["generation_date"] = [None] * len(pose_df)
@@ -1428,8 +1443,6 @@ class PoseSet:
 
         if sort_by:
             pose_df = pose_df.sort_values(by=sort_by, ascending=not sort_reverse)
-
-        fields = []
 
         mrich.writing(out_path)
 
@@ -1466,7 +1479,7 @@ class PoseSet:
 
         from pathlib import Path
 
-        for i, (ref_id, poses) in enumerate(self.split_by_reference().items()):
+        for ref_id, poses in self.split_by_reference().items():
             ref_pose = PoseModel.objects.get(id=ref_id)
             ref_name = ref_pose.pose_alias or ref_id
 
@@ -1488,7 +1501,7 @@ class PoseSet:
             commands.append('set surface_color, white')
             commands.append('set transparency,  0.4')
 
-            for j, (insp_ids, poses) in enumerate(
+            for j, (insp_ids, poses) in enumerate(  # noqa: B020  # TODO(legacy-self.db): port to ORM
                 poses.split_by_inspirations().items()
             ):
                 inspirations = PoseSet(self.db, insp_ids)
@@ -1549,7 +1562,9 @@ class PoseSet:
 
             for pose in self._queryset:
                 assert pose.pose_alias
-                assert pose.methods.filter(pose_method_name__in=DEFAULT_POSE_METHODS).exists()
+                assert pose.methods.filter(
+                    pose_method_name__in=DEFAULT_POSE_METHODS
+                ).exists()
 
                 if aligned_files_dir:
                     mol = str(pose.mol_path)
@@ -1665,8 +1680,6 @@ class PoseSet:
                 shutil.copy(ref.apo_path, template)
 
         ### Inspirations
-        print('all inspirations', all_inspirations)
-        # records = self._queryset.filter(pose_alias__in=all_inspirations)
         # isn't this overwriting the one few lines above??
         records = PoseModel.objects.filter(
             target__in=self.targets, pose_alias__in=all_inspirations
@@ -1677,7 +1690,7 @@ class PoseSet:
         ### Write CSV
 
         if separate:
-            for i, row in df.iterrows():
+            for _, row in df.iterrows():
                 csv_name = out_dir / f'{row["compound_set"]}_syndirella_input.csv'
                 mrich.writing(csv_name)
                 row.to_frame().T.to_csv(csv_name, index=False)
@@ -1853,7 +1866,7 @@ class PoseSet:
         mols = [p.mol for p in self]
 
         drawing = draw_mols(mols)
-        # display(drawing)
+        display(drawing)
 
     def grid(self) -> None:
         """Draw a grid of all contained molecules"""
@@ -1934,7 +1947,7 @@ class PoseSet:
                 pairs.add((pose_j, pose_k))
 
         if return_pairs:
-            return [PoseSet(PoseModel.objects.filter(pk__in[a, b])) for a, b in pairs]
+            return [PoseSet(PoseModel.objects.filter(pk__in=[a, b])) for a, b in pairs]
 
         return count
 
@@ -2009,7 +2022,7 @@ class PoseSet:
 
         # calculate modal interactions
 
-        for i, cluster in psets.items():
+        for cluster in psets.values():
             mrich.var(cluster.name, len(cluster), unit='poses')
 
             df = cluster.interactions.df
@@ -2076,7 +2089,7 @@ class PoseSet:
     @property
     def id_name_dict(self) -> dict:
         """Return a dictionary mapping pose ID's to their name"""
-        return {p.pk: p.pose_alias for p in PoseModel.objects.all()}
+        return dict(self._queryset.values_list('pk', 'pose_alias'))
 
     @property
     def smiles(self) -> list[str]:
@@ -2138,21 +2151,18 @@ class PoseSet:
         return self.get_by_references(self).values_list('pk', flat=True)
 
     @property
-    def inspiration_sets(self) -> list[set[int]]:
-        """Return a list of unique sets of inspiration :class:`.PoseModel` IDs"""
+    def inspiration_sets(self) -> set[tuple[int, ...]]:
+        """Return the unique sets of inspiration :class:`.PoseModel` IDs"""
 
-        pairs = InspirationModel.objects.filter(derivative_pose__in=self._queryset)
-        data = {}
-        for p in pairs:
-            if p.derivative_pose not in data:
-                data[p.derivative_pose] = set()
-            data[p.derivative_pose].add(p.original_pose)
+        # group original (inspiration) pose IDs by derivative pose ID -- use the
+        # FK ids (sortable ints, no extra queries) rather than the model objects
+        data: dict[int, set[int]] = {}
+        for deriv_id, orig_id in InspirationModel.objects.filter(
+            derivative_pose__in=self._queryset
+        ).values_list('derivative_pose_id', 'original_pose_id'):
+            data.setdefault(deriv_id, set()).add(orig_id)
 
-        data = {k: tuple(sorted(list(v))) for k, v in data.items()}
-
-        unique = set(data.values())
-
-        return unique
+        return {tuple(sorted(v)) for v in data.values()}
 
     @property
     def num_inspiration_sets(self) -> int:
@@ -2242,7 +2252,11 @@ class PoseSet:
     @property
     def num_subsites(self) -> int:
         """Count the number of subsites that poses in this set come into contact with"""
-        return SubsiteModel.objects.filter(pose__in=self._queryset).distinct().count()
+        return (
+            SubsiteModel.objects.filter(posemodels__in=self._queryset)
+            .distinct()
+            .count()
+        )
 
     @property
     def subsite_balance(self) -> float:
@@ -2271,7 +2285,7 @@ class PoseSet:
         return SubsiteModel.objects.filter(
             pk__in=SubsiteTagModel.objects.filter(
                 pose__in=self._queryset,
-            ).values(subsite),
+            ).values('subsite'),
         ).values_list('pk', flat=True)
 
     @property

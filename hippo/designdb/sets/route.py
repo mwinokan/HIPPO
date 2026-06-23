@@ -1,9 +1,15 @@
 import json
+from typing import TYPE_CHECKING
 
 import mcol
 import mrich
 from designdb.models import ComponentModel, RouteModel
 from designdb.sets.compound import CompoundSet
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from designdb.recipe import Route
 
 
 class RouteSet:
@@ -39,7 +45,7 @@ class RouteSet:
 
         # avoiding circular reference
         # avoiding name conflict
-        from designdb.components.recipe import Route
+        from designdb.recipe import Route
 
         routes = [Route.get_route(id=r) for r in ids]
 
@@ -80,7 +86,7 @@ class RouteSet:
 
         """
 
-        from designdb.components.recipe import Route
+        from designdb.recipe import Route
 
         self = cls.__new__(cls)
 

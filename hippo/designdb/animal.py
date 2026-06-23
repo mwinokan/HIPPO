@@ -10,12 +10,20 @@ import mrich
 import pandas as pd
 from django.db import transaction
 
+from .client import (
+    GeneratorManager,
+    IngredientManager,
+    RecipeManager,
+    RouteManager,
+    ScorerManager,
+)
 from .models import (
     CompoundModel,
     EnumerationMethodModel,
     PoseMethodModel,
     PoseModel,
     Project,
+    RouteModel,
     ScoringMethodModel,
     TargetModel,
 )
@@ -63,6 +71,9 @@ class HIPPO:
         self,
         target_name: str,
         target_access_string: str,
+        *,
+        stack: str = 'production',
+        auth_token: str | None = None,
     ) -> None:
 
         # TODO: with working db, hippo shouldn't be creating projects
@@ -76,12 +87,33 @@ class HIPPO:
             project=project,
         )
 
+        # Fragalysis stack / auth used for any downloads triggered by this
+        # instance (see _ensure_hit_data / _ensure_apo_desolv_files).
+        self._stack = stack
+        self._auth_token = auth_token
+
         # Download state (see _ensure_hit_data / _ensure_apo_desolv_files). The
         # full hit data persists on disk and is reused across sessions; the
         # apo_desolv subset is re-downloaded once per instance to stay fresh.
         self._hit_data_path: Path | None = None
         self._apo_desolv_path: Path | None = None
         self._apo_desolv_downloaded_at: datetime | None = None
+
+        # Download policy: a first run downloads nothing here (the first add_hits
+        # fetches the full data). On re-instantiation (a persisted download already
+        # on disk) only the apo_desolv proteins are refreshed, so a new session has
+        # current PDBs.
+        target_dir = DOWNLOADS_DIR / project.project_name / target_name
+        if (target_dir / 'metadata.csv').is_file() and (
+            target_dir / 'aligned_files'
+        ).is_dir():
+            try:
+                self._ensure_apo_desolv_files(
+                    auth_token=self._auth_token, stack=self._stack
+                )
+            except ValueError as e:
+                # no poses in the DB yet -> can't tell which structures to fetch
+                mrich.warning(f'Skipping apo_desolv refresh on init: {e}')
 
         # TODO: the way this worked previously was it gave the HIPPO
         # instance full access to the pose table. When working with
@@ -141,6 +173,34 @@ class HIPPO:
         return CompoundSet(list(ReactionService.reactant_compound_ids()))
 
     @property
+    def recipes(self) -> RecipeManager:
+        """Client-side accessor for building recipes (see :class:`.RecipeManager`)."""
+        return RecipeManager(self)
+
+    @property
+    def ingredients(self) -> IngredientManager:
+        """Client-side accessor for building IngredientSets (see
+        :class:`.IngredientManager`)."""
+        return IngredientManager(self)
+
+    @property
+    def routes(self) -> RouteManager:
+        """Client-side accessor for building RouteSets (see
+        :class:`.RouteManager`)."""
+        return RouteManager(self)
+
+    @property
+    def generators(self) -> GeneratorManager:
+        """Client-side accessor for the random recipe/selection generators (see
+        :class:`.GeneratorManager`)."""
+        return GeneratorManager(self)
+
+    @property
+    def scorers(self) -> ScorerManager:
+        """Client-side accessor for recipe scoring (see :class:`.ScorerManager`)."""
+        return ScorerManager(self)
+
+    @property
     def num_poses(self) -> int:
         """Total number of Poses in the Database"""
         return self.poses.count()
@@ -178,29 +238,32 @@ class HIPPO:
         """
         return self.quote_compounds(self.reactants)
 
+    def plot_interaction_punchcard(
+        self, poses: 'PoseSet | None' = None, *, subtitle=None, opacity=1.0, **kwargs
+    ):
+        """Plot an interaction punch-card for a :class:`.PoseSet` (default: all of
+        this target's poses). See :func:`.plotting.plot_interaction_punchcard`."""
+        from .plotting import plot_interaction_punchcard
+
+        return plot_interaction_punchcard(
+            self.poses if poses is None else poses,
+            title_prefix=self._target.target_name,
+            subtitle=subtitle,
+            opacity=opacity,
+            **kwargs,
+        )
+
     def _ensure_hit_data(
         self, auth_token: str | None = None, stack: str = 'production'
     ) -> Path:
-        """Ensure this target's full crystallographic hit data is available locally.
+        """Ensure the target's full Fragalysis hit data is downloaded locally.
 
-        Downloads the target's Fragalysis data (all observations) from the stack
-        via :class:`.DownloadService` and returns the path to the extracted
-        directory (``data/downloads/<project>/<target>``).
+        Downloads all observations via :class:`.DownloadService` to
+        ``data/downloads/<project>/<target>`` and returns that path. The data
+        persists: an existing download (detected by ``metadata.csv``) is reused.
 
-        Unlike :meth:`._ensure_apo_desolv_files`, this data **persists**: if a
-        previous full download is already on disk it is reused without
-        re-fetching (detected by the presence of ``metadata.csv``, which an
-        apo_desolv-only download does not produce).
-
-        .. note::
-            HIPPO-level helper, intended to be called from user-facing
-            :class:`.HIPPO` methods (e.g. :meth:`.add_hits`). It must not be
-            called from the components or services layer.
-
-        :param auth_token: optional Fragalysis ``sessionid``; otherwise the
-            ``FRAGALYSIS_AUTH_TOKEN`` environment variable is used
-        :param stack: Fragalysis stack to download from, a key into
-            :data:`.STACK_URLS`; defaults to ``'production'``
+        :param auth_token: Fragalysis ``sessionid`` (else ``FRAGALYSIS_AUTH_TOKEN``)
+        :param stack: Fragalysis stack to download from (default ``'production'``)
         :returns: path to the extracted download directory
         """
 
@@ -235,33 +298,14 @@ class HIPPO:
     def _ensure_apo_desolv_files(
         self, auth_token: str | None = None, stack: str = 'production'
     ) -> Path:
-        """Ensure this target's apo-desolvated PDB files are available locally.
+        """Ensure the target's apo-desolvated protein PDBs are downloaded locally.
 
-        Downloads the ``apo_desolv`` structures for this target's observations
-        from Fragalysis (via :class:`.DownloadService`) and returns the path to
-        the extracted directory. The download is performed at most once per
-        instance and re-fetched each instance (overwriting any on-disk
-        apo_desolv files) so a fresh instance always works with current data. If
-        the full hit data was already downloaded this instance (via
-        :meth:`._ensure_hit_data`), that is reused since it already includes
-        fresh apo_desolv files.
+        Downloads the ``apo_desolv`` structures for this target's poses (by
+        ``pose_alias``) via :class:`.DownloadService`, once per instance. Reuses the
+        full hit data if it was already downloaded this instance.
 
-        Everything needed for the request is taken from this animal: the target
-        name and project (target access string) from :attr:`.target`, and the
-        observation shortcodes from the ``pose_alias`` of this target's poses.
-
-        .. note::
-            This is a HIPPO-level helper, intended to be called from user-facing
-            :class:`.HIPPO` methods the first time PDB files are needed. It's not
-            expected to be called from the components or services layer. This
-            method won't be necessary once HIPPO functions as a web service as
-            intended.
-
-        :param auth_token: optional Fragalysis ``sessionid``; otherwise the
-            ``FRAGALYSIS_AUTH_TOKEN`` environment variable is used
-        :param stack: Fragalysis stack to download from, a key into
-            :data:`.STACK_URLS` (e.g. ``'production'``, ``'staging'``,
-            ``'localhost'``); defaults to ``'production'``
+        :param auth_token: Fragalysis ``sessionid`` (else ``FRAGALYSIS_AUTH_TOKEN``)
+        :param stack: Fragalysis stack to download from (default ``'production'``)
         :returns: path to the extracted download directory
         """
 
@@ -316,7 +360,7 @@ class HIPPO:
         metadata_csv: str | Path | None = None,
         aligned_directory: str | Path | None = None,
         auth_token: str | None = None,
-        stack: str = 'production',
+        stack: str | None = None,
         tags: list | None = None,
         pose_methods: list[str] | None = None,
         skip: list | None = None,
@@ -345,10 +389,12 @@ class HIPPO:
 
         """
 
-        ### Resolve the data source
-        # Path-driven: provide both metadata_csv and aligned_directory to load
-        # existing local data, or omit both to download the target's data from
-        # the Fragalysis stack (always Fragalysis-type).
+        # fall back to the stack/auth configured at instantiation
+        if stack is None:
+            stack = self._stack
+        if auth_token is None:
+            auth_token = self._auth_token
+
         if metadata_csv is None and aligned_directory is None:
             hit_dir = self._ensure_hit_data(auth_token=auth_token, stack=stack)
             aligned_directory = hit_dir / 'aligned_files'
@@ -452,7 +498,7 @@ class HIPPO:
             if obj is None:
                 raise ValueError(
                     f"Pose method '{name}' not found. "
-                    "Call register_pose_method() first."
+                    'Call register_pose_method() first.'
                 )
             pose_method_objs.append(obj)
 
@@ -556,7 +602,8 @@ class HIPPO:
 
         if name_col is None:
             raise ValueError(
-                "name_col cannot be None. Provide the SDF column name that contains pose identifiers."
+                'name_col cannot be None. Provide the SDF column name that '
+                'contains pose identifiers.'
             )
 
         skip_equal_dict = skip_equal_dict or {}
@@ -612,8 +659,12 @@ class HIPPO:
         score_method_map = {}
         if score_cols and scoring_methods:
             if len(score_cols) != len(scoring_methods):
-                raise ValueError('score_cols and scoring_methods must be the same length')
-            for col, (method_name, method_version) in zip(score_cols, scoring_methods):
+                raise ValueError(
+                    'score_cols and scoring_methods must be the same length'
+                )
+            for col, (method_name, method_version) in zip(
+                score_cols, scoring_methods, strict=False
+            ):
                 try:
                     obj = ScoringMethodModel.objects.get(
                         method_name=method_name, method_version=method_version
@@ -700,6 +751,8 @@ class HIPPO:
             logger.error(exc, exc_info=True)
             # TODO: handle gracefully
             raise Exception from exc
+
+        return result
 
     def add_enamine_real_routes(
         self,
@@ -806,7 +859,9 @@ class HIPPO:
         """Propagate subsite assignments from inspiration poses to their derivatives."""
         SubsiteService.set_derivative_subsites()
 
-    def register_enumeration_method(self, name: str, version: str, description: str = ''):
+    def register_enumeration_method(
+        self, name: str, version: str, description: str = ''
+    ):
         """Register an enumeration method, or retrieve it if already registered."""
         return MethodService.register_enumeration_method(name, version, description)
 

@@ -31,12 +31,6 @@ repos:
         language: system
         types: [python]
 
-      - id: isort
-        name: isort
-        entry: uv run isort src
-        language: system
-        types: [python]
-
       # - id: mypy
       #   name: mypy
       #   entry: uv run mypy

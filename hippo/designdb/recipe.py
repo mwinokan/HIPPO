@@ -4,32 +4,31 @@ A :class:`.Recipe` is a lean *aggregate*: it holds the products, reactants,
 intermediates, reactions and (no-chem) compounds that make up a synthetic recipe,
 and exposes price/serialisation/presentation on top of them.
 
-All construction and DB-traversal *orchestration* lives in the service layer
-(:class:`.RecipeService` in ``services/recipe.py``). The ``from_*`` and export
-methods on :class:`.Recipe` are **deprecated shims** that delegate to the service
-— see the ``DEPRECATED`` banner below. They use a local import of the service so
-there is no module-level ``component -> service`` dependency.
+Construction and DB-traversal *orchestration* lives in :class:`.RecipeService`.
+The ``from_*`` and export methods on :class:`.Recipe` are **deprecated shims** that
+delegate to it (see the ``DEPRECATED`` banner below) via a local import.
 """
 
-import warnings
+from typing import TYPE_CHECKING
 
 import mcol
 import mrich
+from designdb.components.compound import Ingredient
+from designdb.components.reaction import Reaction
 from designdb.models import ComponentModel, CompoundModel, ReactionModel, RouteModel
-from designdb.sets.compound import CompoundSet, IngredientSet
+from designdb.sets.compound import CompoundSet
+from designdb.sets.ingredient import IngredientSet
 from designdb.sets.reaction import ReactionSet
 
-from .reaction import Reaction
+if TYPE_CHECKING:
+    from pathlib import Path
 
-
-def _deprecated(old: str, new: str) -> None:
-    """Emit a uniform deprecation warning for a relocated method."""
-    warnings.warn(
-        f'{old} is deprecated; use {new}. '
-        'The Recipe shim will be removed after the migration settles.',
-        DeprecationWarning,
-        stacklevel=3,
-    )
+    import pandas
+    from designdb.components.price import Price
+    from designdb.sets.interaction import InteractionSet
+    from designdb.sets.pose import PoseSet
+    from designdb.sets.route import RouteSet
+    from plotly import graph_objects
 
 
 class Recipe:
@@ -89,7 +88,6 @@ class Recipe:
         """DEPRECATED: use :meth:`.RecipeService.from_reaction`."""
         from designdb.services.recipe import RecipeService
 
-        _deprecated('Recipe.from_reaction()', 'RecipeService.from_reaction()')
         return RecipeService.from_reaction(*args, **kwargs)
 
     @classmethod
@@ -97,7 +95,6 @@ class Recipe:
         """DEPRECATED: use :meth:`.RecipeService.from_reactions`."""
         from designdb.services.recipe import RecipeService
 
-        _deprecated('Recipe.from_reactions()', 'RecipeService.from_reactions()')
         return RecipeService.from_reactions(*args, **kwargs)
 
     @classmethod
@@ -105,7 +102,6 @@ class Recipe:
         """DEPRECATED: use :meth:`.RecipeService.from_compounds`."""
         from designdb.services.recipe import RecipeService
 
-        _deprecated('Recipe.from_compounds()', 'RecipeService.from_compounds()')
         return RecipeService.from_compounds(*args, **kwargs)
 
     @classmethod
@@ -113,7 +109,6 @@ class Recipe:
         """DEPRECATED: use :meth:`.RecipeService.from_reactants`."""
         from designdb.services.recipe import RecipeService
 
-        _deprecated('Recipe.from_reactants()', 'RecipeService.from_reactants()')
         return RecipeService.from_reactants(*args, **kwargs)
 
     ### FACTORIES
@@ -789,7 +784,6 @@ class Recipe:
         """DEPRECATED: use :meth:`.RecipeService.get_routes`."""
         from designdb.services.recipe import RecipeService
 
-        _deprecated('Recipe.get_routes()', 'RecipeService.get_routes()')
         return RecipeService.get_routes(self, return_ids=return_ids)
 
     def register_missing_routes(
@@ -798,10 +792,6 @@ class Recipe:
         """DEPRECATED: use :meth:`.RecipeService.register_missing_routes`."""
         from designdb.services.recipe import RecipeService
 
-        _deprecated(
-            'Recipe.register_missing_routes()',
-            'RecipeService.register_missing_routes()',
-        )
         return RecipeService.register_missing_routes(
             self, missing_only=missing_only, supplier=supplier
         )
@@ -810,7 +800,6 @@ class Recipe:
         """DEPRECATED: use :meth:`.RecipeService.write_CAR_csv`."""
         from designdb.services.recipe import RecipeService
 
-        _deprecated('Recipe.write_CAR_csv()', 'RecipeService.write_CAR_csv()')
         return RecipeService.write_CAR_csv(self, file, return_df=return_df)
 
     def write_reactant_csv(
@@ -819,7 +808,6 @@ class Recipe:
         """DEPRECATED: use :meth:`.RecipeService.write_reactant_csv`."""
         from designdb.services.recipe import RecipeService
 
-        _deprecated('Recipe.write_reactant_csv()', 'RecipeService.write_reactant_csv()')
         return RecipeService.write_reactant_csv(
             self, file, reaction_type_counts=reaction_type_counts, return_df=return_df
         )
@@ -828,14 +816,12 @@ class Recipe:
         """DEPRECATED: use :meth:`.RecipeService.write_product_csv`."""
         from designdb.services.recipe import RecipeService
 
-        _deprecated('Recipe.write_product_csv()', 'RecipeService.write_product_csv()')
         return RecipeService.write_product_csv(self, file, return_df=return_df)
 
     def to_syndirella(self, out_key: 'str | Path', poses: 'PoseSet', *, separate=False):
         """DEPRECATED: use :meth:`.RecipeService.to_syndirella`."""
         from designdb.services.recipe import RecipeService
 
-        _deprecated('Recipe.to_syndirella()', 'RecipeService.to_syndirella()')
         return RecipeService.to_syndirella(self, out_key, poses, separate=separate)
 
     ### INTERNALS
@@ -985,10 +971,14 @@ class Route(Recipe):
         return self
 
     @classmethod
-    def get_route(cls, *, id: int, debug: bool = False) -> 'Route':
+    def get_route(
+        cls, *, id: int, get_quote: bool = True, debug: bool = False
+    ) -> 'Route':
         """Fetch a :class:`.RouteModel` stored in the database and wrap it.
 
         :param id: the ID of the :class:`.RouteModel` to retrieve
+        :param get_quote: fetch catalogue quotes for the reactants so the route is
+            priced, defaults to ``True``
         :param debug: increase verbosity for debugging
         """
 
@@ -1024,16 +1014,30 @@ class Route(Recipe):
         if debug:
             mrich.var('components', qs)
 
-        def _ingredients(ids, amounts):
-            """Build an IngredientSet, returning an empty one for no ids."""
-            if not ids:
-                return IngredientSet()
-            return IngredientSet.from_compounds(ids=ids, amount=amounts)
+        def _ingredients(ids, amounts, quote=False):
+            """Build an IngredientSet, returning an empty one for no ids.
 
+            When ``quote`` is set, each ingredient fetches its cheapest catalogue
+            quote (via the ``compound_catalogue_map`` junction) so the route can be
+            priced; otherwise ingredients are left unquoted.
+            """
+            iset = IngredientSet()
+            for cid, amount in zip(ids, amounts, strict=False):
+                iset.add(
+                    Ingredient.from_compound(
+                        compound=CompoundModel.objects.get(pk=cid),
+                        amount=amount,
+                        get_quote=quote,
+                    )
+                )
+            return iset
+
+        # products are made, not purchased, so they are never quoted
         products = IngredientSet.from_compounds(
             ids=[route.product_compound_id], amount=1
         )
-        reactants = _ingredients(reactant_ids, reactant_amounts)
+        # reactants are the building blocks that get bought -> fetch quotes
+        reactants = _ingredients(reactant_ids, reactant_amounts, quote=get_quote)
         intermediates = _ingredients(intermediate_ids, intermediate_amounts)
 
         reactions = ReactionSet(reaction_ids)
@@ -1158,9 +1162,7 @@ class RecipeSet:
         """Get a dataframe of recipe dictionaries. See :meth:`.Recipe.get_dict`."""
         from pandas import DataFrame
 
-        data = [
-            recipe.get_dict(timestamp=False, **kwargs) for recipe in self
-        ]
+        data = [recipe.get_dict(timestamp=False, **kwargs) for recipe in self]
         return DataFrame(data)
 
     def items(self) -> 'list[tuple[str, Recipe]]':

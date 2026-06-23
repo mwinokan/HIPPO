@@ -7,7 +7,9 @@ logger = logging.getLogger(__name__)
 
 class MethodService:
     @classmethod
-    def register_enumeration_method(cls, name: str, version: str, description: str = ''):
+    def register_enumeration_method(
+        cls, name: str, version: str, description: str = ''
+    ):
         obj, created = EnumerationMethodModel.objects.get_or_create(
             enum_name=name,
             enum_version=version,

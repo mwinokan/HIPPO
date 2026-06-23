@@ -66,6 +66,8 @@ def load_hippo(
     target_access_string: str,
     username: str,
     db: str | Path | dict | None = None,
+    stack: str = 'production',
+    auth_token: str | None = None,
     # copy_from: str | Path | None = None,
     # overwrite_existing: bool = False,
     # update_legacy: bool = False,
@@ -81,9 +83,9 @@ def load_hippo(
     tas_list = get_auth_target_access(username)
 
     # mock response until auth pod is externally accessible
-    tas_list = ('lb18145-1')
+    tas_list = 'lb18145-1'
 
-    if not target_access_string in tas_list:
+    if target_access_string not in tas_list:
         mrich.error(f'User {username} does not have access to {target_access_string}')
         return
 
@@ -136,7 +138,9 @@ def load_hippo(
         # import .testmodule
     from designdb.animal import HIPPO
 
-    animal = HIPPO(target_name, target_access_string)
+    animal = HIPPO(
+        target_name, target_access_string, stack=stack, auth_token=auth_token
+    )
 
     mrich.success('Initialised animal', f'{target_name}')
     return animal

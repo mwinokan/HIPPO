@@ -5,6 +5,7 @@ import json
 import re
 from datetime import datetime
 from string import ascii_uppercase
+from typing import TYPE_CHECKING
 
 import mcol
 import molparse as mp
@@ -16,6 +17,9 @@ from rdkit import Chem
 from rdkit.Chem import AddHs, MolFromSmiles, MolToSmiles, RegistrationHash, RemoveHs
 from rdkit.Chem.inchi import MolToInchiKey
 from rdkit.Chem.MolStandardize import rdMolStandardize
+
+if TYPE_CHECKING:
+    from designdb.models import PoseModel
 
 
 def strip_sql(sql) -> str:

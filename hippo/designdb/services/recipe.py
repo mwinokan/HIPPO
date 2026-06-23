@@ -1,22 +1,34 @@
-"""Service layer that owns Recipe construction and DB traversal.
+"""Recipe construction and DB traversal.
 
-This is the canonical home for the orchestration logic that builds
-:class:`.Recipe` objects from reactions/compounds/reactants. The :class:`.Recipe`
-component itself is a lean aggregate; its ``from_*`` classmethods are deprecated
-shims that delegate here (see ``components/recipe.py``).
-
-Layering: ``services -> recipe -> sets -> components``. This module may import
-from every lower layer.
+Builds :class:`.Recipe` objects from reactions/compounds/reactants. The
+:class:`.Recipe` aggregate itself is lean; its ``from_*`` classmethods are
+deprecated shims that delegate here.
 """
 
 from itertools import product
+from typing import TYPE_CHECKING
 
 import mrich
 from designdb.components.compound import Compound
 from designdb.components.reaction import DEFAULT_PRODUCT_YIELD, Reaction
-from designdb.models import CompoundModel, ReactionModel, RouteModel
-from designdb.sets.compound import CompoundSet, IngredientSet
+from designdb.models import (
+    CompoundModel,
+    InspirationModel,
+    PoseModel,
+    ReactionModel,
+    RouteModel,
+)
+from designdb.sets.compound import CompoundSet
+from designdb.sets.ingredient import IngredientSet
+from designdb.sets.pose import PoseSet
 from designdb.sets.reaction import ReactionSet
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from designdb.recipe import Recipe
+    from designdb.sets.route import RouteSet
+    from pandas import DataFrame
 
 
 class RecipeService:
@@ -56,7 +68,7 @@ class RecipeService:
         :param get_ingredient_quotes: get quotes for product ingredients
         """
 
-        from designdb.components.recipe import Recipe
+        from designdb.recipe import Recipe
 
         assert isinstance(reaction, ReactionModel)
         reaction_c = Reaction(reaction)
@@ -188,7 +200,9 @@ class RecipeService:
             if not priced:
                 mrich.error("0 recipes with prices, can't choose cheapest")
                 return recipes
-            sorted_recipes = sorted(priced, key=lambda r: r.get_price(supplier=supplier))
+            sorted_recipes = sorted(
+                priced, key=lambda r: r.get_price(supplier=supplier)
+            )
             if debug:
                 for recipe in recipes:
                     mrich.debug(f'{recipe}, {recipe.price}')
@@ -293,7 +307,7 @@ class RecipeService:
             reactions on the fly
         """
 
-        from designdb.components.recipe import Route
+        from designdb.recipe import Route
 
         assert isinstance(compounds, CompoundSet)
 
@@ -321,9 +335,9 @@ class RecipeService:
 
             if use_routes:
                 route_ids = list(
-                    RouteModel.objects.filter(
-                        product_compound__id=comp.id
-                    ).values_list('id', flat=True)
+                    RouteModel.objects.filter(product_compound__id=comp.id).values_list(
+                        'id', flat=True
+                    )
                 )
                 if not route_ids:
                     mrich.error('No routes to', comp)
@@ -435,7 +449,9 @@ class RecipeService:
             mrich.print('Picking cheapest from', len(priced), 'options')
             if not priced:
                 mrich.error("0 recipes with prices, can't choose cheapest")
-                return solutions
+                # fall back to the first (unpriced) solution so the return type
+                # stays a single Recipe, consistent with pick_first / the priced path
+                return solutions[0]
             return sorted(priced, key=lambda r: r.price)[0]
 
         return solutions
@@ -480,9 +496,9 @@ class RecipeService:
             possible_reactions |= set(reaction_ids)
 
             product_ids = list(
-                ReactionModel.objects.filter(
-                    pk__in=reaction_ids
-                ).values_list('product_compound_id', flat=True)
+                ReactionModel.objects.filter(pk__in=reaction_ids).values_list(
+                    'product_compound_id', flat=True
+                )
             )
 
             n_prev = len(all_reactants)
@@ -602,64 +618,164 @@ class RecipeService:
 
     @staticmethod
     def write_reactant_csv(recipe: 'Recipe', file, reaction_type_counts=True, **kwargs):
-        """Detailed reactant-purchasing CSV.
-
-        Not yet ported: depends on the legacy quote-dataframe assembly
-        (``db.get_quote_df``) and raw component/route SQL. Port together with the
-        quoting subsystem.
-        """
-        raise NotImplementedError(
-            'write_reactant_csv requires the unported quote-dataframe / downstream '
-            'route lookups; port alongside the quoting subsystem'
-        )
+        """Detailed reactant-purchasing CSV. Not implemented."""
+        raise NotImplementedError('write_reactant_csv is not implemented')
 
     @staticmethod
-    def write_product_csv(recipe: 'Recipe', file, return_df: bool = False):
-        """Detailed product-selection CSV.
+    def write_product_csv(
+        recipe: 'Recipe', file, return_df: bool = False
+    ) -> 'DataFrame | None':
+        """Detailed CSV output including product information for selection/synthesis.
 
-        Not yet ported: depends on unported Pose machinery
-        (``get_compound_id_pose_ids_dict``, ``get_compound_id_inspiration_ids_dict``,
-        ``PoseSet`` construction from IDs). Port alongside the Pose subsystem.
+        One row per product compound: identifiers, required amount, associated poses,
+        tags, upstream route/reaction/reactant dependencies, scaffold series, and
+        inspiration pose names.
+
+        :param recipe: the :class:`.Recipe` whose products to report
+        :param file: output CSV path
+        :param return_df: also return the assembled ``DataFrame``
         """
-        raise NotImplementedError(
-            'write_product_csv requires unported Pose/inspiration lookups; port '
-            'alongside the Pose subsystem'
-        )
+
+        from pandas import DataFrame
+
+        routes = RecipeService.get_routes(recipe)
+
+        product_ids = list(recipe.products.compound_ids)
+
+        # compound_id -> set of associated pose IDs
+        pose_map: dict[int, set] = {}
+        for comp_id, pose_id in PoseModel.objects.filter(
+            compound_id__in=product_ids
+        ).values_list('compound_id', 'id'):
+            pose_map.setdefault(comp_id, set()).add(pose_id)
+
+        # compound_id -> set of inspiration (original) pose IDs, scoped to the
+        # product compounds and their scaffolds (the inspiration fallback needs both)
+        scaffold_ids = set()
+        for prod in recipe.products:
+            # Ingredient.__getattr__ delegates to the CompoundModel (ORM), so wrap
+            # in the Compound component to reach component-level properties
+            if scaffolds := Compound(prod.compound).scaffolds:
+                scaffold_ids.update(scaffolds.ids)
+        needed_ids = set(product_ids) | scaffold_ids
+
+        inspiration_map: dict[int, set] = {}
+        for comp_id, original_pose_id in InspirationModel.objects.filter(
+            derivative_pose__compound_id__in=needed_ids
+        ).values_list('derivative_pose__compound_id', 'original_pose_id'):
+            inspiration_map.setdefault(comp_id, set()).add(original_pose_id)
+
+        data = []
+
+        for prod in mrich.track(
+            recipe.products, prefix='Constructing product DataFrame'
+        ):
+            # wrap in the Compound component for component-level properties
+            # (Ingredient.__getattr__ delegates to the CompoundModel ORM instead)
+            comp = Compound(prod.compound)
+
+            d = dict(
+                hippo_id=prod.compound_id,
+                smiles=comp.smiles,
+                inchikey=comp.inchikey,
+                required_amount_mg=prod.amount,
+            )
+
+            upstream_routes = []
+            upstream_reaction_ids = []
+
+            for route in routes:
+                if route.product_compound.id == prod.compound_id:
+                    upstream_routes.append(route)
+                    upstream_reaction_ids += route.reactions.ids
+
+            if not upstream_routes:
+                mrich.error('No upstream routes for', prod)
+                continue
+
+            if not upstream_reaction_ids:
+                mrich.error('No upstream reactions for', prod)
+                continue
+
+            upstream_reactions = ReactionSet(list(set(upstream_reaction_ids)))
+
+            # scaffold series: the product's scaffolds, or itself if it is one
+            if scaffolds := comp.scaffolds:
+                scaffold_series, is_scaffold = scaffolds.ids, False
+            else:
+                scaffold_series, is_scaffold = [prod.compound_id], True
+
+            poses = pose_map.get(prod.compound_id, set())
+
+            d['num_poses'] = len(poses)
+            d['poses'] = poses
+            d['tags'] = comp.tags
+            d['num_routes'] = len(upstream_routes)
+            d['num_reaction_steps'] = {len(r.reactions) for r in upstream_routes}
+            d['reaction_dependencies'] = upstream_reactions.ids
+            d['reactant_dependencies'] = set(
+                sum((route.reactants.ids for route in upstream_routes), [])
+            )
+            d['route_ids'] = [route.id for route in upstream_routes]
+            d['chemistry_types'] = ', '.join(t for t in upstream_reactions.types if t)
+            d['is_scaffold'] = is_scaffold
+            d['scaffold_series'] = scaffold_series
+
+            # inspiration pose IDs, with fallback to the scaffold / metadata
+            inspirations = inspiration_map.get(prod.compound_id, None)
+
+            if not inspirations and not is_scaffold:
+                scaffold = Compound(comp.scaffolds[0])
+                inspirations = inspiration_map.get(scaffold.id, None)
+
+                scaffold_meta = scaffold.metadata or {}
+                if not inspirations and 'inspiration_pose_ids' in scaffold_meta:
+                    inspirations = scaffold_meta['inspiration_pose_ids']
+
+            product_meta = comp.metadata or {}
+            if (
+                not inspirations
+                and is_scaffold
+                and 'inspiration_pose_ids' in product_meta
+            ):
+                inspirations = product_meta['inspiration_pose_ids']
+
+            if inspirations:
+                inspiration_poses = PoseSet(
+                    PoseModel.objects.filter(pk__in=list(inspirations))
+                )
+                d['inspirations'] = ', '.join(inspiration_poses.names)
+            else:
+                d['inspirations'] = ''
+
+            data.append(d)
+
+        df = DataFrame(data)
+        mrich.writing(file)
+        df.to_csv(file, index=False)
+
+        if return_df:
+            return df
+        return None
 
     @staticmethod
     def to_syndirella(recipe: 'Recipe', out_key, poses, *, separate: bool = False):
-        """Generate Syndirella elaboration inputs from this recipe.
-
-        Not yet ported: depends on unported Pose machinery (reference/template
-        handling, ``get_pose_id_alias_dict``, inspiration SDF export).
-        """
-        raise NotImplementedError(
-            'RecipeService.to_syndirella requires unported Pose machinery '
-            '(templates, alias/inspiration lookups); port alongside the Pose subsystem'
-        )
+        """Generate Syndirella elaboration inputs from this recipe. Not implemented."""
+        raise NotImplementedError('RecipeService.to_syndirella is not implemented')
 
     @staticmethod
     def register_missing_routes(
         recipe: 'Recipe', missing_only: bool = True, supplier: str = 'Enamine'
     ) -> None:
         """Calculate and register missing routes to the products of ``recipe``.
-
-        Not yet ported: depends on the unported
-        ``CompoundSet.register_missing_routes`` / route-registration helpers.
-        """
-        raise NotImplementedError(
-            'register_missing_routes depends on the unported route-registration '
-            'helpers (CompoundSet.register_missing_routes / db.register_route)'
-        )
+        Not implemented."""
+        raise NotImplementedError('register_missing_routes is not implemented')
 
     ### HELPERS
 
     @staticmethod
     def _possible_reaction_ids(compound_ids: set[int]) -> list[int]:
-        """Return reaction IDs whose every reactant is in ``compound_ids``.
-
-        ORM replacement for the legacy ``db.get_possible_reaction_ids``.
-        """
+        """Return reaction IDs whose every reactant is in ``compound_ids``."""
         from designdb.models import ReactantModel
 
         compound_ids = set(compound_ids)

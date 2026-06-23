@@ -43,7 +43,9 @@ class SubsiteService:
             metadata = pose.pose_metadata or {}
             name = metadata.get(field)
             if not name:
-                logger.warning('Field "%s" not in metadata for pose pk=%s', field, pose.pk)
+                logger.warning(
+                    'Field "%s" not in metadata for pose pk=%s', field, pose.pk
+                )
                 continue
             subsite, _ = SubsiteModel.objects.get_or_create(
                 target=pose.target,

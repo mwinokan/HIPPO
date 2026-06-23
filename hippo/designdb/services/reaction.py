@@ -1,6 +1,7 @@
 import logging
 
 import mrich
+
 # from mypackage.services.compound import CompoundService
 # from rdkit.Chem import inchi
 from designdb.models import CompoundModel, ReactantModel, ReactionModel
@@ -101,7 +102,7 @@ class ReactionService:
             reaction_ids.append(reaction.pk)
 
         payload = []
-        for reaction_id, ((reaction_type, product_id), reactant_ids) in zip(
+        for reaction_id, ((_reaction_type, _product_id), reactant_ids) in zip(
             reaction_ids, non_duplicates.items(), strict=False
         ):
             for reactant_id in reactant_ids:
