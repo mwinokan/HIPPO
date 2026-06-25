@@ -469,13 +469,10 @@ class IngestionService:
             name_col=name_col,
         )
 
-        # temp hack: disable a trigger that runs on every score
+        # temp(?) hack: disable a trigger that runs on every score
         # insertion and later enable it
         cursor = connection.cursor()
-        cursor.execute(
-            'ALTER TABLE designdb.score_values '
-            'DISABLE TRIGGER trg_score_values_refresh_pivoted_mv;'
-        )
+        cursor.execute('SELECT designdb.begin_score_values_load();')
 
         for r in records:
             result.attempts += 1
@@ -563,14 +560,7 @@ class IngestionService:
                 scorer.add_scores_from_record(pose=pose, record=r)
 
         # re-enable trigger and populate matview
-        cursor.execute(
-            'ALTER TABLE designdb.score_values '
-            'ENABLE TRIGGER trg_score_values_refresh_pivoted_mv;'
-        )
-        cursor.execute(
-            'REFRESH MATERIALIZED VIEW CONCURRENTLY '
-            'designdb.scores_per_pose_pivoted_mv;'
-        )
+        cursor.execute('SELECT designdb.begin_score_values_load();')
 
         return result
 

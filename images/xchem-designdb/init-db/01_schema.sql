@@ -1003,6 +1003,7 @@ BEGIN
 END;
 $$;
 
+
 -- =========================================================
 -- AUDIT FUNCTIONS
 -- =========================================================
@@ -1296,3 +1297,28 @@ CREATE TRIGGER trg_has_enumeration_methods_updated_on BEFORE UPDATE ON designdb.
 
 -- Pivoted materialized view once at schema load, this will be mapped in Scarab to do the filtering based on any type of scores/methods
 SELECT designdb.create_scores_per_pose_pivoted_mv();
+
+
+-- functions to disable and enable triggers in pose table (Lucas' later addition)
+CREATE OR REPLACE FUNCTION designdb.begin_score_values_load()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = designdb, pg_temp
+AS $$
+BEGIN
+  EXECUTE 'ALTER TABLE designdb.score_values DISABLE TRIGGER trg_score_values_refresh_pivoted_mv';
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION designdb.end_score_values_load()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = designdb, pg_temp
+AS $$
+BEGIN
+  EXECUTE 'ALTER TABLE designdb.score_values ENABLE TRIGGER trg_score_values_refresh_pivoted_mv';
+  EXECUTE 'REFRESH MATERIALIZED VIEW designdb.scores_per_pose_pivoted_mv';
+END;
+$$;
