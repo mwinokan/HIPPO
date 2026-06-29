@@ -25,6 +25,7 @@ from designdb.services.pose import PoseService, PoseTagService
 from designdb.services.pose_score import ScoreService
 from designdb.services.reaction import ReactionService
 from designdb.services.route import RouteService
+from designdb.sets.compound import CompoundSet
 from designdb.sets.ingredient import IngredientSet
 from designdb.sets.reaction import ReactionSet
 from designdb.utils import (
@@ -653,10 +654,10 @@ class IngestionService:
                                 compound=reactant_comp,
                                 reaction=reaction,
                             )
-                            rs.append(reactant.pk)
+                            rs.append(reactant_comp.pk)
 
                         if do_check_chemistry and not check_chemistry(
-                            reaction_type, rs, product
+                            reaction_type, CompoundSet(rs), product
                         ):
                             raise InvalidChemistryError(
                                 f'{type=}, {rs=}, {product.id=}',
@@ -755,10 +756,10 @@ class IngestionService:
                             compound=reactant_comp,
                             reaction=reaction,
                         )
-                        rs.append(reactant.pk)
+                        rs.append(reactant_comp.pk)
 
                     if do_check_chemistry and not check_chemistry(
-                        reaction_type, rs, product
+                        reaction_type, CompoundSet(rs), product
                     ):
                         raise InvalidChemistryError(
                             f'{reaction_type=}, {rs=}, {product.id=}',
