@@ -34,7 +34,15 @@ from designdb.utils import ScoreSubquery, normalize_string_list
 from designdb.utils_frag import generate_header
 from django.conf import settings
 from django.db import IntegrityError, transaction
-from django.db.models import Exists, FloatField, OuterRef, Q, QuerySet, Subquery
+from django.db.models import (
+    Count,
+    Exists,
+    FloatField,
+    OuterRef,
+    Q,
+    QuerySet,
+    Subquery,
+)
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Cast
 from IPython.display import display
@@ -391,13 +399,6 @@ class PoseSet:
             regardless of value (Default value = None)
 
         """
-        results = self.db.select_where(  # noqa: F841  # TODO(legacy-self.db): port to ORM
-            query='pose_id, pose_metadata',
-            key=f'pose_id IN {self.str_ids}',
-            table='pose',
-            multiple=True,
-        )
-
         if value is None:
             # metadata stored as string
             return PoseSet(
@@ -1501,10 +1502,10 @@ class PoseSet:
             commands.append('set surface_color, white')
             commands.append('set transparency,  0.4')
 
-            for j, (insp_ids, poses) in enumerate(  # noqa: B020  # TODO(legacy-self.db): port to ORM
+            for j, (inspirations, poses) in enumerate(  # noqa: B020
                 poses.split_by_inspirations().items()
             ):
-                inspirations = PoseSet(self.db, insp_ids)
+                # split_by_inspirations() keys are already inspiration PoseSets
                 insp_names = '-'.join(inspirations.names)
 
                 # create the subdirectory
@@ -1879,33 +1880,32 @@ class PoseSet:
         drawing = draw_grid(mols, labels=labels)
         display(drawing)
 
-    # TODO: disabled, the field subsite_tag_ref doesn't exist anymore,
-    # don't know what the query is doing
-    # def subsite_summary(self) -> 'pd.DataFrame':
-    #     """Print a table counting poses by subsite"""
+    def subsite_summary(self) -> 'pd.DataFrame':
+        """Print a table counting poses by subsite"""
 
-    #     sql = f"""
-    #     SELECT subsite_id, subsite_name, COUNT(DISTINCT subsite_tag_pose)
-    #     FROM {self.db.SQL_SCHEMA_PREFIX}subsite
-    #     INNER JOIN {self.db.SQL_SCHEMA_PREFIX}subsite_tag
-    #     ON subsite_id = subsite_tag_ref
-    #     WHERE subsite_tag_pose IN {self.str_ids}
-    #     GROUP BY subsite_name
-    #     """
+        rows = (
+            SubsiteTagModel.objects.filter(pose__in=self._queryset)
+            .values('subsite_id', 'subsite__subsite_name')
+            .annotate(num_poses=Count('pose', distinct=True))
+        )
 
-    #     cursor = self.db.execute(sql)
+        df = DataFrame(
+            [
+                dict(
+                    id=r['subsite_id'],
+                    subsite=r['subsite__subsite_name'],
+                    num_poses=r['num_poses'],
+                )
+                for r in rows
+            ]
+        )
 
-    #     df = DataFrame(
-    #         [dict(id=i, subsite=name, num_poses=count) for i, name, count in cursor]
-    #     )
+        if len(df):
+            df = df.set_index('id').sort_values(by='num_poses', ascending=False)
 
-    #     df = df.set_index('id')
+        mrich.print(df)
 
-    #     df = df.sort_values(by='num_poses', ascending=False)
-
-    #     mrich.print(df)
-
-    #     return df
+        return df
 
     def get_interaction_overlaps(self, return_pairs: bool = False) -> int:
         """Count the number of member pose pairs which share at least one but not all
@@ -1955,17 +1955,6 @@ class PoseSet:
         """Cluster poses based on shared interactions."""
 
         # get interaction records
-
-        sql = f"""
-        SELECT DISTINCT interaction_pose, feature_residue_name,
-        feature_residue_number, interaction_type
-        FROM {self.db.SQL_SCHEMA_PREFIX}interaction
-        INNER JOIN {self.db.SQL_SCHEMA_PREFIX}feature
-        ON interaction_feature = feature_id
-        WHERE interaction_pose IN {self.str_ids}
-        """
-
-        records = self.db.execute(sql).fetchall()
         records = InteractionModel.objects.filter(
             pose__in=self._queryset,
         ).values(
@@ -1978,8 +1967,8 @@ class PoseSet:
         ISETS = {}
         for r in records:
             pose_id = r['pose']
-            feature_residue_name = r['feature_residue_name']
-            feature_residue_number = r['feature_residue_number']
+            feature_residue_name = r['feature__feature_residue_name']
+            feature_residue_number = r['feature__feature_residue_number']
             interaction_type = r['interaction_type']
             values = ISETS.get(pose_id, set())
             values.add((interaction_type, feature_residue_name, feature_residue_number))
@@ -2107,20 +2096,14 @@ class PoseSet:
         # that's one field suspect not in use
         return self._queryset.filter(pose_fingerprint=1).count()
 
-    # seems unused and causes circular dependency
-    # @property
-    # def compounds(self) -> 'CompoundSet':
-    #     """Get the compounds associated to this set of poses"""
-    #     from .cset import CompoundSet
+    @property
+    def compounds(self) -> 'CompoundSet':
+        """Get the compounds associated to this set of poses"""
+        # local import to avoid the PoseSet <-> CompoundSet cycle
+        from designdb.sets.compound import CompoundSet
 
-    #     ids = self.db.select_where(
-    #         table='pose',
-    #         query='DISTINCT pose_compound',
-    #         key=f'pose_id in {self.str_ids}',
-    #         multiple=True,
-    #     )
-    #     ids = [v for (v,) in ids]
-    #     return CompoundSet(self.db, ids)
+        ids = list(self._queryset.values_list('compound_id', flat=True).distinct())
+        return CompoundSet(ids)
 
     @property
     def mols(self) -> list[Chem.rdchem.Mol]:
