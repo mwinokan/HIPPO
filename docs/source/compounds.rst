@@ -31,4 +31,3 @@ IngredientSet: Set of Ingredients
 
 .. autoclass:: hippo.cset.IngredientSet
     :members:
-

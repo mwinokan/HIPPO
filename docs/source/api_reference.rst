@@ -17,6 +17,5 @@ API Reference
    sampling
    metadata
    plotting
-   fragalysis
    db
    web

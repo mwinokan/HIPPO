@@ -1,0 +1,42 @@
+# Postgres + RDKit cartridge (designdb). Config via .env.
+# Rebuild with: docker compose build --pull  to refresh base image and reduce CVEs.
+
+services:
+  database:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        RDKIT_VERSION: ${RDKIT_VERSION:-Release_2025_09_5}
+        BOOST_VERSION: ${BOOST_VERSION:-1.90.0}
+        BOOST_VER_US: ${BOOST_VER_US:-1_90_0}
+        PG_MAJOR: ${PG_MAJOR:-18}
+        PG_BASE: ${PG_BASE:-postgres:18.3-bookworm}
+    image: xchem_designdb:latest
+    container_name: xchem_designdb
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ${POSTGRES_DATA_PATH}:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${DB_NAME:-designdb}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_INITDB_ARGS: ${POSTGRES_INITDB_ARGS:---auth-host=scram-sha-256 --auth-local=trust}
+      PGDATA: ${PGDATA:-/var/lib/postgresql/data}
+      POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-scram-sha-256}
+    shm_size: 8g
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\" -h localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    name: xchem_designdb_network
+    driver: bridge

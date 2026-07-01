@@ -97,7 +97,7 @@ Syndirella has been developed to produce a HIPPO-friendly output in the syntax `
             mrich.error(file)
             mrich.error(e)
             continue
-        
+
     animal.db.close()
 
 The above script can be submitted to the DLS / IRIS cluster as follows:

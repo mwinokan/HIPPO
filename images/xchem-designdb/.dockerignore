@@ -1,0 +1,29 @@
+# =========================================================
+# .dockerignore
+# =========================================================
+
+# Environment and secrets
+.env
+.env.*
+*.env
+
+# Logs
+*.log
+*.log.*
+
+# Git
+.git/
+.gitignore
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+._*
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup

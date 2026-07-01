@@ -1,0 +1,80 @@
+---
+# Dev environment for local HIPPO development.
+# Needs two containers, backend with HIPPO and dependencies installed, and database
+
+# database container is built from images/xchem-designdb/Dockerfile:
+# sudo docker build --no-cache  -t xchem_designdb:latest .
+
+# Backend from ./Dockerfile
+# sudo docker build --no-cache . -t hippo_backend:latest
+
+# Then bring the containers up with:
+# sudo docker-compose up
+
+# To clear the system run
+# sudo docker compose down
+
+# To also clear the datbase volume
+# sudo docker compose down -v
+
+
+services:
+
+  database:
+    image: xchem_designdb:latest
+    container_name: xchem_designdb
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${DB_NAME:-designdb}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_INITDB_ARGS: ${POSTGRES_INITDB_ARGS:---auth-host=scram-sha-256 --auth-local=trust}
+      PGDATA: ${PGDATA:-/var/lib/postgresql/data}
+      POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-scram-sha-256}
+    shm_size: 8g
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\" -h localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    networks:
+      - app_network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+
+  backend:
+    image: hippo_backend:latest
+    container_name: hippo_backend
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./hippo:/home/code/HIPPO/hippo
+      - ./data:/home/code/HIPPO/data
+    networks:
+      - app_network
+    # depends_on:
+    #   database:
+    #     condition: service_healthy
+
+
+networks:
+  app_network:
+    name: xchem_designdb_network
+    driver: bridge
+
+
+volumes:
+  postgres_data:

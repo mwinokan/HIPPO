@@ -63,12 +63,12 @@ You can select a subset of compounds using slices, tuples, or lists:
 Additionally you can get compounds by their tag:
 
 ::
-	
+
 	hits = animal.compounds(tag='hits')
 
 .. See also the :doc:`tools for structure-based searching<queries>`
 
-Equivalent methods exist for animal.poses (returns a :class:`PoseTable`), animal.reactions (returns a :class:`.ReactionTable`), animal.interactions (returns a :class:`.InteractionTable`), and animal.tags returns a :class:`TagTable`). See also the :doc:`api_reference` pages. 
+Equivalent methods exist for animal.poses (returns a :class:`PoseTable`), animal.reactions (returns a :class:`.ReactionTable`), animal.interactions (returns a :class:`.InteractionTable`), and animal.tags returns a :class:`TagTable`). See also the :doc:`api_reference` pages.
 
 Inspecting a compound and its poses
 -----------------------------------
@@ -85,7 +85,7 @@ Once you have a compound you can access database properties using its properties
 	c.mol # rdkit.Chem.Mol
 	c.tags # assigned tags
 	c.metadata # metadata dictionary
-	
+
 	c.draw() # draw the molecule (and its scaffold)
 
 You can access a compounds poses, which have similar functionality
@@ -102,7 +102,7 @@ You can access a compounds poses, which have similar functionality
 	p.mol # rdkit.Chem.Mol
 	p.tags # assigned tags
 	p.metadata # metadata dictionary
-	
+
 	c.draw() # draw the molecule pose (3d)
 
 See also the API reference for :doc:`compounds <compounds>` and :doc:`poses <compounds>`.
@@ -173,4 +173,3 @@ This will create an HTML file you can open in your browser:
 This method of writing to an HTML file works for all the above figures.
 
 See also :func:`.plotting.plot_pose_interactions`.
-

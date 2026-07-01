@@ -15,4 +15,3 @@ Recipes & Routes
 
 .. autoclass:: hippo.rgen.RandomSelectionGenerator
     :members:
-

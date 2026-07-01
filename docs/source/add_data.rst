@@ -140,4 +140,3 @@ To add a reaction:
 The above will register an amidation reaction combining compounds **a** and **b** into **c**.
 
 See also the API reference :meth:`.HIPPO.register_reaction`.
-

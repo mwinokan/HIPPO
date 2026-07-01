@@ -18,7 +18,7 @@ Compound
 
 A :class:`.Compound` represents a ligand/small molecule with stereochemistry removed and no atomic coordinates. I.e. it represents the flattened chemical structure. It's default name is always an InChiKey. :class:`.Compound` objects can have an :attr:`.Compound.alias` which is a custom name which will supercede the InChiKey when representing the compound. :class:`.Compound` objects also have a shorthand prefixed with ``C``, for example: ``C1`` which refers to the compound with database id 7273.
 
-:: 
+::
 
 	c1 = animal.register_compound(smiles="OCc1ccc2c(c1)CCO2")
 	print(c1)
@@ -36,7 +36,7 @@ Scaffolds / Elaborations
 
 Scaffold / superstructure relationships can also be encoded for :class:`.Compound` objects. Namely, the :attr:`.Compound.scaffolds` property can be used to access other :class:`.Compound` objects that have been labelled as scaffolds/substructures, and :attr:`.Compound.elabs` is used to access the inverse relationship.
 
-:: 
+::
 
 	c2 = animal.register_compound(smiles="OCc1ccc2c(c1F)CCO2")
 	c2.add_scaffold(scaffold=c1)
@@ -57,7 +57,7 @@ Pose
 
 A :class:`.Pose` is a particular conformer of a :class:`.Compound` within a protein environment. A pose will have its own (stereochemical) smiles string, and must have a path to a coordinate file. This file can either be a ``.mol`` molecule file or a ``.pdb`` file of the protein-ligand complex.
 
-:: 
+::
 
 	p1 = c1.poses[0]
 	print(p1)
@@ -134,7 +134,7 @@ The :class:`.Interaction` class can be used to store protein-ligand interactions
 
 .. seealso::
 	:doc:`interactions` API reference page
-	
+
 Units
 =====
 

@@ -8,7 +8,7 @@ Since chemicalite is not available on the Windows platform, a workaround is need
 Setting up Docker
 =================
 
-Docker is the industry standard way to create and share application *containers*, which are standalone Linux emulations with customisable software environments. 
+Docker is the industry standard way to create and share application *containers*, which are standalone Linux emulations with customisable software environments.
 
 1. Create a Docker_ account
 2. Install `Docker Desktop`_

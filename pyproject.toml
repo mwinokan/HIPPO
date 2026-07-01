@@ -1,15 +1,17 @@
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+# [build-system]
+# requires = ["hatchling"]
+# build-backend = "hatchling.build"
 [project]
-name = "hippo-db"
-version = "0.3.38"
+name = "xchem-hippo"
+version = "1.0.0"
 authors = [
     { name = "Max Winokan", email = "max@winokan.com" },
+    { name = "Kalev Takkis", email = "ktakkis@informaticsmatters.com" },
 ]
 description = "Hit Interaction Profiling and Procurement Optimisation"
 readme = "README.md"
-requires-python = ">=3.10"
+# python version limit dictated by pandas
+requires-python = ">=3.10,<3.14"
 requires = []
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -17,27 +19,114 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "rdkit >= 2024.9.6",
-    "molparse >= 0.0.41",
-    "mpytools >= 0.0.21",
-    "jupyterlab",
-    "chardet",
-    "pandas",
-    "yattag",
-    "hirsch",
-    "hippo_plot",
-    "scikit-learn",
-    "openpyxl",
-    "ipywidgets",
-    "networkx",
-    "openmm",
-    "apsw",
-    "python-louvain",
+    "rdkit==2025.9.5",
+    "molparse>=0.0.41",
+    "mpytools>=0.0.21",
+    "jupyterlab>=4.5",
+    "chardet>=7",
+    "pandas>=2.3",
+    "yattag>=1.16",       # html widget rendering, possibly to be removed
+    "hirsch>=0.1",        # used?
+    "hippo_plot>=0.0.1",
+    "scikit-learn>=1.7",
+    "openpyxl>=3.1",
+    "ipywidgets>=8.1",
+    "networkx>=3.4",
+    "openmm>=8.4",
+    "apsw>=3.51",
+    "python-louvain>=0.16",
+    "psycopg[binary]>=3.3",
+    "django>=5.2.12",
+    "syndirella>=5.0.7a0",
+    "typer>=0.24.1",      # used?
+    "neo4j>=6.1.0",
+    "gemmi>=0.7.5",
+    "mrich>=1.0",
+    "requests>=2.32",
+    "pdbfixer>=1.12.0",
+    # Max's hippo depends on this. cannot install with uv, comes from conda
+    # "chemicalite==2024.5.1",
+    # options:
+    # - this is probably present in diamond environments,
+    # - can use conda install in container
+    # - but.. probs don't even need it, it's only used for expressions and I got that covered
+    "django-rdkit",
+    "numpy>=1.26.4",
+    # "numpy>=2", # need it but not working
 ]
-[project.urls]
-"Homepage" = "https://hippo.winokan.com"
-"Bug Tracker" = "https://github.com/mwinokan/HIPPO/issues"
-[tool.hatch.build]
-include = [
-    "hippo/*.py",
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2,<10",
+    "ruff>=0.15.2",
+    "ty>=0.0.19",
+    "mypy>=1.19",
+    "commitizen>=4.13.5,<5",
+    "pre-commit>=4.5.1",
+]
+
+[tool.commitizen]
+name = "cz_customize"
+version_provider = "scm"
+version_scheme = "semver2"
+annotated_tag = true
+update_changelog_on_bump = true
+changelog_merge_prerelease = true
+prerelease_offset = 1
+pre_bump_hooks = ["./add-issue-links-to-changelog.sh"]
+
+[tool.commitizen.customize]
+bump_pattern = '^(feat|fix|ci|build|perf|refactor|chore|remove|style|test)'
+bump_map = {feat = "MINOR", fix = "PATCH", ci = "PATCH", build = "PATCH", perf = "PATCH", refactor = "PATCH", chore = "PATCH", remove = "PATCH", style = "PATCH", test = "PATCH" }
+schema_pattern = "(build|bump|chore|ci|dev|docs|feat|fix|perf|refactor|remove|style|test):(\\s.*)"
+commit_parser = "^(?P<change_type>build|bump|chore|ci|dev|docs|feat|fix|perf|refactor|remove|style|test):\\s(?P<message>.*)?"
+# By excluding 'bump', 'ci', 'dev', and 'docs' from
+# 'change_type_map', 'change_type_order' and 'changelog_pattern'
+# we omit the corresponding commit comments from the CHANGELOG.
+# The order of types in the CHANGELOG is dictated by the type_order
+change_type_map = {"feat" = "New Features", "fix" = "Bug Fixes", "perf" = "Performance Improvements", "refactor" = "Refactoring", "chore" = "General Improvements", "remove" = "Removed", "style" = "Stylistic Changes", "test" = "Testing", "build" = "Build"}
+change_type_order = ["BREAKING CHANGE", "New Features", "Bug Fixes", "Performance Improvements", "Refactoring", "General Improvements", "Removed", "Stylistic Changes", "Testing", "Build"]
+changelog_pattern = "^(build|chore|feat|fix|perf|refactor|remove|style|test)"
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+exclude = [
+  "tests",
+  "migrations",
+  # "hippo",
+  "hippo_legacy",
+]
+force-exclude = true
+
+[tool.ruff.lint]
+select = [
+  "E",   # pycodestyle
+  "F",   # pyflakes
+  "I",   # import sort
+  "UP",  # pyupgrade
+  "B",   # bugbear
+]
+
+[tool.ruff.lint.pycodestyle]
+ignore-overlong-task-comments = true
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.ty.src]
+exclude = [
+    "migrations",
+    "tests",
+    # "hippo",
+    "hippo_legacy",
+]
+
+[tool.uv.sources]
+django-rdkit = { git = "https://github.com/rdkit/django-rdkit" }
+
+[tool.uv]
+required-environments = [
+    "sys_platform == 'linux' and platform_machine == 'aarch64'",
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]

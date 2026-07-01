@@ -1,11 +1,21 @@
 ## CONFIGURE TESTING DATA
-TARGET = "SARS2_Nprot"
-PROPOSAL = "lb32627-93"
-STACK = "production"
-DB = "db_test.sqlite"
-TARGET = "SARS2_Nprot"
+TARGET = 'SARS2_Nprot'
+PROPOSAL = 'lb32627-93'
+STACK = 'production'
 
-## DISABLE TESTS
+## CONFIGURE CLEANUP
+
+CLEANUP_FILES = [
+    f'{TARGET}.tar.gz',
+]
+
+CLEANUP_DIRS = [
+    TARGET,
+]
+
+## CONFIGURE DATABASE
+
+## CONFIGURE TESTS
 
 CLEANUP = True
 DOWNLOAD = True
@@ -14,13 +24,24 @@ ADD_HITS = True
 SCAFFOLDS = True
 SUBSITES = True
 
-## CONFIGURE CLEANUP
+### SQLITE
 
-CLEANUP_FILES = [
-    DB,
-    f"{TARGET}.tar.gz",
-]
+DB = 'db_test.sqlite'
 
-CLEANUP_DIRS = [
-    TARGET,
-]
+CLEANUP_FILES.append(DB)
+
+### POSTGRES
+
+# SCAFFOLDS = False
+
+# local testing
+
+# from os import environ
+
+# DB = dict(
+#     username=environ["HIPPO_POSTGRES_USERNAME"],
+#     password=environ["HIPPO_POSTGRES_PASSWORD"],
+#     host="localhost",
+#     port=5555,
+#     dbname="postgres",
+# )

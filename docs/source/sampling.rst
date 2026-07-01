@@ -23,4 +23,3 @@ Scoring recipes
 
 .. autoclass:: hippo.scoring.CustomAttribute
     :members:
-

@@ -7,4 +7,3 @@ Quoting
 
 .. autoclass:: hippo.price.Price
     :members:
-    
