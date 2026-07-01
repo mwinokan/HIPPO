@@ -1,30 +1,30 @@
 import json
 from collections.abc import Callable
 from pathlib import Path
-from statistics import mean
+from statistics import mean, pvariance
 from typing import TYPE_CHECKING
 
 import mcol
 import mrich
 import pandas as pd
-from designdb.components.compound import Ingredient
+from designdb.components.compound import Compound, Ingredient
+from designdb.components.reaction import Reaction
 from designdb.models import (
     CompoundModel,
     CompoundTagJunctionModel,
     CompoundTagModel,
     PoseModel,
+    PoseTagJunctionModel,
     ReactantModel,
     ReactionModel,
     RouteModel,
     ScaffoldModel,
 )
-from django.db.models import Exists, OuterRef, Q
+from django.db.models import Count, Exists, OuterRef, Q
 from pandas import DataFrame
 from rdkit import Chem
 
 # from rdkit.Chem import inchi
-from rdkit.Chem import Mol
-
 from ..utils import registration_hash_tautomer_insensitive, superparent
 
 if TYPE_CHECKING:
@@ -350,25 +350,17 @@ class CompoundSet:
 
         """
 
-        if not isinstance(scaffold, int):
-            assert scaffold._table == 'compound'
-            scaffold = scaffold.id
+        scaffold_id = scaffold if isinstance(scaffold, int) else scaffold.id
 
-        values = self.db.select_where(
-            query='scaffold_superstructure',
-            table='scaffold',
-            key=(
-                f'scaffold_base = {scaffold}'
-                f' AND scaffold_superstructure IN {self.str_ids}'
-            ),
-            multiple=True,
-            none=none,
+        ids = list(
+            ScaffoldModel.objects.filter(
+                base_compound_id=scaffold_id,
+                superstructure_compound_id__in=self.ids,
+            )
+            .values_list('superstructure_compound_id', flat=True)
+            .distinct()
         )
-        ids = [v for (v,) in values if v]
-
-        if not ids:
-            return None
-        return CompoundSet(self.db, ids)
+        return CompoundSet(ids)
 
     def get_by_smiles(self, smiles: str) -> CompoundModel:
         """Get a compound in this set by SMILES, using tautomer-insensitive matching.
@@ -468,37 +460,31 @@ class CompoundSet:
 
         """
 
-        variances = self.db.execute(
-            f"""
-        WITH nums AS (
-            SELECT scaffold_base AS base, scaffold_superstructure AS elab,
-            {self.db.COMPOUND_PROPERTY_FUNCTIONS['num_heavy_atoms']}(c2.compound_mol)
-            - {self.db.COMPOUND_PROPERTY_FUNCTIONS['num_heavy_atoms']}(c1.compound_mol)
-            AS diff
-            FROM {self.db.SQL_SCHEMA_PREFIX}scaffold
-            INNER JOIN {self.db.SQL_SCHEMA_PREFIX}compound AS c1
-            ON scaffold_base = c1.compound_id
-            INNER JOIN {self.db.SQL_SCHEMA_PREFIX}compound AS c2
-            ON scaffold_superstructure = c2.compound_id
-            WHERE scaffold_superstructure IN {self.str_ids}
-        ),
+        # heavy-atom count per compound, cached across scaffold edges
+        nha_cache: dict[int, int | None] = {}
 
-        means AS (
-            SELECT base, AVG(diff) AS mean FROM nums
-            GROUP BY base
-        )
+        def nha(compound_id: int) -> int | None:
+            if compound_id not in nha_cache:
+                nha_cache[compound_id] = Compound(
+                    CompoundModel.objects.get(pk=compound_id)
+                ).num_heavy_atoms
+            return nha_cache[compound_id]
 
-        SELECT AVG((nums.diff - mean)*(nums.diff - mean)) var FROM nums
-        LEFT JOIN means
-        ON nums.base = means.base
-        GROUP BY nums.base
-        """
-        ).fetchall()
+        # group the #atoms-added of each elaboration by its scaffold base
+        diffs_by_base: dict[int, list[int]] = {}
+        for base_id, elab_id in ScaffoldModel.objects.filter(
+            superstructure_compound_id__in=self.ids
+        ).values_list('base_compound_id', 'superstructure_compound_id'):
+            base_nha, elab_nha = nha(base_id), nha(elab_id)
+            if base_nha is None or elab_nha is None:
+                continue
+            diffs_by_base.setdefault(base_id, []).append(elab_nha - base_nha)
 
-        if not variances:
+        if not diffs_by_base:
             return None
 
-        variances = [v for (v,) in variances]
+        # population variance of #atoms-added within each scaffold (0 for singletons)
+        variances = [pvariance(diffs) for diffs in diffs_by_base.values()]
 
         if debug:
             mrich.debug(f'{variances=}')
@@ -537,10 +523,9 @@ class CompoundSet:
         from IPython.display import display
         from molparse.rdkit import draw_grid
 
-        data = [(str(c), c.mol) for c in self]
-
-        mols = [d[1] for d in data]
-        labels = [d[0] for d in data]
+        compounds = [Compound(c) for c in self._queryset]
+        mols = [c.mol for c in compounds]
+        labels = [str(c) for c in compounds]
 
         display(draw_grid(mols, labels=labels))
 
@@ -560,62 +545,44 @@ class CompoundSet:
 
         mrich.header(self)
 
-        from pandas import DataFrame
+        ids = list(self.ids)
 
-        sql = f"""
-        SELECT tag_name,
-        COUNT(DISTINCT tag_compound)
-        FROM {self.db.SQL_SCHEMA_PREFIX}tag
-        WHERE tag_compound IN {self.str_ids}
-        GROUP BY tag_name
-        ORDER BY tag_name
-        """
+        # compound-tag counts: distinct compounds per compound tag
+        comp_rows = [
+            dict(tag=name, num_compounds=n)
+            for name, n in CompoundTagJunctionModel.objects.filter(compound_id__in=ids)
+            .values_list('compound_tag__compound_tag_name')
+            .annotate(n=Count('compound', distinct=True))
+            .order_by('compound_tag__compound_tag_name')
+        ]
+        df = DataFrame(comp_rows)
+        if len(df):
+            df = df.set_index('tag')
+        else:
+            df = DataFrame(columns=['num_compounds'])
+            df.index.name = 'tag'
 
-        cursor = self.db.execute(sql)
-
-        data = [dict(tag=a, num_compounds=b) for a, b in cursor.fetchall()]
-
-        df = DataFrame(data)
-        df = df.set_index('tag')
-
-        # poses
-
-        sql = f"""
-        SELECT tag_name,
-        COUNT(DISTINCT tag_pose)
-        FROM {self.db.SQL_SCHEMA_PREFIX}tag
-        INNER JOIN {self.db.SQL_SCHEMA_PREFIX}pose
-        ON pose_id = tag_pose
-        WHERE pose_compound IN {self.str_ids}
-        GROUP BY tag_name
-        ORDER BY tag_name
-        """
-
-        cursor = self.db.execute(sql)
-
-        for tag, count in cursor.fetchall():
-            df.loc[tag, 'num_poses'] = count
-
-        # compounds with poses
-
-        sql = f"""
-        SELECT tag_name, COUNT(DISTINCT pose_compound)
-        FROM {self.db.SQL_SCHEMA_PREFIX}tag
-        INNER JOIN {self.db.SQL_SCHEMA_PREFIX}pose
-        ON tag_pose = pose_id
-        WHERE pose_compound IN {self.str_ids}
-        GROUP BY tag_name
-        ORDER BY tag_name
-        """
-
-        cursor = self.db.execute(sql)
-
-        for tag, count in cursor.fetchall():
-            df.loc[tag, 'num_posed_compounds'] = count
+        # pose-tag counts over the poses of these compounds
+        for name, num_poses, num_posed in (
+            PoseTagJunctionModel.objects.filter(pose__compound_id__in=ids)
+            .values_list('pose_tag__pose_tag_name')
+            .annotate(
+                num_poses=Count('pose', distinct=True),
+                num_posed=Count('pose__compound', distinct=True),
+            )
+            .order_by('pose_tag__pose_tag_name')
+        ):
+            df.loc[name, 'num_poses'] = num_poses
+            df.loc[name, 'num_posed_compounds'] = num_posed
 
         df.loc['TOTAL', 'num_compounds'] = len(self)
         df.loc['TOTAL', 'num_poses'] = self.num_poses
-        df.loc['TOTAL', 'num_posed_compounds'] = len(self.poses.compounds)
+        df.loc['TOTAL', 'num_posed_compounds'] = (
+            PoseModel.objects.filter(compound_id__in=ids)
+            .values('compound_id')
+            .distinct()
+            .count()
+        )
 
         df = df.fillna(0)
         df = df.astype(int)
@@ -775,25 +742,19 @@ class CompoundSet:
     def tag_summary(self) -> 'pd.DataFrame':
         """Print a summary table of tags with compound counts"""
 
-        from pandas import DataFrame
-
-        sql = f"""
-        SELECT tag_name,
-        COUNT(DISTINCT tag_compound)
-        FROM {self.db.SQL_SCHEMA_PREFIX}tag
-        WHERE tag_compound IN {self.str_ids}
-        GROUP BY tag_name
-        ORDER BY tag_name;
-        """
-
-        cursor = self.db.execute(sql)
-
-        data = [dict(tag=a, num_compounds=b) for a, b in cursor.fetchall()]
+        data = [
+            dict(tag=name, num_compounds=n)
+            for name, n in CompoundTagJunctionModel.objects.filter(
+                compound_id__in=list(self.ids)
+            )
+            .values_list('compound_tag__compound_tag_name')
+            .annotate(n=Count('compound', distinct=True))
+            .order_by('compound_tag__compound_tag_name')
+        ]
 
         df = DataFrame(data)
-        df = df.set_index('tag')
-
-        df = df.astype(int)
+        if len(df):
+            df = df.set_index('tag').astype(int)
 
         mrich.print(df)
 
@@ -889,27 +850,6 @@ class CompoundSet:
     def copy(self) -> 'CompoundSet':
         """Returns a copy of this set"""
         return CompoundSet(self.ids)
-
-    def shuffled(self) -> 'CompoundSet':
-        """Returns a randomised copy of this set"""
-        copy = self.copy()
-        copy.shuffle()
-        return copy
-
-    def pop(self) -> CompoundModel:
-        """Pop the last compound in this set"""
-        c_id = self.pop_id()
-        return self.db.get_compound(id=c_id)
-
-    def pop_id(self) -> int:
-        """Pop the last compound id in this set"""
-        return self._indices.pop()
-
-    def shuffle(self) -> None:
-        """Randomises the order of compounds in this set"""
-        from random import shuffle
-
-        shuffle(self._indices)
 
     def get_df(
         self,
@@ -1130,7 +1070,7 @@ class CompoundSet:
     def get_dict(self) -> dict:
         """Get a dictionary object with all serialisable data needed to reconstruct
         this set"""
-        return dict(db=str(self.db.path.resolve()), indices=self.indices)
+        return dict(indices=list(self.indices))
 
     def write_smiles_csv(
         self, file: str, tags: bool = True, split_tags: bool = True
@@ -1142,43 +1082,15 @@ class CompoundSet:
         :param split_tags: split tags into separate columns
 
         """
-        from pandas import DataFrame
+        df = self.get_df(smiles=True, alias=False, tags=tags).reset_index()
 
-        if tags:
-            records = self.db.select_where(
-                table='tag',
-                query='tag_compound, tag_name',
-                key=f'tag_compound IN {self.str_ids}',
-                multiple=True,
-                none='quiet',
-            )
-            TAGS = {}
-            if records:
-                for compound_id, tag_name in records:
-                    if compound_id not in TAGS:
-                        TAGS[compound_id] = set()
-                    TAGS[compound_id].add(tag_name)
+        # explode the per-compound tag sets into a boolean column per tag
+        if tags and split_tags and 'tags' in df.columns:
+            all_tags: set[str] = set().union(*df['tags']) if len(df) else set()
+            for tag in sorted(all_tags):
+                df[tag] = df['tags'].apply(lambda s, t=tag: t in s)
+            df = df.drop(columns=['tags'])
 
-        records = self.db.select_where(
-            table=self.table,
-            query='compound_id, compound_smiles',
-            key=f'compound_id IN {self.str_ids}',
-            multiple=True,
-        )
-
-        data = [dict(id=id, smiles=smiles) for id, smiles in records]
-
-        if tags:
-            for d in data:
-                tagset = TAGS.get(d['id'], set())
-
-                if split_tags:
-                    for tag in tagset:
-                        d[tag] = True
-                else:
-                    d['tags'] = tagset
-
-        df = DataFrame(data)
         mrich.writing(file)
         df.to_csv(file, index=False)
 
@@ -1323,7 +1235,7 @@ class CompoundSet:
         rows = []
 
         for r_id in mrich.track(self.reaction_ids, prefix='Solving compound recipes'):
-            reaction = self.db.get_reaction(id=r_id)
+            reaction = ReactionModel.objects.get(pk=r_id)
 
             recipes = Recipe.from_reaction(
                 reaction,
@@ -1345,7 +1257,8 @@ class CompoundSet:
                     'batch-tag': None,
                 }
 
-                for i, reaction in enumerate(sub_recipe.reactions):
+                for i, reaction_model in enumerate(sub_recipe.reactions):
+                    reaction = Reaction(reaction_model)
                     i = i + 1
 
                     row['no-steps'] += 1
@@ -1395,12 +1308,17 @@ class CompoundSet:
 
         assert isinstance(tag, str)
 
-        for i in self.indices:
-            self.db.insert_tag(name=tag, compound=i, commit=False)
+        compound_tag, _ = CompoundTagModel.objects.get_or_create(compound_tag_name=tag)
+
+        CompoundTagJunctionModel.objects.bulk_create(
+            [
+                CompoundTagJunctionModel(compound=compound, compound_tag=compound_tag)
+                for compound in self._queryset
+            ],
+            ignore_conflicts=True,
+        )
 
         mrich.print(f'Tagged {self} w/ "{tag}"')
-
-        self.db.commit()
 
     def plot_tsnee(self, **kwargs) -> 'go.Figure':
         """Plot a tanimoto similarity plot of these compounds"""
@@ -1421,16 +1339,21 @@ class CompoundSet:
         )
 
     def split_by_scaffolds(self) -> 'dict[CompoundSet, CompoundSet]':
-        """Split this set into subsets clustered by scaffold compound"""
+        """Split this set into subsets clustered by scaffold compound
 
-        cluster_dict = self.db.get_compound_cluster_dict(cset=self)
+        Maps a single-compound :class:`.CompoundSet` for each scaffold base to a
+        :class:`.CompoundSet` of its elaborations within this set.
+        """
+        clusters: dict[int, set] = {}
+        for base_id, sup_id in ScaffoldModel.objects.filter(
+            superstructure_compound_id__in=self.ids
+        ).values_list('base_compound_id', 'superstructure_compound_id'):
+            clusters.setdefault(base_id, set()).add(sup_id)
 
-        subsets = {}
-        for cluster, elabs in cluster_dict.items():
-            cluster = CompoundSet(self.db, list(cluster))
-            subsets[cluster] = CompoundSet(self.db, list(elabs))
-
-        return subsets
+        return {
+            CompoundSet([base_id]): CompoundSet(list(elab_ids))
+            for base_id, elab_ids in clusters.items()
+        }
 
     def despaghettify(
         self,
@@ -1565,60 +1488,45 @@ class CompoundSet:
     @property
     def names(self) -> list[str]:
         """Returns the aliases of compounds in this set"""
-        result = self.db.select_where(
-            query='compound_alias',
-            table='compound',
-            key=f'compound_id in {self.str_ids}',
-            multiple=True,
-        )
-        return [q for (q,) in result]
+        return list(self._queryset.values_list('compound_alias', flat=True))
 
     @property
     def smiles(self) -> list[str]:
         """Returns the smiles of child compounds"""
-        result = self.db.select_where(
-            query='compound_smiles',
-            table='compound',
-            key=f'compound_id in {self.str_ids}',
-            multiple=True,
-        )
-        return [q for (q,) in result]
+        return list(self._queryset.values_list('compound_smiles', flat=True))
 
     @property
     def mols(self) -> 'list[Chem.Mol]':
-        """Returns the molecules of child compounds"""
+        """Returns the RDKit molecules of child compounds
 
-        result = self.db.select_where(
-            query='mol_to_binary_mol(compound_mol)',
-            table='compound',
-            key=f'compound_id in {self.str_ids}',
-            multiple=True,
-        )
-        return [Mol(q) for (q,) in result]
+        Uses each compound's stored MolBlock (``compound_mol``) where available,
+        falling back to parsing ``compound_smiles``.
+        """
+        mols = []
+        for molblock, smiles in self._queryset.values_list(
+            'compound_mol', 'compound_smiles'
+        ):
+            if molblock:
+                mols.append(Chem.MolFromMolBlock(molblock))
+            elif smiles:
+                mols.append(Chem.MolFromSmiles(smiles))
+            else:
+                mols.append(None)
+        return mols
 
     @property
     def inchikeys(self) -> list[str]:
         """Returns the inchikeys of compounds in this set"""
-        result = self.db.select_where(
-            query='compound_inchikey',
-            table='compound',
-            key=f'compound_id in {self.str_ids}',
-            multiple=True,
-        )
-        return [q for (q,) in result]
+        return list(self._queryset.values_list('compound_inchikey', flat=True))
 
     @property
     def tags(self) -> set[str]:
         """Returns the set of unique tags present in this compound set"""
-        values = self.db.select_where(
-            table='tag',
-            query='DISTINCT tag_name',
-            key=f'tag_compound in {self.str_ids}',
-            multiple=True,
+        return set(
+            CompoundTagJunctionModel.objects.filter(compound_id__in=self.ids)
+            .values_list('compound_tag__compound_tag_name', flat=True)
+            .distinct()
         )
-        if not values:
-            return set()
-        return set(v for (v,) in values)
 
     @property
     def num_poses(self) -> int:
@@ -1632,19 +1540,24 @@ class CompoundSet:
 
         return PoseSet(PoseModel.objects.filter(compound_id__in=self.ids))
 
-    @property
-    def best_placed_poses(self) -> 'PoseSet':
-        """Get the best placed pose for each compound in this set"""
-        from .pose import PoseSet
+    def best_placed_poses(
+        self,
+        scoring_method: str,
+        version: str | None = None,
+        inverse: bool = False,
+    ) -> 'PoseSet':
+        """Get the best-scoring pose for each compound in this set.
 
-        query = self.db.select_where(
-            table='pose',
-            query='pose_id, MIN(pose_distance_score)',
-            key=f'pose_compound in {self.str_ids} GROUP BY pose_compound',
-            multiple=True,
+        Delegates to :meth:`.PoseSet.get_best_scoring_poses_per_compound`.
+
+        :param scoring_method: ``ScoringMethodModel.method_name`` to rank by
+        :param version: ``ScoringMethodModel.method_version`` — required when
+            multiple versions of the same method exist
+        :param inverse: if ``True``, higher score is better (default: lower is better)
+        """
+        return self.poses.get_best_scoring_poses_per_compound(
+            scoring_method, version=version, inverse=inverse
         )
-        ids = [i for i, s in query]
-        return PoseSet(self.db, ids)
 
     @property
     def str_ids(self) -> str:
@@ -1654,12 +1567,16 @@ class CompoundSet:
     @property
     def num_heavy_atoms(self) -> int:
         """Get the total number of heavy atoms"""
-        return sum([c.num_heavy_atoms for c in self])
+        return sum(
+            n for c in self._queryset if (n := Compound(c).num_heavy_atoms) is not None
+        )
 
     @property
     def num_rings(self):
         """Get the total number of molecular rings"""
-        return sum([c.num_rings for c in self])
+        return sum(
+            n for c in self._queryset if (n := Compound(c).num_rings) is not None
+        )
 
     @property
     def formula(self) -> str:
@@ -1674,74 +1591,35 @@ class CompoundSet:
         quantities/counts as values"""
         from molparse.atomtypes import combine_atomtype_dicts
 
-        atomtype_dicts = [c.atomtype_dict for c in self]
+        atomtype_dicts = [Compound(c).atomtype_dict for c in self._queryset]
         return combine_atomtype_dicts(atomtype_dicts)
 
     @property
-    def num_atoms_added(self) -> list[int]:
-        """Calculate the number of atoms added w.r.t the scaffold
+    def num_atoms_added(self) -> list:
+        """Calculate the number of heavy atoms added w.r.t the scaffold(s)
 
-        :returns: list of number of atoms added values
-
+        Delegates to :attr:`.Compound.num_atoms_added` per member, so each entry
+        is an ``int`` (single scaffold), a list of ints (multiple scaffolds), or
+        ``None`` (no scaffold), aligned with this set's compounds.
         """
-
-        nha = self.db.COMPOUND_PROPERTY_FUNCTIONS['num_heavy_atoms']
-        sql = f"""
-        WITH nums AS (
-            SELECT
-                A.compound_id AS comp_id,
-                {nha}(A.compound_mol)
-                - {nha}(B.compound_mol)
-                AS diff
-            FROM {self.db.SQL_SCHEMA_PREFIX}compound A,
-            {self.db.SQL_SCHEMA_PREFIX}compound B
-            WHERE A.compound_base = B.compound_id
-            AND A.compound_id IN {self.str_ids}
-        )
-
-        SELECT compound_id, diff FROM {self.db.SQL_SCHEMA_PREFIX}compound
-        LEFT JOIN nums
-        ON comp_id = compound_id
-        WHERE compound_id IN {self.str_ids}
-        """
-
-        query = self.db.execute(sql).fetchall()
-
-        lookup = {k: v for k, v in query}
-
-        return [lookup[i] for i in self.indices]
+        return [Compound(c).num_atoms_added for c in self._queryset]
 
     @property
     def avg_num_atoms_added(self) -> float:
-        """Calculate the average number of atoms added w.r.t the scaffold
+        """Calculate the average number of heavy atoms added w.r.t the scaffold
 
-        :returns: average number of atoms added values for compounds which have a
-            scaffold
-
+        :returns: mean number of atoms added across members which have a scaffold
+            (``0.0`` if none do)
         """
-        nha = self.db.COMPOUND_PROPERTY_FUNCTIONS['num_heavy_atoms']
-        sql = f"""
-        WITH nums AS (
-            SELECT
-                A.compound_id AS comp_id,
-                {nha}(A.compound_mol)
-                - {nha}(B.compound_mol)
-                AS diff
-            FROM {self.db.SQL_SCHEMA_PREFIX}compound A,
-            {self.db.SQL_SCHEMA_PREFIX}compound B
-            WHERE A.compound_base = B.compound_id
-            AND A.compound_id IN {self.str_ids}
-        )
-
-        SELECT compound_id, diff FROM {self.db.SQL_SCHEMA_PREFIX}compound
-        INNER JOIN nums
-        ON comp_id = compound_id
-        WHERE compound_id IN {self.str_ids}
-        """  # noqa: F841  # TODO(legacy-self.db): port to ORM
-
-        (avg,) = self.db.execute().fetchone()
-
-        return avg
+        values: list[int] = []
+        for v in self.num_atoms_added:
+            if v is None:
+                continue
+            if isinstance(v, list):
+                values.extend(v)
+            else:
+                values.append(v)
+        return mean(values) if values else 0.0
 
     @property
     def risk_diversity(self) -> float:
@@ -1760,21 +1638,17 @@ class CompoundSet:
         """Measure of how evenly elaborations are distributed across scaffolds in
         this set"""
 
-        sql = f"""
-        SELECT COUNT(1) FROM {self.db.SQL_SCHEMA_PREFIX}scaffold
-        WHERE scaffold_superstructure IN {self.str_ids}
-        GROUP BY scaffold_base
-        """
+        # number of elaborations (in this set) per scaffold base compound
+        counts_by_base: dict[int, int] = {}
+        for base_id in ScaffoldModel.objects.filter(
+            superstructure_compound_id__in=self.ids
+        ).values_list('base_compound_id', flat=True):
+            counts_by_base[base_id] = counts_by_base.get(base_id, 0) + 1
 
-        counts = self.db.execute(sql).fetchall()
-
-        counts = [c for (c,) in counts]  # + [0 for _ in range(len(self)-len(counts))]
-
+        # optional dependency, isolated so module import never depends on it
         from hirsch import hirsch
 
-        return hirsch(counts)
-
-        # return -std(counts)
+        return hirsch(list(counts_by_base.values()))
 
     @property
     def num_scaffolds_elaborated(self) -> int:
@@ -1784,16 +1658,7 @@ class CompoundSet:
         :returns: number of scaffold compounds
 
         """
-
-        (count,) = self.db.execute(
-            f"""
-                SELECT COUNT(DISTINCT scaffold_base)
-                FROM {self.db.SQL_SCHEMA_PREFIX}scaffold
-                WHERE scaffold_superstructure IN {self.str_ids}
-            """
-        ).fetchone()
-
-        return count
+        return len(self.scaffold_ids)
 
     @property
     def scaffolds(self) -> 'CompoundSet':
@@ -1802,80 +1667,63 @@ class CompoundSet:
         :returns: :class:`.CompoundSet`
 
         """
-        return CompoundSet(self.db, self.scaffold_ids)
+        return CompoundSet(self.scaffold_ids)
 
     @property
     def scaffold_ids(self) -> list[int]:
         """Return a list of :class:`.CompoundModel` ID's for scaffolds of this set"""
-        scaffold_ids = self.db.execute(
-            f"""
-                SELECT DISTINCT scaffold_base FROM {self.db.SQL_SCHEMA_PREFIX}scaffold
-                WHERE scaffold_superstructure IN {self.str_ids}
-            """
-        ).fetchall()
-        return [i for (i,) in scaffold_ids]
+        return list(
+            ScaffoldModel.objects.filter(superstructure_compound_id__in=self.ids)
+            .values_list('base_compound_id', flat=True)
+            .distinct()
+        )
 
     @property
     def num_scaffolds(self) -> int:
         """Return a count of scaffolds of this set"""
-        (count,) = self.db.execute(
-            f"""
-                SELECT COUNT(DISTINCT scaffold_base)
-                FROM {self.db.SQL_SCHEMA_PREFIX}scaffold
-                WHERE scaffold_superstructure IN {self.str_ids}
-            """
-        ).fetchone()
-        return count
+        return len(self.scaffold_ids)
 
     @property
     def elabs(self) -> 'CompoundSet':
-        """Returns a :class:`.CompoundSet` of all compounds that are a an elaboration
-        of an existing scaffold"""
+        """Returns a :class:`.CompoundSet` of all compounds that are an elaboration
+        of a scaffold in this set"""
 
-        ids = self.db.select_where(
-            query='scaffold_superstructure',
-            table='scaffold',
-            key=(
-                f'scaffold_superstructure IS NOT NULL'
-                f' and scaffold_base IN {self.str_ids}'
-            ),
-            multiple=True,
-            none='quiet',
+        ids = list(
+            ScaffoldModel.objects.filter(
+                base_compound_id__in=self.ids,
+                superstructure_compound_id__isnull=False,
+            )
+            .values_list('superstructure_compound_id', flat=True)
+            .distinct()
         )
-
-        if not ids:
-            return None
-
-        ids = [q for (q,) in ids]
-        return CompoundSet(self.db, ids)
+        return CompoundSet(ids)
 
     @property
     def num_elabs(self) -> int:
         """Return a count of elaborations of this set"""
-        (count,) = self.db.execute(
-            f"""
-                SELECT COUNT(DISTINCT scaffold_superstructure)
-                FROM {self.db.SQL_SCHEMA_PREFIX}scaffold
-                WHERE scaffold_base IN {self.str_ids}
-            """
-        ).fetchone()
-        return count
+        return len(self.elabs)
 
     @property
     def elab_df(self) -> 'pd.DataFrame':
-        """Get a DataFrame summarising the elaborations in this CompoundSet"""
-        from pandas import DataFrame
+        """Get a DataFrame summarising the elaborations in this CompoundSet.
 
-        cluster_dict = self.db.get_compound_cluster_dict(max_scaffolds=1)
+        Groups this set's compounds by the scaffold(s) they elaborate; a compound
+        with multiple scaffolds is listed under each.
+        """
+        # base scaffold compound -> elaboration compound ids within this set
+        clusters: dict[int, set] = {}
+        for base_id, sup_id in ScaffoldModel.objects.filter(
+            superstructure_compound_id__in=self.ids
+        ).values_list('base_compound_id', 'superstructure_compound_id'):
+            clusters.setdefault(base_id, set()).add(sup_id)
 
         data = []
-        for scaffold, elabs in cluster_dict.items():
-            scaffold = self.db.get_compound(id=scaffold[0])
-            elabs = CompoundSet(self.db, indices=elabs)
+        for base_id, elab_ids in clusters.items():
+            elabs = CompoundSet(list(elab_ids))
             data.append(
                 dict(
-                    scaffold_id=scaffold.id,
-                    scaffold_compound=scaffold,
+                    scaffold_id=base_id,
+                    scaffold_compound=Compound(CompoundModel.objects.get(pk=base_id)),
                     elabs=elabs,
                     num_elabs=len(elabs),
                 )
@@ -1887,42 +1735,20 @@ class CompoundSet:
     def id_num_poses_dict(self) -> dict[int, int]:
         """Get a dictionary mapping compound ids to the number of poses"""
 
-        sql = f"""
-            SELECT pose_compound, COUNT(1) FROM {self.db.SQL_SCHEMA_PREFIX}pose
-            WHERE pose_compound IN {self.str_ids}
-            GROUP BY pose_compound
-        """
+        counts = dict(
+            PoseModel.objects.filter(compound_id__in=self.ids)
+            .values_list('compound_id')
+            .annotate(n=Count('id'))
+        )
 
-        records = self.db.execute(sql)
-
-        assert records
-
-        lookup = {k: v for k, v in records}
-
-        for id in self.ids:
-            if id not in lookup:
-                lookup[id] = 0
-
-        return lookup
-
-    @property
-    def _db_changed(self) -> bool:
-        """Has the database changed?"""
-        if self._total_changes != self.db.total_changes:
-            self._total_changes = self.db.total_changes
-            return True
-        return False
+        return {cid: counts.get(cid, 0) for cid in self.ids}
 
     @property
     def reaction_ids(self) -> list[int]:
         """Returns a list of :class:`.ReactionModel` IDs that result in members of
         this set"""
-        records = self.db.select_where(
-            table='reaction',
-            query='reaction_id',
-            key=f'reaction_product IN {self.str_ids}',
-            multiple=True,
+        return list(
+            ReactionModel.objects.filter(product_compound_id__in=self.ids)
+            .values_list('id', flat=True)
+            .distinct()
         )
-        if not records:
-            return None
-        return [r for (r,) in records]
