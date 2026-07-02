@@ -17,23 +17,15 @@ Please see the [documentation](https://hippo-docs.winokan.com) to get started
 
 ## Installation
 
-HIPPO is pip-installable, but use of a `conda` environment is recommended for the
-rdkit and chemicalite dependencies:
+HIPPO is pip-installable:
 
 ```bash
-pip install --upgrade hippo-db
-conda install -c conda-forge chemicalite=2024.05.1
+pip install --upgrade xchem-hippo
 ```
+
+For local development with PostgreSQL + RDKit cartridge, use Docker Compose (see below).
 
 For more information see the [installation guide](https://hippo-docs.winokan.com/en/latest/#installation)
-
-You can verify the installation:
-
-```bash
-python -m hippo verify
-```
-
-Or by running the full suite of tests (see Developer information)
 
 ## More Information
 
@@ -43,10 +35,8 @@ Or by running the full suite of tests (see Developer information)
 
 ### Branches
 
-- [HIPPO/main](https://github.com/xchem/HIPPO/tree/main): latest stable version
-- [HIPPO/dev](https://github.com/xchem/HIPPO/tree/dev): Dvelopment branch
-- [HIPPO/postgres](https://github.com/xchem/HIPPO/tree/dev): PostgreSQL development branch
-- [HIPPO/django_lean](https://github.com/xchem/HIPPO/tree/django_lean): An experimental branch implementing HIPPO as a Django web-app
+- [HIPPO/main](https://github.com/xchem/HIPPO/tree/main): latest stable version (Django ORM + PostgreSQL)
+- [HIPPO/dev](https://github.com/xchem/HIPPO/tree/dev): Development branch
 
 </details>
 
@@ -62,12 +52,18 @@ To develop on HIPPO please fork this repository and then install locally:
 ```bash
 git clone https://github.com/YOUR_USER/HIPPO
 cd HIPPO
+uv sync --frozen
+```
+
+Or with pip:
+
+```bash
 pip install -e .
 ```
 
 ### Releases
 
-HIPPO is automatically released to [PyPI](https://pypi.org/project/hippo-db/) as
+HIPPO is automatically released to [PyPI](https://pypi.org/project/xchem-hippo/) as
 `xchem-hippo` via a Github Action off the using the
 [release](https://github.com/xchem/HIPPO/actions/workflows/release.yaml) workflow.
 
@@ -110,48 +106,68 @@ docstr-coverage hippo
 
 ### Tests
 
-Some tests are provided in the tests directory, which can be run with pytest:
+Tests require a running PostgreSQL database (see Docker setup below). Run with:
 
 ```bash
-cd tests
-pytest
+uv run pytest
 ```
 
-N.B. the numbered tests, e.g. `test_00_cleanup.py` need to run in sequential order to set up the database. Other tests can run in arbitrary order thereafter. The tests will fail if https://fragalysis.diamond.ac.uk can not provide the protein target's data, as specified in tests/config.py.
+N.B. the numbered tests, e.g. `test_01_fragalysis_download.py` need to run in sequential order to set up the database. Configure `tests/config.py` to point at your database. The tests will fail if https://fragalysis.diamond.ac.uk can not provide the protein target's data.
 
 </details>
 
 <details>
 
-<summary> Postgres specific instructions </summary>
+<summary> Local development with Docker </summary>
 
-### Local Postgres development (Mac)
+### Setting up the environment
 
-Install via homebrew
+HIPPO uses Docker Compose to run PostgreSQL with the RDKit cartridge locally.
 
-```bash
-brew install postgresql@18
+1. Create a `.env` file in the project root with your database connection parameters:
+
+```
+DB_NAME=designdb
+DB_USER=postgres
+DB_PASSWORD=your_password
+DB_HOST=database
+POSTGRES_PORT=5432
 ```
 
-Initialise database
+2. Build the database container (includes RDKit cartridge compilation — this may take some time):
 
 ```bash
-/opt/homebrew/opt/postgresql@18/bin/initdb -D /opt/homebrew/var/postgresql@18 -U postgres -W
+cd images/xchem-designdb
+docker build -t xchem_designdb:latest .
+cd ../..
 ```
 
-Run in foreground
+3. Build the application container:
 
 ```bash
-/opt/homebrew/opt/postgresql@18/bin/postgres -D /opt/homebrew/var/postgresql@18 -p 5432
+docker build --no-cache . -t hippo_backend:latest
 ```
 
-Install psycopg
+4. Launch services:
 
 ```bash
-pip install psycopg[binary]
+docker compose up
 ```
 
-See `images/postgres` for a container including the [RDKit cartridge](https://rdkit.org/docs/Cartridge.html)
+To run only the database (connecting from your host):
+
+```bash
+docker compose up database
+```
+
+5. Access the Jupyter environment at the URL printed in the terminal output.
+
+6. Cleanup:
+
+```bash
+docker compose down      # stop services
+docker compose down -v   # also wipe database volume
+```
 
 ### Connecting to a remote deployment
 
@@ -192,9 +208,5 @@ To connect to a specific database with `psql`
 ```bash
 psql -h localhost -U USER -p 5432 -n DATABASE
 ```
-
-### Running tests
-
-To run the unit tests, uncomment and configure `tests/config.py` to the desired postgres deployment. N.B. currently not all tests will succeed.
 
 </details>

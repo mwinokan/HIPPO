@@ -1,8 +1,11 @@
 Reactions
 =========
 
-.. autoclass:: hippo.reaction.Reaction
+.. autoclass:: designdb.components.reaction.Reaction
     :members:
 
-.. autoclass:: hippo.rset.ReactionSet
+ReactionSet
+-----------
+
+.. autoclass:: designdb.sets.reaction.ReactionSet
     :members:

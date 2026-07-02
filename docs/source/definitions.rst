@@ -6,7 +6,7 @@ Definitions and units
 Definitions
 ===========
 
-HIPPO uses an sqlite database with several inter-connected tables (see :doc:`db`). In both the database and the python API the following core objects are defined:
+HIPPO uses a database (PostgreSQL with RDKit cartridge, or SQLite for local development) with several inter-connected tables (see :doc:`db`). In both the database and the python API the following core objects are defined:
 
 Target
 ------
@@ -20,7 +20,7 @@ A :class:`.Compound` represents a ligand/small molecule with stereochemistry rem
 
 ::
 
-	c1 = animal.register_compound(smiles="OCc1ccc2c(c1)CCO2")
+	c1 = animal.compounds[1]
 	print(c1)
 	c1.draw()
 
@@ -38,8 +38,7 @@ Scaffold / superstructure relationships can also be encoded for :class:`.Compoun
 
 ::
 
-	c2 = animal.register_compound(smiles="OCc1ccc2c(c1F)CCO2")
-	c2.add_scaffold(scaffold=c1)
+	c2 = animal.compounds[2]
 	print(c2)
 	c2.draw()
 

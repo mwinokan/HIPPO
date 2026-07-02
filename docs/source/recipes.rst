@@ -1,17 +1,26 @@
 Recipes & Routes
 ================
 
-.. autoclass:: hippo.recipe.Recipe
+.. autoclass:: designdb.recipe.Recipe
     :members:
 
-.. autoclass:: hippo.recipe.Route
+.. autoclass:: designdb.recipe.Route
     :members:
 
-.. autoclass:: hippo.recipe.RouteSet
+RouteSet
+--------
+
+.. autoclass:: designdb.sets.route.RouteSet
     :members:
 
-.. autoclass:: hippo.rgen.RandomRecipeGenerator
+Client Managers
+---------------
+
+.. autoclass:: designdb.client.RecipeManager
     :members:
 
-.. autoclass:: hippo.rgen.RandomSelectionGenerator
+.. autoclass:: designdb.client.RouteManager
+    :members:
+
+.. autoclass:: designdb.client.IngredientManager
     :members:

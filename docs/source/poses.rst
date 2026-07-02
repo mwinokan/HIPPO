@@ -1,11 +1,11 @@
 Poses
 =====
 
-.. autoclass:: hippo.pose.Pose
+.. autoclass:: designdb.components.pose.Pose
     :members:
 
-.. autoclass:: hippo.pset.PoseTable
-    :members:
+PoseSet
+-------
 
-.. autoclass:: hippo.pset.PoseSet
+.. autoclass:: designdb.sets.pose.PoseSet
     :members:

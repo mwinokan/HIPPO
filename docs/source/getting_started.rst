@@ -3,12 +3,34 @@
 Getting started with HIPPO
 ==========================
 
-To create a HIPPO database or interface with an existing one, create a :class:`.HIPPO` `'animal'` object:
+To create a HIPPO animal, use the :func:`~hippo.bootstrap.load_hippo` factory function (exposed as ``HIPPO``):
 
 ::
 
 	from hippo import HIPPO
-	animal = HIPPO(project_name, "path/to/db.sqlite")
+
+	animal = HIPPO(
+		target_name="A71EV2A",
+		target_access_string="lb18145-1",
+		username="your_fed_id",
+	)
+
+This configures Django, connects to the database, and returns an animal object bound to the specified target. Connection parameters are read from environment variables (``DB_NAME``, ``DB_USER``, ``DB_PASSWORD``, ``DB_HOST``, ``POSTGRES_PORT``) or can be passed explicitly via the ``db`` parameter.
+
+For local SQLite usage (no Docker needed):
+
+::
+
+	animal = HIPPO(
+		target_name="A71EV2A",
+		target_access_string="lb18145-1",
+		username="your_fed_id",
+		db="path/to/db.sqlite",
+	)
+
+.. note::
+
+	For PostgreSQL, ensure Docker Compose is running (``docker compose up database``) and your ``.env`` file is configured. See the project README for setup instructions.
 
 
 Loading crystallographic hits from Fragalysis
@@ -21,14 +43,28 @@ Loading crystallographic hits from Fragalysis
 ::
 
 	animal.add_hits(
-		target_name='A71EV2A',
 		metadata_csv='/path/to/metadata.csv',
 		aligned_directory='/path/to/aligned_files',
 	)
 
+The animal is already bound to a target at initialization, so ``target_name`` is not needed here.
+
 .. attention::
 
 	N.B. all poses loaded into a HIPPO database only have an absolute path stored to the original file - they are not copied! It is your responsibility to ensure that their original files remain accessible.
+
+
+Registering methods
+===================
+
+Before loading posed virtual hits, register the computational methods used to generate them:
+
+::
+
+	animal.register_pose_method(name="xray", version="1.0.0", description="Crystallographic poses")
+	animal.register_pose_method(name="fragmenstein", version="1.0.0", description="Fragmenstein placement")
+	animal.register_scoring_method(name="gnina_cnn_vs", version="1.3.2", description="GNINA CNN VS score")
+	animal.register_enumeration_method(name="fragmenstein", version="1.0.0", description="Fragmenstein merges")
 
 
 Navigating compounds and poses
@@ -39,36 +75,28 @@ The below sections explain how to work with :class:`.Compound` objects and sets 
 Getting compounds/poses
 -----------------------
 
-Compounds can be accessed via the compounds property which wraps a :class:`.CompoundTable`:
+Compounds can be accessed via the compounds property which returns a :class:`.CompoundSet`:
 
 ::
 
 	all_compounds = animal.compounds
 
-CompoundTables can be indexed using their database id (positive integer) or InChiKey (str):
+CompoundSets can be indexed using a database id (positive integer) or sliced:
 
 ::
 
-	c1 = animal.compounds[1]
-	c2 = animal.compounds["FHZALEJIENDROK-UHFFFAOYSA-N"]
+	c = animal.compounds[1]
+	subset = animal.compounds[20:30]
 
-You can select a subset of compounds using slices, tuples, or lists:
-
-::
-
-	subset1 = animal.compounds[20:30]
-	subset2 = animal.compounds[1,2,3,4]
-	subset3 = animal.compounds[[1,2,3,4,5]]
-
-Additionally you can get compounds by their tag:
+You can filter compounds by tag:
 
 ::
 
-	hits = animal.compounds(tag='hits')
+	hits = animal.compounds.get_by_tag('hits')
 
 .. See also the :doc:`tools for structure-based searching<queries>`
 
-Equivalent methods exist for animal.poses (returns a :class:`PoseTable`), animal.reactions (returns a :class:`.ReactionTable`), animal.interactions (returns a :class:`.InteractionTable`), and animal.tags returns a :class:`TagTable`). See also the :doc:`api_reference` pages.
+Equivalent methods exist for animal.poses (returns a :class:`.PoseSet`), animal.reactions (returns a :class:`.ReactionSet`), and animal.interactions (returns a :class:`.InteractionSet`). See also the :doc:`api_reference` pages.
 
 Inspecting a compound and its poses
 -----------------------------------
@@ -80,7 +108,7 @@ Once you have a compound you can access database properties using its properties
 	c = animal.compounds[1]
 
 	c.id # Database ID (int)
-	c.name # InChiKey
+	c.name # alias or InChiKey
 	c.smiles # (flattened) smiles
 	c.mol # rdkit.Chem.Mol
 	c.tags # assigned tags
@@ -97,31 +125,19 @@ You can access a compounds poses, which have similar functionality
 	p = poses[0]
 
 	p.id # Database ID (int)
-	p.name # pose name
-	p.smiles # (stereo) smiles
+	p.pose_alias # pose name
+	p.pose_smiles # (stereo) smiles
 	p.mol # rdkit.Chem.Mol
-	p.tags # assigned tags
-	p.metadata # metadata dictionary
+	p.pose_metadata # metadata dictionary
 
-	c.draw() # draw the molecule pose (3d)
+	p.draw() # draw the molecule pose (3d)
 
-See also the API reference for :doc:`compounds <compounds>` and :doc:`poses <compounds>`.
-
-Graphing
-========
-
-Several convenient graphing methods are available. Try:
-
-::
-
-	animal.plot_tag_statistics()
-	animal.plot_pose_property('CanonSites')
-
+See also the API reference for :doc:`compounds <compounds>` and :doc:`poses <poses>`.
 
 Interaction fingerprinting
 ==========================
 
-Interactions fingerprinted as follows:
+Interactions are fingerprinted as follows:
 
 ::
 
@@ -132,44 +148,15 @@ Interactions fingerprinted as follows:
 
 .. note::
 
-	N.B. `mrich.track` just gives you a nice progress bar
+	``mrich.track`` just gives you a nice progress bar.
 
-Interaction fingerprints can be visualised with a 'punchcard', per-residue histogram, or viewed individually for a :class:`.Pose`.
+Graphing
+========
 
-Interaction Punchcard
----------------------
+Interaction fingerprints can be visualised with a punchcard:
 
 ::
 
 	animal.plot_interaction_punchcard(poses=animal.poses(tag='hits'), subtitle='hits', group='pose_name')
 
 See also :func:`.plotting.plot_interaction_punchcard`.
-
-Interactions by residue
------------------------
-
-::
-
-	animal.plot_residue_interactions(poses=animal.poses(tag='hits'), residue_number=123, chain='A', subtitle='hits')
-
-See also :func:`.plotting.plot_residue_interactions`.
-
-Interactions of a single Pose
------------------------------
-
-This will create an HTML file you can open in your browser:
-
-.. image:: ../images/plot_pose_interactions.png
-  :width: 900
-  :alt: plot_pose_interactions
-
-::
-
-	import molparse as mp
-	pose = animal.poses[1]
-	fig = animal.plot_pose_interactions(pose=pose)
-	mp.write(f'{pose}_interactions.html', fig)
-
-This method of writing to an HTML file works for all the above figures.
-
-See also :func:`.plotting.plot_pose_interactions`.

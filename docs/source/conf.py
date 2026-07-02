@@ -6,7 +6,33 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.abspath('../../'))
+sys.path.insert(0, os.path.abspath('../../hippo'))
+
+# Configure Django before any designdb imports
+os.environ.setdefault('DJANGO_ALLOW_ASYNC_UNSAFE', 'true')
+
+import django
+from django.conf import settings
+
+if not settings.configured:
+    settings.configure(
+        INSTALLED_APPS=[
+            'designdb.apps.DesigndbConfig',
+        ],
+        DATABASES={
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': ':memory:',
+            }
+        },
+        SECRET_KEY='sphinx-build',
+        DEFAULT_AUTO_FIELD='django.db.models.BigAutoField',
+        TIME_ZONE='UTC',
+        USE_TZ=True,
+        MIGRATION_MODULES={'designdb': None},
+        MANAGE_MODELS=True,
+    )
+    django.setup()
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
@@ -26,7 +52,6 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx.ext.napoleon',
     'sphinx.ext.intersphinx',
-    'sphinxcontrib.prettyspecialmethods',
 ]
 
 templates_path = ['_templates']

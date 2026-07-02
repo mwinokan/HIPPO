@@ -2,8 +2,8 @@
 Quoting
 =======
 
-.. autoclass:: hippo.quote.Quote
+.. autoclass:: designdb.components.quote.Quote
     :members:
 
-.. autoclass:: hippo.price.Price
+.. autoclass:: designdb.components.price.Price
     :members:

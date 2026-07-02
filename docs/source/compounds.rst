@@ -5,29 +5,23 @@ Compounds
 Compound
 --------
 
-.. autoclass:: hippo.compound.Compound
+.. autoclass:: designdb.components.compound.Compound
     :members:
 
 Ingredient
 ----------
 
-.. autoclass:: hippo.compound.Ingredient
+.. autoclass:: designdb.components.compound.Ingredient
     :members:
 
-CompoundTable: All Compounds
-----------------------------
+CompoundSet
+-----------
 
-.. autoclass:: hippo.cset.CompoundTable
+.. autoclass:: designdb.sets.compound.CompoundSet
     :members:
 
-CompoundSet: Set of Compounds
------------------------------
+IngredientSet
+-------------
 
-.. autoclass:: hippo.cset.CompoundSet
-    :members:
-
-IngredientSet: Set of Ingredients
----------------------------------
-
-.. autoclass:: hippo.cset.IngredientSet
+.. autoclass:: designdb.sets.ingredient.IngredientSet
     :members:

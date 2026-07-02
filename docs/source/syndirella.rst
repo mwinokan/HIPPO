@@ -77,13 +77,14 @@ Syndirella has been developed to produce a HIPPO-friendly output in the syntax `
     :caption: Example script for loading syndirella elaborations and their routes
 
     from pathlib import Path
-    import hippo
+    from hippo import HIPPO
     import mrich
 
-    mrich.var("hippo", hippo.__file__)
-
-    animal = hippo.HIPPO(PROJECT_NAME, DATABASE_PATH)
-    animal.db.backup()
+    animal = HIPPO(
+        target_name=TARGET_NAME,
+        target_access_string=TARGET_ACCESS_STRING,
+        username=USERNAME,
+    )
 
     output_root = Path("../syndirella/elabs/")
 

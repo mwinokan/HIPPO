@@ -1,14 +1,4 @@
-Metadata
-========
+Metadata & Tags
+===============
 
-.. autoclass:: hippo.metadata.MetaData
-    :members:
-
-.. autoclass:: hippo.tags.TagTable
-    :members:
-
-.. autoclass:: hippo.tags.TagSet
-    :members:
-
-.. autoclass:: hippo.target.Target
-    :members:
+Tags and metadata are stored as Django models. See the :doc:`db` page for the full model reference (``CompoundTagModel``, ``PoseTagModel``, ``TargetModel``, etc.).

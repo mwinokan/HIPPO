@@ -1,5 +1,5 @@
 Plotting
 ========
 
-.. automodule:: hippo.plotting
+.. automodule:: designdb.plotting
     :members:

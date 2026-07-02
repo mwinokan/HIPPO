@@ -12,34 +12,26 @@ HIPPO Documentation
 Installation
 ============
 
-On Mac OS and Linux it is recommended to install from PyPI using Conda/Miniconda.
-
-Chemicalite is not supported on Windows, but there is a workaround described in the :doc:`windows`.
-
-The `hippo` python module can be obtained from PyPI:
+Install from PyPI:
 
 ::
 
-   $ pip install --upgrade hippo-db
+   $ pip install --upgrade xchem-hippo
 
-You will also need `chemicalite` which is an extension to SQLite for cheminformatics:
+For local development, HIPPO uses Docker Compose to provide PostgreSQL with the RDKit cartridge. See the project README for Docker setup instructions.
 
-::
-
-   $ conda install -c conda-forge chemicalite=2024.05.1
-
-N.B. Compatibility between rdkit and chemicalite versions is quite strict, and database files created with a certain version pair may not be interoperable with others.
+SQLite is also supported for lightweight local use (no Docker required).
 
 See also :ref:`installation-snippets`.
 
 Getting started
 ===============
 
-HIPPO uses an sqlite database with several inter-connected tables and Python-class representations thereof, the core concepts are explained in :doc:`definitions`. Once familiar you can try :doc:`getting_started`.
+HIPPO uses a database (PostgreSQL with RDKit cartridge, or SQLite for local development) with several inter-connected tables and Python-class representations thereof, the core concepts are explained in :doc:`definitions`. Once familiar you can try :doc:`getting_started`.
 
 .. note::
 
-   HIPPO is built primarily as a Python API to be used in interactive :doc:`notebooks` such as in JupyterLab, but where higher performance is needed several tasks are accessible via a :doc:`cli` which can be used in SLURM jobs.
+   HIPPO is built primarily as a Python API to be used in interactive notebooks such as in JupyterLab.
 
 .. toctree::
    :maxdepth: 1
@@ -53,19 +45,13 @@ HIPPO uses an sqlite database with several inter-connected tables and Python-cla
 
    Interfacing with Syndirella and merging algorithms <syndirella>
 
-   Example Notebooks <notebooks>
-
-   Windows installation <windows>
-
-   Command-Line Interface <cli>
-
    API Reference <api_reference>
 
 
 Core concepts
 =============
 
-HIPPO uses an sqlite database with several inter-connected tables (see :doc:`db`). In both the database and the python API the following core objects are defined:
+HIPPO uses a database with several inter-connected tables (see :doc:`db`). In both the database and the python API the following core objects are defined:
 
 Compound
 --------
@@ -95,9 +81,7 @@ If the above fails in your existing software environments, try this:
 
    mamba create --name py312 python=3.12
    mamba activate py312
-   pip install hippo-db syndirella typer neo4j black gemmi
-   mamba install chemicalite=2024.05.1 pdbfixer
-   python -c  "import mrich; mrich.patch_rich_jupyter_margins()"
+   pip install xchem-hippo
 
 Additionally, this Dockerfile can be used to create a container with a Jupyter Notebook server:
 
@@ -106,14 +90,8 @@ Additionally, this Dockerfile can be used to create a container with a Jupyter N
    FROM quay.io/jupyter/minimal-notebook:2025-04-14
    LABEL authors="Max Winokan"
 
-   # Upgrade pip and install JupyterLab
-   RUN pip install --upgrade pip && pip install hippo-db syndirella typer neo4j black gemmi
-
-   RUN mamba install --yes \
-       chemicalite=2024.05.1 pdbfixer && \
-       mamba clean --all -f -y && \
-       fix-permissions "${CONDA_DIR}" && \
-       fix-permissions "/home/${NB_USER}"
+   # Upgrade pip and install packages
+   RUN pip install --upgrade pip && pip install xchem-hippo
 
    # patch rich
    RUN python -c "import mrich; mrich.patch_rich_jupyter_margins()"

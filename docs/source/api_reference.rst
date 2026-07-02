@@ -18,4 +18,3 @@ API Reference
    metadata
    plotting
    db
-   web
