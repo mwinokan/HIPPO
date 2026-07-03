@@ -1,11 +1,22 @@
-# Defining the exact version will make sure things don't break
-sphinx==7.2.6
-sphinx_rtd_theme==2.0.0
-readthedocs-sphinx-search==0.3.2
-myst-parser==2.0.0
-mpytools>=0.0.9
-molparse>=0.0.27
+sphinx>=7.2.6
+sphinx_rtd_theme>=2.0.0
+readthedocs-sphinx-search>=0.3.2
+
+# Django ORM bootstrap (required by conf.py)
+django>=5.2
+psycopg[binary]>=3.3
+
+# Package dependencies needed for autodoc imports
+rdkit
+molparse>=0.0.41
+mpytools>=0.0.21
+mrich>=1.0
 pandas
-tqdm
-pycule
-sphinxcontrib-prettyspecialmethods
+numpy>=1.26.4
+networkx>=3.4
+scikit-learn>=1.7
+openpyxl>=3.1
+plotly
+requests>=2.32
+gemmi>=0.7.5
+syndirella>=5.0.7a0
