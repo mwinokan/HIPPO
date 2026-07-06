@@ -1,4 +1,5 @@
 import logging
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -93,18 +94,22 @@ def parse_pdb_mp(pdb_path: Path, residue: int, chain: str) -> str:
     logger.debug('Reading %s', pdb_path)
     pdb = mp.parse(pdb_path, verbosity=0)
 
+    # protein_link is stored relative to the current working directory (e.g.
+    # data/downloads/...) so the database stays portable across machines
+    rel_pdb = os.path.relpath(pdb_path)
+
     # create the single ligand bound pdb
     lig_residues = pdb.residues['LIG']
     if len(lig_residues) > 1 or any(r.contains_alternative_sites for r in lig_residues):
         pdb = remove_other_ligands(pdb, residue, chain)
         pdb.prune_alternative_sites('A', verbosity=0)
-        pose_path = str(pdb_path.resolve()).replace('.pdb', '_hippo.pdb')
+        pose_path = rel_pdb.replace('.pdb', '_hippo.pdb')
         # side effect: writes pdb into file
         mp.write(
             pose_path, pdb, shift_name=True, verbosity=logger.level == logging.DEBUG
         )
     else:
-        pose_path = str(pdb_path.resolve())
+        pose_path = rel_pdb
 
     return pose_path
 
@@ -532,7 +537,7 @@ class IngestionService:
                 field_warning=field_warning,
             )
 
-            pose_path = (output_directory / f'{r[name_col]}.fake.mol').resolve()
+            pose_path = os.path.relpath(output_directory / f'{r[name_col]}.fake.mol')
             pose, pose_created = PoseService.create(
                 compound=compound,
                 target=target,
@@ -1165,7 +1170,7 @@ class IngestionService:
         pose_ids = []
         scorer = ScoreService()
         for _, row in ok.iterrows():
-            path = Path(row.path_to_mol).resolve()
+            path = Path(os.path.relpath(row.path_to_mol))
             print('comp id in row', row[f'{num_steps}_product_compound_id'])
 
             # closed for testing
