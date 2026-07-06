@@ -60,6 +60,13 @@ HIT_DATA_FLAGS = (
     'metadata_info',
 )
 
+# When True, HIPPO.__init__ downloads this target's apo_desolv protein PDBs from
+# Fragalysis (see HIPPO._ensure_apo_desolv_files). Toggle this module-level flag
+# to enable/disable download-on-init -- deliberately NOT read from the
+# environment. Currently False because the Fragalysis download/auth services are
+# down for maintenance; set True to re-enable.
+DOWNLOAD_APO_DESOLV_ON_INIT = False
+
 
 class HIPPO:
     """Entry-point class of the xchem-hippo package.
@@ -99,14 +106,10 @@ class HIPPO:
         self._apo_desolv_path: Path | None = None
         self._apo_desolv_downloaded_at: datetime | None = None
 
-        # Download policy: a first run downloads nothing here (the first add_hits
-        # fetches the full data). On re-instantiation (a persisted download already
-        # on disk) only the apo_desolv proteins are refreshed, so a new session has
-        # current PDBs.
-        target_dir = DOWNLOADS_DIR / project.project_name / target_name
-        if (target_dir / 'metadata.csv').is_file() and (
-            target_dir / 'aligned_files'
-        ).is_dir():
+        # Optionally download this target's apo_desolv protein PDBs on init,
+        # gated only by the DOWNLOAD_APO_DESOLV_ON_INIT flag (no longer requires a
+        # previously downloaded aligned_files directory to be present).
+        if DOWNLOAD_APO_DESOLV_ON_INIT:
             try:
                 self._ensure_apo_desolv_files(
                     auth_token=self._auth_token, stack=self._stack
