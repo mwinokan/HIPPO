@@ -1,34 +1,30 @@
-from config import *
+"""Target properties, modernized onto the SQLite ``animal`` conftest fixture.
 
-NOT_NULL_PROPERTIES = [
-    'id',
-    'name',
-    'feature_ids',
-    'features',
-    'subsites',
-]
+Replaces the pre-refactor version (positional ``hippo.HIPPO('test', DB)``,
+``animal.T1``, ``animal.db.close()``), which targeted the removed legacy API.
+``animal.target`` is now a plain :class:`TargetModel`.
+"""
 
-PROPERTIES = []
+import pytest
 
-
-def test_properties():
-
-    import hippo
-
-    animal = hippo.HIPPO('test', DB)
-    target = animal.T1
-
-    for prop in NOT_NULL_PROPERTIES:
-        value = getattr(target, prop)
-        print(prop, value)
-        assert value is not None, f'{prop} is None'
-
-    for prop in PROPERTIES:
-        value = getattr(target, prop)
-        print(prop, value)
-
-    animal.db.close()
+pytestmark = pytest.mark.sqlite
 
 
-if __name__ == '__main__':
-    test_properties()
+def test_target_identity(animal):
+    """animal.target is the configured TargetModel, linked to its project."""
+    target = animal.target
+
+    assert target.pk is not None
+    assert target.target_name == "test"
+    # the project is created from the target_access_string (see conftest)
+    assert target.project.project_name == "test-proposal"
+
+
+def test_target_has_no_features_or_subsites_when_empty(animal):
+    """A freshly-created target has no features/subsites until hits are loaded."""
+    from designdb.models import FeatureModel, SubsiteModel
+
+    target = animal.target
+
+    assert FeatureModel.objects.filter(target=target).count() == 0
+    assert SubsiteModel.objects.filter(target=target).count() == 0
