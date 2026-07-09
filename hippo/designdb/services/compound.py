@@ -9,12 +9,11 @@ from designdb.utils import (
     sanitise_smiles,
     superparent,
 )
+from django.conf import settings
 
 # from mypackage.services.compound import CompoundService
 from rdkit import Chem
-
-# from rdkit.Chem import inchi
-
+from rdkit.Chem.inchi import MolToInchiKey
 
 # from .validation.compound import ValidationError, validate_compound_data
 
@@ -59,15 +58,23 @@ class CompoundService:
 
         h = registration_hash_tautomer_insensitive(sp)
 
+        defaults = {
+            'compound_smiles': smiles,
+            'rdkit_version': rdkit.__version__,
+            'inchi_version': Chem.inchi.GetInchiVersion(),
+        }
+
+        # In SQLite mode there is no cartridge, so populate compound_mol (CTAB)
+        # and compound_inchikey in Python. In Postgres the BEFORE INSERT trigger
+        # (populate_compound_cartridge_from_smiles) fills these from the cartridge
+        # and stays authoritative, so we leave them unset here.
+        if settings.MANAGE_MODELS:
+            defaults['compound_mol'] = Chem.MolToMolBlock(mol)
+            defaults['compound_inchikey'] = MolToInchiKey(mol)
+
         compound, created = CompoundModel.objects.get_or_create(
             compound_hash=h,
-            defaults={
-                # 'compound_mol': mol,
-                # 'compound_inchikey': inchikey,
-                'compound_smiles': smiles,
-                'rdkit_version': rdkit.__version__,
-                'inchi_version': Chem.inchi.GetInchiVersion(),
-            },
+            defaults=defaults,
         )
         if not created and logger.level == logging.DEBUG:
             mrich.warning(f'Skipping compound {h}, duplicate of {compound.pk}')

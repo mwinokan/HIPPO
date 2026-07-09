@@ -898,7 +898,7 @@ class CataloguePriceModel(BaseModel):
 
 
 class CataloguePriceCompoundJunctionModel(BaseModel):
-    ipk = models.CompositePrimaryKey('compound_id', 'catalogue_price_id')
+    pk = models.CompositePrimaryKey('compound_id', 'catalogue_price_id')
     catalogue_price = models.ForeignKey(
         CataloguePriceModel,
         on_delete=models.CASCADE,

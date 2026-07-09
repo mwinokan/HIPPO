@@ -122,6 +122,16 @@ exclude = [
     "hippo_legacy",
 ]
 
+[tool.pytest.ini_options]
+# hippo is not an installed package; it's imported from the repo root (the
+# scripts rely on cwd being on sys.path). Put the repo root on sys.path so
+# `import hippo` works under pytest. `tests/` is added automatically by the
+# tests/conftest.py, which is what makes `from config import *` resolve.
+pythonpath = ["."]
+markers = [
+    "sqlite: container-free tests that run in SQLite mode (no Postgres/Fragalysis). Run with `pytest -m sqlite`.",
+]
+
 [tool.uv.sources]
 django-rdkit = { git = "https://github.com/rdkit/django-rdkit" }
 
