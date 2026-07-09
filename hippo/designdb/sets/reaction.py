@@ -131,7 +131,11 @@ class ReactionSet:
                 return reaction
 
             case slice():
-                return ReactionSet(ReactionModel.objects.filter(pk__in=key))
+                # positional slice of the (ordered) members. Slice `.all()` (a
+                # fresh, unevaluated clone) so this returns a queryset even when
+                # self._queryset is already evaluated (which would otherwise slice
+                # to a list of instances). sort=False: can't re-order a sliced qs.
+                return ReactionSet(self._queryset.all()[key], sort=False)
 
             case _:
                 mrich.error(

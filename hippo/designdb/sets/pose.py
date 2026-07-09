@@ -209,16 +209,20 @@ class PoseSet:
 
         match key:
             case int():
-                try:
-                    pose = PoseModel.objects.get(pk=key)
-                except PoseModel.DoesNotExist as exc:
-                    mrich.error(f'list index out of range: {key=} for {self}')
-                    raise PoseModel.DoesNotExist from exc
-
-                return Pose(pose)
+                # index by position in the (ordered) set, not by pk; support
+                # negative indices (e.g. pset[-1] -> last pose)
+                n = len(self)
+                idx = key + n if key < 0 else key
+                if not 0 <= idx < n:
+                    raise IndexError(f'PoseSet index out of range: {key}')
+                return Pose(self._queryset[idx])
 
             case slice():
-                return PoseSet(PoseModel.objects.filter(pk__in=key))
+                # positional slice of the (ordered) members. Slice `.all()` (a
+                # fresh, unevaluated clone) so this returns a queryset even when
+                # self._queryset is already evaluated (which would otherwise slice
+                # to a list of instances). sort=False: can't re-order a sliced qs.
+                return PoseSet(self._queryset.all()[key], sort=False)
 
             case _:
                 raise NotImplementedError

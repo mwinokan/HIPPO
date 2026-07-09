@@ -134,14 +134,21 @@ class CompoundSet:
         """
         match key:
             case int():
-                index = self.indices[key]
-                try:
-                    return CompoundModel.objects.get(id=index)
-                except CompoundModel.DoesNotExist as exc:
-                    raise CompoundModel.DoesNotExist from exc
+                # index by position in the (ordered) set; support negative
+                # indices (e.g. cset[-1] -> last compound)
+                n = len(self)
+                idx = key + n if key < 0 else key
+                if not 0 <= idx < n:
+                    raise IndexError(f'CompoundSet index out of range: {key}')
+                return self._queryset[idx]
 
             case slice():
-                return CompoundSet(CompoundModel.objects.filter(pk__in=key))
+                # positional slice of the ordered members. Slice `.all()` (a
+                # fresh, unevaluated clone) so this returns a queryset (LIMIT/
+                # OFFSET) even when self._queryset is already evaluated -- an
+                # evaluated queryset would otherwise slice to a list of model
+                # instances. sort=False: a queryset can't be re-ordered once sliced.
+                return CompoundSet(self._queryset.all()[key], sort=False)
 
             case _:
                 raise NotImplementedError
