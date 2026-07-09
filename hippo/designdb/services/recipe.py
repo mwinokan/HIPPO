@@ -307,7 +307,7 @@ class RecipeService:
             reactions on the fly
         """
 
-        from designdb.recipe import Route
+        from designdb.recipe import Recipe, Route
 
         assert isinstance(compounds, CompoundSet)
 
@@ -425,11 +425,17 @@ class RecipeService:
             if not combo:
                 continue
 
-            solution = combo[0]
-            for i, recipe in enumerate(combo[1:]):
-                if debug:
-                    mrich.debug(i + 1)
-                solution += recipe
+            # Combine the whole combination in one pass. Repeated `solution +=
+            # recipe` was O(n^2) -- each Recipe.__add__ copies the growing sets and
+            # IngredientSet.add re-concats -- so batch-merge the underlying sets
+            # instead (see IngredientSet.sum_sets / ReactionSet.union).
+            solution = Recipe(
+                products=IngredientSet.sum_sets([r.products for r in combo]),
+                reactants=IngredientSet.sum_sets([r.reactants for r in combo]),
+                intermediates=IngredientSet.sum_sets([r.intermediates for r in combo]),
+                compounds=IngredientSet.sum_sets([r.compounds for r in combo]),
+                reactions=ReactionSet.union([r.reactions for r in combo]),
+            )
 
             solutions.append(solution)
             ok += 1
