@@ -12,7 +12,7 @@ from designdb.components.compound import Ingredient
 from designdb.components.price import Price
 from designdb.models import CataloguePriceModel, CompoundModel
 from designdb.sets.compound import CompoundSet
-from pandas import DataFrame, concat, isna
+from pandas import DataFrame, concat, isna, to_numeric
 
 
 class IngredientSet:
@@ -240,6 +240,50 @@ class IngredientSet:
 
         df = DataFrame(dicts, dtype=object)
         return cls.from_ingredient_df(df=df, supplier=supplier)
+
+    @classmethod
+    def sum_sets(
+        cls,
+        sets: 'list[IngredientSet]',
+        supplier: str | list | None = None,
+    ) -> 'IngredientSet':
+        """Merge several :class:`.IngredientSet`\\ s into one in a single pass.
+
+        Equivalent to accumulating them with ``+=`` (amounts for a shared compound
+        are summed, the first-seen quote is kept and dropped once the summed amount
+        exceeds its quoted amount) but O(total ingredients) rather than the O(n^2)
+        of repeated pairwise addition. See :meth:`.add`.
+        """
+        frames = [s._data for s in sets if not s._data.empty]
+        if not frames:
+            return cls(supplier=supplier)
+
+        combined = concat(frames, ignore_index=True, join='inner')
+
+        # first-seen row per compound keeps its quote/supplier/lead_time (even a
+        # null quote) -- add() never overwrites an existing ingredient's quote
+        result = combined.drop_duplicates('compound_id', keep='first').set_index(
+            'compound_id'
+        )
+
+        grouped = combined.groupby('compound_id', sort=False)
+        result['amount'] = grouped['amount'].sum()
+        counts = grouped.size()
+
+        # a quote is dropped only for compounds that were actually merged
+        # (appear >1) whose summed amount exceeds the quoted amount (see add())
+        quoted = to_numeric(result['quoted_amount'], errors='coerce')
+        amount = to_numeric(result['amount'], errors='coerce')
+        invalid = (
+            (counts.reindex(result.index) > 1)
+            & quoted.notna()
+            & (quoted != 0)
+            & (quoted < amount)
+        )
+        result.loc[invalid, 'quote_id'] = None
+        result.loc[invalid, 'quoted_amount'] = None
+
+        return cls.from_ingredient_df(result.reset_index(), supplier=supplier)
 
     @classmethod
     def from_compounds(

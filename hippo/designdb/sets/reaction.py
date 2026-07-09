@@ -143,13 +143,15 @@ class ReactionSet:
 
     def __add__(self, other: 'ReactionSet') -> 'ReactionSet':
         """Add a :class:`.ReactionSet` to this one"""
-        if other:
-            return ReactionSet(
-                ReactionModel.objects.filter(
-                    Q(pk__in=self._queryset) | Q(pk__in=other.queryset)
-                ),
-                sort=False,
-            )
+        if not other:
+            return self.copy()
+        # materialise pks so repeated accumulation (e.g. combining many recipes)
+        # stays a single flat query instead of nesting pk__in subqueries, which
+        # recurses and blows the recursion limit at scale
+        ids = set(self._queryset.values_list('pk', flat=True)) | set(
+            other.queryset.values_list('pk', flat=True)
+        )
+        return ReactionSet(ReactionModel.objects.filter(pk__in=ids), sort=False)
 
     def __sub__(
         self,
@@ -158,14 +160,27 @@ class ReactionSet:
         """Substract a :class:`.ReactionSet` from this set"""
         match other:
             case ReactionSet():
+                ids = set(self._queryset.values_list('pk', flat=True)) - set(
+                    other.queryset.values_list('pk', flat=True)
+                )
                 return ReactionSet(
-                    ReactionModel.objects.filter(
-                        Q(pk__in=self._queryset) & ~Q(pk__in=other.queryset)
-                    ),
+                    ReactionModel.objects.filter(pk__in=ids),
                     sort=False,
                 )
 
     ### METHODS
+
+    @classmethod
+    def union(cls, sets: 'list[ReactionSet]') -> 'ReactionSet':
+        """Union several :class:`.ReactionSet`\\ s into one flat set in a single pass.
+
+        Collects pks from each set and builds one ``pk__in`` query, avoiding the
+        nested subqueries that repeated ``+`` would accumulate.
+        """
+        ids: set[int] = set()
+        for s in sets:
+            ids |= set(s._queryset.values_list('pk', flat=True))
+        return cls(ReactionModel.objects.filter(pk__in=ids), sort=False)
 
     def add(self, r: ReactionModel) -> None:
         """Add a :class:`.ReactionModel` to this set

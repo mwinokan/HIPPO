@@ -154,21 +154,20 @@ class CompoundSet:
         multiple at once when ``other`` is a :class:`.CompoundSet` or
         :class:`.IngredientSet`"""
 
+        # local import to avoid the IngredientSet <-> CompoundSet cycle
+        from designdb.sets.ingredient import IngredientSet
+
+        # materialise pks so set ops stay a single flat query instead of nesting
+        # pk__in subqueries, which recurses under repeated accumulation
+        ids = set(self._queryset.values_list('pk', flat=True))
         match other:
-            case CompoundSet():
-                return CompoundSet(
-                    CompoundModel.objects.filter(
-                        Q(pk__in=self._queryset) & ~Q(pk__in=other.queryset)
-                    ),
-                    sort=False,
-                )
+            case CompoundSet() | IngredientSet():
+                ids -= set(other.ids)
             case int():
-                return CompoundSet(
-                    CompoundModel.objects.filter(
-                        Q(pk__in=self._queryset) & ~Q(pk=other.pk)
-                    ),
-                    sort=False,
-                )
+                ids.discard(other)
+            case _:
+                raise NotImplementedError
+        return CompoundSet(CompoundModel.objects.filter(pk__in=ids), sort=False)
 
     def __add__(
         self,
@@ -180,53 +179,27 @@ class CompoundSet:
         # local import to avoid the IngredientSet <-> CompoundSet cycle
         from designdb.sets.ingredient import IngredientSet
 
+        # materialise pks: keep a single flat query, avoiding nested pk__in
+        # subqueries that recurse when accumulated (e.g. combining many recipes)
+        ids = set(self._queryset.values_list('pk', flat=True))
         match other:
             case CompoundModel():
-                return CompoundSet(
-                    CompoundModel.objects.filter(
-                        Q(pk__in=self._queryset) | Q(pk__in=other._queryset)
-                    ),
-                    sort=False,
-                )
-
+                ids.add(other.pk)
             case int():
-                return CompoundSet(
-                    CompoundModel.objects.filter(
-                        Q(pk__in=self._queryset) | Q(pk__in=other._queryset)
-                    ),
-                    sort=False,
-                )
-
-            case CompoundSet():
-                return CompoundSet(
-                    CompoundModel.objects.filter(
-                        Q(pk__in=self._queryset) | Q(pk__in=other._queryset)
-                    ),
-                    sort=False,
-                )
-
-            case IngredientSet():
-                return CompoundSet(
-                    CompoundModel.objects.filter(
-                        Q(pk__in=self._queryset) | Q(pk__in=other._queryset)
-                    ),
-                    sort=False,
-                )
-
+                ids.add(other)
+            case CompoundSet() | IngredientSet():
+                ids |= set(other.ids)
             case _:
                 raise NotImplementedError
+        return CompoundSet(CompoundModel.objects.filter(pk__in=ids), sort=False)
 
     def __and__(self, other: 'CompoundSet'):
         """AND set operation, returns only compounds in both sets"""
 
         match other:
             case CompoundSet():
-                return CompoundSet(
-                    CompoundModel.objects.filter(
-                        Q(pk__in=self._queryset) & Q(pk__in=other.queryset)
-                    ),
-                    sort=False,
-                )
+                ids = set(self._queryset.values_list('pk', flat=True)) & set(other.ids)
+                return CompoundSet(CompoundModel.objects.filter(pk__in=ids), sort=False)
 
             case _:
                 raise NotImplementedError
@@ -236,12 +209,8 @@ class CompoundSet:
 
         match other:
             case CompoundSet():
-                return CompoundSet(
-                    CompoundModel.objects.filter(
-                        Q(pk__in=self._queryset) | Q(pk__in=other.queryset)
-                    ),
-                    sort=False,
-                )
+                ids = set(self._queryset.values_list('pk', flat=True)) | set(other.ids)
+                return CompoundSet(CompoundModel.objects.filter(pk__in=ids), sort=False)
 
             case _:
                 raise NotImplementedError
@@ -252,13 +221,8 @@ class CompoundSet:
 
         match other:
             case CompoundSet():
-                return CompoundSet(
-                    CompoundModel.objects.filter(
-                        Q(Q(pk__in=self._queryset) | Q(pk__in=other.queryset))
-                        & ~Q(Q(pk__in=self._queryset) & Q(pk__in=other.queryset))
-                    ),
-                    sort=False,
-                )
+                ids = set(self._queryset.values_list('pk', flat=True)) ^ set(other.ids)
+                return CompoundSet(CompoundModel.objects.filter(pk__in=ids), sort=False)
 
             case _:
                 raise NotImplementedError
