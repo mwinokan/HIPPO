@@ -11,6 +11,7 @@ elsewhere, not here.
 """
 
 import pytest
+from conftest import BACKEND
 
 pytestmark = pytest.mark.sqlite
 
@@ -60,6 +61,15 @@ def compound(make_compound):
     return Compound(make_compound("c1ccccc1O"))
 
 
+@pytest.mark.xfail(
+    BACKEND == "postgres",
+    reason=(
+        "CompoundService.create returns the in-memory instance; on Postgres the "
+        "cartridge trigger fills compound_inchikey/compound_mol in the DB only, "
+        "so they read as None until the compound is refetched"
+    ),
+    strict=True,
+)
 def test_not_null_properties(compound):
     for prop in NOT_NULL_PROPERTIES:
         assert getattr(compound, prop) is not None, f"{prop} is None"

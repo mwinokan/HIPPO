@@ -80,6 +80,7 @@ dev = [
     "mypy>=1.19",
     "commitizen>=4.13.5,<5",
     "pre-commit>=4.5.1",
+    "pytest-cov>=7",
 ]
 
 [tool.commitizen]
@@ -146,8 +147,19 @@ exclude = [
 # tests/conftest.py, which is what makes `from config import *` resolve.
 pythonpath = ["."]
 markers = [
-    "sqlite: container-free tests that run in SQLite mode (no Postgres/Fragalysis). Run with `pytest -m sqlite`.",
+    "sqlite: container-free tests that run in SQLite mode (no Postgres/Fragalysis). Run with `pytest -m sqlite`. They also run against Postgres with HIPPO_TEST_DB=postgres.",
+    "postgres: tests that need the DesignDB Postgres schema (RDKit cartridge, triggers, materialized view). Skipped unless HIPPO_TEST_DB=postgres; see tests/postgres/start_db.sh.",
 ]
+
+[tool.coverage.run]
+# a path, not a module: hippo's subpackages are imported as top-level modules
+# (`designdb`, ...), so `--cov=hippo` would miss them
+source = ["hippo"]
+branch = true
+
+[tool.coverage.report]
+skip_empty = true
+sort = "cover"
 
 [tool.uv]
 required-environments = [

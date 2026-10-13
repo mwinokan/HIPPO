@@ -1,40 +1,61 @@
-from config import *
+"""Tag accessor tests (SQLite tier).
 
-NOT_NULL_PROPERTIES = [
-    'unique',
-]
+Ported from the pre-refactor ``test_tags.py``, which checked the unique tags and
+the tag summary of the old ``animal.tags`` table. Tags now live on the sets:
+``PoseSet.tags`` / ``CompoundSet.tags`` / ``CompoundSet.tag_summary``. Tag
+*resolution* during ingestion is covered by ``test_tag_resolution.py``.
+"""
 
-PROPERTIES = []
+import pytest
 
-
-def test_properties():
-
-    import hippo
-
-    animal = hippo.HIPPO('test', DB)
-    tag_table = animal.tags
-
-    for prop in NOT_NULL_PROPERTIES:
-        value = getattr(tag_table, prop)
-        print(prop, value)
-        assert value is not None, f'{prop} is None'
-
-    for prop in PROPERTIES:
-        value = getattr(tag_table, prop)
-        print(prop, value)
-
-    animal.db.close()
+pytestmark = pytest.mark.sqlite
 
 
-def test_summary():
+@pytest.fixture
+def compounds(make_compound):
+    from designdb.models import CompoundModel
+    from designdb.sets.compound import CompoundSet
 
-    import hippo
-
-    animal = hippo.HIPPO('test', DB)
-    tag_table = animal.tags
-    tag_table.summary()
+    created = [make_compound(s) for s in ("CCN", "CCCN", "CCCCN")]
+    return CompoundSet(CompoundModel.objects.filter(pk__in=[c.pk for c in created]))
 
 
-if __name__ == '__main__':
-    test_properties()
-    test_summary()
+@pytest.fixture
+def poses(animal, compounds):
+    from designdb.models import PoseModel
+    from designdb.sets.pose import PoseSet
+
+    created = [
+        PoseModel.objects.create(
+            compound_id=cid, target=animal.target, pose_alias=f"tags-{cid}"
+        )
+        for cid in compounds.ids
+    ]
+    return PoseSet(PoseModel.objects.filter(pk__in=[p.pk for p in created]))
+
+
+def test_compoundset_tags(animal, compounds):
+    compounds.add_tag("tags-all", target=animal.target)
+    compounds[0:1].add_tag("tags-one", target=animal.target)
+
+    assert compounds.tags == {"tags-all", "tags-one"}
+    assert compounds.get_tags(target=animal.target) == {"tags-all", "tags-one"}
+
+
+def test_compoundset_tag_summary(animal, compounds):
+    compounds.add_tag("tags-summary-all", target=animal.target)
+    compounds[0:1].add_tag("tags-summary-one", target=animal.target)
+
+    df = compounds.tag_summary()
+
+    assert df.loc["tags-summary-all", "num_compounds"] == 3
+    assert df.loc["tags-summary-one", "num_compounds"] == 1
+
+
+def test_poseset_tags(poses):
+    poses.add_tag("tags-pose-all")
+    poses[0:1].add_tag("tags-pose-one")
+
+    assert set(poses.tags) == {"tags-pose-all", "tags-pose-one"}
+    assert len(poses(tag="tags-pose-all")) == 3
+    assert len(poses.get_by_tag("tags-pose-one")) == 1
