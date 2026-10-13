@@ -14,8 +14,13 @@ permissions:
 
 jobs:
   # Container-free tier: SQLite, no Postgres or Fragalysis.
+  # Runs on every supported Python; other jobs use the .python-version default.
   sqlite:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.13", "3.14"]
     steps:
     - name: Checkout
       uses: actions/checkout@v6
@@ -23,6 +28,8 @@ jobs:
       uses: astral-sh/setup-uv@v6
       with:
         enable-cache: true
+        # sets UV_PYTHON, which overrides .python-version
+        python-version: ${{ matrix.python }}
     - name: Install dependencies
       run: uv sync --frozen
     - name: Test
