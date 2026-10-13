@@ -13,7 +13,8 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  # Container-free tier: SQLite, no Postgres or Fragalysis.
+  sqlite:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -24,7 +25,41 @@ jobs:
         enable-cache: true
     - name: Install dependencies
       run: uv sync --frozen
-    # Only the container-free SQLite tier (see `make test`); the Postgres
-    # integration tier needs a DesignDB container and isn't wired up yet.
     - name: Test
-      run: make test
+      run: make coverage
+    - name: Coverage summary
+      if: always()
+      run: uv run coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
+
+  # The same tests plus the Postgres-only ones, against the DesignDB schema on a
+  # Postgres with the RDKit cartridge. Versions match images/xchem-designdb.
+  postgres:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+    - name: Install Postgres with the RDKit cartridge
+      uses: mamba-org/setup-micromamba@v2
+      with:
+        environment-name: designdb-test
+        create-args: >-
+          -c conda-forge
+          postgresql=18
+          rdkit-postgresql=2025.09.5
+        cache-environment: true
+    # a login shell activates the env; not `micromamba run`, which waits on the
+    # server the script leaves running and never returns
+    - name: Start DesignDB
+      shell: bash -el {0}
+      run: tests/postgres/start_db.sh
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+      with:
+        enable-cache: true
+    - name: Install dependencies
+      run: uv sync --frozen
+    - name: Test
+      run: make test-postgres PYTEST_ARGS="--cov --cov-report=term"
+    - name: Coverage summary
+      if: always()
+      run: uv run coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
