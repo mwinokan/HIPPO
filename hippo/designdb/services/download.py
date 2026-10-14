@@ -16,6 +16,7 @@ flags can still be overridden per call via keyword arguments.
 Adapted and hardened from the ``downloader.py`` prototype.
 """
 
+import os
 import tarfile
 import time
 import zipfile
@@ -25,11 +26,15 @@ from urllib.parse import urljoin
 import mrich
 import requests
 from designdb.utils_frag import STACK_URLS
-from requests.exceptions import JSONDecodeError
+from requests.exceptions import HTTPError, JSONDecodeError
 
 LOGIN_URL = '/accounts/login/'
 DOWNLOAD_URL = '/api/download_structures/'
 LANDING_PAGE_URL = '/viewer/react/landing/'
+
+# Environment variable holding the Fragalysis ``sessionid``, used when no
+# ``auth_token`` is passed explicitly.
+AUTH_TOKEN_ENV = 'FRAGALYSIS_AUTH_TOKEN'
 
 # Keep reasonably current; some endpoints reject obviously-bot user agents.
 USER_AGENT = (
@@ -183,6 +188,8 @@ class DownloadService:
                 'or pass an explicit url'
             )
 
+        auth_token = auth_token or os.environ.get(AUTH_TOKEN_ENV) or None
+
         destination = Path(destination) if destination else Path.cwd()
         destination.mkdir(parents=True, exist_ok=True)
 
@@ -235,7 +242,13 @@ class DownloadService:
             start_response = session.post(
                 download_api_url, data=payload, timeout=timeout
             )
-            start_response.raise_for_status()
+            _raise_for_status(
+                start_response,
+                target_name=target_name,
+                target_access_string=target_access_string,
+                base_url=base_url,
+                authenticated=bool(auth_token),
+            )
             start_json = start_response.json()
 
             # Step 2: resolve the file_url. Newer servers return a task status
@@ -266,7 +279,13 @@ class DownloadService:
                 stream=True,
                 timeout=timeout,
             ) as r:
-                r.raise_for_status()
+                _raise_for_status(
+                    r,
+                    target_name=target_name,
+                    target_access_string=target_access_string,
+                    base_url=base_url,
+                    authenticated=bool(auth_token),
+                )
                 with open(archive_path, 'wb') as f:
                     for chunk in r.iter_content(chunk_size=8192):
                         f.write(chunk)
@@ -393,6 +412,57 @@ class DownloadService:
 
         mrich.success('Extracted to', extract_dir)
         return extract_dir
+
+
+def _raise_for_status(
+    response: requests.Response,
+    *,
+    target_name: str,
+    target_access_string: str,
+    base_url: str,
+    authenticated: bool,
+) -> None:
+    """Like :meth:`requests.Response.raise_for_status`, but keeps Fragalysis's
+    explanation.
+
+    Fragalysis answers a download it refuses with a JSON ``message`` (e.g.
+    ``User "|anon|" is not a member of lb32627-71``, with a 404 for a target the
+    user may not see), which plain ``raise_for_status`` discards. On 403/404 a
+    hint about authentication and the stack is added, as those are the usual
+    causes.
+
+    :raises requests.HTTPError: if the response is a 4xx/5xx, with
+        ``response`` attached as usual
+    """
+    try:
+        response.raise_for_status()
+    except HTTPError as exc:
+        try:
+            body = response.json()
+        except (JSONDecodeError, ValueError):
+            body = None
+        detail = None
+        if isinstance(body, dict):
+            detail = body.get('message') or body.get('detail') or body.get('error')
+
+        msg = f'Fragalysis download of {target_name!r} failed: {exc}'
+        if detail:
+            msg += f'\nFragalysis says: {detail}'
+        if response.status_code in (403, 404):
+            if authenticated:
+                msg += (
+                    f'\nCheck that the Fragalysis session is still valid and that '
+                    f'its user has access to {target_access_string!r} on '
+                    f'{base_url} (or try another stack).'
+                )
+            else:
+                msg += (
+                    f'\nNo Fragalysis login was sent, so only public targets on '
+                    f'{base_url} are available. Pass auth_token (the Fragalysis '
+                    f'sessionid cookie) or set {AUTH_TOKEN_ENV}, or check the '
+                    'stack.'
+                )
+        raise HTTPError(msg, response=response) from exc
 
 
 def _archive_stem(name: str) -> str:
