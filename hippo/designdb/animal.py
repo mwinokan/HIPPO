@@ -25,9 +25,11 @@ from .models import (
     RouteModel,
     TargetModel,
 )
+from .services.compound import CompoundTagService
 from .services.download import DownloadService
 from .services.ingestion import IngestionBatchResult, IngestionService
 from .services.method import MethodService
+from .services.pose import PoseTagService
 from .services.quote import QuoteService
 from .services.reaction import ReactionService
 from .services.route import RouteService
@@ -388,10 +390,10 @@ class HIPPO:
         :param skip: optional list of observation names to skip
         :param tags: compound tags to assign to every loaded hit
         :returns: a DataFrame of metadata
-        :raises MissingTagError: if any tag is not in the tag vocabulary. The tag
-            vocabulary is maintained outside HIPPO and ingestion never creates
-            tags, so this covers ``tags`` *and* every curated ``metadata.csv``
-            column that is used as a pose tag
+        :raises MissingTagError: if any tag is not registered. Ingestion never
+            creates tags (see :meth:`register_compound_tag` /
+            :meth:`register_pose_tag`), so this covers ``tags`` *and* every
+            curated ``metadata.csv`` column that is used as a pose tag
 
         """
 
@@ -585,8 +587,8 @@ class HIPPO:
         :param inspiration_map: Optional mapping between inspiration strings found
             in ``inspiration_col`` and :class:`.PoseModel` ids
         :param compound_tags: String tags to assign to all created compounds,
-            defaults to ``None``. Tags must already exist -- the tag vocabulary is
-            maintained outside HIPPO and ingestion never creates tags
+            defaults to ``None``. Tags must already be registered (see
+            :meth:`register_compound_tag`); ingestion never creates tags
         :param pose_tags: String tags to assign to all created poses, defaults to
             ``None``. Must already exist, as for ``compound_tags``
         :param enumeration_method: ``(name, version)`` of a registered enumeration
@@ -836,9 +838,9 @@ class HIPPO:
         :param dry_run: Don't insert new records into the database
             (for debugging/testing)
         :param pose_tags: Add these tags to all inserted poses, defaults to
-            ["syndirella_product", "syndirella_placed"]. Tags must already exist --
-            the tag vocabulary is maintained outside HIPPO and ingestion never
-            creates tags, so these defaults must be present in the database
+            ["syndirella_product", "syndirella_placed"]. Tags must already be
+            registered (see :meth:`register_pose_tag`); ingestion never creates
+            tags, so these defaults must be present in the database
         :param product_tags: Add these tags to all inserted product compounds,
             defaults to ["syndirella_product"]. Must already exist, as for
             ``pose_tags``
@@ -891,15 +893,27 @@ class HIPPO:
     def register_enumeration_method(
         self, name: str, version: str, description: str = ''
     ):
-        """Register an enumeration method, or retrieve it if already registered."""
+        """Register an enumeration method, or retrieve it if already registered.
+
+        Adding a new method needs DesignDB admin rights (from your database
+        login); without them this raises :class:`.InsufficientPrivilegeError`.
+        """
         return MethodService.register_enumeration_method(name, version, description)
 
     def register_pose_method(self, name: str, version: str, description: str = ''):
-        """Register a pose method, or retrieve it if already registered."""
+        """Register a pose method, or retrieve it if already registered.
+
+        Adding a new method needs DesignDB admin rights (from your database
+        login); without them this raises :class:`.InsufficientPrivilegeError`.
+        """
         return MethodService.register_pose_method(name, version, description)
 
     def register_scoring_method(self, name: str, version: str, description: str = ''):
-        """Register a scoring method, or retrieve it if already registered."""
+        """Register a scoring method, or retrieve it if already registered.
+
+        Adding a new method needs DesignDB admin rights (from your database
+        login); without them this raises :class:`.InsufficientPrivilegeError`.
+        """
         return MethodService.register_scoring_method(name, version, description)
 
     @property
@@ -916,3 +930,33 @@ class HIPPO:
     def scoring_methods(self):
         """All registered scoring methods."""
         return MethodService.get_scoring_methods()
+
+    def register_compound_tag(
+        self, name: str, description: str | None = None, note: str | None = None
+    ):
+        """Register a compound tag, or retrieve it if already registered.
+
+        Adding a new tag needs DesignDB admin rights (from your database login);
+        without them this raises :class:`.InsufficientPrivilegeError`.
+        """
+        return CompoundTagService.register_tag(name, description, note)
+
+    def register_pose_tag(
+        self, name: str, description: str | None = None, note: str | None = None
+    ):
+        """Register a pose tag, or retrieve it if already registered.
+
+        Adding a new tag needs DesignDB admin rights (from your database login);
+        without them this raises :class:`.InsufficientPrivilegeError`.
+        """
+        return PoseTagService.register_tag(name, description, note)
+
+    @property
+    def compound_tags(self):
+        """All registered compound tags."""
+        return CompoundTagService.get_tags()
+
+    @property
+    def pose_tags(self):
+        """All registered pose tags."""
+        return PoseTagService.get_tags()

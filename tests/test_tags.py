@@ -11,6 +11,15 @@ import pytest
 pytestmark = pytest.mark.sqlite
 
 
+@pytest.fixture(autouse=True)
+def registered_tags(animal):
+    """The tags these tests apply; add_tag only uses registered tags."""
+    for name in ("tags-all", "tags-one", "tags-summary-all", "tags-summary-one"):
+        animal.register_compound_tag(name)
+    for name in ("tags-pose-all", "tags-pose-one"):
+        animal.register_pose_tag(name)
+
+
 @pytest.fixture
 def compounds(make_compound):
     from designdb.models import CompoundModel

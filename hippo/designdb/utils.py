@@ -6,7 +6,9 @@ import functools
 import json
 import os
 import re
+from collections.abc import Iterator
 from concurrent.futures import ProcessPoolExecutor
+from contextlib import contextmanager
 from datetime import datetime
 from string import ascii_uppercase
 from typing import TYPE_CHECKING
@@ -15,7 +17,7 @@ import mcol
 import molparse as mp
 import mrich
 import numpy as np
-from designdb import settings as designdb_settings
+from django.db import ProgrammingError, connection
 from django.db.models import Aggregate, OuterRef, Subquery
 from molparse.rdkit import mol_from_smiles
 from rdkit import Chem
@@ -286,30 +288,45 @@ class MissingTagError(ValueError):
     ...
 
 
-def guard_tag_creation(name: str) -> None:
-    """Guard the debugging-only tag-creation paths.
+# SQLSTATE for "permission denied" (insufficient_privilege)
+INSUFFICIENT_PRIVILEGE = '42501'
 
-    The tag vocabulary is maintained outside HIPPO. Ingestion never creates tags;
-    the ``add_tag`` helpers still may, so that test instances can be set up
-    without the external pathway, but every creation is announced and can be
-    switched off wholesale via
-    :data:`~designdb.settings.ALLOW_TAG_CREATION`.
 
-    Call this *before* writing the row, so disabling creation actually prevents
-    it.
+class InsufficientPrivilegeError(PermissionError):
+    """The database login lacks the rights for a write, typically adding to a
+    vocabulary (tags, methods) that only DesignDB admins may extend.
 
-    :param name: the tag name about to be created
-    :raises MissingTagError: if tag creation is disabled
+    Rights come from the user's infrastructure login, not from HIPPO; HIPPO only
+    attempts the write and explains the refusal.
     """
-    if not designdb_settings.ALLOW_TAG_CREATION:
-        raise MissingTagError(
-            f'Unknown tag {name!r} and tag creation is disabled. '
-            'Add it to the tag vocabulary first.'
-        )
-    mrich.warning(
-        f'Creating tag {name!r}. Tag creation is for test instances only and '
-        'will be disabled in production.'
-    )
+
+    ...
+
+
+@contextmanager
+def admin_write(action: str) -> Iterator[None]:
+    """Turn a database permission refusal into :class:`InsufficientPrivilegeError`.
+
+    Wrap writes that need DesignDB admin rights. The write is attempted as
+    normal; if Postgres refuses it for lack of privilege, the user is told what
+    was refused and who to ask. Every other error passes through unchanged.
+
+    :param action: what was being attempted, completing "<action> needs DesignDB
+        admin rights", e.g. ``"Registering compound tag 'foo'"``
+    :raises InsufficientPrivilegeError: if the database refused the write for
+        lack of privilege
+    """
+    try:
+        yield
+    except ProgrammingError as exc:
+        if getattr(exc.__cause__, 'sqlstate', None) != INSUFFICIENT_PRIVILEGE:
+            raise
+        user = connection.settings_dict.get('USER') or 'unknown'
+        raise InsufficientPrivilegeError(
+            f'{action} needs DesignDB admin rights, which your database login '
+            f'({user!r}) does not have. Ask a DesignDB administrator to do it '
+            'for you.'
+        ) from exc
 
 
 def make_warn_once_per_key():

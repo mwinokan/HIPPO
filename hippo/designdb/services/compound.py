@@ -6,6 +6,7 @@ import rdkit
 from designdb.models import CompoundModel, CompoundTagModel
 from designdb.utils import (
     MissingTagError,
+    admin_write,
     compound_hashes_from_smiles,
     registration_hash_tautomer_insensitive,
     safe_batch_size,
@@ -13,6 +14,7 @@ from designdb.utils import (
     superparent,
 )
 from django.conf import settings
+from django.db.models import QuerySet
 
 # from mypackage.services.compound import CompoundService
 from rdkit import Chem
@@ -288,12 +290,47 @@ class CompoundService:
 
 class CompoundTagService:
     @staticmethod
+    def register_tag(
+        name: str, description: str | None = None, note: str | None = None
+    ) -> tuple[CompoundTagModel, bool]:
+        """Register a compound tag, or retrieve it if already registered.
+
+        Registration counterpart of :meth:`resolve_tags`, in the same spirit as
+        :meth:`.MethodService.register_pose_method`. Adding to the vocabulary
+        needs DesignDB admin rights; retrieving an existing tag does not.
+
+        :param name: tag name; surrounding whitespace is ignored
+        :param description: description, used only when the tag is created
+        :param note: note, used only when the tag is created
+        :returns: ``(tag, created)``
+        :raises ValueError: if ``name`` is blank
+        :raises InsufficientPrivilegeError: if the tag is new and the database
+            login may not add it
+        """
+        name = name.strip() if name else ''
+        if not name:
+            raise ValueError('Tag name must not be blank')
+
+        with admin_write(f'Registering compound tag {name!r}'):
+            return CompoundTagModel.objects.get_or_create(
+                compound_tag_name=name,
+                defaults={
+                    'compound_tag_description': description,
+                    'compound_tag_note': note,
+                },
+            )
+
+    @staticmethod
+    def get_tags() -> QuerySet[CompoundTagModel]:
+        """All registered compound tags."""
+        return CompoundTagModel.objects.all()
+
+    @staticmethod
     def resolve_tags(tag_list: list[str]) -> list[CompoundTagModel]:
         """Resolve tag names to existing rows in the tag vocabulary.
 
-        Lookup-only: the vocabulary is maintained outside HIPPO, so an unknown
-        name is an error rather than a new row. Lookup counterpart of the
-        external registration pathway, in the same spirit as
+        Lookup-only: an unknown name is an error rather than a new row; tags are
+        added with :meth:`register_tag`, in the same spirit as
         :meth:`.MethodService.resolve_pose_method`.
 
         :param tag_list: tag names; surrounding whitespace, blanks and duplicates
@@ -315,8 +352,9 @@ class CompoundTagService:
         if missing:
             raise MissingTagError(
                 f'Unknown compound tag(s): {sorted(missing)}. Tags must exist '
-                'before ingestion -- add them to the tag vocabulary first, then '
-                're-run.'
+                'before ingestion -- register them with '
+                'animal.register_compound_tag() (needs DesignDB admin rights), '
+                'then re-run.'
             )
 
         return tags

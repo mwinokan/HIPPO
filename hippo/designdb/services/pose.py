@@ -17,10 +17,15 @@ from designdb.models import (
     PoseTagModel,
     TargetModel,
 )
-from designdb.utils import MissingTagError, normalize_string_list, safe_batch_size
+from designdb.utils import (
+    MissingTagError,
+    admin_write,
+    normalize_string_list,
+    safe_batch_size,
+)
 from designdb.utils_chem import get_rmsd
 from designdb.utils_frag import GENERATED_TAG_COLS, META_IGNORE_COLS
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 
 # from mypackage.services.compound import CompoundService
 from rdkit import Chem
@@ -622,12 +627,47 @@ class PoseTagService:
         }
 
     @staticmethod
+    def register_tag(
+        name: str, description: str | None = None, note: str | None = None
+    ) -> tuple[PoseTagModel, bool]:
+        """Register a pose tag, or retrieve it if already registered.
+
+        Registration counterpart of :meth:`resolve_tags`, in the same spirit as
+        :meth:`.MethodService.register_pose_method`. Adding to the vocabulary
+        needs DesignDB admin rights; retrieving an existing tag does not.
+
+        :param name: tag name; surrounding whitespace is ignored
+        :param description: description, used only when the tag is created
+        :param note: note, used only when the tag is created
+        :returns: ``(tag, created)``
+        :raises ValueError: if ``name`` is blank
+        :raises InsufficientPrivilegeError: if the tag is new and the database
+            login may not add it
+        """
+        name = name.strip() if name else ''
+        if not name:
+            raise ValueError('Tag name must not be blank')
+
+        with admin_write(f'Registering pose tag {name!r}'):
+            return PoseTagModel.objects.get_or_create(
+                pose_tag_name=name,
+                defaults={
+                    'pose_tag_description': description,
+                    'pose_tag_note': note,
+                },
+            )
+
+    @staticmethod
+    def get_tags() -> QuerySet[PoseTagModel]:
+        """All registered pose tags."""
+        return PoseTagModel.objects.all()
+
+    @staticmethod
     def resolve_tags(tag_list: list[str]) -> list[PoseTagModel]:
         """Resolve tag names to existing rows in the tag vocabulary.
 
-        Lookup-only: the vocabulary is maintained outside HIPPO, so an unknown
-        name is an error rather than a new row. Lookup counterpart of the
-        external registration pathway, in the same spirit as
+        Lookup-only: an unknown name is an error rather than a new row; tags are
+        added with :meth:`register_tag`, in the same spirit as
         :meth:`.MethodService.resolve_pose_method`.
 
         :param tag_list: tag names; surrounding whitespace, blanks and duplicates
@@ -649,7 +689,8 @@ class PoseTagService:
         if missing:
             raise MissingTagError(
                 f'Unknown pose tag(s): {sorted(missing)}. Tags must exist before '
-                'ingestion -- add them to the tag vocabulary first, then re-run.'
+                'ingestion -- register them with animal.register_pose_tag() '
+                '(needs DesignDB admin rights), then re-run.'
             )
 
         return tags

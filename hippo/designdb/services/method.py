@@ -1,6 +1,7 @@
 import logging
 
 from designdb.models import EnumerationMethodModel, PoseMethodModel, ScoringMethodModel
+from designdb.utils import admin_write
 
 logger = logging.getLogger(__name__)
 
@@ -10,29 +11,32 @@ class MethodService:
     def register_enumeration_method(
         cls, name: str, version: str, description: str = ''
     ):
-        obj, created = EnumerationMethodModel.objects.get_or_create(
-            enum_name=name,
-            enum_version=version,
-            defaults={'enum_description': description},
-        )
+        with admin_write(f'Registering enumeration method {name!r} v{version}'):
+            obj, created = EnumerationMethodModel.objects.get_or_create(
+                enum_name=name,
+                enum_version=version,
+                defaults={'enum_description': description},
+            )
         return obj, created
 
     @classmethod
     def register_pose_method(cls, name: str, version: str, description: str = ''):
-        obj, created = PoseMethodModel.objects.get_or_create(
-            pose_method_name=name,
-            pose_method_version=version,
-            defaults={'pose_method_description': description},
-        )
+        with admin_write(f'Registering pose method {name!r} v{version}'):
+            obj, created = PoseMethodModel.objects.get_or_create(
+                pose_method_name=name,
+                pose_method_version=version,
+                defaults={'pose_method_description': description},
+            )
         return obj, created
 
     @classmethod
     def register_scoring_method(cls, name: str, version: str, description: str = ''):
-        obj, created = ScoringMethodModel.objects.get_or_create(
-            method_name=name,
-            method_version=version,
-            defaults={'method_description': description},
-        )
+        with admin_write(f'Registering scoring method {name!r} v{version}'):
+            obj, created = ScoringMethodModel.objects.get_or_create(
+                method_name=name,
+                method_version=version,
+                defaults={'method_description': description},
+            )
         return obj, created
 
     @classmethod

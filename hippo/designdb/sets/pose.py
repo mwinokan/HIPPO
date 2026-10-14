@@ -30,7 +30,7 @@ from designdb.models import (
 )
 from designdb.sets.interaction import InteractionSet
 from designdb.settings import DEFAULT_POSE_METHODS
-from designdb.utils import ScoreSubquery, guard_tag_creation, normalize_string_list
+from designdb.utils import MissingTagError, ScoreSubquery, normalize_string_list
 from designdb.utils_frag import generate_header
 from django.conf import settings
 from django.db import IntegrityError, transaction
@@ -846,20 +846,20 @@ class PoseSet:
     ) -> None:
         """Add this tag to every member of the set
 
-        The tag vocabulary is maintained outside HIPPO. An unknown tag is created
-        here for the benefit of test instances, with a warning; see
-        :func:`.guard_tag_creation`.
+        The tag must already be registered (see
+        ``animal.register_pose_tag``); this never adds to the vocabulary.
 
-        :raises MissingTagError: if the tag is unknown and tag creation is
-            disabled
+        :raises MissingTagError: if the tag is not registered
         """
 
         assert isinstance(tag, str)
 
         pose_tag = PoseTagModel.objects.filter(pose_tag_name=tag).first()
         if pose_tag is None:
-            guard_tag_creation(tag)
-            pose_tag = PoseTagModel.objects.create(pose_tag_name=tag)
+            raise MissingTagError(
+                f'Unknown pose tag {tag!r}. Register it with '
+                'animal.register_pose_tag() (needs DesignDB admin rights) first.'
+            )
 
         PoseTagJunctionModel.objects.bulk_create(
             [

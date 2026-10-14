@@ -692,9 +692,8 @@ class IngestionService:
         :param rmsd_threshold: RMSD below which two poses are the same, in Angstrom
         :returns: counts of attempted records and created compounds/poses
         :raises ValueError: if a named method is not registered
-        :raises MissingTagError: if a named tag is not in the tag vocabulary. Tags
-            are resolved, never created -- the vocabulary is maintained outside
-            HIPPO
+        :raises MissingTagError: if a named tag is not registered. Tags are
+            resolved, never created -- see ``register_tag`` on the tag services
         """
         result = IngestionBatchResult()
 
@@ -1274,7 +1273,7 @@ class IngestionService:
         scaffold_compound: CompoundModel | None = None,
     ) -> pd.DataFrame:
 
-        # Tags must already exist: the vocabulary is maintained outside HIPPO.
+        # Tags must already be registered; ingestion never creates them.
         # Resolved here rather than at their point of use further down, so an
         # unknown tag fails before the compounds and reactions are written.
         product_tags = CompoundTagService.resolve_tags(product_tag_list)

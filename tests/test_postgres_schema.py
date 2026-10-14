@@ -3,9 +3,12 @@
 These cover what the SQLite tier can't: the RDKit cartridge triggers that
 populate compound/pose/catalogue fields, the hash-join triggers that link
 catalogue prices to compounds (and so drive quoting), the score consistency
-check, and the score-pivot materialized view. Run with ``HIPPO_TEST_DB=postgres``
+check, the score-pivot materialized view, and how a login without admin rights
+is refused when registering tags/methods. Run with ``HIPPO_TEST_DB=postgres``
 against a database from ``tests/postgres/start_db.sh``.
 """
+
+from contextlib import contextmanager
 
 import pytest
 
@@ -206,3 +209,65 @@ def test_score_pivot_materialized_view(scored_pose):
 
     assert len(rows) == 1
     assert float(rows[0][0]) == -7.5
+
+
+
+### vocabulary permissions
+
+READ_ONLY_ROLE = "hippo_test_read_only"
+
+
+@contextmanager
+def as_read_only():
+    """Run as a role that may read, but not add to, the designdb tables.
+
+    Stands in for a non-admin infrastructure login: the role is switched with
+    ``SET ROLE`` on the test's own connection and reset afterwards.
+    """
+    from django.db import connection
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", [READ_ONLY_ROLE])
+        if cursor.fetchone() is None:
+            cursor.execute(f"CREATE ROLE {READ_ONLY_ROLE} NOLOGIN")
+        cursor.execute(f"GRANT USAGE ON SCHEMA designdb TO {READ_ONLY_ROLE}")
+        cursor.execute(
+            f"GRANT SELECT ON ALL TABLES IN SCHEMA designdb TO {READ_ONLY_ROLE}"
+        )
+        cursor.execute(f"SET ROLE {READ_ONLY_ROLE}")
+    try:
+        yield
+    finally:
+        with connection.cursor() as cursor:
+            cursor.execute("RESET ROLE")
+
+
+@pytest.mark.parametrize(
+    "register",
+    [
+        lambda animal: animal.register_compound_tag("perm-new-compound-tag"),
+        lambda animal: animal.register_pose_tag("perm-new-pose-tag"),
+        lambda animal: animal.register_enumeration_method("perm-new-enum", "1.0"),
+        lambda animal: animal.register_pose_method("perm-new-pose-method", "1.0"),
+        lambda animal: animal.register_scoring_method("perm-new-scoring", "1.0"),
+    ],
+    ids=["compound_tag", "pose_tag", "enumeration", "pose_method", "scoring"],
+)
+def test_registration_without_admin_rights_is_explained(animal, register):
+    from designdb.utils import InsufficientPrivilegeError
+
+    with as_read_only():
+        with pytest.raises(InsufficientPrivilegeError, match="DesignDB admin rights"):
+            register(animal)
+
+
+def test_registering_an_existing_tag_needs_no_admin_rights(animal):
+    """get_or_create only reads when the tag exists, so non-admins can use it."""
+    tag, created = animal.register_compound_tag("perm-existing-tag")
+    assert created
+
+    with as_read_only():
+        again, created = animal.register_compound_tag("perm-existing-tag")
+
+    assert not created
+    assert again == tag
